@@ -10,6 +10,7 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/database"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/role"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/user"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +30,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"(use '--credential <name>' for a named credential, " +
 			"'--credential desktop' for a running Neo4j Desktop 2 DBMS, " +
 			"or '--credential desktop-connection:<uuid>' for a saved Desktop connection). " +
-			"Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate).",
+			"Subcommands: `database` (list, get, create, drop, start, stop), " +
+			"`user` (list, get, create, drop, rename, set-password, suspend, activate), " +
+			"`role` (list, get, create, drop, grant, revoke).",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			conn, err := dbconn.ResolveConn(cmd, cfg, true)
 			if err != nil {
@@ -59,6 +62,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd.AddCommand(database.NewCmd(cfg, &adminConn, RunAdminStatement))
 	cmd.AddCommand(user.NewCmd(cfg, &adminConn, RunAdminStatement))
+	cmd.AddCommand(role.NewCmd(cfg, &adminConn, RunAdminStatement))
 
 	return cmd
 }

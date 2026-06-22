@@ -15,6 +15,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 
+	"github.com/neo4j/cli/common/analytics"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
@@ -145,14 +146,14 @@ func RunAdminStatement(ctx context.Context, cfg *clicfg.Config, conn *dbconn.Con
 	runner := adminRunnerFn(cfg)
 	rows, err := runner.run(ctx, conn, cypher25Prefix+cypher, params)
 	if err != nil {
-		return nil, translateAdminError(err)
+		return nil, translateAdminError(conn.URI, err)
 	}
 	return rows, nil
 }
 
 // translateAdminError converts Neo4j Bolt errors that have well-known
 // admin-command semantics into targeted CLI errors.
-func translateAdminError(err error) error {
+func translateAdminError(uri string, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -165,18 +166,25 @@ func translateAdminError(err error) error {
 
 	var ne *neo4j.Neo4jError
 	if errors.As(err, &ne) {
-		return translateNeo4jError(ne)
+		return translateNeo4jError(uri, ne)
 	}
 
 	return clierr.NewValidationError("%w", err)
 }
 
-func translateNeo4jError(ne *neo4j.Neo4jError) error {
+func translateNeo4jError(uri string, ne *neo4j.Neo4jError) error {
 	switch ne.Code {
 	case unsupportedAdminCode:
 		return translateUnsupportedAdmin(ne.Msg)
 	case forbiddenCode:
-		return clierr.NewValidationError("insufficient privileges: the connected user does not have permission to manage users (requires admin role)")
+		if analytics.IsAuraURI(uri) {
+			return clierr.NewValidationError(
+				"%s\n\nOn Aura, this admin operation requires Business Critical edition. "+
+					"Professional and Free tiers support a reduced set of administrative "+
+					"operations; check the Aura Console for your tier's capabilities.",
+				ne.Msg)
+		}
+		return clierr.NewValidationError("%w", ne)
 	case argumentErrorCode:
 		if strings.Contains(ne.Msg, "non-native") || strings.Contains(ne.Msg, "authentication provider apart from native") {
 			return clierr.NewValidationError("renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)")

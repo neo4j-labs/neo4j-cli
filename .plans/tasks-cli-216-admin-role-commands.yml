@@ -1,0 +1,488 @@
+feature: cli-216-admin-role-commands
+prd: ./prd-cli-216-admin-role-commands.md
+created_at: 2026-06-16T00:00:00Z
+updated_at: 2026-06-17T02:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold role package: helpers.go, skeleton role.go, role_helpers_test.go"
+    description: |
+      Create the foundational files for the `neo4j-cli/internal/subcommands/admin/role/` package.
+      `helpers.go` defines the `roleExecFn` package-level seam var (`adminutil.ExecFn`), `roleFields`,
+      `normalizeRoleRow` (member nil→""), `outputRoleMembers` (SHOW ROLES WITH USERS WHERE role=$name),
+      and `outputUserAfterRoleChange` (SHOW USERS WHERE user=$name with snake_case fields including
+      `password_change_required`). `role.go` defines a skeleton `NewCmd` that sets `roleExecFn = execFn`
+      and returns the parent `*cobra.Command` with NO `AddCommand` calls — leaf wiring is added
+      incrementally by tasks 002–007 as each leaf compiles. `role_helpers_test.go` provides ONLY
+      the seam infrastructure shared across all leaf tests: `testConn()`, `withFakeExecFn`, and
+      `withSequencedExecFn`. Each leaf task owns its own `runXxx` builder in its `*_test.go` file.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`helpers.go` compiles with all five symbols: `roleExecFn`, `roleFields`, `normalizeRoleRow`, `outputRoleMembers`, `outputUserAfterRoleChange`"
+      - "`outputUserAfterRoleChange` uses snake_case field names: `[\"user\", \"roles\", \"password_change_required\", \"suspended\"]`"
+      - "`normalizeRoleRow` converts nil `member` to `\"\"` and leaves non-nil values unchanged"
+      - "`role.go` skeleton compiles with `NewCmd` that sets `roleExecFn = execFn` and has zero `AddCommand` calls"
+      - "`role_helpers_test.go` provides `withSequencedExecFn` that returns responses in order and fails the test if called more times than expected; does NOT define any `runXxx` helpers"
+      - "All new `.go` files carry the Neo4j copyright header"
+    completed_at: "2026-06-16T01:30:00Z"
+
+  - id: task-002
+    title: "Implement role list + tests"
+    description: |
+      Create `list.go` and `list_test.go`, and add `cmd.AddCommand(newListCmd(cfg, conn))` to
+      `role.go`. The command executes `SHOW ROLES WITH USERS`, applies `normalizeRoleRow` to every
+      row, and calls `PrintBodyMap` with `roleFields`. An optional `--user <name>` flag filters rows
+      in-process to those where `member == name` — this is the only command that answers "what roles
+      does user X belong to". `list_test.go` defines its own `runList` helper (builds `NewCmd`,
+      sets args to `["list", ...]`, executes). Tests cover: happy-path JSON, `--user` filter, null
+      member normalization, exec error propagation.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`list.go` executes `SHOW ROLES WITH USERS` and outputs `role` + `member` columns"
+      - "`cmd.AddCommand(newListCmd(cfg, conn))` added to `role.go`; `neo4j-cli admin role list --help` works"
+      - "`--user <name>` flag filters rows where `member == name`; rows for other users are excluded"
+      - "JSON output shows `\"member\": \"\"` (not `null`) for roles with a nil member value"
+      - "`TestList_HappyPath_FormatJson` parses output as `[]map[string]any` and asserts role/member values"
+      - "`TestList_NullMember_NormalizesToEmptyString` asserts member field is `\"\"` not `null`"
+    completed_at: "2026-06-16T02:00:00Z"
+
+  - id: task-003
+    title: "Implement role get + tests"
+    description: |
+      Create `get.go` and `get_test.go`, and add `cmd.AddCommand(newGetCmd(cfg, conn))` to `role.go`.
+      The command performs two Cypher calls: first `SHOW ROLES WITH USERS WHERE role = $name` (column
+      is `role`, NOT `name` — using `name` causes a Neo4j syntax error) to check existence; zero rows
+      returns `clierr.NewNotFoundError`. If the role exists, executes `SHOW ROLE $name PRIVILEGES`;
+      zero privilege rows returns an empty list (exit 0, not not_found). Output fields are dynamic:
+      sort keys of `rows[0]` and pass to `PrintBodyMap`. `get_test.go` defines `runGet`,
+      `existsResponse`, and `notFoundResponse` helpers; uses `withSequencedExecFn` for two-call tests.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`get.go` existence check Cypher is exactly `SHOW ROLES WITH USERS WHERE role = $name` (not `SHOW ROLES WHERE name = $name`)"
+      - "`cmd.AddCommand(newGetCmd(cfg, conn))` added to `role.go`"
+      - "Zero rows on existence check → `clierr.NewNotFoundError` (exit code 3)"
+      - "Zero privilege rows on second call → empty list returned (exit 0, no error)"
+      - "`TestGet_ExistingRole_NoPrivileges_ReturnsEmptyList` asserts `[]` output and no error"
+      - "`TestGet_NotFound_ReturnsNotFoundError` asserts exit code 3 and role name in message"
+    completed_at: "2026-06-16T03:00:00Z"
+
+  - id: task-004
+    title: "Implement role create + tests"
+    description: |
+      Create `create.go` and `create_test.go`, and add `cmd.AddCommand(newCreateCmd(cfg, conn))` to
+      `role.go`. The command executes `CREATE ROLE $name IF NOT EXISTS` (idempotent — second
+      invocation must not error). After a successful create it calls `outputRoleMembers` to fetch and
+      print `SHOW ROLES WITH USERS WHERE role = $name`; zero rows is valid (freshly created role has
+      no members). Requires `--rw`. `create_test.go` defines `runCreate` and uses a sequenced exec-fn
+      with the mutation as call 1 and the follow-up SHOW as call 2.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`create.go` Cypher is `CREATE ROLE $name IF NOT EXISTS`"
+      - "`cmd.AddCommand(newCreateCmd(cfg, conn))` added to `role.go`"
+      - "Successful create followed by empty SHOW → outputs `[]` JSON (not an error)"
+      - "Successful create followed by member rows → outputs those rows"
+      - "`TestCreate_HappyPath_EmitsEmptyMemberList` asserts empty JSON array output"
+      - "`TestCreate_HappyPath_EmitsMemberRows` asserts member record in follow-up output"
+      - "`TestCreate_ExecError_PropagatesError` asserts error propagates without calling follow-up"
+    completed_at: "2026-06-16T04:00:00Z"
+
+  - id: task-005
+    title: "Implement role drop + tests"
+    description: |
+      Create `drop.go` and `drop_test.go`, and add `cmd.AddCommand(newDropCmd(cfg, conn))` to
+      `role.go`. The command uses `confirm.Require`/`confirm.Register` for the `--yes`/`--force`
+      gate. Executes `DROP ROLE $name`. Translates `Neo.ClientError.Statement.ArgumentError` with
+      message containing `"does not exist"` → `clierr.NewNotFoundError` locally in `RunE` (the
+      draft incorrectly used `Neo.ClientError.Security.InvalidArguments`). No output on success.
+      `drop_test.go` defines `buildDropCmd`/`runDrop` and uses `confirmtest.AssertLeafGate`.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`cmd.AddCommand(newDropCmd(cfg, conn))` added to `role.go`"
+      - "`drop.go` not-found translation checks `Neo.ClientError.Statement.ArgumentError` code (not `Security.InvalidArguments`)"
+      - "`TestDrop_ConfirmGate` uses `confirmtest.AssertLeafGate` and passes"
+      - "`TestDrop_YesForce_Succeeds` asserts no error and no output"
+      - "`TestDrop_NotFound_ReturnsNotFoundError` builds the Neo4j error with code `Neo.ClientError.Statement.ArgumentError` and message containing `\"does not exist\"`; asserts exit code 3"
+      - "`TestDrop_CommunityEditionError_ReturnsEnterpriseHint` asserts the Enterprise edition hint is present"
+      - "No output is written to stdout on successful drop"
+    completed_at: "2026-06-16T05:00:00Z"
+
+  - id: task-006
+    title: "Implement role grant + tests"
+    description: |
+      Create `grant.go` and `grant_test.go`, and add `cmd.AddCommand(newGrantCmd(cfg, conn))` to
+      `role.go`. Required flags: `--role <role>` and `--user <user>`, both marked required via
+      `cmd.MarkFlagRequired`. Executes `GRANT ROLE $role TO $user`. On success calls
+      `outputUserAfterRoleChange` which fetches `SHOW USERS WHERE user = $name`, normalizes the row,
+      and prints with snake_case fields. `grant_test.go` defines `runGrant` and uses a sequenced
+      exec-fn (mutation call 1, follow-up SHOW call 2).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`cmd.AddCommand(newGrantCmd(cfg, conn))` added to `role.go`"
+      - "`grant.go` executes `GRANT ROLE $role TO $user` with both params"
+      - "Missing `--role` flag → cobra usage error mentioning `role`"
+      - "Missing `--user` flag → cobra usage error mentioning `user`"
+      - "Follow-up output field is `password_change_required` (snake_case), not `passwordChangeRequired`"
+      - "`TestGrant_HappyPath_EmitsUpdatedUserRecord` asserts user record in JSON output"
+      - "`TestGrant_ExecError_PropagatesError` asserts error without calling follow-up"
+    completed_at: "2026-06-16T06:00:00Z"
+
+  - id: task-007
+    title: "Implement role revoke + tests"
+    description: |
+      Create `revoke.go` and `revoke_test.go`, and add `cmd.AddCommand(newRevokeCmd(cfg, conn))` to
+      `role.go`. Mirror of `grant.go` but executes `REVOKE ROLE $role FROM $user`. Same required
+      `--role` and `--user` flags. On success calls `outputUserAfterRoleChange`. `revoke_test.go`
+      defines `runRevoke`; tests mirror the grant suite. After this task `role.go` is complete with
+      all 6 `AddCommand` calls wired.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`cmd.AddCommand(newRevokeCmd(cfg, conn))` added to `role.go`; all 6 leaves now wired"
+      - "`revoke.go` executes `REVOKE ROLE $role FROM $user`"
+      - "Missing `--role` or `--user` returns a cobra usage error"
+      - "Follow-up output field is `password_change_required` (snake_case)"
+      - "`TestRevoke_HappyPath_EmitsUpdatedUserRecord` asserts user record in JSON output after revoke"
+      - "`TestRevoke_ExecError_PropagatesError` asserts error propagates and no follow-up query runs"
+      - "Community edition error surfaces `(requires Enterprise edition)` hint"
+    completed_at: "2026-06-16T07:00:00Z"
+
+  - id: task-008
+    title: "Wire role into admin.go, regenerate skill bundle, add changelog"
+    description: |
+      Wire the role subcommand tree into the CLI. In `admin.go`: add the `role` package import,
+      add `cmd.AddCommand(role.NewCmd(cfg, &adminConn, RunAdminStatement))` after the user AddCommand,
+      and update the `Long` description to list `role` among the subcommands. Run
+      `go generate ./neo4j-cli/internal/skill/...` to regenerate the skill bundle. Add a Minor
+      changelog entry via `changie new --projects neo4j-cli --kind Minor --body "Add admin role
+      commands: list, get, create, drop, grant, revoke"`. Verify all final gates pass.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "`neo4j-cli admin role --help` shows list/get/create/drop/grant/revoke subcommands"
+      - "`TestGenerator_RoundTrip` passes (skill bundle reflects database + user + role commands)"
+      - "`TestAllLeafCommands_HaveExamples` passes (all 6 role leaves have flush-left Examples)"
+      - "`make test` passes"
+      - "`make fmt-check` passes"
+      - "`make lint` passes"
+      - "Changelog entry file present under `.changes/unreleased/`"
+    completed_at: "2026-06-16T14:35:00Z"
+
+  - id: task-009
+    title: "Fix runGrant/runRevoke helper signature and add follow-up-error tests"
+    description: |
+      The `runGrant(t, args, execErr)` and `runRevoke(t, args, execErr)` helpers hardcode the
+      follow-up response as always-empty success, making it impossible to test a non-empty follow-up
+      through the helper. As a result, `TestGrant_HappyPath_EmitsUpdatedUserRecord` and
+      `TestRevoke_HappyPath_EmitsUpdatedUserRecord` bypass the helper entirely and rebuild the full
+      cmd setup inline — 30+ lines of boilerplate that duplicates what the helper already does.
+
+      Fix: change both helpers to accept full `responses []struct{ rows []map[string]any; err error }`
+      (matching `runCreate`'s signature). Remove the hardcoded two-element response. Update all
+      existing call sites to pass their own response slice. The inline cmd blocks in the
+      EmitsUpdatedUserRecord tests can then collapse to single helper calls.
+
+      After fixing the helpers, add:
+      - `TestGrant_FollowUpExecError_PropagatesError` — mutation succeeds, follow-up returns error;
+        assert the error propagates (mirrors `TestCreate_FollowUpExecError_PropagatesError` in
+        `database/create_test.go`).
+      - `TestRevoke_FollowUpExecError_PropagatesError` — same for revoke.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`runGrant` and `runRevoke` accept `responses []struct{ rows []map[string]any; err error }` matching `runCreate`'s signature"
+      - "`TestGrant_HappyPath_EmitsUpdatedUserRecord` uses `runGrant` directly (no inline cmd setup)"
+      - "`TestRevoke_HappyPath_EmitsUpdatedUserRecord` uses `runRevoke` directly (no inline cmd setup)"
+      - "`TestGrant_FollowUpExecError_PropagatesError` exists and asserts the follow-up error propagates"
+      - "`TestRevoke_FollowUpExecError_PropagatesError` exists and asserts the follow-up error propagates"
+      - "`make test` passes after the refactor"
+    source: review
+    completed_at: "2026-06-16T15:30:00Z"
+
+  - id: task-010
+    title: "Remove spurious //nolint:unused from role_helpers_test.go"
+    description: |
+      `role_helpers_test.go` annotates `testConn`, `withFakeExecFn`, and `withSequencedExecFn` with
+      `//nolint:unused`. All three are called from leaf test files in the same package. The
+      suppressions are unnecessary and will mask any future real "unused" warnings in this file.
+      `database/database_helpers_test.go` has the identical pattern without any nolint directives —
+      the role package should match.
+
+      Remove the `//nolint:unused` comment from all three function declarations in
+      `role_helpers_test.go`. Verify `make lint` still passes after removal.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "No `//nolint:unused` directives remain in `role_helpers_test.go`"
+      - "`make lint` passes (0 issues) after removal"
+      - "`make test` passes"
+    source: review
+    completed_at: "2026-06-16T15:30:00Z"
+
+  - id: task-011
+    title: "Promote userFields to package var and extract normalizeRoleRows helper"
+    description: |
+      Two minor inconsistencies vs the roleFields pattern:
+
+      1. `userFields` is declared as a local variable inside `outputUserAfterRoleChange` in
+         `helpers.go`. `roleFields` is at package scope and reused by multiple callers. Promote
+         `userFields` to `var userFields = []string{...}` at package scope alongside `roleFields`.
+
+      2. The three-line normalize loop (`for i, row := range rows { rows[i] = normalizeRoleRow(row) }`)
+         appears verbatim in both `list.go` and inside `outputRoleMembers` in `helpers.go`. Extract
+         it into a `func normalizeRoleRows(rows []map[string]any) []map[string]any` helper in
+         `helpers.go`, and replace both inline loops with calls to it.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`var userFields = []string{...}` declared at package scope in `helpers.go`"
+      - "`func normalizeRoleRows(rows []map[string]any) []map[string]any` defined in `helpers.go`"
+      - "Both `list.go` and `outputRoleMembers` call `normalizeRoleRows` instead of the inline loop"
+      - "`make test` and `make lint` pass"
+    source: review
+    completed_at: "2026-06-16T16:00:00Z"
+
+  - id: task-012
+    title: "Fix revoke Short + replace MarkFlagRequired with manual validation in grant/revoke"
+    description: |
+      Two consistency fixes surfaced during live QA testing:
+
+      1. `revoke.go` Short is `"Revoke a role from a user (Enterprise only)"` — the only command with
+         this annotation. Remove `(Enterprise only)` so all six commands are consistent (REQ-F-026).
+
+      2. `grant.go` and `revoke.go` use `cmd.MarkFlagRequired("role")` / `cmd.MarkFlagRequired("user")`.
+         Cobra fires required-flag validation before `RunE`, producing `fatal_error` (exit 1). Replace
+         both `MarkFlagRequired` calls in each file with explicit checks at the start of `RunE`
+         (before `cmd.SilenceUsage = true`) that return `clierr.NewUsageError` (exit 2) (REQ-F-027).
+
+      Pattern in `RunE` after removing `MarkFlagRequired`:
+      ```go
+      RunE: func(cmd *cobra.Command, args []string) error {
+          if roleName == "" {
+              return clierr.NewUsageError("--role is required")
+          }
+          if userName == "" {
+              return clierr.NewUsageError("--user is required")
+          }
+          cmd.SilenceUsage = true
+          // ... rest unchanged
+      },
+      ```
+
+      Update tests in `grant_test.go` and `revoke_test.go` that previously asserted cobra's
+      `"required flag(s) \"role\" not set"` message — they should now assert a CLIError with
+      `ce.Code == 2` and message containing `"--role is required"` / `"--user is required"`.
+      Verify `make test`, `make fmt-check`, `make lint` all pass.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`revoke.go` Short is `\"Revoke a role from a user\"` (no `(Enterprise only)` annotation)"
+      - "No `cmd.MarkFlagRequired` calls remain in `grant.go` or `revoke.go`"
+      - "`grant.go` RunE returns `clierr.NewUsageError(\"--role is required\")` when `--role` is absent"
+      - "`grant.go` RunE returns `clierr.NewUsageError(\"--user is required\")` when `--user` is absent"
+      - "`revoke.go` RunE has the same two pre-validation checks in the same order"
+      - "`TestGrant_MissingRole_ReturnsUsageError` asserts `ce.Code == 2` and message contains `\"--role is required\"`"
+      - "`TestGrant_MissingUser_ReturnsUsageError` asserts `ce.Code == 2` and message contains `\"--user is required\"`"
+      - "`TestRevoke_MissingRole_ReturnsUsageError` and `TestRevoke_MissingUser_ReturnsUsageError` assert the same"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    source: qa
+    completed_at: "2026-06-16T17:00:00Z"
+
+  - id: task-013
+    title: "Aura Security.Forbidden: add tier hint in translateAdminError (run.go)"
+    description: |
+      Live testing across Aura Free, Professional, and Business Critical revealed that role management
+      commands return `Neo.ClientError.Security.Forbidden` on restricted tiers rather than
+      `UnsupportedAdministrationCommand`. The raw Neo4j error message ("Permission has not been
+      granted … try GRANT/REVOKE") is impossible for users to follow on Aura-managed instances.
+
+      Changes in `neo4j-cli/internal/subcommands/admin/run.go`:
+
+      1. Add `isAuraURI(uri string) bool`:
+         ```go
+         func isAuraURI(uri string) bool {
+             return strings.Contains(strings.ToLower(uri), ".neo4j.io")
+         }
+         ```
+
+      2. Change `translateAdminError(err error) error` → `translateAdminError(uri string, err error) error`.
+         Thread `uri` into `translateNeo4jError(uri string, ne *neo4j.Neo4jError) error`.
+
+      3. Update `RunAdminStatement` to pass `conn.URI`:
+         ```go
+         return nil, translateAdminError(conn.URI, err)
+         ```
+
+      4. In `translateNeo4jError`, add a case for `Security.Forbidden`:
+         ```go
+         case "Neo.ClientError.Security.Forbidden":
+             if isAuraURI(uri) {
+                 return clierr.NewValidationError(
+                     "%s\n\nOn Aura, role management support varies by tier: "+
+                         "Business Critical supports all role commands; "+
+                         "Professional supports list, grant, and revoke only; "+
+                         "Free does not support role management.",
+                     ne.Msg)
+             }
+             return clierr.NewValidationError("%w", ne)
+         ```
+
+      Add two test cases to `run_test.go` (or a new `run_aura_test.go` in the same package):
+      - Aura URI (`neo4j+s://test.databases.neo4j.io`) + `Security.Forbidden` error → `validation_error`
+        message contains `"Business Critical"` and `"Professional"`.
+      - Non-Aura URI (`neo4j://localhost:7687`) + same error → message does NOT contain `"Business Critical"`.
+
+      All existing `run_test.go` tests must still pass (function signature change propagates only
+      to `RunAdminStatement`'s internal call; all existing call sites in tests use the seam and
+      don't call `translateAdminError` directly unless test-tested explicitly).
+    status: in_progress
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "`isAuraURI(\"neo4j+s://abc.databases.neo4j.io\")` returns `true`"
+      - "`isAuraURI(\"neo4j://localhost:7687\")` returns `false`"
+      - "`translateAdminError` signature is `(uri string, err error) error`"
+      - "`translateNeo4jError` handles `Neo.ClientError.Security.Forbidden` with Aura check"
+      - "Test: Aura URI + Forbidden error → validation_error message contains `\"Business Critical\"` and `\"Professional\"`"
+      - "Test: non-Aura URI + Forbidden error → message does NOT contain `\"Business Critical\"`"
+      - "All existing `run_test.go` tests pass unchanged"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    source: qa
+    status: completed
+    completed_at: "2026-06-16T17:30:00Z"
+
+  - id: task-014
+    title: "Group role list rows by role with members as a list, with table comma-join (REQ-F-028, REQ-F-030)"
+    description: |
+      SHOW ROLES WITH USERS returns one row per (role, member) pair. From a user
+      perspective the natural shape is one entry per role with all members collected
+      into a list. This task changes the output field from `member` (singular, flat)
+      to `members` (plural, list) everywhere `outputRoleMembers` or `list.go` emits
+      role rows. It also adds format-dependent rendering: JSON/toon emit a proper list,
+      table emits a comma-joined string.
+
+      Changes in `helpers.go`:
+      1. Rename `roleFields` to `["role", "members"]`.
+      2. Delete `normalizeRoleRow` and `normalizeRoleRows` (their null-handling is
+         subsumed by the new helper).
+      3. Add `groupRoleRows(rows []map[string]any) []map[string]any`:
+         - Iterate rows in order; track role insertion order.
+         - For each row, if `row["member"] != nil`, append the value to that role's
+           `members` slice.
+         - After all rows, build the result slice: one map per role with
+           `{"role": r, "members": members}` where `members` defaults to `[]any{}`
+           if no members were collected.
+      4. Update `outputRoleMembers` to call `groupRoleRows` then apply format-dependent
+         rendering before printing:
+         - Resolve format via `commonoutput.ResolveOutput(cmd, cfg)`.
+         - If format is `"table"`, convert each row's `members` `[]any` to a
+           comma-joined string (`strings.Join`). Otherwise leave as `[]any`.
+
+      Changes in `list.go`:
+      1. Replace `normalizeRoleRows(rows)` with `groupRoleRows(rows)`.
+      2. Update the `--user` filter: iterate `row["members"].([]any)` and retain the
+         row if any element equals `userFilter`. (Filter runs BEFORE the format
+         conversion so the comparison is always against `[]any`.)
+      3. After filtering, apply the same format-dependent `members` rendering as in
+         `outputRoleMembers` (resolve format, comma-join if table).
+
+      Changes in tests:
+      - `list_test.go`: update `--format json` assertions to check `"members"` as a
+        list (e.g. `["alice"]`). Add or update `--format table` assertions to check
+        `"members"` as a comma-joined string (e.g. `"alice, bob"`).
+      - `create_test.go`: update follow-up JSON output assertions to use `"members"`
+        as a list.
+    status: todo
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "`roleFields` is `[\"role\", \"members\"]` in `helpers.go`"
+      - "`groupRoleRows` exists in `helpers.go` and collapses flat rows into one-per-role with `members []any`"
+      - "`normalizeRoleRow` and `normalizeRoleRows` are deleted"
+      - "`outputRoleMembers` calls `groupRoleRows` then comma-joins `members` for table format"
+      - "`list.go` calls `groupRoleRows`; `--user` filter checks `members` `[]any` list; table rendering comma-joins after filtering"
+      - "`TestList_HappyPath_FormatJson` asserts `\"members\": [\"alice\"]` (list)"
+      - "`TestList_HappyPath_FormatTable` asserts `members` column contains `\"alice, bob\"` (comma-joined string)"
+      - "`TestList_NullMember_NormalizesToEmptyString` (or renamed equivalent) asserts `\"members\": []` for a null-member row in JSON"
+      - "`create_test.go` follow-up JSON assertions use `\"members\"` as a list"
+      - "`make test`, `make fmt-check`, `make lint` all pass"
+    source: extension
+
+  - id: task-015
+    title: "Reshape role get output: single object with role, members, and privileges (REQ-F-029, REQ-F-031)"
+    description: |
+      `role get` currently returns a flat list of privilege rows. Users expect a richer single
+      object that shows the role name, its members, and its privileges together — matching the
+      mental model of a role as a first-class resource. Table format is best-effort (nested
+      JSON blobs in cells); `--format json` is the intended use.
+
+      Changes in `get.go`:
+      1. After the existence check succeeds, extract `members` from the grouped existence-check
+         rows: `members := groupRoleRows(existRows)[0]["members"]`.
+      2. After fetching privilege rows, delete the `role` key from each row (it is redundant —
+         always equal to the role name already captured).
+      3. Build a single output object:
+         ```go
+         out := map[string]any{
+             "role":       name,
+             "members":    members,
+             "privileges": privObjs,  // []any of privilege maps, role field removed
+         }
+         ```
+      4. Define `getFields = []string{"role", "members", "privileges"}` (can be a package-level
+         var in `helpers.go` or a file-level var in `get.go`).
+      5. Print via `commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRow(out, getFields), getFields)`.
+      6. For the no-privilege case, `privObjs` is `[]any{}` — the output is still a single object
+         with `"privileges": []`.
+      7. Delete the `sort.Strings(fields)` dynamic-field derivation from `rows[0]` — no longer needed.
+      8. Update the `Long` description to include: "Use --format json for machine-readable output;
+         table format renders nested fields as JSON."
+
+      Changes in `get_test.go`:
+      - Update `existsResponse` to include a member in the existence-check row so the grouped
+        members list is non-empty in happy-path tests (e.g. `{"role":"admin","member":"alice"}`).
+      - Update `TestGet_HappyPath_FormatJson` to assert the new single-object shape:
+        `got["role"] == "admin"`, `got["members"]` is a list, `got["privileges"]` is a list.
+        Assert that privilege objects do NOT contain a `"role"` key.
+      - Update `TestGet_HappyPath_FormatTable` to check that output contains `PRIVILEGES`
+        (the column name) — table output will render the nested JSON blob but the column header
+        must be present.
+      - Rename/update `TestGet_ExistingRole_NoPrivileges_ReturnsEmptyList` to
+        `TestGet_ExistingRole_NoPrivileges_ReturnsObjectWithEmptyPrivileges` — assert the output
+        is a single object `{"role":"admin","members":[...],"privileges":[]}`, not bare `[]`.
+    status: todo
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "`get.go` outputs a single object with fields `[\"role\", \"members\", \"privileges\"]`"
+      - "`members` is extracted from the existence-check result via `groupRoleRows`"
+      - "Each privilege object does NOT contain a `\"role\"` field"
+      - "No-privilege case: output is single object with `\"privileges\": []` (not bare `[]`)"
+      - "`sort.Strings` dynamic-field logic deleted from `get.go`"
+      - "`get.go` `Long` description notes that `--format json` is intended and table format is best-effort"
+      - "`TestGet_HappyPath_FormatJson` asserts single object shape and absence of `role` key in privilege objects"
+      - "`TestGet_HappyPath_FormatTable` asserts `PRIVILEGES` appears in table output"
+      - "`TestGet_ExistingRole_NoPrivileges_ReturnsObjectWithEmptyPrivileges` exists and asserts single object"
+      - "`make test`, `make fmt-check`, `make lint` all pass"
+    source: extension

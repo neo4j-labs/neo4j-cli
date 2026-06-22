@@ -9,6 +9,13 @@
 - [neo4j-cli admin database list](#neo4j-cli-admin-database-list)
 - [neo4j-cli admin database start](#neo4j-cli-admin-database-start)
 - [neo4j-cli admin database stop](#neo4j-cli-admin-database-stop)
+- [neo4j-cli admin role](#neo4j-cli-admin-role)
+- [neo4j-cli admin role create](#neo4j-cli-admin-role-create)
+- [neo4j-cli admin role drop](#neo4j-cli-admin-role-drop)
+- [neo4j-cli admin role get](#neo4j-cli-admin-role-get)
+- [neo4j-cli admin role grant](#neo4j-cli-admin-role-grant)
+- [neo4j-cli admin role list](#neo4j-cli-admin-role-list)
+- [neo4j-cli admin role revoke](#neo4j-cli-admin-role-revoke)
 - [neo4j-cli admin user](#neo4j-cli-admin-user)
 - [neo4j-cli admin user activate](#neo4j-cli-admin-user-activate)
 - [neo4j-cli admin user create](#neo4j-cli-admin-user-create)
@@ -21,7 +28,7 @@
 
 Manage Neo4j databases, users, and roles
 
-Manage Neo4j databases via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate).
+Manage Neo4j databases via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke).
 
 Usage: `neo4j-cli admin`
 
@@ -185,6 +192,162 @@ neo4j-cli admin database stop mydb --credential local --rw
 
 # Stop a database and wait until it is offline before returning
 neo4j-cli admin database stop mydb --credential local --wait --rw
+```
+
+## neo4j-cli admin role
+
+Manage Neo4j roles and role membership
+
+Manage Neo4j roles and role membership via the system database. Read commands (list, get) do not require --rw. Write commands (create, drop, grant, revoke) require --rw.
+
+Usage: `neo4j-cli admin role`
+
+Examples:
+
+```
+# Show help for the role subcommands
+neo4j-cli admin role --help
+
+# List all roles (read-only)
+neo4j-cli admin role list --credential local --format json
+```
+
+### neo4j-cli admin role create
+
+Create a role
+
+Create a role via CREATE ROLE $name IF NOT EXISTS against the system database. The command is idempotent — running it twice does not return an error. After creation the current member list for the role is printed.
+
+Usage: `neo4j-cli admin role create <name>`
+
+Examples:
+
+```
+# Create a role named analyst
+neo4j-cli admin role create analyst --credential local --rw
+
+# Create a role and output the member list as JSON
+neo4j-cli admin role create analyst --credential local --rw --format json
+```
+
+### neo4j-cli admin role drop
+
+Drop a role
+
+Drop a role via DROP ROLE $name against the system database. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli admin role drop <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Drop a role, prompting for confirmation on a TTY
+neo4j-cli admin role drop analyst --credential local --rw
+
+# Drop a role without prompting (required for scripts and non-TTY callers)
+neo4j-cli admin role drop analyst --credential local --rw --yes --force
+```
+
+### neo4j-cli admin role get
+
+Get the privileges for a role
+
+Get the privileges assigned to a role. First checks the role exists via SHOW ROLES WITH USERS WHERE role = $name; returns a not-found error if no rows are returned. Then executes SHOW ROLE $name PRIVILEGES and returns the privilege list. Returns an empty list if the role exists but has no privileges.
+
+Usage: `neo4j-cli admin role get <name>`
+
+Examples:
+
+```
+# Get the privileges for the admin role
+neo4j-cli admin role get admin --credential local
+
+# Get privileges as JSON for scripting
+neo4j-cli admin role get admin --credential local --format json
+```
+
+### neo4j-cli admin role grant
+
+Grant a role to a user
+
+Grant a role to a user via GRANT ROLE $role TO $user against the system database. After the grant, the updated user record is printed with the current role membership.
+
+Usage: `neo4j-cli admin role grant [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--role` | string | - | Name of the role to grant |
+| `--user` | string | - | Name of the user to grant the role to |
+
+Examples:
+
+```
+# Grant the analyst role to alice
+neo4j-cli admin role grant --role analyst --user alice --credential local --rw
+
+# Grant a role and output the updated user record as JSON
+neo4j-cli admin role grant --role analyst --user alice --credential local --rw --format json
+```
+
+### neo4j-cli admin role list
+
+List all roles and their members
+
+List all roles and their members via SHOW ROLES WITH USERS. Use --user to filter results to only roles that contain a specific user.
+
+Usage: `neo4j-cli admin role list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--user` | string | - | Filter results to only roles that contain this user |
+
+Examples:
+
+```
+# List all roles and their members
+neo4j-cli admin role list --credential local
+
+# List all roles and members as JSON
+neo4j-cli admin role list --credential local --format json
+
+# List only the roles that user alice belongs to
+neo4j-cli admin role list --credential local --user alice --format json
+```
+
+### neo4j-cli admin role revoke
+
+Revoke a role from a user
+
+Revoke a role from a user via REVOKE ROLE $role FROM $user against the system database. After the revoke, the updated user record is printed with the current role membership.
+
+Usage: `neo4j-cli admin role revoke [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--role` | string | - | Name of the role to revoke |
+| `--user` | string | - | Name of the user to revoke the role from |
+
+Examples:
+
+```
+# Revoke the analyst role from alice
+neo4j-cli admin role revoke --role analyst --user alice --credential local --rw
+
+# Revoke a role and output the updated user record as JSON
+neo4j-cli admin role revoke --role analyst --user alice --credential local --rw --format json
 ```
 
 ## neo4j-cli admin user

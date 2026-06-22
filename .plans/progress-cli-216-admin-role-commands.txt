@@ -1,0 +1,60 @@
+## TASK-001 — 2026-06-16T01:30:00Z
+Scaffolded the role package foundation with helpers.go (roleExecFn seam, roleFields, normalizeRoleRow, outputRoleMembers, outputUserAfterRoleChange), skeleton role.go (NewCmd with zero AddCommand calls), and role_helpers_test.go (testConn, withFakeExecFn, withSequencedExecFn). Added //nolint:unused directives to satisfy the golangci-lint unused gate on pre-declared helpers before leaf commands exist.
+Files: +neo4j-cli/internal/subcommands/admin/role/helpers.go, +neo4j-cli/internal/subcommands/admin/role/role.go, +neo4j-cli/internal/subcommands/admin/role/role_helpers_test.go
+
+## TASK-002 — 2026-06-16T02:00:00Z
+Implemented the `role list` command with optional `--user` in-process filter, normalizes nil member to empty string, and outputs role+member columns via PrintBodyMap. Wired newListCmd into role.go and removed nolint:unused from now-used helpers symbols.
+Files: +neo4j-cli/internal/subcommands/admin/role/list.go, +neo4j-cli/internal/subcommands/admin/role/list_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go, ~neo4j-cli/internal/subcommands/admin/role/helpers.go
+
+## TASK-003 — 2026-06-16T03:00:00Z
+Implemented the `role get` command with two-step Cypher: existence check via `SHOW ROLES WITH USERS WHERE role = $name` (correct column name, not `name`), followed by `SHOW ROLE $name PRIVILEGES`. Zero existence rows → clierr.NewNotFoundError (exit 3). Zero privilege rows → empty list (exit 0). Dynamic field sorting from rows[0] keys. Tests cover happy-path JSON and table, existing role with no privileges, not-found, exec error propagation, and no-args cobra usage error.
+Files: +neo4j-cli/internal/subcommands/admin/role/get.go, +neo4j-cli/internal/subcommands/admin/role/get_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go
+
+## TASK-004 — 2026-06-16T04:00:00Z
+Implemented the `role create` command with idempotent `CREATE ROLE $name IF NOT EXISTS` Cypher. On success, calls `outputRoleMembers` for the follow-up SHOW. On error, returns immediately without follow-up. Removed `//nolint:unused` from `outputRoleMembers` in helpers.go. Tests use `withSequencedExecFn` for two-call flows (mutation + follow-up). Covers empty member list, member rows, exec error propagation, Enterprise edition hint, and no-args cobra error.
+Files: +neo4j-cli/internal/subcommands/admin/role/create.go, +neo4j-cli/internal/subcommands/admin/role/create_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go, ~neo4j-cli/internal/subcommands/admin/role/helpers.go
+
+## TASK-005 — 2026-06-16T05:00:00Z
+Implemented the `role drop` command with confirm gate (`confirm.Require`/`confirm.Register` for `--yes`/`--force`). Executes `DROP ROLE $name`. Translates `Neo.ClientError.Statement.ArgumentError` with message containing "does not exist" to `clierr.NewNotFoundError` (exit code 3). No stdout output on success. Tests use `confirmtest.AssertLeafGate` for the four canonical gate scenarios. Covers: confirm gate, yes-force success (no output), not-found error with correct error code, Enterprise edition hint, and no-args cobra error.
+Files: +neo4j-cli/internal/subcommands/admin/role/drop.go, +neo4j-cli/internal/subcommands/admin/role/drop_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go
+
+## TASK-006 — 2026-06-16T06:00:00Z
+Implemented the `role grant` command with required `--role` and `--user` flags (both `cmd.MarkFlagRequired`). Executes `GRANT ROLE $role TO $user`. On success calls `outputUserAfterRoleChange` which prints the updated user record with snake_case `password_change_required` field. Removed `//nolint:unused` from `outputUserAfterRoleChange` in helpers.go. Tests cover: happy-path success, updated user record in JSON output with snake_case field assertion, exec error propagation, Enterprise edition hint, missing --role cobra error, missing --user cobra error.
+Files: +neo4j-cli/internal/subcommands/admin/role/grant.go, +neo4j-cli/internal/subcommands/admin/role/grant_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go, ~neo4j-cli/internal/subcommands/admin/role/helpers.go
+
+## TASK-007 — 2026-06-16T07:00:00Z
+Implemented the `role revoke` command as a mirror of grant.go with `REVOKE ROLE $role FROM $user` Cypher. Same required `--role` and `--user` flags (both `cmd.MarkFlagRequired`). On success calls `outputUserAfterRoleChange`. Wired `newRevokeCmd` into role.go completing all 6 AddCommand calls. Tests mirror the grant suite: happy-path success, updated user record in JSON output with snake_case `password_change_required` field assertion, exec error propagation, Enterprise edition hint, missing --role cobra error, missing --user cobra error. All gates pass: make test, make fmt-check, make lint.
+Files: +neo4j-cli/internal/subcommands/admin/role/revoke.go, +neo4j-cli/internal/subcommands/admin/role/revoke_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go
+
+## TASK-008 — 2026-06-16T14:35:00Z
+Wired the role package into admin.go: added `role` import alongside `database`, added `cmd.AddCommand(role.NewCmd(cfg, &adminConn, RunAdminStatement))` after the database AddCommand, and updated the Long description to include "`role` (list, get, create, drop, grant, revoke)". Regenerated the skill bundle via `go generate ./neo4j-cli/internal/skill/...` — admin.md now includes all 6 role leaves. Added Minor changelog entry via `changie new`. All gates pass: make test, make fmt-check, make lint.
+Files: ~neo4j-cli/internal/subcommands/admin/admin.go, ~neo4j-cli/internal/skill/bundle/references/admin.md, +.changes/unreleased/neo4j-cli-Minor-20260616-143459.yaml
+
+## REVIEW — 2026-06-16T15:00:00Z
+Added 3 review tasks (task-009..task-011).
+
+## TASK-009 — 2026-06-16T15:30:00Z
+Widened runGrant/runRevoke helpers to accept full responses slice; collapsed inline cmd blocks in EmitsUpdatedUserRecord tests; added TestGrant_FollowUpExecError_PropagatesError and TestRevoke_FollowUpExecError_PropagatesError.
+Files: ~neo4j-cli/internal/subcommands/admin/role/grant_test.go, ~neo4j-cli/internal/subcommands/admin/role/revoke_test.go
+
+## TASK-010 — 2026-06-16T15:30:00Z
+Removed spurious //nolint:unused from testConn, withFakeExecFn, withSequencedExecFn in role_helpers_test.go.
+Files: ~neo4j-cli/internal/subcommands/admin/role/role_helpers_test.go
+
+## TASK-011 — 2026-06-16T16:00:00Z
+Promoted userFields to package scope in helpers.go; extracted normalizeRoleRows helper; updated list.go and outputRoleMembers to use it.
+Files: ~neo4j-cli/internal/subcommands/admin/role/helpers.go, ~neo4j-cli/internal/subcommands/admin/role/list.go
+
+## TASK-012 — 2026-06-16T17:00:00Z
+Removed "(Enterprise only)" from revoke.go Short; replaced cmd.MarkFlagRequired("role")/("user") in grant.go and revoke.go with explicit pre-validation in RunE that returns clierr.NewUsageError (exit 2); renamed and updated the missing-flag tests to assert ce.Code == 2 and message content; regenerated skill bundle to reflect the Short change.
+Files: ~neo4j-cli/internal/subcommands/admin/role/grant.go, ~neo4j-cli/internal/subcommands/admin/role/revoke.go, ~neo4j-cli/internal/subcommands/admin/role/grant_test.go, ~neo4j-cli/internal/subcommands/admin/role/revoke_test.go, ~neo4j-cli/internal/skill/bundle/references/admin.md
+
+## TASK-013 — 2026-06-16T17:30:00Z
+Added Aura Security.Forbidden tier hint: threaded conn.URI into translateAdminError/translateNeo4jError; added forbiddenCode case that delegates to analytics.IsAuraURI and emits a generic BC-upgrade hint; added two run_test.go cases covering Aura and non-Aura URIs. Reviewer feedback applied: dropped local isAuraURI in favour of analytics.IsAuraURI, and made hint text generic (not role-specific) so it's accurate for database and user commands too.
+Files: ~neo4j-cli/internal/subcommands/admin/run.go, ~neo4j-cli/internal/subcommands/admin/run_test.go
+
+## QA SESSION — 2026-06-16T16:30:00Z
+Live tested against Docker Enterprise, Docker Community, Aura Free (free-db), Aura Professional, and Aura Business Critical. All Docker acceptance criteria pass. Found 3 bugs requiring fixes:
+(1) revoke Short carries "(Enterprise only)" annotation absent from all other 5 commands (REQ-F-026 → task-012).
+(2) missing --role/--user on grant/revoke returns fatal_error exit 1 instead of usage_error exit 2 (REQ-F-027 → task-012).
+(3) Security.Forbidden on Aura Free/Pro returns raw Neo4j "Permission has not been granted ... try GRANT/REVOKE" advice which users cannot follow on Aura; the UnsupportedAdministrationCommand/Aura hint path never fires for role commands on those tiers (REQ-F-025 → task-013). Aura BC confirmed fully functional. Added task-012 and task-013.
