@@ -108,7 +108,7 @@ tasks:
       Wire `newDenyCmd` into `privilege.go`. Tests mirror the grant test suite using `DENY` Cypher
       assertions; no need to repeat every category — cover at least one propertyBearer case and one
       dbms case plus the required-flag and flag-conflict error paths.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -118,7 +118,7 @@ tasks:
       - "`privilege deny --action read --rw` (missing --role) returns exit code 2"
       - "Mutation exec error propagates and skips follow-up (tested via withSequencedPrivilegeExecFn)"
       - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
-    completed_at: null
+    completed_at: 2026-06-22
 
   - id: task-006
     title: "Implement privilege revoke command"

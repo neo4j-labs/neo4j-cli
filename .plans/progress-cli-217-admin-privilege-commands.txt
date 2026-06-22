@@ -17,3 +17,7 @@ Decisions: list_test.go uses a local capturing exec fake (records cypher/params)
 Implemented the `admin privilege grant` leaf: required --action/--role pre-validated as clierr.NewUsageError before SilenceUsage, delegates to buildPrivilegeCypher("GRANT", ...), sends `<cypher> TO $role` then outputPrivileges (SHOW ROLE $name PRIVILEGES). Wired newGrantCmd into privilege.go and dropped now-consumed nolint:unused comments on buildPrivilegeCypher/validActions/privilegeOpts/normalizeAction/outputPrivileges/clause helpers and testConn. All four gates pass.
 Files: +grant.go, +grant_test.go, ~privilege.go, ~helpers.go, ~privilege_helpers_test.go
 Decisions: Role target is parameterised (`TO $role`) rather than inlined, mirroring role/grant.go; grant_test uses a local recording sequenced exec fake (captures cypher/params) since acceptance criteria assert exact statements/params.
+
+## task-005 — 2026-06-22T00:00:00Z
+Implemented the `admin privilege deny` leaf as a structural mirror of grant: required --action/--role pre-validated, delegates to buildPrivilegeCypher("DENY", ...), sends `<cypher> TO $role` then outputPrivileges. Wired newDenyCmd into privilege.go. Tests reuse the shared sequencedCall/withRecordingSequencedExecFn/twoOK helpers from grant_test.go (same package) and cover propertyBearer, dbms, required-flag/flag-conflict errors, and mutation-error-skips-follow-up. All four gates pass.
+Files: +deny.go, +deny_test.go, ~privilege.go
