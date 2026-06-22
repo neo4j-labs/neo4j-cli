@@ -33,6 +33,7 @@ neo4j-cli admin privilege list --credential local --format json`,
 	}
 
 	cmd.AddCommand(newListCmd(cfg, conn))
+	cmd.AddCommand(newGrantCmd(cfg, conn))
 
 	return cmd
 }

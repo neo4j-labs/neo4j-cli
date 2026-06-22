@@ -85,7 +85,7 @@ tasks:
       `privilege.go`. Tests cover at least one case per action category, all required-flag paths
       (exit code 2), flag conflict errors, Enterprise-only error, and the two-call
       mutation+follow-up sequence.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -97,7 +97,7 @@ tasks:
       - "`privilege grant --action create_role --role analyst --rw` (missing --on-dbms) returns a usage error"
       - "Tests use `withSequencedPrivilegeExecFn` for the two-call flow; mutation exec error propagates and skips follow-up"
       - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
-    completed_at: null
+    completed_at: 2026-06-22
 
   - id: task-005
     title: "Implement privilege deny command"

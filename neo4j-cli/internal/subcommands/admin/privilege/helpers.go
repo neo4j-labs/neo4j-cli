@@ -27,8 +27,6 @@ var privilegeFields = []string{"access", "action", "resource", "segment", "role"
 // outputPrivileges executes SHOW ROLE $name PRIVILEGES and prints the result
 // with privilegeFields columns. Called after a successful mutation to confirm
 // the role's updated privilege list.
-//
-//nolint:unused // consumed by leaf commands added in later tasks
 func outputPrivileges(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, roleName string) error {
 	rows, err := privilegeExecFn(cmd.Context(), cfg, conn, "SHOW ROLE $name PRIVILEGES", map[string]any{"name": roleName})
 	if err != nil {
@@ -54,8 +52,6 @@ const (
 
 // validActions maps each supported (normalised) privilege action keyword to its
 // category. FIND is intentionally absent (REQ-F-013).
-//
-//nolint:unused // consumed by leaf commands added in later tasks
 var validActions = map[string]actionCategory{
 	"READ":         propertyBearer,
 	"MATCH":        propertyBearer,
@@ -116,8 +112,6 @@ var validActions = map[string]actionCategory{
 // privilegeOpts captures the resolved flag values shared by grant, deny, and
 // revoke. onGraph and onDatabase are considered "set" when non-empty; onDbms
 // when true.
-//
-//nolint:unused // consumed by leaf commands added in later tasks
 type privilegeOpts struct {
 	onGraph    string
 	onDatabase string
@@ -131,8 +125,6 @@ type privilegeOpts struct {
 // whitespace into single spaces, so "all_graph_privileges" and
 // "ALL GRAPH PRIVILEGES" both normalise to "ALL GRAPH PRIVILEGES". It returns a
 // usage error listing the valid keywords if the result is not a known action.
-//
-//nolint:unused // consumed by leaf commands added in later tasks
 func normalizeAction(action string) (string, error) {
 	normalized := strings.ToUpper(strings.Join(strings.Fields(strings.ReplaceAll(action, "_", " ")), " "))
 	if _, ok := validActions[normalized]; !ok {
@@ -141,7 +133,6 @@ func normalizeAction(action string) (string, error) {
 	return normalized, nil
 }
 
-//nolint:unused // consumed by normalizeAction
 func sortedActions() []string {
 	out := make([]string, 0, len(validActions))
 	for a := range validActions {
@@ -159,8 +150,6 @@ func sortedActions() []string {
 // parses privilege Cypher; the returned params map is non-nil and empty (only
 // $role, added by the caller, is parameterised). It returns a usage error for
 // any invalid flag/category combination (REQ-F-011) before producing Cypher.
-//
-//nolint:unused // consumed by leaf commands added in later tasks
 func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[string]any, error) {
 	normalized, err := normalizeAction(action)
 	if err != nil {
@@ -247,8 +236,6 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 
 // propertyClause renders the property qualifier for propertyBearer actions:
 // {*} when no properties, {p1, p2} otherwise.
-//
-//nolint:unused // consumed by buildPrivilegeCypher
 func propertyClause(properties []string) string {
 	if len(properties) == 0 {
 		return "{*}"
@@ -259,8 +246,6 @@ func propertyClause(properties []string) string {
 // entityClause renders the entity qualifier shared by propertyBearer and
 // graphOnly actions: ELEMENTS * when neither labels nor types, NODES l1, l2
 // when only labels, RELATIONSHIPS t1, t2 when only types.
-//
-//nolint:unused // consumed by buildPrivilegeCypher
 func entityClause(nodeLabels, relTypes []string) string {
 	switch {
 	case len(nodeLabels) > 0:

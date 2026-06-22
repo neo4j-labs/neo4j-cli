@@ -16,8 +16,6 @@ import (
 
 // testConn returns a *dbconn.Conn for use in tests. The connection params are
 // never used because tests always override privilegeExecFn with a fake.
-//
-//nolint:unused // consumed by leaf command tests added in later tasks
 func testConn() *dbconn.Conn {
 	return &dbconn.Conn{
 		URI:      "neo4j://localhost:7687",

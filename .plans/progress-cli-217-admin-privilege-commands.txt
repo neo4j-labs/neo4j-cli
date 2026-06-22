@@ -12,3 +12,8 @@ Decisions: buildPrivilegeCypher returns the Cypher fragment WITHOUT the trailing
 Implemented the `admin privilege list` leaf: SHOW PRIVILEGES by default, --role/--user switch to SHOW ROLE/USER $name PRIVILEGES, both-flags usage error before SilenceUsage and any seam call, output via adminutil.NewRows + PrintBodyMap. Wired newListCmd into privilege.go and dropped the now-consumed nolint:unused on privilegeExecFn/privilegeFields. All four gates pass.
 Files: +list.go, +list_test.go, ~privilege.go, ~helpers.go
 Decisions: list_test.go uses a local capturing exec fake (records cypher/params) rather than the shared withFakePrivilegeExecFn, since the acceptance criteria assert on the exact statement and params["name"].
+
+## task-004 — 2026-06-22T00:00:00Z
+Implemented the `admin privilege grant` leaf: required --action/--role pre-validated as clierr.NewUsageError before SilenceUsage, delegates to buildPrivilegeCypher("GRANT", ...), sends `<cypher> TO $role` then outputPrivileges (SHOW ROLE $name PRIVILEGES). Wired newGrantCmd into privilege.go and dropped now-consumed nolint:unused comments on buildPrivilegeCypher/validActions/privilegeOpts/normalizeAction/outputPrivileges/clause helpers and testConn. All four gates pass.
+Files: +grant.go, +grant_test.go, ~privilege.go, ~helpers.go, ~privilege_helpers_test.go
+Decisions: Role target is parameterised (`TO $role`) rather than inlined, mirroring role/grant.go; grant_test uses a local recording sequenced exec fake (captures cypher/params) since acceptance criteria assert exact statements/params.
