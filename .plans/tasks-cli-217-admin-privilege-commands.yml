@@ -6,6 +6,7 @@ updated_at: 2026-06-22T00:00:00Z
 tasks:
   - id: task-001
     title: "Scaffold privilege package foundation (seam, helpers, test infrastructure)"
+    status: completed
     description: |
       Create the `neo4j-cli/internal/subcommands/admin/privilege/` package with the
       shared infrastructure that all leaf commands depend on. This includes: `privilege.go`
@@ -14,7 +15,6 @@ tasks:
       `privilegeFields`, and `outputPrivileges`; and `privilege_helpers_test.go` with
       `testConn()`, `withFakePrivilegeExecFn`, and `withSequencedPrivilegeExecFn` mirroring
       `role/role_helpers_test.go` exactly.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "privilege.go compiles: NewCmd signature is `func NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command`, sets `privilegeExecFn = execFn`, registers no leaf commands yet"
@@ -22,7 +22,7 @@ tasks:
       - "privilege_helpers_test.go provides testConn(), withFakePrivilegeExecFn(t, rows, err), and withSequencedPrivilegeExecFn(t, responses) — same shape as role/role_helpers_test.go"
       - "All new .go files carry the Neo4j copyright header"
       - "`make test` passes (package compiles and test helpers compile)"
-    completed_at: null
+    completed_at: 2026-06-22T00:00:00Z
 
   - id: task-002
     title: "Implement buildPrivilegeCypher helper with all action categories and validation"

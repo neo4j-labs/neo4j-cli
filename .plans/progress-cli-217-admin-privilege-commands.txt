@@ -1,0 +1,4 @@
+## task-001 — 2026-06-22T00:00:00Z
+Scaffolded the privilege package mirroring role/: NewCmd seam (no leaves yet), privilegeExecFn/privilegeFields/outputPrivileges helpers (using adminutil.NewRows), and test helpers (testConn, withFakePrivilegeExecFn, withSequencedPrivilegeExecFn). All four gates pass.
+Files: +privilege/privilege.go, +privilege/helpers.go, +privilege/privilege_helpers_test.go
+Decisions: Foundation symbols are unused until leaf tasks land, so each carries a scoped //nolint:unused with a reason; these drop out as task-003+ consume them.
