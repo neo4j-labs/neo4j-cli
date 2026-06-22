@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: add admin user management commands (list, get, create, drop, rename, set-password, suspend, activate)
+time: 2026-06-15T13:00:22.733823+01:00

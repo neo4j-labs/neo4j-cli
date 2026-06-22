@@ -28,6 +28,7 @@ const (
 	argumentErrorCode    = "Neo.ClientError.Statement.ArgumentError"
 	executionFailedCode  = "Neo.DatabaseError.Statement.ExecutionFailed"
 	syntaxErrorCode      = "Neo.ClientError.Statement.SyntaxError"
+	forbiddenCode        = "Neo.ClientError.Security.Forbidden"
 
 	cypher25Prefix = "CYPHER 25 "
 )
@@ -174,6 +175,8 @@ func translateNeo4jError(ne *neo4j.Neo4jError) error {
 	switch ne.Code {
 	case unsupportedAdminCode:
 		return translateUnsupportedAdmin(ne.Msg)
+	case forbiddenCode:
+		return clierr.NewValidationError("insufficient privileges: the connected user does not have permission to manage users (requires admin role)")
 	case argumentErrorCode:
 		if strings.Contains(ne.Msg, "non-native") || strings.Contains(ne.Msg, "authentication provider apart from native") {
 			return clierr.NewValidationError("renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)")

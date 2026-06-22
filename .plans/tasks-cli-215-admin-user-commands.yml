@@ -1,0 +1,531 @@
+feature: cli-215-admin-user-commands
+prd: ./prd-cli-215-admin-user-commands.md
+created_at: 2026-06-15T00:00:00Z
+updated_at: 2026-06-15T16:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'user/ package foundation: helpers.go and user_helpers_test.go only'
+    description: |
+      Create ONLY the shared foundation files for the admin/user/ package. Do NOT create
+      user.go, and do NOT implement any leaf command files. This task is strictly helpers.go
+      and the test helper file.
+
+      helpers.go must contain:
+        - package user declaration + copyright header
+        - var userExecFn adminutil.ExecFn  (package-level test seam; set later by NewCmd)
+        - userFields []string{"user", "roles", "password_change_required", "suspended"}
+        - normalizeUserRow(m map[string]any) map[string]any  (null roles → []any{}, null suspended → false)
+        - outputUser(cmd, cfg, conn, userName) error  (runs SHOW USERS WHERE user = $name via
+          userExecFn, normalizes + prints single row; returns nil with no output if zero rows)
+        - promptUserPassword(cmd, flagName) (string, error)  (reads flagName flag; if empty
+          and dbconn.StdinIsTTY() prompts stderr; if empty and not TTY returns usage error)
+
+      user_helpers_test.go must contain:
+        - withFakeExecFn(t, fake) — sets userExecFn for the test and restores on cleanup
+        - fakeExecFn type (func matching adminutil.ExecFn signature)
+        - helpers to override dbconn.StdinIsTTY and dbconn.PasswordReader and restore them
+
+      STOP after these two files. Do NOT add AddCommand calls, do NOT create any leaf files.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "helpers.go compiles as package user with userExecFn var, userFields, normalizeUserRow, outputUser, and promptUserPassword"
+      - "userExecFn is declared in helpers.go (not in any leaf file or user.go)"
+      - "promptUserPassword calls dbconn.StdinIsTTY() and dbconn.PasswordReader() — no new local seam vars declared"
+      - "user_helpers_test.go provides withFakeExecFn, fakeExecFn, and overrides for dbconn.StdinIsTTY / dbconn.PasswordReader"
+      - "NO user.go, NO leaf files created in this task"
+      - "make test passes (package compiles; test helpers compile)"
+    completed_at: "2026-06-15T00:00:00Z"
+
+  - id: task-002
+    title: 'user list and user get commands'
+    description: |
+      Implement ONLY list.go + list_test.go and get.go + get_test.go.
+
+      list.go: newListCmd(...) *cobra.Command that executes SHOW USERS via userExecFn,
+      normalizes each row with normalizeUserRow, and outputs all rows. For table/toon
+      format, convert the roles []any to a comma-joined string before calling PrintBodyMap;
+      JSON retains the array. Supports --format json|table|toon. No --rw.
+
+      get.go: newGetCmd(...) *cobra.Command that executes SHOW USERS WHERE user = $name via
+      userExecFn, applies normalizeUserRow, and outputs the single row. Returns
+      clierr.NewNotFoundError if zero rows. No --rw.
+
+      Both leaf constructors must be private (newListCmd / newGetCmd). They are NOT yet
+      registered anywhere — NewCmd does not exist yet. The commands will be wired in
+      task-008.
+
+      Add flush-left Example: fields with >= 2 invocations each (>= 1 --format json on reads).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "list.go and get.go define newListCmd and newGetCmd as private constructors"
+      - "roles column renders as comma-joined string in table/toon and as array in JSON"
+      - "null roles normalizes to [] and null suspended normalizes to false in all output formats"
+      - "get.go returns not_found (exit 3) for zero rows"
+      - "list_test.go and get_test.go use table-driven tests with fakeExecFn covering happy path, empty result, and format variants"
+      - "both files have flush-left Example: fields with >= 2 invocations"
+      - "NO user.go AddCommand calls touched in this task"
+    completed_at: "2026-06-15T01:00:00Z"
+
+  - id: task-003
+    title: 'user create command'
+    description: |
+      Implement ONLY create.go + create_test.go.
+
+      create.go: newCreateCmd(...) *cobra.Command that executes CREATE USER $name SET
+      PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED via userExecFn. Registers:
+        - --set-password (string, empty default; NOT --password, which shadows the parent flag)
+        - --password-change-required (bool, default true)
+      When --set-password is absent, calls promptUserPassword(cmd, "set-password"). On
+      success, calls outputUser to emit the created user record. Requires --rw.
+
+      newCreateCmd is a private constructor. It is NOT yet wired into any NewCmd — that
+      happens in task-008.
+
+      Add a flush-left Example: with >= 2 invocations (include --rw).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "create.go registers --set-password (not --password)"
+      - "--password-change-required defaults to true"
+      - "absent --set-password on TTY prompts Password: to stderr and reads without echo"
+      - "absent --set-password on non-TTY returns a usage error"
+      - "successful create emits the new user record via outputUser"
+      - "create_test.go covers: explicit password, TTY prompt, non-TTY usage error, password-change-required variants"
+      - "flush-left Example: with >= 2 invocations including --rw"
+      - "NO user.go AddCommand calls touched in this task"
+    completed_at: "2026-06-15T03:00:00Z"
+
+  - id: task-004
+    title: 'user drop command'
+    description: |
+      Implement ONLY drop.go + drop_test.go.
+
+      drop.go: newDropCmd(...) *cobra.Command that executes DROP USER $name via userExecFn.
+      Registers confirm.Register (--yes/--force) and calls confirm.Require in RunE, mirroring
+      database/drop.go. Translates Neo.ClientError.Statement.ArgumentError with "does not
+      exist" in the message to clierr.NewNotFoundError("user %q not found", name). Produces
+      no output on success. Requires --rw.
+
+      newDropCmd is a private constructor. It is NOT yet wired into any NewCmd.
+
+      Add a flush-left Example: with >= 2 invocations (include --rw and --yes).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "drop.go calls confirm.Register and confirm.Require with the user name as the resource identifier"
+      - "successful drop produces no stdout output"
+      - "drop of a nonexistent user returns not_found (exit 3), not a raw Neo4jError string"
+      - "drop_test.go covers: success (no output), not-found translation, confirm gate"
+      - "flush-left Example: with >= 2 invocations including --rw and --yes"
+      - "NO user.go AddCommand calls touched in this task"
+    completed_at: "2026-06-15T02:00:00Z"
+
+  - id: task-005
+    title: 'user rename command'
+    description: |
+      Implement ONLY rename.go + rename_test.go.
+
+      rename.go: newRenameCmd(...) *cobra.Command that executes RENAME USER $oldName TO
+      $newName via userExecFn. One positional arg (<old-name>), cobra.ExactArgs(1); one
+      required --new-name string flag. Aura ArgumentError is already translated by
+      translateAdminError in run.go — no local error check needed. On success, calls
+      outputUser with the new name. Requires --rw.
+
+      newRenameCmd is a private constructor. It is NOT yet wired into any NewCmd.
+
+      Add a flush-left Example: with >= 2 invocations (include --rw).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "rename.go uses cobra.ExactArgs(1) and a required --new-name string flag"
+      - "passing two positional args returns an ExactArgs error"
+      - "successful rename emits the renamed user record (SHOW USERS WHERE user = $newName)"
+      - "rename_test.go covers: success with output, two-positional-arg rejection, Aura error passthrough"
+      - "flush-left Example: with >= 2 invocations including --rw"
+      - "NO user.go AddCommand calls touched in this task"
+    completed_at: "2026-06-15T04:00:00Z"
+
+  - id: task-006
+    title: 'user set-password command'
+    description: |
+      Implement ONLY set_password.go + set_password_test.go.
+
+      set_password.go: newSetPasswordCmd(...) *cobra.Command that executes ALTER USER $name
+      SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED via userExecFn. Registers:
+        - --new-password (string, empty default; NOT --password)
+        - --password-change-required (bool, default false — note: different from create's default)
+      When --new-password is absent, calls promptUserPassword(cmd, "new-password"). On
+      success, calls outputUser. Requires --rw.
+
+      newSetPasswordCmd is a private constructor. It is NOT yet wired into any NewCmd.
+
+      Add a flush-left Example: with >= 2 invocations (include --rw).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "set_password.go registers --new-password (not --password)"
+      - "--password-change-required defaults to false for set-password"
+      - "absent --new-password on TTY prompts; on non-TTY returns usage error"
+      - "successful set-password emits the updated user record via outputUser"
+      - "set_password_test.go covers: explicit password, TTY prompt, non-TTY error, both password-change-required values"
+      - "flush-left Example: with >= 2 invocations including --rw"
+      - "NO user.go AddCommand calls touched in this task"
+    completed_at: "2026-06-15T02:00:00Z"
+
+  - id: task-007
+    title: 'user suspend and user activate commands'
+    description: |
+      Implement ONLY suspend.go + suspend_test.go and activate.go + activate_test.go.
+
+      suspend.go: newSuspendCmd(...) executes ALTER USER $name SET STATUS SUSPENDED via
+      userExecFn, calls outputUser on success. Requires --rw.
+      activate.go: newActivateCmd(...) executes ALTER USER $name SET STATUS ACTIVE via
+      userExecFn, calls outputUser on success. Requires --rw.
+
+      Community ExecutionFailed errors are already classified by translateAdminError —
+      no local translation needed. Both constructors are private and NOT yet wired.
+
+      Add flush-left Example: fields on both files with >= 2 invocations (include --rw).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "suspend.go emits ALTER USER $name SET STATUS SUSPENDED and calls outputUser on success"
+      - "activate.go emits ALTER USER $name SET STATUS ACTIVE and calls outputUser on success"
+      - "Community ExecutionFailed error surfaces as validation_error via translateAdminError — no local handling"
+      - "suspend_test.go and activate_test.go cover: success with output, Community error passthrough"
+      - "flush-left Example: with >= 2 invocations including --rw on both files"
+      - "NO user.go AddCommand calls touched in this task"
+    completed_at: "2026-06-15T02:00:00Z"
+
+  - id: task-011
+    title: 'Add helpers_test.go: direct unit tests for normalizeUserRow, outputUser, promptUserPassword'
+    description: |
+      Create helpers_test.go in neo4j-cli/internal/subcommands/admin/user/ as an INTERNAL
+      test (package user, not package user_test) so it can call unexported functions directly
+      without needing export_test.go wrappers.
+
+      Test normalizeUserRow:
+        - null roles and null suspended both normalized
+        - non-null roles and non-null suspended pass through unchanged
+        - mixed (null roles, non-null suspended) and vice versa
+
+      Test outputUser:
+        - zero rows returned by fakeExecFn → nil error, no output
+        - one row returned → row printed (set userExecFn to a fake, capture stdout via
+          cobra cmd.SetOut, verify output contains expected field)
+        - fakeExecFn returns error → error propagated
+
+      Test promptUserPassword:
+        - non-empty flag value → returned immediately, no TTY/reader called
+        - empty flag + StdinIsTTY=true + PasswordReader returns "pw" → "Password: " on
+          stderr, "pw" returned
+        - empty flag + StdinIsTTY=false → usage error
+        - empty flag + StdinIsTTY=true + PasswordReader returns error → wrapped error
+
+      Since this is package user (internal), override the seams directly:
+        userExecFn = fakeExecFn(...)    (direct assignment, no ExportedUserExecFn needed)
+        dbconn.StdinIsTTY = func() bool { return ... }
+        dbconn.PasswordReader = func() (string, error) { ... }
+      Restore each via t.Cleanup.
+
+      Do NOT modify export_test.go, helpers.go, or any other existing file.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "helpers_test.go is package user (internal), not package user_test"
+      - "TestNormalizeUserRow covers null normalization and passthrough cases"
+      - "TestOutputUser covers zero-rows, one-row output, and exec error"
+      - "TestPromptUserPassword covers explicit value, TTY prompt, non-TTY error, reader error"
+      - "make test passes with the new test file"
+    completed_at: "2026-06-15T05:00:00Z"
+
+  - id: task-008
+    title: 'Create user.go (NewCmd) and wire all 8 leaves via AddCommand'
+    description: |
+      Create user.go with NewCmd that:
+        1. Sets userExecFn = execFn (the passed-in adminutil.ExecFn)
+        2. Calls cmd.AddCommand for all 8 leaves:
+             newListCmd, newGetCmd, newCreateCmd, newDropCmd, newRenameCmd,
+             newSetPasswordCmd, newSuspendCmd, newActivateCmd
+      NewCmd signature: NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command
+
+      This task does NOT modify admin.go — that wiring happens in task-009. Its only job
+      is to make the user package self-contained and usable.
+
+      Verify `neo4j-cli admin user --help` is NOT yet reachable (admin.go not updated yet),
+      but `go build ./neo4j-cli/internal/subcommands/admin/user/...` compiles clean.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "user.go defines NewCmd(cfg, conn, execFn) that sets userExecFn and calls AddCommand for all 8 leaves"
+      - "go build ./neo4j-cli/internal/subcommands/admin/user/... compiles clean"
+      - "make test passes"
+      - "admin.go is NOT modified in this task"
+    completed_at: "2026-06-15T05:00:00Z"
+
+  - id: task-009
+    title: 'Wire user subtree into admin.go and regenerate skill bundle'
+    description: |
+      Add cmd.AddCommand(user.NewCmd(cfg, &adminConn, RunAdminStatement)) to admin.go,
+      mirroring the existing database.NewCmd call. Update admin.go Long description to
+      mention user subcommands. Then run:
+        go generate ./neo4j-cli/internal/skill/...
+      to regenerate the skill bundle. Verify `neo4j-cli admin user --help` shows all 8
+      subcommands and that TestAllLeafCommands_HaveExamples passes.
+      Run make test, make fmt-check, and make lint — all must pass.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "admin.go AddCommand line for user.NewCmd is present and compiles"
+      - "neo4j-cli admin user --help shows list/get/create/drop/rename/set-password/suspend/activate"
+      - "every user leaf has a flush-left Example: with >= 2 invocations; TestAllLeafCommands_HaveExamples passes"
+      - "go generate ./neo4j-cli/internal/skill/... produces no diff; TestGenerator_RoundTrip passes"
+      - "make test, make fmt-check, make lint all pass clean"
+    completed_at: "2026-06-15T06:00:00Z"
+
+  - id: task-010
+    title: 'Add changelog entry'
+    description: |
+      Add a changelog entry for the new admin user commands via changie. Run:
+        changie new --projects neo4j-cli --kind Minor --body "add admin user management commands (list, get, create, drop, rename, set-password, suspend, activate)"
+      Verify the generated file appears under .changes/unreleased/ with the correct
+      project, kind, and body fields.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "a new .changes/unreleased/ file exists with project: neo4j-cli, kind: Minor"
+      - "body mentions list, get, create, drop, rename, set-password, suspend, activate"
+      - "make test still passes after the changelog file is added"
+    completed_at: "2026-06-15T13:00:22Z"
+
+  - id: task-012
+    title: 'Collapse to internal test package: delete export_test.go, merge user_helpers_test.go'
+    description: |
+      The user package chose package user_test (external) for all leaf tests while the
+      sibling database package uses package database (internal). This generated ~118 lines
+      of pure scaffolding — export_test.go (62 lines exposing 8 private constructors + one
+      seam pointer) and user_helpers_test.go (56 lines re-implementing seam helpers that
+      already exist in helpers_test.go as internal versions). There is no technical reason
+      for the external package choice: no import cycles, no end-to-end harness requirement.
+
+      The fix:
+        1. Delete export_test.go entirely.
+        2. Convert all leaf *_test.go files from package user_test to package user.
+        3. Replace all ExportedUserExecFn / NewXxxCmdForTest references with direct calls
+           to the unexported symbols (newListCmd, newGetCmd, etc.) and direct assignment
+           to userExecFn.
+        4. Merge user_helpers_test.go into helpers_test.go (or delete it and move any
+           non-duplicate helpers into helpers_test.go). Remove duplicate seam-override
+           helpers — withFakeExecFn/withFakeStdinIsTTY/withFakePasswordReader in
+           user_helpers_test.go duplicate setFakeExecFn/setStdinIsTTY/setPasswordReader
+           in helpers_test.go; keep the helpers_test.go versions (they're already there),
+           discard the external-package duplicates. testConn() can move from
+           user_helpers_test.go into helpers_test.go.
+
+      The target state mirrors database/database_helpers_test.go: one internal helper file,
+      no export_test.go.
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "export_test.go is deleted"
+      - "all *_test.go files in admin/user/ are package user (internal)"
+      - "make test passes with no changes to production code"
+      - "the package has a single shared test-helper set (no duplicate seam-override functions)"
+    completed_at: "2026-06-15T14:00:00Z"
+
+  - id: task-013
+    title: 'Consolidate duplicate response struct: createExecResponse and fakeResponse'
+    description: |
+      createExecResponse is defined in create_test.go and fakeResponse is defined in
+      suspend_test.go (and used by activate_test.go). Both have the identical shape:
+        struct { rows []map[string]any; err error }
+      This is a near-duplicate type definition that exists only because the external test
+      package forced each leaf to define its own — there was no shared location accessible
+      to package user_test.
+
+      After task-012 collapses everything into package user (internal), consolidate these
+      into a single type (e.g. execResponse or testResponse) defined once in helpers_test.go
+      and used by all leaf test files that need it. Remove the leaf-local definitions.
+
+      Note: this task depends on task-012 being completed first.
+    status: completed
+    dependencies:
+      - task-012
+    source: review
+    acceptance_criteria:
+      - "a single shared response-mock struct is defined in helpers_test.go"
+      - "create_test.go and suspend_test.go no longer define their own equivalent struct"
+      - "make test passes"
+    completed_at: "2026-06-15T15:30:00Z"
+
+  - id: task-014
+    title: 'Move joinRoles to helpers.go'
+    description: |
+      joinRoles is defined in list.go but is called from both list.go and get.go. An
+      unexported function in a leaf file silently becoming shared infrastructure for
+      another leaf file violates the organizational intent of the package — helpers.go is
+      the explicit home for shared helpers (normalizeUserRow, outputUser, promptUserPassword
+      are all there). rolesJoined (the list-specific []any→string wrapper) lives alongside
+      joinRoles in list.go.
+
+      Move joinRoles (and rolesJoined if it is used by both files; leave it in list.go if
+      it is genuinely list-only) to helpers.go. Update any callers. No behavior change.
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "joinRoles is defined in helpers.go, not list.go"
+      - "get.go and list.go both compile and call joinRoles from helpers.go"
+      - "make test passes"
+    completed_at: "2026-06-15T15:00:00Z"
+
+  - id: task-015
+    title: 'Extract passwordChangeClause helper and table-drive the True/False tests'
+    description: |
+      Two issues in one task (both localized to the same files):
+
+      (a) create.go and set_password.go each build the Cypher password-change clause
+      independently with inconsistent style:
+        create.go:      var changeClause string; if ... changeClause = "SET PASSWORD CHANGE REQUIRED" ...
+        set_password.go: changeRequired := "NOT REQUIRED"; if ... changeRequired = "REQUIRED" ...
+      Add passwordChangeClause(required bool) string to helpers.go — returns either
+      "SET PASSWORD CHANGE REQUIRED" or "SET PASSWORD CHANGE NOT REQUIRED" — and replace
+      both inline constructions with a call to it.
+
+      (b) TestUserCreate_PasswordChangeRequired_True and _False in create_test.go are
+      ~60-line near-duplicates differing only in flag value and expected Cypher string.
+      Merge them into a single table-driven test. Do the same for the matching pair in
+      set_password_test.go (TestSetPassword_PasswordChangeRequired_True/_False).
+    status: in_progress
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "passwordChangeClause(bool) string is defined in helpers.go"
+      - "create.go and set_password.go call passwordChangeClause instead of building the clause inline"
+      - "create_test.go has a single table-driven test for both password-change-required variants"
+      - "set_password_test.go has a single table-driven test for both variants"
+      - "make test passes"
+    status: completed
+    completed_at: "2026-06-15T14:00:00Z"
+
+  - id: task-016
+    title: 'QA fix: not-found and already-exists error translations across write commands'
+    description: |
+      QA testing revealed that suspend, activate, set-password, and rename surface raw
+      Neo4jError strings when the target user does not exist, while get and drop already
+      return a clean not_found (exit 3). This task adds consistent error translation.
+
+      (a) Add translateUserNotFoundError(err error, name string) error to helpers.go.
+      It checks errors.As(*neo4j.Neo4jError), code == "Neo.ClientError.Statement.ArgumentError",
+      and strings.Contains(ne.Msg, "does not exist"), returning clierr.NewNotFoundError(
+      "user %q not found", name). Otherwise returns err unchanged.
+
+      (b) In suspend.go, activate.go, set_password.go, and rename.go, replace the bare
+      `return err` after userExecFn with:
+        return translateUserNotFoundError(err, name)
+
+      (c) In create.go add a local check after userExecFn for "already exists":
+        var ne *neo4j.Neo4jError
+        if errors.As(err, &ne) &&
+            ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
+            strings.Contains(ne.Msg, "already exists") {
+            return clierr.NewUsageError("user %q already exists", name)
+        }
+        return err
+
+      Update tests in suspend_test.go, activate_test.go, set_password_test.go, rename_test.go
+      and create_test.go to assert the clean error code/message instead of the raw Neo4j string.
+    status: in_progress
+    dependencies:
+      - task-013
+    source: qa
+    acceptance_criteria:
+      - "translateUserNotFoundError is defined in helpers.go and covered by helpers_test.go"
+      - "suspend/activate/set-password/rename each call translateUserNotFoundError"
+      - "a non-existent user returns not_found (exit 3) for all four commands in tests"
+      - "create with an existing name returns usage_error (exit 2) with message 'user X already exists'"
+      - "make test passes"
+    status: completed
+    completed_at: "2026-06-15T17:00:00Z"
+
+  - id: task-017
+    title: 'QA fix: drop command emits success output'
+    description: |
+      QA testing found that drop is the only write command that produces no stdout on
+      success, making it impossible for callers to distinguish a successful drop from a
+      failed/silent command. All other write commands call outputUser and emit a record.
+
+      Change drop.go to emit a synthesised success record after DROP USER succeeds.
+      Because the user is deleted, do NOT run a follow-up SHOW USERS; instead build the
+      record inline:
+
+        dropFields := []string{"user", "status"}
+        row := map[string]any{"user": name, "status": "dropped"}
+        commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRow(row, dropFields), dropFields)
+        return nil
+
+      Update drop_test.go to assert that stdout contains the name and "dropped" rather than
+      asserting empty output. Update any acceptance-criteria comment referencing "no output".
+    status: completed
+    dependencies:
+      - task-004
+    source: qa
+    acceptance_criteria:
+      - "successful drop emits {\"user\": \"<name>\", \"status\": \"dropped\"} in JSON format"
+      - "successful drop renders a two-column table (user, status) in table format"
+      - "drop_test.go asserts output contains the name and dropped status"
+      - "make test passes"
+    completed_at: "2026-06-15T16:30:00Z"
+
+  - id: task-018
+    title: 'QA fix: Security.Forbidden translation + rename Long description correction'
+    description: |
+      Two related QA findings addressed in one task because both touch the Aura
+      error-handling surface and neither requires new command logic.
+
+      (a) Security.Forbidden translation in run.go:
+      Translate Neo.ClientError.Security.Forbidden to a user-friendly validation_error
+      inside translateAdminError (or translateNeo4jError) in
+      neo4j-cli/internal/subcommands/admin/run.go. Add before the existing ArgumentError
+      checks:
+        if ne.Code == "Neo.ClientError.Security.Forbidden" {
+            return clierr.NewValidationError(
+                "insufficient privileges: the connected user does not have permission to manage users (requires admin role)")
+        }
+      Add a unit test to run_test.go (or a new run_translate_test.go in the admin package)
+      covering the Forbidden -> validation_error translation.
+
+      (b) rename.go Long description:
+      Change "On Aura, renaming a non-native user is rejected by the server." to
+      "On Aura, renaming any user is not supported (Aura uses a non-native authentication
+      provider globally)." Regenerate the skill bundle after this change:
+        go generate ./neo4j-cli/internal/skill/...
+    status: completed
+    dependencies: []
+    source: qa
+    acceptance_criteria:
+      - "translateAdminError returns a validation_error with 'insufficient privileges' message for Security.Forbidden"
+      - "a test asserts the Forbidden -> clean message translation"
+      - "rename.go Long text reads 'On Aura, renaming any user is not supported'"
+      - "go generate ./neo4j-cli/internal/skill/... produces no diff (TestGenerator_RoundTrip passes)"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: "2026-06-15T17:30:00Z"

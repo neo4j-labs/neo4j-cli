@@ -1,0 +1,89 @@
+## TASK-001 — 2026-06-15T00:00:00Z
+Created the admin/user/ package foundation: helpers.go with userExecFn seam, userFields, normalizeUserRow, outputUser, promptUserPassword; export_test.go bridge; user_helpers_test.go with withFakeExecFn, withFakeStdinIsTTY, withFakePasswordReader, testConn.
+Files: +neo4j-cli/internal/subcommands/admin/user/helpers.go, +neo4j-cli/internal/subcommands/admin/user/export_test.go, +neo4j-cli/internal/subcommands/admin/user/user_helpers_test.go
+Decisions: userExecFn declared in helpers.go (not user.go) so leaf files can reference it and be tested independently before NewCmd exists; export_test.go bridge exposes the var to the external test package.
+
+## TASK-002 — 2026-06-15T01:00:00Z
+Implemented list.go and get.go leaf commands with format-aware roles rendering (comma-joined for table/toon, array for JSON); added list_test.go and get_test.go with external test package covering happy path, empty result, null normalization, not-found, and exec error cases.
+Files: +list.go, +list_test.go, +get.go, +get_test.go; ~export_test.go (added NewListCmdForTest/NewGetCmdForTest for external test access)
+Decisions: Since tests are in package user_test (external), added exported test constructors to export_test.go to expose private newListCmd/newGetCmd; rolesJoined helper in list.go copies rows and converts []any roles to comma-joined string before passing to PrintBodyMap.
+
+## TASK-003 — 2026-06-15T03:00:00Z
+Implemented create.go with newCreateCmd: CREATE USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED via userExecFn; --set-password flag (prompts on TTY, usage error on non-TTY), --password-change-required defaulting to true; calls outputUser on success. Added create_test.go covering explicit password, both password-change-required cypher variants, TTY prompt with password capture, non-TTY usage error, successful record emission with null normalization, exec error propagation, write annotation, and no-args error. Also fixed gofmt alignment issues in activate_test.go and suspend_test.go from other task agents.
+Files: +create.go, +create_test.go; ~export_test.go (added NewCreateCmdForTest); ~activate_test.go, ~suspend_test.go (gofmt fixes)
+Decisions: Used createExecResponse (not fakeResponse) to avoid name collision with suspend_test.go's type in the same test package; Cypher built with fmt.Sprintf to embed the change-required clause directly (not parametrized, matching Neo4j syntax).
+
+## TASK-004 — 2026-06-15T02:00:00Z
+Implemented drop.go with newDropCmd: DROP USER $name via userExecFn; confirm.Register/confirm.Require gate (--yes/--force); translates Neo.ClientError.Statement.ArgumentError with "does not exist" to clierr.NewNotFoundError; no output on success. Added drop_test.go (external package) covering success/no-output, two not-found variants, exec error, confirm gate via confirmtest.AssertLeafGate, and write annotation.
+Files: +drop.go, +drop_test.go; ~export_test.go (added NewDropCmdForTest)
+Decisions: Wrapped drop in a "user" cobra.Command parent in buildDropCmd so confirm.Require can use "user" as the resource type label in its prompt, matching the confirmtest.AssertLeafGate ResourceLabel assertion.
+
+## TASK-006 — 2026-06-15T02:00:00Z
+Implemented set_password.go with newSetPasswordCmd: ALTER USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED; --new-password flag (prompts on TTY, usage error on non-TTY), --password-change-required defaulting to false; calls outputUser on success. Added set_password_test.go covering explicit password, cypher variant for both password-change-required values (with NotContains guard), TTY prompt path, non-TTY usage error, exec error propagation, write annotation, and no-args error.
+Files: +set_password.go, +set_password_test.go; ~export_test.go (added NewSetPasswordCmdForTest)
+Decisions: Used setPasswordUserRow (not sampleUserRow) to avoid redeclaration with create_test.go's package-level var in the same test package. Added NotContains("NOT REQUIRED") assertion in the REQUIRED=true test (mirroring create_test.go) to prevent false-pass on condition inversion.
+
+## TASK-007 — 2026-06-15T02:00:00Z
+Implemented suspend.go (ALTER USER $name SET STATUS SUSPENDED) and activate.go (ALTER USER $name SET STATUS ACTIVE); both call outputUser on success and carry write annotation. Added suspend_test.go and activate_test.go covering happy path with correct suspended field, exec error passthrough, no-args cobra error, and write annotation check.
+Files: +suspend.go, +suspend_test.go, +activate.go, +activate_test.go; ~export_test.go (added NewSuspendCmdForTest, NewActivateCmdForTest)
+Decisions: Tests use fakeResponse (defined in suspend_test.go, shared across user_test package) for sequential exec calls; --rw omitted from test args since rw gate is only enforced by the root PersistentPreRunE, not at the leaf level.
+
+## TASK-005 — 2026-06-15T04:00:00Z
+Implemented rename.go and rename_test.go: RENAME USER $oldName TO $newName, cobra.ExactArgs(1), required --new-name flag, calls outputUser with new name on success.
+Files: +rename.go, +rename_test.go; ~export_test.go (NewRenameCmdForTest added by parallel agent)
+
+## TASK-008 — 2026-06-15T05:00:00Z
+Created user.go with NewCmd that sets userExecFn and registers all 8 leaf commands; removed //nolint:unused directives now that all helpers have callers.
+Files: +user.go; ~helpers.go (removed nolint directives), ~user_helpers_test.go (removed nolint)
+
+## TASK-011 — 2026-06-15T05:00:00Z
+Added helpers_test.go (package user internal) with direct unit tests for normalizeUserRow, outputUser, and promptUserPassword.
+Files: +helpers_test.go
+
+## TASK-009 — 2026-06-15T06:00:00Z
+Wired user.NewCmd into admin.go; regenerated skill bundle; all gates pass.
+Files: ~admin.go, ~neo4j-cli/internal/skill/bundle/ (regenerated)
+
+## TASK-010 — 2026-06-15T13:00:22Z
+Added changelog entry for admin user management commands (Minor).
+Files: +.changes/unreleased/neo4j-cli-Minor-20260615-130022.yaml
+
+## REVIEW — 2026-06-15T13:30:00Z
+Added 4 review tasks (task-012..task-015): collapse external test package, consolidate duplicate response struct, move joinRoles to helpers.go, extract passwordChangeClause + table-drive tests.
+
+## TASK-012 — 2026-06-15T14:00:00Z
+Collapsed all *_test.go to package user (internal); deleted export_test.go and user_helpers_test.go; unified seam helpers in helpers_test.go.
+Files: -export_test.go, -user_helpers_test.go, ~helpers_test.go, ~list_test.go, ~get_test.go, ~create_test.go, ~drop_test.go, ~rename_test.go, ~set_password_test.go, ~suspend_test.go, ~activate_test.go
+
+## TASK-014 — 2026-06-15T15:00:00Z
+Moved joinRoles from list.go to helpers.go alongside normalizeUserRow.
+Files: ~helpers.go, ~list.go
+
+## TASK-015 — 2026-06-15T14:00:00Z
+Extracted passwordChangeClause to helpers.go; table-drove True/False test pairs in create_test.go and set_password_test.go.
+Files: ~helpers.go, ~create.go, ~set_password.go, ~create_test.go, ~set_password_test.go
+
+## QA TESTING — 2026-06-15T16:00:00Z
+QA testing against local Enterprise, Desktop, Aura Free, and Aura Professional surfaced 5 issues:
+1. suspend/activate/rename/set-password surface raw Neo4jError for non-existent users (not_found inconsistency) → task-016
+2. create surfaces raw Neo4jError for duplicate user (no conflict code) → task-016
+3. drop produces no stdout on success unlike all other write commands → task-017
+4. Security.Forbidden (Aura Free admin restriction) shows raw error with GRANT/REVOKE hints → task-018
+5. rename Long text says "non-native user" but Aura blocks ALL renames → task-018
+Added REQ-F-011..REQ-F-014 to PRD; added tasks task-016..task-018.
+
+## TASK-017 — 2026-06-15T16:30:00Z
+drop now emits {"user": "<name>", "status": "dropped"} on success via PrintBodyMap with a two-field dropFields slice, aligning it with other write commands.
+Files: ~drop.go, ~drop_test.go
+
+## TASK-016 — 2026-06-15T17:00:00Z
+Added translateUserNotFoundError to helpers.go; suspend/activate/set_password/rename now return not_found (exit 3) for missing users; create returns usage_error (exit 2) for duplicate users.
+Files: ~helpers.go, ~helpers_test.go, ~suspend.go, ~suspend_test.go, ~activate.go, ~activate_test.go, ~set_password.go, ~set_password_test.go, ~rename.go, ~rename_test.go, ~create.go, ~create_test.go
+
+## TASK-018 — 2026-06-15T17:30:00Z
+Added forbiddenCode case to translateAdminError so Security.Forbidden surfaces as a clean "insufficient privileges" validation_error; corrected rename.go Long text (any user, not non-native); regenerated skill bundle.
+Files: ~run.go, ~run_test.go, ~user/rename.go, ~skill/bundle/references/admin.md
+
+## TASK-013 — 2026-06-15T15:30:00Z
+Consolidated duplicate response-mock structs into a single fakeResponse type in helpers_test.go; removed createExecResponse from create_test.go and replaced all usages with fakeResponse.
+Files: ~create_test.go

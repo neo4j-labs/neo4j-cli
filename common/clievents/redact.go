@@ -26,6 +26,8 @@ var secretFlags = []string{
 	"client-secret",
 	"api-key",
 	"instance-password",
+	"set-password",
+	"new-password",
 }
 
 // redactedPlaceholder is what the secret value is replaced with in output.

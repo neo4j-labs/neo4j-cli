@@ -9,10 +9,19 @@
 - [neo4j-cli admin database list](#neo4j-cli-admin-database-list)
 - [neo4j-cli admin database start](#neo4j-cli-admin-database-start)
 - [neo4j-cli admin database stop](#neo4j-cli-admin-database-stop)
+- [neo4j-cli admin user](#neo4j-cli-admin-user)
+- [neo4j-cli admin user activate](#neo4j-cli-admin-user-activate)
+- [neo4j-cli admin user create](#neo4j-cli-admin-user-create)
+- [neo4j-cli admin user drop](#neo4j-cli-admin-user-drop)
+- [neo4j-cli admin user get](#neo4j-cli-admin-user-get)
+- [neo4j-cli admin user list](#neo4j-cli-admin-user-list)
+- [neo4j-cli admin user rename](#neo4j-cli-admin-user-rename)
+- [neo4j-cli admin user set-password](#neo4j-cli-admin-user-set-password)
+- [neo4j-cli admin user suspend](#neo4j-cli-admin-user-suspend)
 
 Manage Neo4j databases, users, and roles
 
-Manage Neo4j databases via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop).
+Manage Neo4j databases via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate).
 
 Usage: `neo4j-cli admin`
 
@@ -176,5 +185,194 @@ neo4j-cli admin database stop mydb --credential local --rw
 
 # Stop a database and wait until it is offline before returning
 neo4j-cli admin database stop mydb --credential local --wait --rw
+```
+
+## neo4j-cli admin user
+
+Manage Neo4j users via the system database
+
+Manage Neo4j users. Read commands (list, get) do not require --rw. Write commands (create, drop, rename, set-password, suspend, activate) require --rw.
+
+Usage: `neo4j-cli admin user`
+
+Examples:
+
+```
+# Show help for the user subcommands
+neo4j-cli admin user --help
+
+# List all users (read-only)
+neo4j-cli admin user list --credential local --format json
+```
+
+### neo4j-cli admin user activate
+
+Activate a user
+
+Activate a previously suspended user by setting their status to ACTIVE via ALTER USER $name SET STATUS ACTIVE against the system database. An active user can log in normally. Returns the updated user record on success.
+
+Usage: `neo4j-cli admin user activate <name>`
+
+Examples:
+
+```
+# Activate a user
+neo4j-cli admin user activate alice --credential local --rw
+
+# Activate a user and display the result as JSON
+neo4j-cli admin user activate alice --credential local --rw --format json
+```
+
+### neo4j-cli admin user create
+
+Create a user
+
+Create a user via CREATE USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED against the system database. Pass --set-password to supply the password non-interactively; omit it on a TTY to be prompted. Pass --password-change-required=false to allow the new user to log in without changing password.
+
+Usage: `neo4j-cli admin user create <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--password-change-required` | bool | true | Require the user to change password on first login |
+| `--set-password` | string | - | Password for the new user (prompted on TTY if omitted) |
+
+Examples:
+
+```
+# Create a user (prompted for password on a TTY)
+neo4j-cli admin user create alice --credential local --rw
+
+# Create a user with an explicit password and no change-on-login requirement
+neo4j-cli admin user create alice --set-password s3cr3t --password-change-required=false --credential local --rw --format json
+```
+
+### neo4j-cli admin user drop
+
+Drop a user
+
+Drop a user via DROP USER <name> against the system database. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli admin user drop <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Drop a user, prompting for confirmation on a TTY
+neo4j-cli admin user drop alice --credential local --rw
+
+# Drop a user without prompting (required for scripts and non-TTY callers)
+neo4j-cli admin user drop alice --credential local --rw --yes --force
+```
+
+### neo4j-cli admin user get
+
+Get details of a user
+
+Get the full record for a single user by name. Executes SHOW USERS WHERE user = $name against the system database. Renders user, roles, password_change_required, and suspended columns.
+
+Usage: `neo4j-cli admin user get <name>`
+
+Examples:
+
+```
+# Get a user record as a table
+neo4j-cli admin user get neo4j --credential local
+
+# Get a user record as JSON for scripting
+neo4j-cli admin user get neo4j --credential local --format json
+```
+
+### neo4j-cli admin user list
+
+List all users
+
+List all users visible from the system database. Renders an overview with user, roles, password_change_required, and suspended columns. Use `get` for the full record of a single user.
+
+Usage: `neo4j-cli admin user list`
+
+Examples:
+
+```
+# List all users as a table
+neo4j-cli admin user list --credential local
+
+# List all users as JSON for scripting
+neo4j-cli admin user list --credential local --format json
+```
+
+### neo4j-cli admin user rename
+
+Rename a user
+
+Rename a user via RENAME USER $oldName TO $newName against the system database. On success, emits the updated user record for the new name. On Aura, renaming any user is not supported (Aura uses a non-native authentication provider globally).
+
+Usage: `neo4j-cli admin user rename <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--new-name` | string | - | New name for the user (required) |
+
+Examples:
+
+```
+# Rename a user
+neo4j-cli admin user rename alice --new-name bob --credential local --rw
+
+# Rename a user and view the result as JSON
+neo4j-cli admin user rename alice --new-name bob --credential local --rw --format json
+```
+
+### neo4j-cli admin user set-password
+
+Set the password for a user
+
+Set the password for an existing user via ALTER USER $name SET PASSWORD against the system database. Use --password-change-required to control whether the user must change their password on next login (defaults to false).
+
+Usage: `neo4j-cli admin user set-password <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--new-password` | string | - | New password for the user (prompted if absent in interactive mode) |
+| `--password-change-required` | bool | false | Require the user to change their password on next login |
+
+Examples:
+
+```
+# Set a password explicitly
+neo4j-cli admin user set-password alice --new-password s3cr3t --credential local --rw
+
+# Set a password and require the user to change it on next login
+neo4j-cli admin user set-password alice --new-password s3cr3t --password-change-required --credential local --rw
+```
+
+### neo4j-cli admin user suspend
+
+Suspend a user
+
+Suspend a user by setting their status to SUSPENDED via ALTER USER $name SET STATUS SUSPENDED against the system database. A suspended user cannot log in. Returns the updated user record on success.
+
+Usage: `neo4j-cli admin user suspend <name>`
+
+Examples:
+
+```
+# Suspend a user
+neo4j-cli admin user suspend alice --credential local --rw
+
+# Suspend a user and display the result as JSON
+neo4j-cli admin user suspend alice --credential local --rw --format json
 ```
 
