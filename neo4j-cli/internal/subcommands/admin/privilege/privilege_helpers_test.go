@@ -173,6 +173,13 @@ func TestBuildPrivilegeCypher_HappyPaths(t *testing.T) {
 			want:   "GRANT SET LABEL `Person` ON GRAPH `neo4j`",
 		},
 		{
+			name:   "setLabel multiple labels",
+			verb:   "GRANT",
+			action: "set_label",
+			opts:   privilegeOpts{onGraph: "neo4j", nodeLabels: []string{"Person", "Movie"}},
+			want:   "GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j`",
+		},
+		{
 			name:   "removeLabel",
 			verb:   "GRANT",
 			action: "remove_label",

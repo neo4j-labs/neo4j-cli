@@ -280,7 +280,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		if graph == "" {
 			graph = "*"
 		}
-		clause = normalized + " " + cypherIdentifier(opts.nodeLabels[0]) + " ON GRAPH " + cypherIdentifier(graph)
+		clause = normalized + " " + strings.Join(escapeIdentifiers(opts.nodeLabels), ", ") + " ON GRAPH " + cypherIdentifier(graph)
 	case database:
 		if hasGraph || opts.onDbms {
 			return "", nil, clierr.NewUsageError("action %s is a database privilege and accepts only --on-database", normalized)

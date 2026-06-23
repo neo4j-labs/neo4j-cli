@@ -364,6 +364,8 @@ tasks:
 
   - id: task-015
     title: "Emit all --node-label values for SET LABEL / REMOVE LABEL (REQ-F-026)"
+    status: completed
+    completed_at: 2026-06-23T00:00:00Z
     description: |
       CLI-217 QA found `SET LABEL` / `REMOVE LABEL` silently drop every `--node-label` after the
       first: the `labelScoped` arm inlines only `opts.nodeLabels[0]`. `--node-label` is a repeatable
