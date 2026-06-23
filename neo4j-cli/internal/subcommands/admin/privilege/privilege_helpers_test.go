@@ -201,6 +201,20 @@ func TestBuildPrivilegeCypher_HappyPaths(t *testing.T) {
 			want:   "GRANT CREATE ROLE ON DBMS",
 		},
 		{
+			name:   "load on all data by default",
+			verb:   "GRANT",
+			action: "load",
+			opts:   privilegeOpts{},
+			want:   "GRANT LOAD ON ALL DATA",
+		},
+		{
+			name:   "load on cidr",
+			verb:   "GRANT",
+			action: "load",
+			opts:   privilegeOpts{cidr: "127.0.0.1/32"},
+			want:   `GRANT LOAD ON CIDR "127.0.0.1/32"`,
+		},
+		{
 			name:   "revoke uses verb prefix",
 			verb:   "REVOKE GRANT",
 			action: "read",
@@ -274,6 +288,13 @@ func TestBuildPrivilegeCypher_EscapesIdentifiers(t *testing.T) {
 			opts:   privilegeOpts{onGraph: "*", nodeLabels: []string{"Person TO adminRole-- "}},
 			want:   "GRANT SET LABEL `Person TO adminRole-- ` ON GRAPH *",
 		},
+		{
+			name:   "cidr with embedded quote and backslash is escaped",
+			verb:   "GRANT",
+			action: "load",
+			opts:   privilegeOpts{cidr: `1.2.3.4/32" TO adminRole\`},
+			want:   `GRANT LOAD ON CIDR "1.2.3.4/32\" TO adminRole\\"`,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -315,6 +336,13 @@ func TestBuildPrivilegeCypher_Errors(t *testing.T) {
 		{name: "database with property", verb: "GRANT", action: "access", opts: privilegeOpts{properties: []string{"name"}}, wantMsg: "ACCESS does not accept a property qualifier"},
 		{name: "node-label and rel-type both set", verb: "GRANT", action: "read", opts: privilegeOpts{onGraph: "*", nodeLabels: []string{"Person"}, relTypes: []string{"KNOWS"}}, wantMsg: "--node-label and --relationship-type are mutually exclusive"},
 		{name: "two scope flags set", verb: "GRANT", action: "read", opts: privilegeOpts{onGraph: "*", onDatabase: "neo4j"}, wantMsg: "--on-graph, --on-database, and --on-dbms are mutually exclusive"},
+		{name: "cidr with non-load action", verb: "GRANT", action: "read", opts: privilegeOpts{onGraph: "*", cidr: "127.0.0.1/32"}, wantMsg: "--cidr is only valid for the LOAD action"},
+		{name: "load with on-graph", verb: "GRANT", action: "load", opts: privilegeOpts{onGraph: "*"}, wantMsg: "action LOAD does not accept --on-graph, --on-database, or --on-dbms"},
+		{name: "load with on-database", verb: "GRANT", action: "load", opts: privilegeOpts{onDatabase: "neo4j"}, wantMsg: "action LOAD does not accept --on-graph, --on-database, or --on-dbms"},
+		{name: "load with on-dbms", verb: "GRANT", action: "load", opts: privilegeOpts{onDbms: true}, wantMsg: "action LOAD does not accept --on-graph, --on-database, or --on-dbms"},
+		{name: "load with node-label", verb: "GRANT", action: "load", opts: privilegeOpts{nodeLabels: []string{"Person"}}, wantMsg: "action LOAD does not accept node-label or relationship-type qualifiers"},
+		{name: "load with relationship-type", verb: "GRANT", action: "load", opts: privilegeOpts{relTypes: []string{"KNOWS"}}, wantMsg: "action LOAD does not accept node-label or relationship-type qualifiers"},
+		{name: "load with property", verb: "GRANT", action: "load", opts: privilegeOpts{properties: []string{"name"}}, wantMsg: "LOAD does not accept a property qualifier"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

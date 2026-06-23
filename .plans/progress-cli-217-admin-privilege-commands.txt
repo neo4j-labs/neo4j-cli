@@ -65,3 +65,8 @@ Files: ~grant_test.go, ~privilege_helpers_test.go
 Added a graphWhole action category for WRITE / ALL GRAPH PRIVILEGES that emits `<ACTION> ON GRAPH <name>` with no entity/property clause (the prior graphOnly mapping produced server-invalid `ELEMENTS *`); TRAVERSE/CREATE/DELETE/LOAD stay graphOnly. graphWhole rejects --node-label/--relationship-type/--property and --on-database/--on-dbms; replaced the bug-encoding test assertions. All four gates pass and no bundle drift; reviewer LGTM.
 Files: ~helpers.go, ~privilege_helpers_test.go, ~deny_test.go
 Decisions: The combined-qualifier guard for graphWhole fires before the generic --property guard so the message lists all three rejected qualifiers; license-check run via the gate set.
+
+## task-014 — 2026-06-23T00:00:00Z
+Re-categorised LOAD into a new `load` actionCategory emitting `LOAD ON ALL DATA` (default) or `LOAD ON CIDR "<cidr>"` (via new --cidr flag); load rejects all scope flags and qualifiers, and --cidr on any non-LOAD action is a usage error. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~privilege_helpers_test.go, ~skill/bundle/references/admin.md
+Decisions: CIDR is rendered as a double-quoted Cypher string literal via new cypherStringLiteral (backslash escaped before quote) — NOT backtick-quoted, since ON CIDR takes a string literal not an identifier. The --property guard for load is caught by the pre-switch generic property guard (different message) before the load arm's node-label/rel-type guard.

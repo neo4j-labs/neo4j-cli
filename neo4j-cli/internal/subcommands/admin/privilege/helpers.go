@@ -49,6 +49,7 @@ func addPrivilegeFlags(cmd *cobra.Command, action, roleName *string, opts *privi
 	cmd.Flags().StringArrayVar(&opts.nodeLabels, "node-label", nil, "Restrict a graph privilege to node labels")
 	cmd.Flags().StringArrayVar(&opts.relTypes, "relationship-type", nil, "Restrict a graph privilege to relationship types")
 	cmd.Flags().StringArrayVar(&opts.properties, "property", nil, "Restrict a property privilege to properties")
+	cmd.Flags().StringVar(&opts.cidr, "cidr", "", "Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data)")
 }
 
 func rolePreposition(verbWord string) string {
@@ -95,6 +96,7 @@ const (
 	labelScoped
 	database
 	dbms
+	load
 )
 
 // validActions maps each supported (normalised) privilege action keyword to its
@@ -108,10 +110,11 @@ var validActions = map[string]actionCategory{
 	"TRAVERSE": graphOnly,
 	"CREATE":   graphOnly,
 	"DELETE":   graphOnly,
-	"LOAD":     graphOnly,
 
 	"WRITE":                graphWhole,
 	"ALL GRAPH PRIVILEGES": graphWhole,
+
+	"LOAD": load,
 
 	"SET LABEL":    labelScoped,
 	"REMOVE LABEL": labelScoped,
@@ -167,6 +170,7 @@ type privilegeOpts struct {
 	nodeLabels []string
 	relTypes   []string
 	properties []string
+	cidr       string
 }
 
 // normalizeAction upper-cases the action and collapses underscores and runs of
@@ -204,6 +208,10 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		return "", nil, err
 	}
 	category := validActions[normalized]
+
+	if opts.cidr != "" && category != load {
+		return "", nil, clierr.NewUsageError("--cidr is only valid for the LOAD action")
+	}
 
 	hasGraph := opts.onGraph != ""
 	hasDatabase := opts.onDatabase != ""
@@ -290,6 +298,18 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 			return "", nil, clierr.NewUsageError("action %s requires --on-dbms", normalized)
 		}
 		clause = normalized + " ON DBMS"
+	case load:
+		if hasGraph || hasDatabase || opts.onDbms {
+			return "", nil, clierr.NewUsageError("action %s does not accept --on-graph, --on-database, or --on-dbms (use --cidr)", normalized)
+		}
+		if hasNodeLabel || hasRelType {
+			return "", nil, clierr.NewUsageError("action %s does not accept node-label or relationship-type qualifiers", normalized)
+		}
+		if opts.cidr == "" {
+			clause = normalized + " ON ALL DATA"
+		} else {
+			clause = normalized + " ON CIDR " + cypherStringLiteral(opts.cidr)
+		}
 	}
 
 	return verb + " " + clause, map[string]any{}, nil
@@ -328,6 +348,16 @@ func cypherIdentifier(id string) string {
 		return id
 	}
 	return "`" + strings.ReplaceAll(id, "`", "``") + "`"
+}
+
+// cypherStringLiteral renders value as a double-quoted Cypher string literal,
+// escaping embedded backslashes and double quotes. Used for the LOAD ON CIDR
+// target, which is a string literal in Cypher — NOT an identifier, so it is
+// double-quoted rather than backtick-quoted.
+func cypherStringLiteral(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+	return `"` + escaped + `"`
 }
 
 func escapeIdentifiers(ids []string) []string {

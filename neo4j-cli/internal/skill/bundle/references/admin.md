@@ -230,6 +230,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--action` | string | - | Privilege action to deny (e.g. read, traverse, create_role) |
+| `--cidr` | string | - | Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data) |
 | `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
 | `--on-database` | string | - | Scope the privilege to a database (use * for all) |
 | `--on-dbms` | bool | false | Scope the privilege to the DBMS |
@@ -261,6 +262,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--action` | string | - | Privilege action to grant (e.g. read, traverse, create_role) |
+| `--cidr` | string | - | Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data) |
 | `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
 | `--on-database` | string | - | Scope the privilege to a database (use * for all) |
 | `--on-dbms` | bool | false | Scope the privilege to the DBMS |
@@ -320,6 +322,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--action` | string | - | Privilege action to revoke (e.g. read, traverse, create_role) |
+| `--cidr` | string | - | Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data) |
 | `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
 | `--on-database` | string | - | Scope the privilege to a database (use * for all) |
 | `--on-dbms` | bool | false | Scope the privilege to the DBMS |

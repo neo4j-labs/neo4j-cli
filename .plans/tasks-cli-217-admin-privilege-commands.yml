@@ -332,6 +332,8 @@ tasks:
 
   - id: task-014
     title: "Re-categorise LOAD to its real ON ALL DATA / ON CIDR syntax with a --cidr flag (REQ-F-025)"
+    status: completed
+    completed_at: 2026-06-23T00:00:00Z
     description: |
       CLI-217 QA found `LOAD` is fundamentally miscategorised: it is NOT a graph privilege. Its
       grammar is `GRANT LOAD ON ALL DATA TO role` or `GRANT LOAD ON CIDR "<cidr>" TO role` (both
