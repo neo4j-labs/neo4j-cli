@@ -51,7 +51,7 @@ func TestDeny_PropertyBearer_DeniesAndShowsPrivileges(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
-	assert.Equal(t, "DENY WRITE ON GRAPH * ELEMENTS * TO $role", calls[0].cypher)
+	assert.Equal(t, "DENY WRITE ON GRAPH * TO $role", calls[0].cypher)
 	assert.Equal(t, "readonly", calls[0].params["role"])
 	assert.Equal(t, "SHOW ROLE $name PRIVILEGES", calls[1].cypher)
 	assert.Equal(t, "readonly", calls[1].params["name"])

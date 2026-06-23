@@ -91,6 +91,7 @@ type actionCategory int
 const (
 	propertyBearer actionCategory = iota
 	graphOnly
+	graphWhole
 	labelScoped
 	database
 	dbms
@@ -104,12 +105,13 @@ var validActions = map[string]actionCategory{
 	"SET PROPERTY": propertyBearer,
 	"MERGE":        propertyBearer,
 
-	"TRAVERSE":             graphOnly,
-	"WRITE":                graphOnly,
-	"CREATE":               graphOnly,
-	"DELETE":               graphOnly,
-	"LOAD":                 graphOnly,
-	"ALL GRAPH PRIVILEGES": graphOnly,
+	"TRAVERSE": graphOnly,
+	"CREATE":   graphOnly,
+	"DELETE":   graphOnly,
+	"LOAD":     graphOnly,
+
+	"WRITE":                graphWhole,
+	"ALL GRAPH PRIVILEGES": graphWhole,
 
 	"SET LABEL":    labelScoped,
 	"REMOVE LABEL": labelScoped,
@@ -227,6 +229,10 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		return "", nil, clierr.NewUsageError("--node-label and --relationship-type are mutually exclusive")
 	}
 
+	if category == graphWhole && (hasNodeLabel || hasRelType || hasProperty) {
+		return "", nil, clierr.NewUsageError("%s does not accept node-label, relationship-type, or property qualifiers", normalized)
+	}
+
 	if hasProperty && category != propertyBearer {
 		return "", nil, clierr.NewUsageError("%s does not accept a property qualifier", normalized)
 	}
@@ -246,6 +252,15 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 			prop = " " + propertyClause(opts.properties)
 		}
 		clause = normalized + prop + " ON GRAPH " + cypherIdentifier(graph) + " " + entityClause(opts.nodeLabels, opts.relTypes)
+	case graphWhole:
+		if hasDatabase || opts.onDbms {
+			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
+		}
+		graph := opts.onGraph
+		if graph == "" {
+			graph = "*"
+		}
+		clause = normalized + " ON GRAPH " + cypherIdentifier(graph)
 	case labelScoped:
 		if hasDatabase || opts.onDbms {
 			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)

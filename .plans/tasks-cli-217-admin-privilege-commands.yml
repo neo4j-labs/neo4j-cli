@@ -299,6 +299,8 @@ tasks:
 
   - id: task-013
     title: "Fix WRITE / ALL GRAPH PRIVILEGES: new graphWhole category with no entity clause (REQ-F-023/024)"
+    status: completed
+    completed_at: 2026-06-23T00:00:00Z
     description: |
       CLI-217 QA (live against Neo4j 2025.10 Enterprise + Aura Business Critical) found that
       `WRITE` and `ALL GRAPH PRIVILEGES` can NEVER be granted: they are in the `graphOnly`

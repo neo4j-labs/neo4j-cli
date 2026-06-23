@@ -60,3 +60,8 @@ Added 1 review task (task-012) from CI conventions-review (shared test helpers m
 ## task-012 — 2026-06-22T17:00:00Z
 Relocated the cross-leaf shared test helpers (sequencedCall, withRecordingSequencedExecFn, twoOK) verbatim from grant_test.go into privilege_helpers_test.go, satisfying AGENTS.md's resource-level shared-helper rule; grant_test.go keeps only its grant-specific runGrant helper and tests. Moved context/clicfg imports accordingly. All four gates pass and no bundle drift; reviewer LGTM.
 Files: ~grant_test.go, ~privilege_helpers_test.go
+
+## task-013 — 2026-06-23T00:00:00Z
+Added a graphWhole action category for WRITE / ALL GRAPH PRIVILEGES that emits `<ACTION> ON GRAPH <name>` with no entity/property clause (the prior graphOnly mapping produced server-invalid `ELEMENTS *`); TRAVERSE/CREATE/DELETE/LOAD stay graphOnly. graphWhole rejects --node-label/--relationship-type/--property and --on-database/--on-dbms; replaced the bug-encoding test assertions. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~privilege_helpers_test.go, ~deny_test.go
+Decisions: The combined-qualifier guard for graphWhole fires before the generic --property guard so the message lists all three rejected qualifiers; license-check run via the gate set.
