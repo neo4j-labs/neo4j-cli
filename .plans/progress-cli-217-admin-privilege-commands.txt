@@ -74,3 +74,8 @@ Decisions: CIDR is rendered as a double-quoted Cypher string literal via new cyp
 ## task-015 — 2026-06-23T00:00:00Z
 Changed the labelScoped arm of buildPrivilegeCypher to emit all --node-label values comma-joined and backtick-escaped via escapeIdentifiers (was inlining only nodeLabels[0]); added a multi-label unit case. Single-label output unchanged; guards/mutual-exclusion untouched. All four gates pass and no bundle drift; reviewer LGTM.
 Files: ~helpers.go, ~privilege_helpers_test.go
+
+## task-016 — 2026-06-23T00:00:00Z
+Added a server-validated note atop the buildPrivilegeCypher happy-path test table (all 7 categories already had REQ-NF-005-confirmed cases), and extended grant/deny/revoke Long strings to mention --cidr (LOAD-only) and the no-qualifier rule for WRITE / ALL GRAPH PRIVILEGES; regenerated the skill bundle.
+Files: ~4 (privilege_helpers_test.go, grant.go, deny.go, revoke.go), ~1 generated (bundle/references/admin.md)
+Decisions: No code/grouping comments still mis-classified WRITE/LOAD/ALL GRAPH PRIVILEGES as graphOnly (tasks 13/14 already corrected those), so requirement 2 needed no edit.

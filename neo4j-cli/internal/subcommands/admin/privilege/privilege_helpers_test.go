@@ -108,6 +108,10 @@ func TestValidActions_FindAbsent(t *testing.T) {
 	}
 }
 
+// The expected Cypher fragments below are server-validated: each was confirmed
+// valid on a real Neo4j 2025.x server (see REQ-NF-005). Do not change them to
+// invalid Cypher just to make a test pass — a green test asserting Cypher the
+// server rejects is the exact regression these cases guard against.
 func TestBuildPrivilegeCypher_HappyPaths(t *testing.T) {
 	cases := []struct {
 		name   string

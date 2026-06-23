@@ -26,6 +26,8 @@ func newRevokeCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 			"privilege; omit it to revoke both. " +
 			"Resource scope is set with --on-graph, --on-database, or --on-dbms (mutually exclusive); " +
 			"graph privileges may be qualified with --node-label, --relationship-type, or --property. " +
+			"WRITE and ALL GRAPH PRIVILEGES accept no qualifiers. " +
+			"--cidr scopes a LOAD privilege to a CIDR range (LOAD only). " +
 			"After the revoke, the role's updated privileges are printed.",
 		Example: `# Revoke READ on all graphs from the analyst role
 neo4j-cli admin privilege revoke --action read --on-graph * --role analyst --credential local --rw

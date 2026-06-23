@@ -21,6 +21,8 @@ func newGrantCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 			"The action is supplied with --action (case-insensitive, underscores tolerated). " +
 			"Resource scope is set with --on-graph, --on-database, or --on-dbms (mutually exclusive); " +
 			"graph privileges may be qualified with --node-label, --relationship-type, or --property. " +
+			"WRITE and ALL GRAPH PRIVILEGES accept no qualifiers. " +
+			"--cidr scopes a LOAD privilege to a CIDR range (LOAD only). " +
 			"After the grant, the role's updated privileges are printed.",
 		Example: `# Grant READ on all graphs to the analyst role
 neo4j-cli admin privilege grant --action read --on-graph * --role analyst --credential local --rw

@@ -221,7 +221,7 @@ neo4j-cli admin privilege list --credential local --format json
 
 Deny a privilege to a role
 
-Deny a privilege to a role via DENY <privilege> TO <role> against the system database. The action is supplied with --action (case-insensitive, underscores tolerated). Resource scope is set with --on-graph, --on-database, or --on-dbms (mutually exclusive); graph privileges may be qualified with --node-label, --relationship-type, or --property. After the deny, the role's updated privileges are printed.
+Deny a privilege to a role via DENY <privilege> TO <role> against the system database. The action is supplied with --action (case-insensitive, underscores tolerated). Resource scope is set with --on-graph, --on-database, or --on-dbms (mutually exclusive); graph privileges may be qualified with --node-label, --relationship-type, or --property. WRITE and ALL GRAPH PRIVILEGES accept no qualifiers. --cidr scopes a LOAD privilege to a CIDR range (LOAD only). After the deny, the role's updated privileges are printed.
 
 Usage: `neo4j-cli admin privilege deny [flags]`
 
@@ -253,7 +253,7 @@ neo4j-cli admin privilege deny --action create_role --on-dbms --role analyst --c
 
 Grant a privilege to a role
 
-Grant a privilege to a role via GRANT <privilege> TO <role> against the system database. The action is supplied with --action (case-insensitive, underscores tolerated). Resource scope is set with --on-graph, --on-database, or --on-dbms (mutually exclusive); graph privileges may be qualified with --node-label, --relationship-type, or --property. After the grant, the role's updated privileges are printed.
+Grant a privilege to a role via GRANT <privilege> TO <role> against the system database. The action is supplied with --action (case-insensitive, underscores tolerated). Resource scope is set with --on-graph, --on-database, or --on-dbms (mutually exclusive); graph privileges may be qualified with --node-label, --relationship-type, or --property. WRITE and ALL GRAPH PRIVILEGES accept no qualifiers. --cidr scopes a LOAD privilege to a CIDR range (LOAD only). After the grant, the role's updated privileges are printed.
 
 Usage: `neo4j-cli admin privilege grant [flags]`
 
@@ -313,7 +313,7 @@ neo4j-cli admin privilege list --credential local --user alice
 
 Revoke a privilege from a role
 
-Revoke a privilege from a role via REVOKE <privilege> FROM <role> against the system database. The action is supplied with --action (case-insensitive, underscores tolerated). Use --revoke-type grant or --revoke-type deny to revoke only a previously granted or denied privilege; omit it to revoke both. Resource scope is set with --on-graph, --on-database, or --on-dbms (mutually exclusive); graph privileges may be qualified with --node-label, --relationship-type, or --property. After the revoke, the role's updated privileges are printed.
+Revoke a privilege from a role via REVOKE <privilege> FROM <role> against the system database. The action is supplied with --action (case-insensitive, underscores tolerated). Use --revoke-type grant or --revoke-type deny to revoke only a previously granted or denied privilege; omit it to revoke both. Resource scope is set with --on-graph, --on-database, or --on-dbms (mutually exclusive); graph privileges may be qualified with --node-label, --relationship-type, or --property. WRITE and ALL GRAPH PRIVILEGES accept no qualifiers. --cidr scopes a LOAD privilege to a CIDR range (LOAD only). After the revoke, the role's updated privileges are printed.
 
 Usage: `neo4j-cli admin privilege revoke [flags]`
 

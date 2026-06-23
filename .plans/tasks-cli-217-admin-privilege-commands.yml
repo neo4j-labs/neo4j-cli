@@ -389,6 +389,8 @@ tasks:
 
   - id: task-016
     title: "Add per-category server-validity regression guard and refresh docs/skill bundle (REQ-NF-005, REQ-F-027/028)"
+    status: completed
+    completed_at: 2026-06-23T00:00:00Z
     description: |
       Close out the QA fixes. (1) Ensure `buildPrivilegeCypher` unit tests in
       `privilege_helpers_test.go` have at least one case per category — propertyBearer, graphOnly,
