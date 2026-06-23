@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-22T00:00:00Z
+updated_at: 2026-06-22T17:30:00Z
 
 tasks:
   - id: task-001
@@ -296,3 +296,111 @@ tasks:
       - "No duplicate symbol definitions; the privilege package test build is clean"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
     completed_at: 2026-06-22
+
+  - id: task-013
+    title: "Fix WRITE / ALL GRAPH PRIVILEGES: new graphWhole category with no entity clause (REQ-F-023/024)"
+    description: |
+      CLI-217 QA (live against Neo4j 2025.10 Enterprise + Aura Business Critical) found that
+      `WRITE` and `ALL GRAPH PRIVILEGES` can NEVER be granted: they are in the `graphOnly`
+      category, which unconditionally appends `entityClause(...)` (defaulting to `ELEMENTS *`),
+      and Neo4j rejects `GRANT WRITE ON GRAPH * ELEMENTS * TO role` with
+      `Neo.ClientError.Statement.SyntaxError (Invalid input 'ELEMENTS')`. The correct forms are
+      `GRANT WRITE ON GRAPH * TO role` and `GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j TO role`
+      (both verified live; no `ELEMENTS`/`NODES`/`RELATIONSHIPS` segment allowed).
+      Add a new `graphWhole` constant to the `actionCategory` enum in helpers.go and re-map
+      `WRITE` and `ALL GRAPH PRIVILEGES` in `validActions` from `graphOnly` to `graphWhole`.
+      `TRAVERSE`, `CREATE`, `DELETE` stay on `graphOnly` (they correctly accept the entity clause —
+      verified live). Add a `case graphWhole:` arm to `buildPrivilegeCypher` that: rejects
+      `--on-database`/`--on-dbms` (same as graphOnly); rejects `--node-label`,
+      `--relationship-type`, and `--property` with a usage error like
+      `"<ACTION> does not accept node-label, relationship-type, or property qualifiers"`; and emits
+      `normalized + " ON GRAPH " + cypherIdentifier(graph)` with NO property clause and NO entity
+      clause (default graph `*`). Order the new qualifier check so it fires before the generic
+      `--property` guard at the top of the function (or fold it in) to keep messages sensible.
+    source: review
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "`actionCategory` has a `graphWhole` constant; `WRITE` and `ALL GRAPH PRIVILEGES` map to it in `validActions`; `TRAVERSE`/`CREATE`/`DELETE` remain `graphOnly`"
+      - "`buildPrivilegeCypher` emits `GRANT WRITE ON GRAPH *` and ``GRANT ALL GRAPH PRIVILEGES ON GRAPH `neo4j` `` with no `ELEMENTS *`/entity/property clause (fragment before the leaf appends ` TO $role`)"
+      - "`graphWhole` action with `--node-label`, `--relationship-type`, or `--property` returns a usage error (exit code 2)"
+      - "`graphWhole` action with `--on-database` or `--on-dbms` returns a usage error (only `--on-graph` allowed)"
+      - "Unit cases for WRITE and ALL GRAPH PRIVILEGES assert the server-valid Cypher (no ELEMENTS); the previously bug-encoding assertion at privilege_helpers_test.go is replaced (REQ-F-028)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+
+  - id: task-014
+    title: "Re-categorise LOAD to its real ON ALL DATA / ON CIDR syntax with a --cidr flag (REQ-F-025)"
+    description: |
+      CLI-217 QA found `LOAD` is fundamentally miscategorised: it is NOT a graph privilege. Its
+      grammar is `GRANT LOAD ON ALL DATA TO role` or `GRANT LOAD ON CIDR "<cidr>" TO role` (both
+      verified live; `GRANT LOAD ON GRAPH * ... TO role` fails with a SyntaxError). As currently
+      classified (`graphOnly` → `ON GRAPH`), LOAD is unreachable.
+      Add a `load` constant to the `actionCategory` enum and re-map `LOAD` to it in `validActions`
+      (remove it from graphOnly). Add a `--cidr <value>` flag to the shared flag set
+      (`addPrivilegeFlags`) and a `cidr string` field to `privilegeOpts`. Add a `case load:` arm to
+      `buildPrivilegeCypher` that rejects every scope flag (`--on-graph`/`--on-database`/`--on-dbms`)
+      and every qualifier (`--node-label`/`--relationship-type`/`--property`) with a usage error, and
+      emits `LOAD ON ALL DATA` when `opts.cidr == ""` or `LOAD ON CIDR "<cidr>"` when set. The CIDR
+      value is rendered as a double-quoted Cypher string literal (NOT cypherIdentifier/backticks);
+      escape embedded `"` and backslash for safety, consistent with task-011 hardening. Add a guard
+      near the top of buildPrivilegeCypher: `opts.cidr != "" && category != load` → usage error
+      (`"--cidr is only valid for the LOAD action"`).
+    source: review
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "`actionCategory` has a `load` constant; `LOAD` maps to it; LOAD is removed from `graphOnly`"
+      - "A `--cidr` flag exists on grant/deny/revoke and `privilegeOpts` has a `cidr` field"
+      - "`buildPrivilegeCypher` emits `LOAD ON ALL DATA` by default and `LOAD ON CIDR \"127.0.0.1/32\"` when `--cidr 127.0.0.1/32` is supplied (CIDR is a double-quoted string literal, not backtick-quoted)"
+      - "A `load` action with any of `--on-graph`/`--on-database`/`--on-dbms`/`--node-label`/`--relationship-type`/`--property` returns a usage error (exit code 2)"
+      - "`--cidr` supplied with any non-LOAD action returns a usage error"
+      - "Embedded `\"`/backslash in a `--cidr` value is escaped (no string-literal breakout)"
+      - "Unit cases cover both LOAD forms and the new usage errors; expected Cypher matches the server-valid forms in REQ-NF-005"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+
+  - id: task-015
+    title: "Emit all --node-label values for SET LABEL / REMOVE LABEL (REQ-F-026)"
+    description: |
+      CLI-217 QA found `SET LABEL` / `REMOVE LABEL` silently drop every `--node-label` after the
+      first: the `labelScoped` arm inlines only `opts.nodeLabels[0]`. `--node-label` is a repeatable
+      (StringArray) flag and Neo4j accepts a comma list — `GRANT SET LABEL Person, Movie ON GRAPH
+      neo4j TO role` is valid (verified live) — so additional labels vanish with no error or warning.
+      Change the `labelScoped` arm in `buildPrivilegeCypher` to emit every label, comma-joined, each
+      backtick-escaped via the existing helper:
+      `normalized + " " + strings.Join(escapeIdentifiers(opts.nodeLabels), ", ") + " ON GRAPH " + cypherIdentifier(graph)`.
+      The existing `--node-label`/`--relationship-type` mutual-exclusion and the
+      "requires --node-label" guard are unchanged; `--relationship-type` and `--property` remain
+      invalid for label actions.
+    source: review
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "`labelScoped` emits all `--node-label` values comma-joined, each backtick-escaped (e.g. ``SET LABEL `Person`, `Movie` ``), not just the first"
+      - "A single `--node-label` still renders as before (one backtick-quoted label)"
+      - "Multi-label unit case asserts ``GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j` `` (fragment before ` TO $role`)"
+      - "Missing `--node-label` for SET/REMOVE LABEL still returns a usage error; `--relationship-type` with a label action still errors"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+
+  - id: task-016
+    title: "Add per-category server-validity regression guard and refresh docs/skill bundle (REQ-NF-005, REQ-F-027/028)"
+    description: |
+      Close out the QA fixes. (1) Ensure `buildPrivilegeCypher` unit tests in
+      `privilege_helpers_test.go` have at least one case per category — propertyBearer, graphOnly,
+      graphWhole, labelScoped, database, dbms, load — whose expected Cypher is a string a human has
+      confirmed valid on Neo4j 2025.x (the QA-confirmed fragments are listed in REQ-NF-005). Add a
+      short comment at the top of that test table noting the assertions are server-validated and must
+      not be changed to invalid Cypher to make a test pass. (2) Remove any remaining references to
+      WRITE/LOAD/ALL GRAPH PRIVILEGES under `graphOnly` in code comments and the validActions grouping
+      comments. (3) Re-run `go generate ./neo4j-cli/internal/skill/...` so the regenerated bundle
+      reflects the new `--cidr` flag and any updated `Long`/flag help, and commit it. Update the
+      grant/deny/revoke `Long` strings to mention `--cidr` (LOAD-only) and that WRITE / ALL GRAPH
+      PRIVILEGES accept no qualifiers.
+    source: review
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "Every action category has ≥1 buildPrivilegeCypher unit case with server-valid expected Cypher; a comment documents that these are server-validated"
+      - "No code comment or grouping still classifies WRITE/LOAD/ALL GRAPH PRIVILEGES as graphOnly"
+      - "grant/deny/revoke `Long` text mentions `--cidr` (LOAD-only) and the no-qualifier rule for WRITE / ALL GRAPH PRIVILEGES"
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no diff after commit (`TestGenerator_RoundTrip` passes); the bundle reflects `--cidr`"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean"

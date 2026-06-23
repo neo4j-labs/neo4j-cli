@@ -14,10 +14,12 @@ targeting Neo4j Enterprise. All commands execute Cypher against the `system` dat
 shared `adminutil.ExecFn` seam introduced in CLI-214.
 
 The principal technical challenge is **action-category-aware Cypher construction**: each privilege
-action belongs to one of five categories (propertyBearer, graphOnly, setLabel, removeLabel,
-database, dbms) and each category has different valid resource scopes, qualifier flags, and Cypher
-templates. A `buildPrivilegeCypher` helper in `privilege/helpers.go` centralises this logic and
-is directly unit-tested.
+action belongs to one category (propertyBearer, graphOnly, graphWhole, load, labelScoped, database,
+dbms) and each category has different valid resource scopes, qualifier flags, and Cypher templates.
+A `buildPrivilegeCypher` helper in `privilege/helpers.go` centralises this logic and is directly
+unit-tested. **The unit tests assert the generated string only — they do not execute it — so they
+cannot catch a category that emits Cypher a real server rejects; CLI-217 QA found three such defects
+(see "Bug fixes from QA").**
 
 PR #226 (CLI-216, role commands) introduced two infrastructure changes that directly affect
 privilege implementation: (1) `run.go`'s `translateAdminError` now takes a `uri string` parameter
@@ -35,6 +37,7 @@ internally. Both patterns must be followed.
 3. Emit the role's updated privilege list after every mutation (same output path as `privilege list --role <name>`).
 4. Provide clear usage errors for incompatible flag combinations before ever hitting the database.
 5. Pass all final gates: `make test`, `make fmt-check`, `make lint`, `TestGenerator_RoundTrip` (skill bundle regenerated with all admin commands).
+6. Emit Cypher that a live Neo4j 2025.x server actually accepts for **every** advertised action — no action category may produce a guaranteed `SyntaxError`, and no qualifier flag may be silently dropped (added after CLI-217 QA found three such defects; see "Bug fixes from QA" below).
 
 ---
 
@@ -108,20 +111,23 @@ internally. Both patterns must be followed.
   | Category | Actions | Property clause | Entity clause | Valid resource scope |
   |---|---|---|---|---|
   | `propertyBearer` | READ, MATCH, SET PROPERTY, MERGE | `{*}` or `{p1, p2}` | ELEMENTS * / NODES / RELATIONSHIPS | `--on-graph` only |
-  | `graphOnly` | TRAVERSE, WRITE, CREATE, DELETE, LOAD, ALL GRAPH PRIVILEGES | none | ELEMENTS * / NODES / RELATIONSHIPS | `--on-graph` only |
-  | `setLabel` | SET LABEL | none | `<label>` (from `--node-label`) | `--on-graph` only |
-  | `removeLabel` | REMOVE LABEL | none | `<label>` (from `--node-label`) | `--on-graph` only |
+  | `graphOnly` | TRAVERSE, CREATE, DELETE | none | ELEMENTS * / NODES / RELATIONSHIPS | `--on-graph` only |
+  | `graphWhole` | WRITE, ALL GRAPH PRIVILEGES | none | none (qualifiers rejected) | `--on-graph` only |
+  | `load` | LOAD | none | none | none — `ON ALL DATA` (default) or `ON CIDR "<cidr>"` via `--cidr` |
+  | `labelScoped` | SET LABEL, REMOVE LABEL | none | `<label1>, <label2>, …` (all `--node-label` values) | `--on-graph` only |
   | `database` | ACCESS, START, STOP, CREATE INDEX, DROP INDEX, SHOW INDEX, INDEX MANAGEMENT, CREATE CONSTRAINT, DROP CONSTRAINT, SHOW CONSTRAINT, CONSTRAINT MANAGEMENT, CREATE NEW NODE LABEL, CREATE NEW RELATIONSHIP TYPE, CREATE NEW PROPERTY NAME, NAME MANAGEMENT, ALL DATABASE PRIVILEGES, SHOW TRANSACTION, TERMINATE TRANSACTION, TRANSACTION MANAGEMENT | none | none | `--on-database` only (default `*`) |
   | `dbms` | CREATE ROLE, DROP ROLE, ASSIGN ROLE, REMOVE ROLE, SHOW ROLE, ROLE MANAGEMENT, CREATE USER, DROP USER, SHOW USER, SET USER STATUS, SET USER HOME DATABASE, ALTER USER, USER MANAGEMENT, CREATE DATABASE, DROP DATABASE, DATABASE MANAGEMENT, SHOW PRIVILEGE, PRIVILEGE MANAGEMENT, ALL DBMS PRIVILEGES | none | none | `--on-dbms` only (required) |
 
 - REQ-F-011: Client-side usage errors for flag/category mismatches (checked before sending to the
   database):
-  - `graphOnly` or `propertyBearer` action with `--on-database` or `--on-dbms` → error
+  - `graphOnly`, `graphWhole`, or `propertyBearer` action with `--on-database` or `--on-dbms` → error
   - `database` action with `--on-graph` or `--on-dbms` → error
   - `dbms` action without `--on-dbms` → error: `"action <ACTION> requires --on-dbms"`
   - `dbms` action with `--on-graph` or `--on-database` → error
-  - `setLabel` or `removeLabel` without `--node-label` → error: `"action SET/REMOVE LABEL requires --node-label"`
-  - `graphOnly`, `setLabel`, `removeLabel`, `database`, or `dbms` action with `--property` → error: `"<ACTION> does not accept a property qualifier"`
+  - `labelScoped` (`SET LABEL`/`REMOVE LABEL`) without `--node-label` → error: `"action SET/REMOVE LABEL requires --node-label"`
+  - any non-`propertyBearer` action with `--property` → error: `"<ACTION> does not accept a property qualifier"`
+  - `graphWhole` (`WRITE`/`ALL GRAPH PRIVILEGES`) with `--node-label` or `--relationship-type` → error (REQ-F-024)
+  - `load` (`LOAD`) with any scope or qualifier flag → error; `--cidr` with any non-`load` action → error (REQ-F-025)
   - `--node-label` and `--relationship-type` both set → error: `"--node-label and --relationship-type are mutually exclusive"`
   - `--on-graph`, `--on-database`, and `--on-dbms` more than one set simultaneously → error
 
@@ -137,21 +143,40 @@ internally. Both patterns must be followed.
   when only `--node-label`; `RELATIONSHIPS t1, t2` when only `--relationship-type`.
   Resource: `ON GRAPH <name>` — default name is `*` when `--on-graph` is absent.
 
-  **graphOnly** (`TRAVERSE`, `WRITE`, `CREATE`, `DELETE`, `LOAD`, `ALL GRAPH PRIVILEGES`):
+  **graphOnly** (`TRAVERSE`, `CREATE`, `DELETE`):
   ```
   GRANT TRAVERSE ON GRAPH * ELEMENTS * TO analyst
   GRANT TRAVERSE ON GRAPH neo4j NODES Movie TO analyst
   ```
   No property clause. Entity clause same as propertyBearer. Resource: `ON GRAPH <name>`.
 
-  **setLabel** (`SET LABEL`):
+  **graphWhole** (`WRITE`, `ALL GRAPH PRIVILEGES`) — REQ-F-023/024:
+  ```
+  GRANT WRITE ON GRAPH * TO analyst
+  GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j TO analyst
+  ```
+  No property clause AND no entity clause (`ELEMENTS *` / `NODES` / `RELATIONSHIPS` is invalid Cypher
+  for these actions). Resource: `ON GRAPH <name>` — default `*`. `--node-label`,
+  `--relationship-type`, and `--property` are usage errors.
+
+  **load** (`LOAD`) — REQ-F-025:
+  ```
+  GRANT LOAD ON ALL DATA TO analyst
+  GRANT LOAD ON CIDR "127.0.0.1/32" TO analyst
+  ```
+  No scope/entity/property flags. `ON ALL DATA` by default; `ON CIDR "<cidr>"` when `--cidr` is set
+  (CIDR value is a double-quoted string literal, not a backtick identifier). All of `--on-graph`,
+  `--on-database`, `--on-dbms`, `--node-label`, `--relationship-type`, `--property` are usage errors;
+  `--cidr` on any non-LOAD action is a usage error.
+
+  **labelScoped** (`SET LABEL`, `REMOVE LABEL`) — REQ-F-026:
   ```
   GRANT SET LABEL Person ON GRAPH neo4j TO analyst
+  GRANT SET LABEL Person, Movie ON GRAPH neo4j TO analyst
   ```
-  Emits `SET LABEL <label>` using the first `--node-label` value; no entity clause.
-  Resource: `ON GRAPH <name>`.
-
-  **removeLabel** (`REMOVE LABEL`): same shape as setLabel.
+  Emits `SET LABEL <l1>, <l2>, …` using **all** `--node-label` values (each backtick-escaped),
+  comma-joined; no entity clause. Resource: `ON GRAPH <name>`. `--relationship-type` and `--property`
+  are invalid.
 
   **database** scope:
   ```
@@ -230,6 +255,65 @@ internally. Both patterns must be followed.
 - REQ-F-020: A Minor changelog entry is added via `changie new --projects neo4j-cli --kind Minor
   --body "..."` describing the new `admin privilege` commands.
 
+**Bug fixes from QA (CLI-217 live testing against Neo4j 2025.10 Enterprise + Aura Free/Professional/Business Critical)**
+
+These requirements correct three defects found during end-to-end QA. All three were *masked* by the
+unit suite because the leaf/`buildPrivilegeCypher` tests assert the generated Cypher *string* and
+never execute it against a server — two of them even assert the broken output as the expected value
+(see REQ-F-028). Every fix below MUST be accompanied by a test whose expected Cypher is valid on a
+real Neo4j 2025.x server.
+
+- REQ-F-023: **`WRITE` and `ALL GRAPH PRIVILEGES` must not emit an entity clause.** These two actions
+  are currently in the `graphOnly` category, which unconditionally appends `entityClause(...)`
+  (defaulting to `ELEMENTS *`). Neo4j rejects this — `GRANT WRITE ON GRAPH * ELEMENTS * TO role`
+  fails with `Neo.ClientError.Statement.SyntaxError (Invalid input 'ELEMENTS')` — so **no invocation
+  of `WRITE` or `ALL GRAPH PRIVILEGES` can ever succeed** today. Introduce a new action category
+  (e.g. `graphWhole`) for these two actions that emits `<ACTION> ON GRAPH <name>` with **no property
+  clause and no entity clause**. Default graph name is `*` when `--on-graph` is absent. The correct
+  forms are `GRANT WRITE ON GRAPH * TO role` and `GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j TO role`
+  (both verified live). `TRAVERSE`, `CREATE`, `DELETE` remain in `graphOnly` (they correctly accept
+  `ELEMENTS *` / `NODES` / `RELATIONSHIPS`, verified live).
+
+- REQ-F-024: **`graphWhole` actions reject entity and property qualifiers with a usage error.** Because
+  `WRITE` / `ALL GRAPH PRIVILEGES` take no segment, passing `--node-label`, `--relationship-type`, or
+  `--property` with one of them is a client-side usage error (checked before hitting the DB), e.g.
+  `"WRITE does not accept node-label, relationship-type, or property qualifiers"`. They still accept
+  `--on-graph` (and only `--on-graph` — `--on-database` / `--on-dbms` remain errors, same as
+  `graphOnly`).
+
+- REQ-F-025: **`LOAD` is re-categorised to its real syntax.** `LOAD` is not a graph privilege; its
+  grammar is `GRANT LOAD ON ALL DATA TO role` or `GRANT LOAD ON CIDR "<cidr>" TO role` (both verified
+  live — `LOAD ON GRAPH *` fails with a `SyntaxError`). Move `LOAD` out of `graphOnly` into a new
+  `load` category that emits:
+  - `LOAD ON ALL DATA` when `--cidr` is absent (default), and
+  - `LOAD ON CIDR "<cidr>"` when `--cidr <value>` is supplied (the CIDR value is rendered as a
+    double-quoted string literal, not a backtick identifier).
+  Add a new `--cidr <value>` flag to the shared privilege flag set (only meaningful for `LOAD`). A
+  `load` action rejects `--on-graph`, `--on-database`, `--on-dbms`, `--node-label`,
+  `--relationship-type`, and `--property` with a usage error; `--cidr` on any non-`LOAD` action is
+  likewise a usage error.
+
+- REQ-F-026: **`SET LABEL` / `REMOVE LABEL` emit all `--node-label` values, not just the first.** The
+  `labelScoped` arm currently inlines only `opts.nodeLabels[0]`, silently dropping any additional
+  `--node-label` values with no error or warning. Neo4j accepts a comma list:
+  `GRANT SET LABEL Person, Movie ON GRAPH neo4j TO role` (verified live). Emit every `--node-label`
+  value, comma-joined, each backtick-escaped via the existing `cypherIdentifier` helper (REQ-F-011's
+  `--node-label`/`--relationship-type` mutual-exclusion still applies; `--relationship-type` remains
+  invalid for label actions).
+
+- REQ-F-027: **The `validActions` category map and the per-category Cypher templates are updated** to
+  reflect REQ-F-023/024/025: `WRITE` and `ALL GRAPH PRIVILEGES` → `graphWhole`; `LOAD` → `load`;
+  `TRAVERSE`, `CREATE`, `DELETE` stay `graphOnly`. The category-classification table in REQ-F-010 and
+  the Cypher-template rules in REQ-F-012 are corrected accordingly (they currently mis-state that
+  `WRITE`, `LOAD`, and `ALL GRAPH PRIVILEGES` take an `ELEMENTS *` clause).
+
+- REQ-F-028: **The bug-encoding test assertions are corrected.** `privilege_helpers_test.go` asserts
+  `"GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j ELEMENTS *"` (the invalid output), and the original
+  acceptance criteria in this PRD encoded `GRANT WRITE ON GRAPH * ELEMENTS * TO analyst` and
+  `GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j ELEMENTS * TO analyst` as expected. These expectations
+  are replaced with the corrected (server-valid) Cypher, and the `graphOnly` happy-path test for
+  `WRITE`/`ALL GRAPH PRIVILEGES` (if any) is moved to the new `graphWhole` cases.
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: Unit tests for every leaf command using the `privilegeExecFn` package-level seam
@@ -241,6 +325,20 @@ internally. Both patterns must be followed.
 - REQ-NF-003: All new `.go` files carry the Neo4j copyright header.
 
 - REQ-NF-004: `make test`, `make fmt-check`, `make lint` all pass.
+
+- REQ-NF-005: For each action category — `propertyBearer`, `graphOnly`, `graphWhole`, `labelScoped`,
+  `database`, `dbms`, and `load` — at least one `buildPrivilegeCypher` unit case asserts Cypher that
+  is **known-valid on a real Neo4j 2025.x server** (a regression guard against the string-only tests
+  re-encoding invalid output). The expected fragments for the QA-confirmed cases (before the leaf
+  appends ` TO $role` / ` FROM $role`) are:
+
+  ```
+  GRANT WRITE ON GRAPH *
+  GRANT ALL GRAPH PRIVILEGES ON GRAPH `neo4j`
+  GRANT LOAD ON ALL DATA
+  GRANT LOAD ON CIDR "127.0.0.1/32"
+  GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j`
+  ```
 
 ---
 
@@ -393,6 +491,39 @@ go generate ./neo4j-cli/internal/skill/...
 This produces the final skill bundle with all admin subcommands. Commit the source files and the
 regenerated bundle together.
 
+### QA Bug-Fix Implementation Notes (REQ-F-023..028, REQ-NF-005)
+
+- **New categories in `helpers.go`**: add `graphWhole` and `load` to the `actionCategory` enum. In
+  `validActions`, re-map `WRITE` and `ALL GRAPH PRIVILEGES` from `graphOnly` → `graphWhole`, and
+  `LOAD` from `graphOnly` → `load`. Leave `TRAVERSE`, `CREATE`, `DELETE` on `graphOnly`.
+- **`buildPrivilegeCypher` switch arms**:
+  - `graphWhole`: reject `--on-database`/`--on-dbms` (as `graphOnly` does) AND reject
+    `--node-label`/`--relationship-type`/`--property`. Emit
+    `normalized + " ON GRAPH " + cypherIdentifier(graph)` with no property/entity clause.
+  - `load`: reject every scope flag (`--on-graph`/`--on-database`/`--on-dbms`) and every qualifier
+    (`--node-label`/`--relationship-type`/`--property`). Emit `LOAD ON ALL DATA`, or
+    `LOAD ON CIDR "<cidr>"` when `opts.cidr != ""`. The CIDR value is wrapped in double quotes as a
+    Cypher string literal — NOT `cypherIdentifier` (which uses backticks). Consider escaping embedded
+    `"`/backslash in the CIDR value for safety, consistent with task-011's injection-hardening.
+  - `labelScoped`: change `opts.nodeLabels[0]` to `strings.Join(escapeIdentifiers(opts.nodeLabels), ", ")`
+    so every label is emitted.
+- **New flag**: add `--cidr` to `addPrivilegeFlags` (or register it only where it applies); add
+  `cidr string` to `privilegeOpts`. Guard: `opts.cidr != ""` with `category != load` → usage error
+  (mirror the existing `--property` non-propertyBearer guard at the top of `buildPrivilegeCypher`).
+- **The `--property` guard** currently fires for any `category != propertyBearer`; verify it still
+  produces a sensible message for `graphWhole`/`load` (REQ-F-024 wants a combined entity+property
+  message for `graphWhole`, so order the new `graphWhole` qualifier check before or alongside it).
+- **Tests (REQ-NF-005)**: update the `graphOnly` table in `privilege_helpers_test.go` to drop
+  `WRITE`/`ALL GRAPH PRIVILEGES`/`LOAD`; add `graphWhole`, `load`, and multi-label `labelScoped`
+  cases with the server-valid expected fragments listed in REQ-NF-005; add the new usage-error cases
+  (REQ-F-024/025). The corrected expectations replace the previously bug-encoding assertions
+  (REQ-F-028). No live Bolt connection — but the expected strings must be ones a human has confirmed
+  valid on Neo4j 2025.x (they were, during CLI-217 QA).
+- **Skill bundle + Long/help**: `--cidr` and the new behaviour change `grant`/`deny`/`revoke` flag
+  help, so re-run `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle
+  (`TestGenerator_RoundTrip`). Mention `--cidr` (LOAD-only) and that `WRITE`/`ALL GRAPH PRIVILEGES`
+  take no qualifiers in the relevant `Long` strings.
+
 ---
 
 ## Acceptance Criteria
@@ -410,15 +541,26 @@ regenerated bundle together.
 - [ ] `--action match --on-graph neo4j --relationship-type KNOWS --property weight --role analyst --rw` → `GRANT MATCH {weight} ON GRAPH neo4j RELATIONSHIPS KNOWS TO analyst`
 - [ ] `--action read --node-label Person --role analyst --rw` (no explicit `--on-graph`) → `GRANT READ {*} ON GRAPH * NODES Person TO analyst` (default graph `*`)
 
-**Privilege grant / deny — Cypher construction (graphOnly)**
+**Privilege grant / deny — Cypher construction (graphOnly: TRAVERSE, CREATE, DELETE)**
 - [ ] `--action traverse --on-graph * --role analyst --rw` → `GRANT TRAVERSE ON GRAPH * ELEMENTS * TO analyst` (no `{*}`)
-- [ ] `--action traverse --on-graph neo4j --node-label Movie --role analyst --rw` → `GRANT TRAVERSE ON GRAPH neo4j NODES Movie TO analyst`
-- [ ] `--action write --on-graph * --role analyst --rw` → `GRANT WRITE ON GRAPH * ELEMENTS * TO analyst`
-- [ ] `--action all_graph_privileges --on-graph neo4j --role analyst --rw` → `GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j ELEMENTS * TO analyst`
+- [ ] `--action traverse --on-graph neo4j --node-label Movie --role analyst --rw` → ``GRANT TRAVERSE ON GRAPH `neo4j` NODES `Movie` TO analyst``
 
-**Privilege grant / deny — Cypher construction (setLabel / removeLabel)**
-- [ ] `--action set_label --node-label Person --on-graph neo4j --role analyst --rw` → `GRANT SET LABEL Person ON GRAPH neo4j TO analyst`
-- [ ] `--action remove_label --node-label Person --on-graph neo4j --role analyst --rw` → `GRANT REMOVE LABEL Person ON GRAPH neo4j TO analyst`
+**Privilege grant / deny — Cypher construction (graphWhole: WRITE, ALL GRAPH PRIVILEGES) — REQ-F-023/024**
+- [ ] `--action write --on-graph * --role analyst --rw` → `GRANT WRITE ON GRAPH * TO analyst` (no `ELEMENTS *`; executes successfully on a live server)
+- [ ] `--action all_graph_privileges --on-graph neo4j --role analyst --rw` → ``GRANT ALL GRAPH PRIVILEGES ON GRAPH `neo4j` TO analyst`` (no `ELEMENTS *`)
+- [ ] `--action write --on-graph * --node-label Person --role analyst --rw` → usage error (WRITE does not accept entity/property qualifiers)
+- [ ] `--action write --on-graph * --property name --role analyst --rw` → usage error
+
+**Privilege grant / deny — Cypher construction (load: LOAD) — REQ-F-025**
+- [ ] `--action load --role analyst --rw` → `GRANT LOAD ON ALL DATA TO analyst` (executes successfully on a live server)
+- [ ] `--action load --cidr 127.0.0.1/32 --role analyst --rw` → `GRANT LOAD ON CIDR "127.0.0.1/32" TO analyst`
+- [ ] `--action load --on-graph * --role analyst --rw` → usage error (LOAD takes no scope/entity flags)
+- [ ] `--cidr 127.0.0.1/32` on any non-LOAD action → usage error
+
+**Privilege grant / deny — Cypher construction (labelScoped: SET LABEL / REMOVE LABEL) — REQ-F-026**
+- [ ] `--action set_label --node-label Person --on-graph neo4j --role analyst --rw` → ``GRANT SET LABEL `Person` ON GRAPH `neo4j` TO analyst``
+- [ ] `--action set_label --node-label Person --node-label Movie --on-graph neo4j --role analyst --rw` → ``GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j` TO analyst`` (all labels emitted, none dropped)
+- [ ] `--action remove_label --node-label Person --on-graph neo4j --role analyst --rw` → ``GRANT REMOVE LABEL `Person` ON GRAPH `neo4j` TO analyst``
 - [ ] `--action set_label --role analyst --rw` (missing `--node-label`) → usage error
 
 **Privilege grant / deny — Cypher construction (database scope)**
