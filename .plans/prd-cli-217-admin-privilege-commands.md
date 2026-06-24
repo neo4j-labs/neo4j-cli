@@ -354,8 +354,8 @@ construction core, now invoked with the action resolved from the positional rath
   The `--action` flag is removed from `grant`/`deny`/`revoke` (REQ-F-035).
 
 - REQ-F-030: **The specific action is a required positional argument on each category subcommand**,
-  not a subcommand of its own. Each category command sets `Use: "<category> <action>"`, `Args`
-  requiring exactly one positional, and `ValidArgs` = the kebab-cased action keywords in that
+  not a subcommand of its own. Each multi-action category command sets `Use: "<category> <action>"`,
+  `Args` requiring exactly one positional, and `ValidArgs` = the kebab-cased action keywords in that
   category (e.g. `property` → `read match set-property merge`; `dbms` → `create-role drop-role …`).
   `ValidArgs` drives `grant property <TAB>` completion and the command's `--help` lists the category's
   actions. The positional is validated against the category's action set before any DB call:
@@ -363,6 +363,27 @@ construction core, now invoked with the action resolved from the positional rath
     category command (e.g. `grant property access` → `"access is a database privilege; use 'admin
     privilege grant database access'"`), turning a wrong guess into a discovery hint;
   - an entirely unknown action (e.g. `find`) produces the existing unknown-action usage error.
+
+  **Single-action categories take no positional (REQ-F-040)** — `load` is the sole example today.
+
+- REQ-F-040: **A category whose action set has exactly one member takes no positional argument; the
+  sole action is implied.** With the per-category redesign, a single-action category makes the
+  positional pure repetition — `grant load load` says "load" twice for no information. Such a category
+  instead sets `Use: "<category>"` (no `<action>`), `Args: cobra.NoArgs`, and no `ValidArgs`, and its
+  `RunE` resolves directly to the category's sole action. `neo4j-cli admin privilege grant load --cidr
+  127.0.0.1/32 --role analyst --rw` is the only valid form; **`grant load load` is rejected** as an
+  unexpected argument (cobra's `NoArgs` error), not silently accepted. This is a **general,
+  data-driven rule** keyed off the action count in `validActions`/`categoryMeta` (today only `load`
+  qualifies, but a future single-action category inherits it automatically), mirroring how REQ-F-038
+  drops the redundant `--on-dbms`. Knock-on effects:
+  - The cross-category discovery hint (REQ-F-030) that points at a single-action category omits the
+    action (e.g. `grant property load` → `"load is a LOAD privilege; use 'admin privilege grant
+    load'"`, **not** `… grant load load`).
+  - The category's `Short` need not carry an action summary (REQ-F-036) — there is no positional to
+    disambiguate — so a single-action category's `Short` reads e.g. `"Grant a LOAD privilege to a
+    role"` with no `(load)` suffix.
+  - The rendered `Example` (REQ-F-033) for the category drops the action token: `grant load --cidr
+    127.0.0.1/32 --role analyst --rw` (not `grant load load …`).
 
 - REQ-F-031: **Each category subcommand registers only the flags valid for that category**, so invalid
   combinations are unrepresentable rather than rejected after the fact:
@@ -557,6 +578,21 @@ keywords instead of the CLI forms the user actually types.
     (exit 2) whose action list is the kebab `dbms` actions only — it contains `alter-user` (not
     `ALTER USER`) and does not contain other categories' actions such as `read`/`access`.
   - The skill bundle is regenerated (the `dbms` `Long`/flags and example change) and
+    `TestGenerator_RoundTrip` passes; `make test`, `make fmt-check`, `make lint`, `make license-check`
+    all pass.
+
+- REQ-NF-011: Tests for the single-action-category rule (REQ-F-040):
+  - A structure test asserts a single-action category command (i.e. `load`) takes `cobra.NoArgs` and
+    exposes no `ValidArgs`, while every multi-action category still requires exactly one positional
+    with `ValidArgs` equal to its kebab actions. (The REQ-NF-006 union-of-`ValidArgs` check is updated
+    so the single-action category contributes its action without a positional.)
+  - A behavioural test asserts `grant load --cidr 127.0.0.1/32 --role analyst --rw` emits
+    `GRANT LOAD ON CIDR "127.0.0.1/32" TO analyst` (and `grant load --role analyst --rw` emits
+    `GRANT LOAD ON ALL DATA TO analyst`) with no positional, and that `grant load load` returns a
+    non-zero (usage) error.
+  - A test asserts the cross-category hint pointing at `load` omits the action (`grant property load`
+    → `"… use 'admin privilege grant load'"`, no trailing `load`).
+  - The skill bundle is regenerated (the `load` `Use`/`Short`/`Example` change) and
     `TestGenerator_RoundTrip` passes; `make test`, `make fmt-check`, `make lint`, `make license-check`
     all pass.
 
@@ -791,6 +827,19 @@ input-casing gate. `RunE` maps the kebab positional back to the canonical `valid
 in a *different* category is a usage error naming that category's command; an unknown one falls
 through to the existing unknown-action error.
 
+**Single-action category takes no positional (REQ-F-040).** `newCategoryCmd` branches on
+`len(actionsForCategory(cat)) == 1`: for a single-action category it sets `Use: meta.name` (no
+`<action>`), `Args: cobra.NoArgs`, leaves `ValidArgs` nil, and the `RunE` resolves the sole action
+directly (`actionsForCategory(cat)[0]`) instead of reading `args[0]`. Multi-action categories keep
+`Use: "<name> <action>"`, `cobra.ExactArgs(1)`, and `ValidArgs`. The cross-category hint builder must
+omit the action token when the *target* category is single-action (so `grant property load` →
+`… grant load`, not `… grant load load`); the cleanest implementation is a small `categoryInvocation(cat)`
+helper returning `meta.name` for single-action categories and `meta.name + " " + kebabAction(action)`
+otherwise, used by both the hint and any generated docs. `actionSummary` (REQ-F-037) should return
+empty for a single-action category so the `Short` carries no redundant `(load)` suffix, and the
+`Example` renderer must not append the action token for single-action categories. All of this keys off
+the action count, so it is general (today only `load`).
+
 **Shared `runPrivilegeMutation`/`addPrivilegeFlags` reuse.** `runPrivilegeMutation` (task-009) is
 reused verbatim. `addPrivilegeFlags` is refactored into per-flag registration the factory composes
 from `categoryMeta.flags`, so each category gets only its valid flags rather than the full set
@@ -930,6 +979,14 @@ lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated
 - [ ] `neo4j-cli admin privilege grant dbms aleter-user --role analyst --rw` returns a usage error (exit 2) listing only the kebab `dbms` actions (contains `alter-user`, not `ALTER USER`; does not contain `read`/`access`).
 - [ ] No privilege usage error lists Cypher-form (UPPER-CASE, space-separated) action keywords; `sortedActions()`'s Cypher-form enumeration is removed from all user-facing paths.
 - [ ] `categoryMeta[dbms].flags` is empty; `privilegeOpts.onDbms` and `flagOnDbms` are removed; skill bundle regenerated; `make test`/`fmt-check`/`lint`/`license-check` and `TestGenerator_RoundTrip` pass.
+
+**Single-action category takes no positional (REQ-F-040, REQ-NF-011)**
+- [ ] `neo4j-cli admin privilege grant load --cidr 127.0.0.1/32 --role analyst --rw` emits `GRANT LOAD ON CIDR "127.0.0.1/32" TO analyst` with no positional; `grant load --role analyst --rw` emits `GRANT LOAD ON ALL DATA TO analyst`.
+- [ ] `neo4j-cli admin privilege grant load load …` is rejected as an unexpected argument (cobra `NoArgs`), not accepted.
+- [ ] The `load` command's `Use` is `load` (no `<action>`), `Args` is `cobra.NoArgs`, and it exposes no `ValidArgs`; multi-action categories are unchanged (one positional + `ValidArgs`).
+- [ ] The cross-category hint pointing at `load` omits the action: `grant property load` → `"… use 'admin privilege grant load'"` (no trailing `load`).
+- [ ] The `load` `Short`/`Example` carry no action token (`Short` has no `(load)` suffix; `Example` is `grant load --cidr …`). Same for `deny load`/`revoke load`.
+- [ ] Rule is data-driven from the category's action count (general, not load-hardcoded); skill bundle regenerated; `make test`/`fmt-check`/`lint`/`license-check` and `TestGenerator_RoundTrip` pass.
 
 ---
 

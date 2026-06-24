@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-24T19:30:00Z
+updated_at: 2026-06-24T20:30:00Z
 
 tasks:
   - id: task-001
@@ -753,3 +753,54 @@ tasks:
       - "Pure relocation: no behavior, signature, or exported-symbol changes; all existing tests pass unchanged"
       - "The new file carries the Neo4j copyright header"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-027
+    title: "Single-action categories take no positional; grant/deny/revoke load drops the redundant action token (REQ-F-040, REQ-NF-011)"
+    status: pending
+    source: extend-prd
+    description: |
+      Dogfooding: `grant load load` repeats "load" for no information — the load category has exactly
+      one action (LOAD). Make a category whose action set has exactly one member take NO positional;
+      the sole action is implied. This is a general, data-driven rule keyed off the action count in
+      validActions/categoryMeta (today only `load` qualifies), mirroring how task-023 dropped the
+      redundant --on-dbms.
+
+      In `newCategoryCmd` (helpers.go), branch on `len(actionsForCategory(cat)) == 1`:
+      - single-action: `Use: meta.name` (no `<action>`), `Args: cobra.NoArgs`, no `ValidArgs`; RunE
+        resolves the sole action directly via `actionsForCategory(cat)[0]` instead of reading args[0].
+        `grant load --cidr ... --role ... --rw` is the only valid form; `grant load load` must be
+        rejected as an unexpected argument (NoArgs), NOT accepted.
+      - multi-action: unchanged (`Use: "<name> <action>"`, `cobra.ExactArgs(1)`, `ValidArgs`).
+
+      Knock-on changes (all keyed off the action count, so general):
+      - Cross-category hint (REQ-F-030): when the TARGET category is single-action, omit the action
+        token so `grant property load` → "load is a LOAD privilege; use 'admin privilege grant load'"
+        (not "... grant load load"). Cleanest: a small `categoryInvocation(cat[, action])` helper
+        returning `meta.name` for single-action categories and `meta.name + " " + kebabAction(action)`
+        otherwise, used by the hint.
+      - `actionSummary` (REQ-F-037): return empty for a single-action category so the Short carries no
+        redundant `(load)` suffix — `Short` reads "Grant a LOAD privilege to a role".
+      - Example renderer (REQ-F-033/renderCategoryExample): do not append the action token for a
+        single-action category — emit `grant load --cidr 127.0.0.1/32 --role analyst --credential local
+        --rw` (and the deny/revoke variants), not `grant load load ...`. Adjust categoryMeta[load]
+        exampleAction/exampleFlags handling accordingly.
+
+      Behavior for the LOAD privilege Cypher itself is unchanged (still `GRANT LOAD ON ALL DATA` /
+      `GRANT LOAD ON CIDR "<cidr>"`). Re-run `go generate ./neo4j-cli/internal/skill/...` (the load
+      Use/Short/Example change) and commit the regenerated bundle.
+
+      Tests: structure test asserts the single-action (`load`) command has `cobra.NoArgs` and nil
+      ValidArgs while multi-action categories keep one positional + ValidArgs (update the REQ-NF-006
+      union check so load contributes its action without a positional). Behavioural test asserts
+      `grant load --cidr 127.0.0.1/32 --role analyst --rw` and `grant load --role analyst --rw` emit
+      the right Cypher with no positional, and `grant load load` errors. Test the cross-category hint
+      to `load` omits the trailing action.
+    dependencies:
+      - task-026
+    acceptance_criteria:
+      - "A single-action category (load) command sets `Use: \"<name>\"` (no `<action>`), `Args: cobra.NoArgs`, and nil `ValidArgs`; RunE resolves the sole action directly"
+      - "`grant load --cidr 127.0.0.1/32 --role analyst --rw` emits `GRANT LOAD ON CIDR \"127.0.0.1/32\" TO analyst`; `grant load --role analyst --rw` emits `GRANT LOAD ON ALL DATA TO analyst`; `grant load load` returns a non-zero usage error"
+      - "Multi-action categories are unchanged (one positional + ValidArgs); the rule is data-driven from the action count, not hardcoded to load"
+      - "Cross-category hint pointing at load omits the action (`grant property load` → `... use 'admin privilege grant load'`, no trailing `load`)"
+      - "The load `Short` has no `(load)` action-summary suffix; the load `Example` (grant/deny/revoke) is `... grant load --cidr ...` with no action token"
+      - "Skill bundle regenerated; `make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
