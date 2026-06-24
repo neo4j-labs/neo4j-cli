@@ -808,7 +808,8 @@ tasks:
 
   - id: task-028
     title: "Model the single-action-category property once instead of re-deriving len(actionsForCategory)==1 at five call sites"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T22:15:00Z
     source: review
     description: |
       End-of-feature audit (Priority 3, non-blocking — "missing model" smell). The concept "this

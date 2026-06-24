@@ -85,10 +85,10 @@ func newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat act
 
 	// A single-action category (today only load) takes NO positional: its sole
 	// action is implied, so repeating it ("grant load load") carries no
-	// information. The rule is data-driven from the action count, not hardcoded
-	// to load — a future single-action category inherits it automatically.
+	// information. The property is modelled once (categoryActions.singleAction),
+	// not hardcoded to load — a future single-action category inherits it.
 	actions := actionsForCategory(cat)
-	singleAction := len(actions) == 1
+	singleAction := categoryActionsByCat[cat].singleAction
 
 	use := meta.name + " <action>"
 	args := cobra.ExactArgs(1)
@@ -170,7 +170,7 @@ func categoryLong(verbWord string, cat actionCategory) string {
 	actionText := "The action is the positional argument; valid actions are: " + strings.Join(kebabActionsForCategory(cat), ", ") + ". "
 	// A single-action category takes no positional: the sole action is implied
 	// by the command name, so the Long says so rather than describing an argument.
-	if len(actionsForCategory(cat)) == 1 {
+	if categoryActionsByCat[cat].singleAction {
 		actionText = "Takes no action argument. "
 	}
 	return verbTitle(verbWord) + " a " + meta.shortNoun + " " + rolePreposition(verbWord) + " a role. " +
@@ -397,18 +397,48 @@ var categoryOrder = []actionCategory{
 	dbms,
 }
 
-// actionsForCategory returns the canonical action keywords belonging to cat,
-// sorted, so categoryMeta need not duplicate the action lists already in
-// validActions.
-func actionsForCategory(cat actionCategory) []string {
-	out := make([]string, 0, len(validActions))
-	for action, c := range validActions {
-		if c == cat {
-			out = append(out, action)
+// categoryActions holds the per-category action data derived once from
+// validActions: the canonical keywords (sorted), their kebab forms (sorted),
+// and whether the category has exactly one action (so its action is implied by
+// the command name and takes no positional). It is computed at package init —
+// rather than re-scanning validActions on every help/exec call — and is the
+// single home of the "single-action" property the help and command-build paths
+// read.
+type categoryActions struct {
+	canonical    []string
+	kebab        []string
+	singleAction bool
+}
+
+// categoryActionsByCat is populated once in init() from validActions, keeping
+// validActions the single source of action->category.
+var categoryActionsByCat map[actionCategory]categoryActions
+
+func init() {
+	byCat := make(map[actionCategory][]string, len(categoryMeta))
+	for action, cat := range validActions {
+		byCat[cat] = append(byCat[cat], action)
+	}
+	categoryActionsByCat = make(map[actionCategory]categoryActions, len(byCat))
+	for cat, canonical := range byCat {
+		sort.Strings(canonical)
+		kebab := make([]string, len(canonical))
+		for i, a := range canonical {
+			kebab[i] = kebabAction(a)
+		}
+		categoryActionsByCat[cat] = categoryActions{
+			canonical:    canonical,
+			kebab:        kebab,
+			singleAction: len(canonical) == 1,
 		}
 	}
-	sort.Strings(out)
-	return out
+}
+
+// actionsForCategory returns the canonical action keywords belonging to cat,
+// sorted, derived once from validActions so categoryMeta need not duplicate the
+// action lists already in validActions.
+func actionsForCategory(cat actionCategory) []string {
+	return categoryActionsByCat[cat].canonical
 }
 
 // kebabAction converts a canonical action keyword to its kebab form used for
@@ -425,7 +455,7 @@ func kebabAction(canonical string) string {
 // redundant action token.
 func categoryInvocation(cat actionCategory, canonical string) string {
 	name := categoryMeta[cat].name
-	if len(actionsForCategory(cat)) == 1 {
+	if categoryActionsByCat[cat].singleAction {
 		return name
 	}
 	return name + " " + kebabAction(canonical)
@@ -434,12 +464,7 @@ func categoryInvocation(cat actionCategory, canonical string) string {
 // kebabActionsForCategory returns the kebab action keywords for cat, used for a
 // category subcommand's ValidArgs.
 func kebabActionsForCategory(cat actionCategory) []string {
-	canonical := actionsForCategory(cat)
-	out := make([]string, len(canonical))
-	for i, a := range canonical {
-		out[i] = kebabAction(a)
-	}
-	return out
+	return categoryActionsByCat[cat].kebab
 }
 
 // categoryShort builds a category leaf's Short. The parenthesised action
@@ -463,7 +488,7 @@ func categoryShort(word string, cat actionCategory) string {
 // the full set. The threshold and preview count are defined only here.
 func actionSummary(cat actionCategory) string {
 	actions := kebabActionsForCategory(cat)
-	if len(actions) == 1 {
+	if categoryActionsByCat[cat].singleAction {
 		return ""
 	}
 	if len(actions) <= 6 {
@@ -483,7 +508,7 @@ func renderCategoryExample(verbWord string, cat actionCategory) string {
 	base := "neo4j-cli admin privilege " + verbWord + " " + meta.name
 	// A single-action category takes no positional, so the example omits the
 	// action token ("grant load --cidr ...", not "grant load load ...").
-	if len(actionsForCategory(cat)) != 1 {
+	if !categoryActionsByCat[cat].singleAction {
 		base += " " + meta.exampleAction
 	}
 	flags := ""

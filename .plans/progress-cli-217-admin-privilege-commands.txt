@@ -136,3 +136,8 @@ Files: ~mod (privilege/helpers.go, privilege/structure_test.go, privilege/catego
 
 ## REVIEW — 2026-06-24T21:30:00Z
 Added 1 review task (task-028).
+
+## TASK-028 — 2026-06-24T22:15:00Z
+Modelled the single-action-category property once: a categoryActions struct (canonical/kebab/singleAction) is computed in init() from validActions into categoryActionsByCat, and the five sites that re-derived len(actionsForCategory(cat))==1 (newCategoryCmd, categoryLong, categoryInvocation, actionSummary, renderCategoryExample) now read meta.singleAction; actionsForCategory/kebabActionsForCategory became thin readers. Pure refactor, no behavior change; all gates green and no bundle drift.
+Files: ~mod (privilege/helpers.go)
+Decisions: validActions stays the single source — init() scans it once and preserves the prior sort order, so help/ValidArgs output is byte-identical.
