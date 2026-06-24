@@ -133,3 +133,6 @@ Files: +neo4j-cli/internal/subcommands/admin/privilege/cypher.go, ~neo4j-cli/int
 ## TASK-027 — 2026-06-24T21:15:00Z
 Single-action categories (data-driven on len(actionsForCategory(cat))==1; today only load) now take no positional: newCategoryCmd sets Use=meta.name, Args=cobra.NoArgs, nil ValidArgs, and RunE resolves the sole action directly. Knock-ons: categoryInvocation helper drops the action token in the cross-category hint, actionSummary returns "" for single-action (no "(load)" suffix), renderCategoryExample and categoryLong omit the action token. LOAD Cypher unchanged; bundle regenerated; all gates green; reviewer LGTM.
 Files: ~mod (privilege/helpers.go, privilege/structure_test.go, privilege/category_test.go, privilege/privilege_helpers_test.go, skill bundle references/admin.md)
+
+## REVIEW — 2026-06-24T21:30:00Z
+Added 1 review task (task-028).

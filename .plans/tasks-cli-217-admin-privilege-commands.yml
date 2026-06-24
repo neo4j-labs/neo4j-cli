@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-24T20:30:00Z
+updated_at: 2026-06-24T21:30:00Z
 
 tasks:
   - id: task-001
@@ -805,3 +805,41 @@ tasks:
       - "Cross-category hint pointing at load omits the action (`grant property load` → `... use 'admin privilege grant load'`, no trailing `load`)"
       - "The load `Short` has no `(load)` action-summary suffix; the load `Example` (grant/deny/revoke) is `... grant load --cidr ...` with no action token"
       - "Skill bundle regenerated; `make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-028
+    title: "Model the single-action-category property once instead of re-deriving len(actionsForCategory)==1 at five call sites"
+    status: pending
+    source: review
+    description: |
+      End-of-feature audit (Priority 3, non-blocking — "missing model" smell). The concept "this
+      category's action is implied, not a positional" is a real property of a category, but it
+      currently lives as an ad-hoc `len(actionsForCategory(cat)) == 1` count check (and its
+      `actions[0]`/`!= 1` variants) re-derived as a special-case branch in five functions in
+      helpers.go: newCategoryCmd, categoryLong, categoryInvocation, actionSummary, and
+      renderCategoryExample. Each evaluation of actionsForCategory does a full validActions map scan +
+      sort, and every new surface that cares about single-action categories must remember to add the
+      same branch (task-027 had to touch all five) — debt likely to become permanent.
+
+      Code-judo move: compute the action set (and the single-action property) ONCE per category and
+      hang it off the model, so the help/exec paths read it rather than re-deriving it. Preferred shape
+      (per the auditor): give categoryInfo a derived field — a resolved `actions []string` (kebab
+      and/or canonical) and/or a `singleAction bool` — computed once at package init from validActions
+      (e.g. in an init() or a sync.Once-populated map, keeping validActions the single source of
+      truth). Then categoryLong / categoryInvocation / actionSummary / renderCategoryExample read
+      `meta.singleAction` (and the precomputed actions) instead of each calling
+      `len(actionsForCategory(cat))`. newCategoryCmd already resolves it once; have it use the model
+      field too. The goal: the "single-action" concept appears in the model exactly once and the other
+      sites read it; the four independent recomputations are deleted.
+
+      Constraints: validActions stays the single source of action→category (do not hand-duplicate the
+      action lists in categoryMeta); the derived data must be computed from validActions, not
+      independently maintained. No behavior change — emitted Cypher, help text, Short/Long/Example, and
+      cross-category hints stay byte-identical; existing tests pass unchanged. Pure refactor.
+    dependencies:
+      - task-027
+    acceptance_criteria:
+      - "The single-action property (and the resolved per-category action set) is computed once from validActions and stored on the category model (e.g. a derived categoryInfo field populated at init), not re-derived inline"
+      - "categoryLong, categoryInvocation, actionSummary, renderCategoryExample, and newCategoryCmd read the modelled property instead of each calling `len(actionsForCategory(cat))`; the redundant recomputations are removed"
+      - "validActions remains the single source of action→category; the derived data is computed from it, not hand-maintained"
+      - "No behavior change: emitted Cypher, Short/Long/Example, and cross-category hints are byte-identical; all existing privilege tests pass unchanged"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean (no bundle drift)"
