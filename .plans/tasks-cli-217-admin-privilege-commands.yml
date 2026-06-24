@@ -528,7 +528,8 @@ tasks:
 
   - id: task-021
     title: "Regenerate bundle/agent-context, update README + changelog for the per-category interface (REQ-F-035, REQ-NF-008)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T16:30:00Z
     description: |
       Close out the discoverability redesign. Run `go generate ./neo4j-cli/internal/skill/...` so the
       skill bundle reflects the 21 category subcommands and commit it (TestGenerator_RoundTrip). Verify

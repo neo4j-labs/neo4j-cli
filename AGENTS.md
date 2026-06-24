@@ -26,6 +26,7 @@ Strict one-file-per-leaf layout under `neo4j-cli/aura/internal/subcommands/<reso
 - Leaf `<action>.go` — private constructor (`newInstallCmd(...)`) with the leaf's flags + `RunE`. No leaf bodies in the parent.
 - Colocated `<action>_test.go`; shared helpers in `<resource>_helpers_test.go`.
 - New leaf = `<action>.go` + `<action>_test.go` + one `AddCommand` line.
+- Documented exception: `admin privilege` grant/deny/revoke generate their 7 category leaves (property/entity/graph/label/load/database/dbms) from a single `categoryMeta` table via `newCategoryCmd` in `privilege/helpers.go` — no per-leaf file.
 
 ## Build System
 
