@@ -108,3 +108,8 @@ Files: ~AGENTS.md, ~.changes/unreleased/neo4j-cli-Minor-20260622-133720.yaml, ~.
 Added actionSummary(cat) helper (reuses kebabActionsForCategory; <=6 -> full list, else first-three preview + count + "see --help" with U+2026 ellipsis and em dash) and spliced it into the Short built by newCategoryCmd; added unit tests for the helper and the wired Short; regenerated the skill bundle.
 Files: ~2 (privilege/helpers.go, privilege/structure_test.go), ~1 generated (bundle/references/admin.md)
 Decisions: kebabActionsForCategory returns SORTED order, so Short lists are sorted (e.g. "(match, merge, read, set-property)") not the PRD's illustrative reading order — chosen to honor REQ-F-037 (no second ordering source) over the PRD's illustrative examples; tests assert the actual sorted output.
+
+## TASK-023 — 2026-06-24T12:55:31Z
+Dropped the redundant --on-dbms flag: removed flagOnDbms const, the registerPrivilegeFlag case, privilegeOpts.onDbms, and emptied categoryMeta[dbms].flags/exampleFlags + reworded its longRule; the dbms arm of buildPrivilegeCypher now emits "<ACTION> ON DBMS" unconditionally. Deleted the now-impossible opts.onDbms cross-scope guards (scope mutual-exclusion collapsed to hasGraph && hasDatabase) and updated tests + skill bundle. All gates pass.
+Files: ~mod (privilege/helpers.go, grant.go, deny.go, grant_test.go, deny_test.go, category_test.go, privilege_helpers_test.go), ~gen (bundle/references/admin.md), -del (TestGrant_DbmsMissingOnDbms_ReturnsUsageError)
+Decisions: dbms.flags set to nil (not empty slice) — wantFlagSet/registration treat nil the same; the load/mutual-exclusion guard messages were reworded since --on-dbms no longer exists.

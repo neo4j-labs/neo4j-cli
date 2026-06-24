@@ -22,7 +22,7 @@ func newDenyCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 neo4j-cli admin privilege deny graph write --on-graph * --role readonly --credential local --rw
 
 # Deny CREATE ROLE (a DBMS privilege) to the analyst role, output as JSON
-neo4j-cli admin privilege deny dbms create-role --on-dbms --role analyst --credential local --rw --format json`,
+neo4j-cli admin privilege deny dbms create-role --role analyst --credential local --rw --format json`,
 	}
 
 	for _, cat := range categoryOrder {

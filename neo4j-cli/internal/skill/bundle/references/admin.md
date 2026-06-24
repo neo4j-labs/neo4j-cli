@@ -253,7 +253,7 @@ Examples:
 neo4j-cli admin privilege deny graph write --on-graph * --role readonly --credential local --rw
 
 # Deny CREATE ROLE (a DBMS privilege) to the analyst role, output as JSON
-neo4j-cli admin privilege deny dbms create-role --on-dbms --role analyst --credential local --rw --format json
+neo4j-cli admin privilege deny dbms create-role --role analyst --credential local --rw --format json
 ```
 
 #### neo4j-cli admin privilege deny database
@@ -285,7 +285,7 @@ neo4j-cli admin privilege deny database access --on-database neo4j --role analys
 
 Deny a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) to a role
 
-Deny a DBMS privilege to a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Requires --on-dbms. --role is required.
+Deny a DBMS privilege to a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Applies to the whole DBMS; takes no scope flag. --role is required.
 
 Usage: `neo4j-cli admin privilege deny dbms <action> [flags]`
 
@@ -293,17 +293,16 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--on-dbms` | bool | false | Scope the privilege to the DBMS |
 | `--role` | string | - | Name of the role to deny the privilege to |
 
 Examples:
 
 ```
 # Deny a DBMS privilege to the analyst role
-neo4j-cli admin privilege deny dbms create-role --on-dbms --role analyst --credential local --rw
+neo4j-cli admin privilege deny dbms create-role --role analyst --credential local --rw
 
 # Deny the same privilege, output as JSON
-neo4j-cli admin privilege deny dbms create-role --on-dbms --role analyst --credential local --rw --format json
+neo4j-cli admin privilege deny dbms create-role --role analyst --credential local --rw --format json
 ```
 
 #### neo4j-cli admin privilege deny entity
@@ -452,7 +451,7 @@ Examples:
 neo4j-cli admin privilege grant property read --on-graph * --role analyst --credential local --rw
 
 # Grant CREATE ROLE (a DBMS privilege) to the admin role, output as JSON
-neo4j-cli admin privilege grant dbms create-role --on-dbms --role admin --credential local --rw --format json
+neo4j-cli admin privilege grant dbms create-role --role admin --credential local --rw --format json
 ```
 
 #### neo4j-cli admin privilege grant database
@@ -484,7 +483,7 @@ neo4j-cli admin privilege grant database access --on-database neo4j --role analy
 
 Grant a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) to a role
 
-Grant a DBMS privilege to a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Requires --on-dbms. --role is required.
+Grant a DBMS privilege to a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Applies to the whole DBMS; takes no scope flag. --role is required.
 
 Usage: `neo4j-cli admin privilege grant dbms <action> [flags]`
 
@@ -492,17 +491,16 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--on-dbms` | bool | false | Scope the privilege to the DBMS |
 | `--role` | string | - | Name of the role to grant the privilege to |
 
 Examples:
 
 ```
 # Grant a DBMS privilege to the analyst role
-neo4j-cli admin privilege grant dbms create-role --on-dbms --role analyst --credential local --rw
+neo4j-cli admin privilege grant dbms create-role --role analyst --credential local --rw
 
 # Grant the same privilege, output as JSON
-neo4j-cli admin privilege grant dbms create-role --on-dbms --role analyst --credential local --rw --format json
+neo4j-cli admin privilege grant dbms create-role --role analyst --credential local --rw --format json
 ```
 
 #### neo4j-cli admin privilege grant entity
@@ -712,7 +710,7 @@ neo4j-cli admin privilege revoke database access --on-database neo4j --role anal
 
 Revoke a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) from a role
 
-Revoke a DBMS privilege from a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Requires --on-dbms. --role is required.
+Revoke a DBMS privilege from a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Applies to the whole DBMS; takes no scope flag. --role is required.
 
 Usage: `neo4j-cli admin privilege revoke dbms <action> [flags]`
 
@@ -720,7 +718,6 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--on-dbms` | bool | false | Scope the privilege to the DBMS |
 | `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
 | `--role` | string | - | Name of the role to revoke the privilege from |
 
@@ -728,10 +725,10 @@ Examples:
 
 ```
 # Revoke a DBMS privilege to the analyst role
-neo4j-cli admin privilege revoke dbms create-role --on-dbms --role analyst --credential local --rw
+neo4j-cli admin privilege revoke dbms create-role --role analyst --credential local --rw
 
 # Revoke the same privilege, output as JSON
-neo4j-cli admin privilege revoke dbms create-role --on-dbms --role analyst --credential local --rw --format json
+neo4j-cli admin privilege revoke dbms create-role --role analyst --credential local --rw --format json
 ```
 
 #### neo4j-cli admin privilege revoke entity

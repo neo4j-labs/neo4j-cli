@@ -60,7 +60,7 @@ func TestDeny_GraphWhole_DeniesAndShowsPrivileges(t *testing.T) {
 
 func TestDeny_Dbms_EmitsDbmsClause(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runDeny(t, "dbms create-role --on-dbms --role analyst", &calls, twoOK())
+	_, _, err := runDeny(t, "dbms create-role --role analyst", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)

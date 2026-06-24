@@ -47,8 +47,6 @@ func registerPrivilegeFlag(cmd *cobra.Command, opts *privilegeOpts, flag string)
 		cmd.Flags().StringVar(&opts.onGraph, flagOnGraph, "", "Scope the privilege to a graph (use * for all)")
 	case flagOnDatabase:
 		cmd.Flags().StringVar(&opts.onDatabase, flagOnDatabase, "", "Scope the privilege to a database (use * for all)")
-	case flagOnDbms:
-		cmd.Flags().BoolVar(&opts.onDbms, flagOnDbms, false, "Scope the privilege to the DBMS")
 	case flagNodeLabel:
 		cmd.Flags().StringArrayVar(&opts.nodeLabels, flagNodeLabel, nil, "Restrict a graph privilege to node labels")
 	case flagRelType:
@@ -259,12 +257,10 @@ var validActions = map[string]actionCategory{
 }
 
 // privilegeOpts captures the resolved flag values shared by grant, deny, and
-// revoke. onGraph and onDatabase are considered "set" when non-empty; onDbms
-// when true.
+// revoke. onGraph and onDatabase are considered "set" when non-empty.
 type privilegeOpts struct {
 	onGraph    string
 	onDatabase string
-	onDbms     bool
 	nodeLabels []string
 	relTypes   []string
 	properties []string
@@ -277,7 +273,6 @@ type privilegeOpts struct {
 const (
 	flagOnGraph    = "on-graph"
 	flagOnDatabase = "on-database"
-	flagOnDbms     = "on-dbms"
 	flagNodeLabel  = "node-label"
 	flagRelType    = "relationship-type"
 	flagProperty   = "property"
@@ -291,10 +286,10 @@ const (
 // validActions) for the per-category subcommand surface introduced by the
 // discoverability redesign (REQ-F-034); newCategoryCmd is its only consumer.
 //
-// Per-flag requirements (e.g. label needs --node-label, dbms needs --on-dbms)
-// are not declared here: buildPrivilegeCypher already enforces them as usage
-// errors, so a separate requiredFlags field would be a second, unenforced source
-// of the same rule. The longRule text states the requirement for help.
+// Per-flag requirements (e.g. label needs --node-label) are not declared here:
+// buildPrivilegeCypher already enforces them as usage errors, so a separate
+// requiredFlags field would be a second, unenforced source of the same rule.
+// The longRule text states the requirement for help.
 type categoryInfo struct {
 	name          string
 	flags         []string
@@ -359,11 +354,11 @@ var categoryMeta = map[actionCategory]categoryInfo{
 	},
 	dbms: {
 		name:          "dbms",
-		flags:         []string{flagOnDbms},
+		flags:         nil,
 		shortNoun:     "DBMS privilege",
-		longRule:      "Requires --on-dbms.",
+		longRule:      "Applies to the whole DBMS; takes no scope flag.",
 		exampleAction: "create-role",
-		exampleFlags:  "--on-dbms",
+		exampleFlags:  "",
 	},
 }
 
@@ -495,18 +490,8 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 	hasRelType := len(opts.relTypes) > 0
 	hasProperty := len(opts.properties) > 0
 
-	scopeCount := 0
-	if hasGraph {
-		scopeCount++
-	}
-	if hasDatabase {
-		scopeCount++
-	}
-	if opts.onDbms {
-		scopeCount++
-	}
-	if scopeCount > 1 {
-		return "", nil, clierr.NewUsageError("--on-graph, --on-database, and --on-dbms are mutually exclusive")
+	if hasGraph && hasDatabase {
+		return "", nil, clierr.NewUsageError("--on-graph and --on-database are mutually exclusive")
 	}
 
 	if hasNodeLabel && hasRelType {
@@ -524,7 +509,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 	var clause string
 	switch category {
 	case propertyBearer, graphOnly:
-		if hasDatabase || opts.onDbms {
+		if hasDatabase {
 			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
 		}
 		graph := opts.onGraph
@@ -537,7 +522,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		}
 		clause = normalized + prop + " ON GRAPH " + cypherIdentifier(graph) + " " + entityClause(opts.nodeLabels, opts.relTypes)
 	case graphWhole:
-		if hasDatabase || opts.onDbms {
+		if hasDatabase {
 			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
 		}
 		graph := opts.onGraph
@@ -546,7 +531,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		}
 		clause = normalized + " ON GRAPH " + cypherIdentifier(graph)
 	case labelScoped:
-		if hasDatabase || opts.onDbms {
+		if hasDatabase {
 			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
 		}
 		if !hasNodeLabel {
@@ -558,7 +543,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		}
 		clause = normalized + " " + strings.Join(escapeIdentifiers(opts.nodeLabels), ", ") + " ON GRAPH " + cypherIdentifier(graph)
 	case database:
-		if hasGraph || opts.onDbms {
+		if hasGraph {
 			return "", nil, clierr.NewUsageError("action %s is a database privilege and accepts only --on-database", normalized)
 		}
 		db := opts.onDatabase
@@ -567,16 +552,10 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		}
 		clause = normalized + " ON DATABASE " + cypherIdentifier(db)
 	case dbms:
-		if hasGraph || hasDatabase {
-			return "", nil, clierr.NewUsageError("action %s is a DBMS privilege and accepts only --on-dbms", normalized)
-		}
-		if !opts.onDbms {
-			return "", nil, clierr.NewUsageError("action %s requires --on-dbms", normalized)
-		}
 		clause = normalized + " ON DBMS"
 	case load:
-		if hasGraph || hasDatabase || opts.onDbms {
-			return "", nil, clierr.NewUsageError("action %s does not accept --on-graph, --on-database, or --on-dbms (use --cidr)", normalized)
+		if hasGraph || hasDatabase {
+			return "", nil, clierr.NewUsageError("action %s does not accept --on-graph or --on-database (use --cidr)", normalized)
 		}
 		if hasNodeLabel || hasRelType {
 			return "", nil, clierr.NewUsageError("action %s does not accept node-label or relationship-type qualifiers", normalized)

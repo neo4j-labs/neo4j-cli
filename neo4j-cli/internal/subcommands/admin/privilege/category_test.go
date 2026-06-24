@@ -158,7 +158,7 @@ func TestCategoryCmd_PerCategoryCypherParity(t *testing.T) {
 		{
 			name: "dbms",
 			cat:  dbms,
-			args: "create-role --on-dbms --role analyst",
+			args: "create-role --role analyst",
 			want: "GRANT CREATE ROLE ON DBMS TO $role",
 		},
 	}

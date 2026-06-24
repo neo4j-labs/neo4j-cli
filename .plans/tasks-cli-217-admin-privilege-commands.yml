@@ -593,7 +593,8 @@ tasks:
 
   - id: task-023
     title: "Drop the redundant --on-dbms flag; dbms category emits ON DBMS unconditionally (REQ-F-038, REQ-NF-010)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T12:55:31Z
     description: |
       CLI-217 dogfooding: with the per-category redesign the `dbms` subcommand already carries the
       scope in its name, so `--on-dbms` is a boolean that must always be set to true and conveys

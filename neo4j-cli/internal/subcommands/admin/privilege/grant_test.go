@@ -87,7 +87,7 @@ func TestGrant_Database_EmitsDatabaseClause(t *testing.T) {
 
 func TestGrant_Dbms_EmitsDbmsClause(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "dbms create-role --on-dbms --role admin", &calls, twoOK())
+	_, _, err := runGrant(t, "dbms create-role --role admin", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -116,17 +116,6 @@ func TestGrant_FlagConflict_ReturnsUsageErrorWithoutSeam(t *testing.T) {
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 2, ce.Code)
 	assert.Empty(t, calls, "seam must not be called on a flag-conflict error")
-}
-
-func TestGrant_DbmsMissingOnDbms_ReturnsUsageError(t *testing.T) {
-	var calls []sequencedCall
-	_, _, err := runGrant(t, "dbms create-role --role analyst", &calls, nil)
-	require.Error(t, err)
-
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 2, ce.Code)
-	assert.Empty(t, calls, "seam must not be called when --on-dbms is missing for a DBMS action")
 }
 
 func TestGrant_MutationExecError_SkipsFollowUp(t *testing.T) {

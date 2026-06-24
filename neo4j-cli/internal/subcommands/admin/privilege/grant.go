@@ -22,7 +22,7 @@ func newGrantCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 neo4j-cli admin privilege grant property read --on-graph * --role analyst --credential local --rw
 
 # Grant CREATE ROLE (a DBMS privilege) to the admin role, output as JSON
-neo4j-cli admin privilege grant dbms create-role --on-dbms --role admin --credential local --rw --format json`,
+neo4j-cli admin privilege grant dbms create-role --role admin --credential local --rw --format json`,
 	}
 
 	for _, cat := range categoryOrder {
