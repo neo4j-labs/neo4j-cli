@@ -477,7 +477,8 @@ tasks:
 
   - id: task-019
     title: "Restructure grant/deny/revoke into category-subcommand parents; remove --action (REQ-F-029/035)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T14:30:00Z
     description: |
       Convert grant.go, deny.go, revoke.go so each constructor builds a parent command with no RunE
       and loops over `categoryOrder` calling newCategoryCmd(cfg, conn, <verb>, cat) to register the

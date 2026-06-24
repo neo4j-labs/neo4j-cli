@@ -18,7 +18,8 @@ import (
 )
 
 // runGrant builds the `admin privilege grant` command tree, installs a
-// recording sequenced exec-fn, then executes with args.
+// recording sequenced exec-fn, then executes with args (a `<category> <action>
+// ...` invocation, without the leading `grant`).
 func runGrant(t *testing.T, args string, calls *[]sequencedCall, responses []struct {
 	rows []map[string]any
 	err  error
@@ -47,7 +48,7 @@ func runGrant(t *testing.T, args string, calls *[]sequencedCall, responses []str
 
 func TestGrant_PropertyBearer_GrantsAndShowsPrivileges(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action read --on-graph * --role analyst", &calls, twoOK())
+	_, _, err := runGrant(t, "property read --on-graph * --role analyst", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -59,7 +60,7 @@ func TestGrant_PropertyBearer_GrantsAndShowsPrivileges(t *testing.T) {
 
 func TestGrant_GraphOnly_NoPropertyClause(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action traverse --on-graph * --role analyst", &calls, twoOK())
+	_, _, err := runGrant(t, "entity traverse --on-graph * --role analyst", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -68,7 +69,7 @@ func TestGrant_GraphOnly_NoPropertyClause(t *testing.T) {
 
 func TestGrant_SetLabel_EmitsLabelClause(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action set_label --node-label Person --on-graph neo4j --role analyst", &calls, twoOK())
+	_, _, err := runGrant(t, "label set-label --node-label Person --on-graph neo4j --role analyst", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -77,7 +78,7 @@ func TestGrant_SetLabel_EmitsLabelClause(t *testing.T) {
 
 func TestGrant_Database_EmitsDatabaseClause(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action access --on-database neo4j --role analyst", &calls, twoOK())
+	_, _, err := runGrant(t, "database access --on-database neo4j --role analyst", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -86,7 +87,7 @@ func TestGrant_Database_EmitsDatabaseClause(t *testing.T) {
 
 func TestGrant_Dbms_EmitsDbmsClause(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action create_role --on-dbms --role admin", &calls, twoOK())
+	_, _, err := runGrant(t, "dbms create-role --on-dbms --role admin", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -94,21 +95,9 @@ func TestGrant_Dbms_EmitsDbmsClause(t *testing.T) {
 	assert.Equal(t, "admin", calls[0].params["role"])
 }
 
-func TestGrant_MissingAction_ReturnsUsageError(t *testing.T) {
-	var calls []sequencedCall
-	_, _, err := runGrant(t, "--role analyst", &calls, nil)
-	require.Error(t, err)
-
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 2, ce.Code)
-	assert.Contains(t, ce.Message, "--action is required")
-	assert.Empty(t, calls, "seam must not be called when --action is missing")
-}
-
 func TestGrant_MissingRole_ReturnsUsageError(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action read", &calls, nil)
+	_, _, err := runGrant(t, "property read --on-graph *", &calls, nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -120,7 +109,7 @@ func TestGrant_MissingRole_ReturnsUsageError(t *testing.T) {
 
 func TestGrant_FlagConflict_ReturnsUsageErrorWithoutSeam(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action traverse --property name --on-graph * --role analyst", &calls, nil)
+	_, _, err := runGrant(t, "property read --node-label Person --relationship-type KNOWS --on-graph * --role analyst", &calls, nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -131,7 +120,7 @@ func TestGrant_FlagConflict_ReturnsUsageErrorWithoutSeam(t *testing.T) {
 
 func TestGrant_DbmsMissingOnDbms_ReturnsUsageError(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action create_role --role analyst", &calls, nil)
+	_, _, err := runGrant(t, "dbms create-role --role analyst", &calls, nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -143,7 +132,7 @@ func TestGrant_DbmsMissingOnDbms_ReturnsUsageError(t *testing.T) {
 func TestGrant_MutationExecError_SkipsFollowUp(t *testing.T) {
 	execErr := clierr.NewValidationError("bolt connection refused")
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action read --on-graph * --role analyst", &calls, []struct {
+	_, _, err := runGrant(t, "property read --on-graph * --role analyst", &calls, []struct {
 		rows []map[string]any
 		err  error
 	}{
@@ -160,7 +149,7 @@ func TestGrant_MutationExecError_SkipsFollowUp(t *testing.T) {
 func TestGrant_FollowUpExecError_Propagates(t *testing.T) {
 	followUpErr := clierr.NewValidationError("show role privileges failed")
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action read --on-graph * --role analyst", &calls, []struct {
+	_, _, err := runGrant(t, "property read --on-graph * --role analyst", &calls, []struct {
 		rows []map[string]any
 		err  error
 	}{
@@ -178,7 +167,7 @@ func TestGrant_FollowUpExecError_Propagates(t *testing.T) {
 func TestGrant_EnterpriseOnlyError_PropagatesValidationError(t *testing.T) {
 	enterpriseErr := clierr.NewValidationError("GRANT is not supported (requires Enterprise edition)")
 	var calls []sequencedCall
-	_, _, err := runGrant(t, "--action read --on-graph * --role analyst", &calls, []struct {
+	_, _, err := runGrant(t, "property read --on-graph * --role analyst", &calls, []struct {
 		rows []map[string]any
 		err  error
 	}{

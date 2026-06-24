@@ -18,7 +18,8 @@ import (
 )
 
 // runDeny builds the `admin privilege deny` command tree, installs a recording
-// sequenced exec-fn, then executes with args.
+// sequenced exec-fn, then executes with args (a `<category> <action> ...`
+// invocation, without the leading `deny`).
 func runDeny(t *testing.T, args string, calls *[]sequencedCall, responses []struct {
 	rows []map[string]any
 	err  error
@@ -45,9 +46,9 @@ func runDeny(t *testing.T, args string, calls *[]sequencedCall, responses []stru
 	return out.String(), errBuf.String(), execCmdErr
 }
 
-func TestDeny_PropertyBearer_DeniesAndShowsPrivileges(t *testing.T) {
+func TestDeny_GraphWhole_DeniesAndShowsPrivileges(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runDeny(t, "--action write --on-graph * --role readonly", &calls, twoOK())
+	_, _, err := runDeny(t, "graph write --on-graph * --role readonly", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -59,7 +60,7 @@ func TestDeny_PropertyBearer_DeniesAndShowsPrivileges(t *testing.T) {
 
 func TestDeny_Dbms_EmitsDbmsClause(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runDeny(t, "--action create_role --on-dbms --role analyst", &calls, twoOK())
+	_, _, err := runDeny(t, "dbms create-role --on-dbms --role analyst", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -67,21 +68,9 @@ func TestDeny_Dbms_EmitsDbmsClause(t *testing.T) {
 	assert.Equal(t, "analyst", calls[0].params["role"])
 }
 
-func TestDeny_MissingAction_ReturnsUsageError(t *testing.T) {
-	var calls []sequencedCall
-	_, _, err := runDeny(t, "--role analyst", &calls, nil)
-	require.Error(t, err)
-
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 2, ce.Code)
-	assert.Contains(t, ce.Message, "--action is required")
-	assert.Empty(t, calls, "seam must not be called when --action is missing")
-}
-
 func TestDeny_MissingRole_ReturnsUsageError(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runDeny(t, "--action read", &calls, nil)
+	_, _, err := runDeny(t, "property read --on-graph *", &calls, nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -93,7 +82,7 @@ func TestDeny_MissingRole_ReturnsUsageError(t *testing.T) {
 
 func TestDeny_FlagConflict_ReturnsUsageErrorWithoutSeam(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runDeny(t, "--action traverse --property name --on-graph * --role analyst", &calls, nil)
+	_, _, err := runDeny(t, "property read --node-label Person --relationship-type KNOWS --on-graph * --role analyst", &calls, nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -105,7 +94,7 @@ func TestDeny_FlagConflict_ReturnsUsageErrorWithoutSeam(t *testing.T) {
 func TestDeny_MutationExecError_SkipsFollowUp(t *testing.T) {
 	execErr := clierr.NewValidationError("bolt connection refused")
 	var calls []sequencedCall
-	_, _, err := runDeny(t, "--action write --on-graph * --role readonly", &calls, []struct {
+	_, _, err := runDeny(t, "graph write --on-graph * --role readonly", &calls, []struct {
 		rows []map[string]any
 		err  error
 	}{

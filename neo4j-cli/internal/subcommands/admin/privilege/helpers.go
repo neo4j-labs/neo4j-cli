@@ -66,18 +66,6 @@ func rolePreposition(verbWord string) string {
 	return "to"
 }
 
-// addPrivilegeFlags registers the full flag surface shared by the current
-// (single-command) grant, deny, and revoke leaves onto cmd, composing the
-// per-flag helper. verbWord ("grant"/"deny"/"revoke") parameterises the usage
-// strings; revoke registers its own --revoke-type flag.
-func addPrivilegeFlags(cmd *cobra.Command, action, roleName *string, opts *privilegeOpts, verbWord string) {
-	cmd.Flags().StringVar(action, "action", "", "Privilege action to "+verbWord+" (e.g. read, traverse, create_role)")
-	cmd.Flags().StringVar(roleName, "role", "", "Name of the role to "+verbWord+" the privilege "+rolePreposition(verbWord))
-	for _, flag := range []string{flagOnGraph, flagOnDatabase, flagOnDbms, flagNodeLabel, flagRelType, flagProperty, flagCidr} {
-		registerPrivilegeFlag(cmd, opts, flag)
-	}
-}
-
 // newCategoryCmd builds one category leaf for the given verb ("GRANT"/"DENY" or
 // a REVOKE verb base) and action category, driven entirely by categoryMeta[cat].
 // The seven category commands are structurally identical apart from their
@@ -168,14 +156,12 @@ func categoryLong(verbWord string, cat actionCategory) string {
 		meta.longRule + " --role is required."
 }
 
-// runPrivilegeMutation runs the shared write sequence: required-flag checks,
+// runPrivilegeMutation runs the shared write sequence: the --role check,
 // buildPrivilegeCypher, SilenceUsage, exec via the seam (appending the role
 // target with the given keyword, "TO" or "FROM"), then outputPrivileges. verb
-// is the resolved privilege verb ("GRANT", "DENY", "REVOKE", ...).
+// is the resolved privilege verb ("GRANT", "DENY", "REVOKE", ...) and action is
+// the already-resolved canonical keyword.
 func runPrivilegeMutation(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, verb, action, roleName string, opts privilegeOpts, target string) error {
-	if action == "" {
-		return clierr.NewUsageError("--action is required")
-	}
 	if roleName == "" {
 		return clierr.NewUsageError("--role is required")
 	}
@@ -284,9 +270,9 @@ type privilegeOpts struct {
 	cidr       string
 }
 
-// privilege flag long names, shared by addPrivilegeFlags and categoryMeta so the
-// per-category registered-flag sets stay in sync with what buildPrivilegeCypher
-// reads.
+// privilege flag long names, shared by registerPrivilegeFlag and categoryMeta so
+// the per-category registered-flag sets stay in sync with what
+// buildPrivilegeCypher reads.
 const (
 	flagOnGraph    = "on-graph"
 	flagOnDatabase = "on-database"

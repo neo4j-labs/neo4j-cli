@@ -18,7 +18,8 @@ import (
 )
 
 // runRevoke builds the `admin privilege revoke` command tree, installs a
-// recording sequenced exec-fn, then executes with args.
+// recording sequenced exec-fn, then executes with args (a `<category> <action>
+// ...` invocation, without the leading `revoke`).
 func runRevoke(t *testing.T, args string, calls *[]sequencedCall, responses []struct {
 	rows []map[string]any
 	err  error
@@ -47,7 +48,7 @@ func runRevoke(t *testing.T, args string, calls *[]sequencedCall, responses []st
 
 func TestRevoke_Plain_RevokesAndShowsPrivileges(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst", &calls, twoOK())
+	_, _, err := runRevoke(t, "property read --on-graph * --role analyst", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -59,7 +60,7 @@ func TestRevoke_Plain_RevokesAndShowsPrivileges(t *testing.T) {
 
 func TestRevoke_TypeGrant_EmitsRevokeGrant(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst --revoke-type grant", &calls, twoOK())
+	_, _, err := runRevoke(t, "property read --on-graph * --role analyst --revoke-type grant", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -68,7 +69,7 @@ func TestRevoke_TypeGrant_EmitsRevokeGrant(t *testing.T) {
 
 func TestRevoke_TypeDeny_EmitsRevokeDeny(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst --revoke-type deny", &calls, twoOK())
+	_, _, err := runRevoke(t, "property read --on-graph * --role analyst --revoke-type deny", &calls, twoOK())
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
@@ -77,7 +78,7 @@ func TestRevoke_TypeDeny_EmitsRevokeDeny(t *testing.T) {
 
 func TestRevoke_InvalidType_ReturnsUsageErrorWithoutSeam(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst --revoke-type bogus", &calls, nil)
+	_, _, err := runRevoke(t, "property read --on-graph * --role analyst --revoke-type bogus", &calls, nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -87,21 +88,9 @@ func TestRevoke_InvalidType_ReturnsUsageErrorWithoutSeam(t *testing.T) {
 	assert.Empty(t, calls, "seam must not be called on an invalid --revoke-type")
 }
 
-func TestRevoke_MissingAction_ReturnsUsageError(t *testing.T) {
-	var calls []sequencedCall
-	_, _, err := runRevoke(t, "--role analyst", &calls, nil)
-	require.Error(t, err)
-
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 2, ce.Code)
-	assert.Contains(t, ce.Message, "--action is required")
-	assert.Empty(t, calls, "seam must not be called when --action is missing")
-}
-
 func TestRevoke_MissingRole_ReturnsUsageError(t *testing.T) {
 	var calls []sequencedCall
-	_, _, err := runRevoke(t, "--action read", &calls, nil)
+	_, _, err := runRevoke(t, "property read --on-graph *", &calls, nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -114,7 +103,7 @@ func TestRevoke_MissingRole_ReturnsUsageError(t *testing.T) {
 func TestRevoke_MutationExecError_SkipsFollowUp(t *testing.T) {
 	execErr := clierr.NewValidationError("bolt connection refused")
 	var calls []sequencedCall
-	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst", &calls, []struct {
+	_, _, err := runRevoke(t, "property read --on-graph * --role analyst", &calls, []struct {
 		rows []map[string]any
 		err  error
 	}{
