@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-24T12:00:00Z
+updated_at: 2026-06-24T17:30:00Z
 
 tasks:
   - id: task-001
@@ -550,4 +550,42 @@ tasks:
       - "Changelog describes the per-category `grant/deny/revoke <category> <action>` interface"
       - "`grant <TAB>` lists the seven categories and `grant property <TAB>` completes its actions (cobra `__complete`)"
       - "AGENTS.md Cobra-layout note records the privilege categories as the documented one-file-per-leaf exception"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-022
+    title: "Surface each category's valid actions in the leaf Short (truncated for database/dbms) for parent-help discoverability (REQ-F-036/037, REQ-NF-009)"
+    status: pending
+    description: |
+      CLI-217 dogfooding found a category's valid actions are only discoverable via ValidArgs
+      tab-completion or a `<category> --help` drill-down — running `neo4j-cli admin privilege grant
+      graph` or scanning `grant --help` does not reveal that `graph` accepts write/all-graph-privileges.
+      Put the action list in each category leaf's `Short`, which cobra renders both at the leaf and in
+      the parent verb's subcommand listing.
+
+      Add an `actionSummary(cat actionCategory) string` helper to helpers.go that reuses
+      `kebabActionsForCategory(cat)`: when `len(actions) <= 6` (every category except database/dbms),
+      join all kebab actions in parentheses, e.g. `"(read, match, set-property, merge)"`; otherwise
+      show the first three plus the total count, e.g.
+      `"(access, start, stop, … — 19 actions; see --help)"`. Define the threshold (≤ 6 → full) and the
+      preview count (first 3) only in this helper. Splice `actionSummary(cat)` into the `Short` built
+      by `newCategoryCmd` (currently
+      `verbTitle(word) + " a " + meta.shortNoun + " " + rolePreposition(word) + " a role"`), e.g.
+      `… + meta.shortNoun + " " + actionSummary(cat) + " " + rolePreposition(word) + " a role"`. Leave
+      `categoryLong` unchanged — the leaf `Long` already lists the full action set, so the complete
+      list stays one `--help` away even for the truncated categories.
+
+      Because `Short` text feeds `references/admin.md`, re-run
+      `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle. Add a unit test
+      (REQ-NF-009) asserting the per-category Short summaries: small categories list all their kebab
+      actions; database and dbms show the three-action preview plus the `19 actions` count.
+    source: extend-prd
+    dependencies:
+      - task-021
+    acceptance_criteria:
+      - "An `actionSummary(cat)` helper derives the Short action summary from kebabActionsForCategory; ≤6 actions → full list, otherwise first three + total count + `see --help`; threshold and preview count defined only there"
+      - "`newCategoryCmd` Short includes actionSummary(cat): `grant property` → `(read, match, set-property, merge)`, `grant graph` → `(write, all-graph-privileges)`, `grant entity` → `(traverse, create, delete)`"
+      - "`grant database`/`grant dbms` Short show the truncated preview with `19 actions` and `see --help`; their leaf `Long` still lists the full action set (categoryLong unchanged)"
+      - "Parent `grant`/`deny`/`revoke --help` subcommand listing shows each category's action summary via the child Short"
+      - "A unit test asserts the per-category Short action summaries (full for small categories, truncated+count for database/dbms)"
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no diff after commit; `TestGenerator_RoundTrip` passes with the updated bundle"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"

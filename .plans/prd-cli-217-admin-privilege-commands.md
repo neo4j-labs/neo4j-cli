@@ -56,6 +56,7 @@ command surface changes.
 6. Emit Cypher that a live Neo4j 2025.x server actually accepts for **every** advertised action — no action category may produce a guaranteed `SyntaxError`, and no qualifier flag may be silently dropped (added after CLI-217 QA found three such defects; see "Bug fixes from QA" below).
 7. Make valid privilege combinations discoverable from the CLI itself: one subcommand per action *category* under `grant`/`deny`/`revoke` (the 7 groups sharing a flag signature), each exposing only the flags valid for that category plus a positional, tab-completable action — so a user learns the valid shape from `--help` and completion rather than by trial-and-error, while the tree stays at 21 leaves (added after CLI-217 dogfooding; see "Discoverability redesign" below).
 8. Preserve all server-validity and validation guarantees from REQ-F-009..028 / REQ-NF-005 through the redesign: the command surface changes, the emitted Cypher does not.
+9. Make a category's valid actions visible without tab-completion or drilling into each `<category> --help`: surface the action list in every category leaf's `Short`, so it appears in the parent `grant`/`deny`/`revoke --help` subcommand listing and at the leaf itself (added after CLI-217 dogfooding found `grant graph`-style categories don't advertise their actions outside completion; see "Action discoverability in help" below).
 
 ---
 
@@ -421,6 +422,38 @@ construction core, now invoked with the action resolved from the positional rath
   external callers to preserve, and a parallel `--action` path would re-introduce the
   low-discoverability surface this redesign removes.
 
+**Action discoverability in help — surface a category's actions in its `Short` (added after CLI-217 dogfooding)**
+
+The per-category redesign (REQ-F-029..035) makes a category's valid actions reachable only via
+`ValidArgs` tab-completion or by running `<category> --help` (which shows the `Long`). A user who
+runs `neo4j-cli admin privilege grant graph` — or scans `grant --help` — has no way to see that
+`graph` accepts `write` / `all-graph-privileges` without shell completion configured or a second
+`--help` drill-down. These requirements put the action list where it is always visible: in each
+category leaf's `Short`, which cobra renders both at the leaf and in the parent verb's subcommand
+listing.
+
+- REQ-F-036: **Each category subcommand's `Short` includes the category's valid actions** (kebab
+  keywords), so the action set is visible in the parent `grant`/`deny`/`revoke --help` subcommand
+  listing (cobra renders each child's `Short` there) and at the leaf itself — without tab-completion
+  or a `<category> --help` drill-down. Rendering follows a length rule so summary surfaces stay
+  readable:
+  - Categories with a **small** action set (≤ 6 actions — every category except `database`/`dbms`)
+    show the **full** kebab action list, e.g. `"Grant a graph privilege (write, all-graph-privileges)
+    to a role"`, `"Grant a property privilege (read, match, set-property, merge) to a role"`.
+  - The **large** `database` and `dbms` categories (19 actions each) show a **truncated preview with
+    the total count**, e.g. `"Grant a database privilege (access, start, stop, … — 19 actions; see
+    --help) to a role"`. The preview shows the first three kebab actions in `categoryMeta`/sorted
+    order.
+  Each category leaf's `Long` continues to list the **full** action set (REQ-F-033), so the complete
+  list is always one `--help` away regardless of truncation. (This also realises the action-listing
+  `Short` that REQ-F-033's example illustrated but the initial implementation omitted.)
+
+- REQ-F-037: **A single helper derives the `Short` action summary from `categoryMeta`/`validActions`**
+  (e.g. `actionSummary(cat string) string`), reusing `kebabActionsForCategory` — no second
+  hand-maintained action list. The truncation threshold (≤ 6 → full) and the preview count (first 3)
+  are defined once in this helper, and `newCategoryCmd` composes the `Short` from it. Adding a future
+  action still means editing `validActions` only; the `Short` updates automatically.
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: Unit tests for every leaf command using the `privilegeExecFn` package-level seam
@@ -466,6 +499,14 @@ construction core, now invoked with the action resolved from the positional rath
 - REQ-NF-008: `make test`, `make fmt-check`, `make lint`, `make license-check` all pass;
   `TestGenerator_RoundTrip` passes with the new command tree; the `neo4j-cli agent-context` build
   remains correct for the new subcommands.
+
+- REQ-NF-009: A unit test asserts each category leaf's `Short` contains its action summary
+  (REQ-F-036): small categories list all their kebab actions; `database` and `dbms` show the
+  truncated three-action preview plus the `19 actions` count; and the parent `grant`/`deny`/`revoke
+  --help` output includes each category's action summary (since cobra renders child `Short` text in
+  the subcommand listing). Because `Short` text feeds `references/admin.md`, the skill bundle is
+  regenerated (`go generate ./neo4j-cli/internal/skill/...`) and `TestGenerator_RoundTrip` passes
+  with the updated bundle.
 
 ---
 
@@ -703,6 +744,16 @@ reused verbatim. `addPrivilegeFlags` is refactored into per-flag registration th
 from `categoryMeta.flags`, so each category gets only its valid flags rather than the full set
 (or it is retired in favour of inline per-flag registration driven by the metadata).
 
+**Action discoverability in `Short` (REQ-F-036/037).** `newCategoryCmd` currently builds `Short` as
+`verbTitle(word) + " a " + meta.shortNoun + " " + rolePreposition(word) + " a role"` — no action
+list. Add an `actionSummary(cat)` helper in `helpers.go` that reuses `kebabActionsForCategory(cat)`:
+if `len(actions) <= 6` it joins them all (`"(read, match, set-property, merge)"`); otherwise it joins
+the first three and appends the count (`"(access, start, stop, … — 19 actions; see --help)"`). Splice
+the result into `Short` (e.g. `… + " " + meta.shortNoun + " " + actionSummary(cat) + " " + …`). The
+threshold and preview count live only in this helper. The `Long` already lists the full set via
+`categoryLong`, so no change there. Note: changing `Short` changes `references/admin.md`, so re-run
+`go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle.
+
 **Skill bundle / agent-context size.** The tree grows by only 7 categories × 3 verbs = 21 leaves (a
 modest, bounded increase, not the ~150 a per-action tree would add). `go generate` enlarges
 `references/admin.md` proportionally and `agent-context` lists the 21 category commands; the action
@@ -812,6 +863,15 @@ lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated
 - [ ] Every category subcommand has a flush-left `Example` (`TestAllLeafCommands_HaveExamples` passes for all 21 leaves).
 - [ ] Structure test (REQ-NF-006) and per-category Cypher-parity tests (REQ-NF-007) pass.
 - [ ] `make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass with the new tree; README, skill bundle, and agent-context regenerated/updated.
+
+**Action discoverability in help (REQ-F-036/037, REQ-NF-009)**
+- [ ] `neo4j-cli admin privilege grant graph --help` and the parent `grant --help` subcommand listing both show `graph`'s actions, e.g. `"Grant a graph privilege (write, all-graph-privileges) to a role"`.
+- [ ] `grant property`'s `Short` lists `(read, match, set-property, merge)`; `grant entity`'s lists `(traverse, create, delete)`.
+- [ ] `grant database`'s `Short` shows a truncated preview with a count, e.g. `(access, start, stop, … — 19 actions; see --help)`; `grant dbms`'s likewise shows `19 actions`.
+- [ ] `neo4j-cli admin privilege grant --help` (and `deny`/`revoke --help`) lists all seven category subcommands each annotated with its action summary.
+- [ ] The full action list for `database`/`dbms` is still shown by their leaf `--help` (`Long`), not truncated.
+- [ ] A unit test asserts the per-category `Short` action summaries (full for small categories, truncated+count for `database`/`dbms`).
+- [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff after committing the regenerated bundle (`Short` change flows into `references/admin.md`); `TestGenerator_RoundTrip` passes.
 
 ---
 
