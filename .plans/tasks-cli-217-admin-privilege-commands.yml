@@ -635,7 +635,8 @@ tasks:
 
   - id: task-024
     title: "Make unknown/invalid-action privilege errors CLI-form (kebab) and category-scoped (REQ-F-039, REQ-NF-010)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T15:03:19Z
     description: |
       CLI-217 dogfooding: `grant dbms aleter-user` returns
       `unknown action "aleter-user"; valid actions are: ACCESS, ALL DATABASE PRIVILEGES, …` — the list

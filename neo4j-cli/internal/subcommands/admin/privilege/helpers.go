@@ -95,15 +95,9 @@ func newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat act
 		// than cobra's generic invalid-argument message.
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			canonical, err := normalizeAction(args[0])
+			canonical, err := resolveCategoryAction(cat, args[0], word)
 			if err != nil {
 				return err
-			}
-			if got := validActions[canonical]; got != cat {
-				return clierr.NewUsageError(
-					"%s is a %s; use 'admin privilege %s %s %s'",
-					args[0], categoryMeta[got].shortNoun, word, categoryMeta[got].name, kebabAction(canonical),
-				)
 			}
 			resolvedVerb := verb
 			if word == "revoke" {
@@ -440,29 +434,54 @@ func renderCategoryExample(verbWord string, cat actionCategory) string {
 		base + flags + " --role analyst --credential local --rw --format json"
 }
 
-// normalizeAction upper-cases the action and collapses underscores, hyphens, and
-// runs of whitespace into single spaces, so "all_graph_privileges",
-// "all-graph-privileges", and "ALL GRAPH PRIVILEGES" all normalise to
-// "ALL GRAPH PRIVILEGES". The hyphen separator resolves the kebab positional
-// (e.g. "set-property" -> "SET PROPERTY") used by the category subcommands. It
-// returns a usage error listing the valid keywords if the result is not a known
-// action.
-func normalizeAction(action string) (string, error) {
-	cleaned := strings.NewReplacer("_", " ", "-", " ").Replace(action)
-	normalized := strings.ToUpper(strings.Join(strings.Fields(cleaned), " "))
-	if _, ok := validActions[normalized]; !ok {
-		return "", clierr.NewUsageError("unknown action %q; valid actions are: %s", action, strings.Join(sortedActions(), ", "))
+// resolveCategoryAction resolves a category subcommand's positional action to its
+// canonical keyword, scoped to cat. The error messages are CLI-form (kebab) and
+// category-scoped (REQ-F-039): when the positional resolves to an action in a
+// DIFFERENT category it returns the cross-category hint naming the right command
+// (REQ-F-030); when it is unknown (or otherwise not in cat) it returns an
+// "unknown <category> action" error listing only this category's kebab actions —
+// never the global Cypher-form enumeration. verbWord is the lower-case command
+// word ("grant"/"deny"/"revoke") used in the cross-category hint.
+func resolveCategoryAction(cat actionCategory, positional, verbWord string) (string, error) {
+	canonical := canonicalAction(positional)
+	got, ok := validActions[canonical]
+	switch {
+	case ok && got == cat:
+		return canonical, nil
+	case ok:
+		return "", clierr.NewUsageError(
+			"%s is a %s; use 'admin privilege %s %s %s'",
+			positional, categoryMeta[got].shortNoun, verbWord, categoryMeta[got].name, kebabAction(canonical),
+		)
+	default:
+		return "", clierr.NewUsageError(
+			"unknown %s action %q; valid actions are: %s",
+			categoryMeta[cat].name, positional, strings.Join(kebabActionsForCategory(cat), ", "),
+		)
 	}
-	return normalized, nil
 }
 
-func sortedActions() []string {
-	out := make([]string, 0, len(validActions))
-	for a := range validActions {
-		out = append(out, a)
+// canonicalAction normalises action input (case-insensitive; underscores,
+// hyphens, and whitespace runs collapse to single spaces) into the canonical
+// keyword form used as validActions keys. The result is not guaranteed to be a
+// known action; callers look it up in validActions.
+func canonicalAction(action string) string {
+	cleaned := strings.NewReplacer("_", " ", "-", " ").Replace(action)
+	return strings.ToUpper(strings.Join(strings.Fields(cleaned), " "))
+}
+
+// normalizeAction resolves an action keyword to its canonical form via
+// canonicalAction, returning an error if the result is not a known action. The
+// category subcommand layer (resolveCategoryAction) owns the user-facing
+// CLI-form, category-scoped error message (REQ-F-039); this error is reached only
+// internally — buildPrivilegeCypher receives an already-resolved action — so it
+// carries no action enumeration.
+func normalizeAction(action string) (string, error) {
+	normalized := canonicalAction(action)
+	if _, ok := validActions[normalized]; !ok {
+		return "", clierr.NewUsageError("unknown action %q", action)
 	}
-	sort.Strings(out)
-	return out
+	return normalized, nil
 }
 
 // buildPrivilegeCypher constructs the privilege Cypher fragment (without the

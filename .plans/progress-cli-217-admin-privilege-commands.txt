@@ -113,3 +113,7 @@ Decisions: kebabActionsForCategory returns SORTED order, so Short lists are sort
 Dropped the redundant --on-dbms flag: removed flagOnDbms const, the registerPrivilegeFlag case, privilegeOpts.onDbms, and emptied categoryMeta[dbms].flags/exampleFlags + reworded its longRule; the dbms arm of buildPrivilegeCypher now emits "<ACTION> ON DBMS" unconditionally. Deleted the now-impossible opts.onDbms cross-scope guards (scope mutual-exclusion collapsed to hasGraph && hasDatabase) and updated tests + skill bundle. All gates pass.
 Files: ~mod (privilege/helpers.go, grant.go, deny.go, grant_test.go, deny_test.go, category_test.go, privilege_helpers_test.go), ~gen (bundle/references/admin.md), -del (TestGrant_DbmsMissingOnDbms_ReturnsUsageError)
 Decisions: dbms.flags set to nil (not empty slice) — wantFlagSet/registration treat nil the same; the load/mutual-exclusion guard messages were reworded since --on-dbms no longer exists.
+
+## TASK-024 — 2026-06-24T15:03:19Z
+Replaced the global Cypher-form unknown-action enumeration with a category-aware resolver (resolveCategoryAction) in newCategoryCmd.RunE: in-category returns canonical, cross-category keeps the kebab hint, unknown yields a category-scoped kebab "unknown <category> action" list. Deleted sortedActions(); normalizeAction now reuses a new canonicalAction helper and carries no enumeration (internal-only).
+Files: ~privilege/helpers.go, ~privilege/category_test.go

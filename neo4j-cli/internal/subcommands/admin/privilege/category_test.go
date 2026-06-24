@@ -205,16 +205,56 @@ func TestCategoryCmd_CrossCategoryPositional_PerCategory(t *testing.T) {
 	}
 }
 
-func TestNewCategoryCmd_UnknownAction_ReturnsUnknownActionError(t *testing.T) {
-	var calls []sequencedCall
-	err := runCategory(t, "GRANT", propertyBearer, "find --role analyst", &calls, nil)
-	require.Error(t, err)
+// TestNewCategoryCmd_UnknownAction_KebabCategoryScoped asserts that an unknown
+// positional yields a CLI-form (kebab), category-scoped "unknown <category>
+// action" error listing only this category's actions — never the Cypher-form
+// keywords nor actions from other categories (REQ-F-039).
+func TestNewCategoryCmd_UnknownAction_KebabCategoryScoped(t *testing.T) {
+	cases := []struct {
+		name       string
+		cat        actionCategory
+		positional string
+		// must appear in the message: this category's name + at least one of
+		// its kebab actions.
+		wantCategory string
+		wantAction   string
+		// must NOT appear: Cypher-form keywords or other categories' actions.
+		notWant []string
+	}{
+		{
+			name:         "dbms unknown action",
+			cat:          dbms,
+			positional:   "aleter-user",
+			wantCategory: "unknown dbms action",
+			wantAction:   "alter-user",
+			notWant:      []string{"ALTER USER", "read", "access"},
+		},
+		{
+			name:         "property unknown action",
+			cat:          propertyBearer,
+			positional:   "reed",
+			wantCategory: "unknown property action",
+			wantAction:   "set-property",
+			notWant:      []string{"SET PROPERTY", "access", "create-role"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []sequencedCall
+			err := runCategory(t, "GRANT", tc.cat, tc.positional+" --role analyst", &calls, nil)
+			require.Error(t, err)
 
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 2, ce.Code)
-	assert.Contains(t, ce.Message, "unknown action")
-	assert.Empty(t, calls)
+			var ce *clierr.CLIError
+			require.True(t, errors.As(err, &ce))
+			assert.Equal(t, 2, ce.Code)
+			assert.Contains(t, ce.Message, tc.wantCategory)
+			assert.Contains(t, ce.Message, tc.wantAction)
+			for _, nw := range tc.notWant {
+				assert.NotContains(t, ce.Message, nw)
+			}
+			assert.Empty(t, calls)
+		})
+	}
 }
 
 func TestNewCategoryCmd_MissingRole_ReturnsUsageError(t *testing.T) {
