@@ -103,3 +103,8 @@ Decisions: Removed requiredFlags rather than wiring it (would be a second unenfo
 ## TASK-021 — 2026-06-24T16:30:00Z
 Closeout for the per-category redesign: confirmed no bundle/agent-context drift (tasks 018-020 already migrated source+bundle), verified agent-context lists all 21 category subcommands and that `__complete` tab-completion lists the 7 categories and each category's positional actions; rewrote the existing unreleased changelog body to the per-category form and added the AGENTS.md one-file-per-leaf documented exception. README has no privilege content; only --action refs remaining are in .plans/ (historical) and a negative test assertion. All gates green.
 Files: ~AGENTS.md, ~.changes/unreleased/neo4j-cli-Minor-20260622-133720.yaml, ~.plans/tasks-cli-217-admin-privilege-commands.yml
+
+## TASK-022 — 2026-06-24T18:00:00Z
+Added actionSummary(cat) helper (reuses kebabActionsForCategory; <=6 -> full list, else first-three preview + count + "see --help" with U+2026 ellipsis and em dash) and spliced it into the Short built by newCategoryCmd; added unit tests for the helper and the wired Short; regenerated the skill bundle.
+Files: ~2 (privilege/helpers.go, privilege/structure_test.go), ~1 generated (bundle/references/admin.md)
+Decisions: kebabActionsForCategory returns SORTED order, so Short lists are sorted (e.g. "(match, merge, read, set-property)") not the PRD's illustrative reading order — chosen to honor REQ-F-037 (no second ordering source) over the PRD's illustrative examples; tests assert the actual sorted output.

@@ -151,6 +151,54 @@ func TestRevokeCategories_CarryRevokeType(t *testing.T) {
 	}
 }
 
+// TestCategoryCommands_ShortIncludesActionSummary asserts each category leaf's
+// Short surfaces its valid actions: small categories list all their kebab
+// actions in parentheses; database and dbms show the three-action preview plus
+// the total count and "see --help" (REQ-NF-009).
+func TestCategoryCommands_ShortIncludesActionSummary(t *testing.T) {
+	grant := verbParent(t, "grant")
+	byName := map[string]*cobra.Command{}
+	for _, sub := range grant.Commands() {
+		byName[strings.Fields(sub.Use)[0]] = sub
+	}
+
+	fullList := map[string]string{
+		"property": "(match, merge, read, set-property)",
+		"entity":   "(create, delete, traverse)",
+		"graph":    "(all-graph-privileges, write)",
+		"label":    "(remove-label, set-label)",
+		"load":     "(load)",
+	}
+	for name, want := range fullList {
+		t.Run(name, func(t *testing.T) {
+			sub := byName[name]
+			require.NotNil(t, sub)
+			assert.Contains(t, sub.Short, want)
+		})
+	}
+
+	for _, name := range []string{"database", "dbms"} {
+		t.Run(name, func(t *testing.T) {
+			sub := byName[name]
+			require.NotNil(t, sub)
+			assert.Contains(t, sub.Short, "… — 19 actions; see --help)")
+		})
+	}
+}
+
+// TestActionSummary asserts the threshold (<= 6 -> full list) and the truncated
+// preview form directly against the helper.
+func TestActionSummary(t *testing.T) {
+	assert.Equal(t, "(match, merge, read, set-property)", actionSummary(propertyBearer))
+	assert.Equal(t, "(create, delete, traverse)", actionSummary(graphOnly))
+	assert.Equal(t, "(all-graph-privileges, write)", actionSummary(graphWhole))
+	assert.Equal(t, "(remove-label, set-label)", actionSummary(labelScoped))
+	assert.Equal(t, "(load)", actionSummary(load))
+
+	assert.Equal(t, "(access, all-database-privileges, constraint-management, … — 19 actions; see --help)", actionSummary(database))
+	assert.Equal(t, "(all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help)", actionSummary(dbms))
+}
+
 // TestCategoryCommands_HaveFlushLeftExample asserts every category leaf carries a
 // non-empty flush-left Example (REQ-NF-006; mirrors TestAllLeafCommands_HaveExamples
 // scoped to this tree).

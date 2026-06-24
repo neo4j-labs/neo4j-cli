@@ -258,7 +258,7 @@ neo4j-cli admin privilege deny dbms create-role --on-dbms --role analyst --crede
 
 #### neo4j-cli admin privilege deny database
 
-Deny a database privilege to a role
+Deny a database privilege (access, all-database-privileges, constraint-management, … — 19 actions; see --help) to a role
 
 Deny a database privilege to a role. The action is the positional argument; valid actions are: access, all-database-privileges, constraint-management, create-constraint, create-index, create-new-node-label, create-new-property-name, create-new-relationship-type, drop-constraint, drop-index, index-management, name-management, show-constraint, show-index, show-transaction, start, stop, terminate-transaction, transaction-management. Scope with --on-database (default *). --role is required.
 
@@ -283,7 +283,7 @@ neo4j-cli admin privilege deny database access --on-database neo4j --role analys
 
 #### neo4j-cli admin privilege deny dbms
 
-Deny a DBMS privilege to a role
+Deny a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) to a role
 
 Deny a DBMS privilege to a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Requires --on-dbms. --role is required.
 
@@ -308,7 +308,7 @@ neo4j-cli admin privilege deny dbms create-role --on-dbms --role analyst --crede
 
 #### neo4j-cli admin privilege deny entity
 
-Deny a graph entity privilege to a role
+Deny a graph entity privilege (create, delete, traverse) to a role
 
 Deny a graph entity privilege to a role. The action is the positional argument; valid actions are: create, delete, traverse. Scope with --on-graph (default *); restrict to entities with --node-label or --relationship-type (mutually exclusive). No property qualifier. --role is required.
 
@@ -335,7 +335,7 @@ neo4j-cli admin privilege deny entity traverse --on-graph * --node-label Person 
 
 #### neo4j-cli admin privilege deny graph
 
-Deny a whole-graph privilege to a role
+Deny a whole-graph privilege (all-graph-privileges, write) to a role
 
 Deny a whole-graph privilege to a role. The action is the positional argument; valid actions are: all-graph-privileges, write. Scope with --on-graph (default *). WRITE and ALL GRAPH PRIVILEGES accept no node-label, relationship-type, or property qualifiers. --role is required.
 
@@ -360,7 +360,7 @@ neo4j-cli admin privilege deny graph write --on-graph * --role analyst --credent
 
 #### neo4j-cli admin privilege deny label
 
-Deny a label privilege to a role
+Deny a label privilege (remove-label, set-label) to a role
 
 Deny a label privilege to a role. The action is the positional argument; valid actions are: remove-label, set-label. Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels. --role is required.
 
@@ -386,7 +386,7 @@ neo4j-cli admin privilege deny label set-label --node-label Person --on-graph ne
 
 #### neo4j-cli admin privilege deny load
 
-Deny a LOAD privilege to a role
+Deny a LOAD privilege (load) to a role
 
 Deny a LOAD privilege to a role. The action is the positional argument; valid actions are: load. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
 
@@ -411,7 +411,7 @@ neo4j-cli admin privilege deny load load --cidr 127.0.0.1/32 --role analyst --cr
 
 #### neo4j-cli admin privilege deny property
 
-Deny a property privilege to a role
+Deny a property privilege (match, merge, read, set-property) to a role
 
 Deny a property privilege to a role. The action is the positional argument; valid actions are: match, merge, read, set-property. Scope with --on-graph (default *); restrict to properties with --property and to entities with --node-label or --relationship-type (mutually exclusive). --role is required.
 
@@ -457,7 +457,7 @@ neo4j-cli admin privilege grant dbms create-role --on-dbms --role admin --creden
 
 #### neo4j-cli admin privilege grant database
 
-Grant a database privilege to a role
+Grant a database privilege (access, all-database-privileges, constraint-management, … — 19 actions; see --help) to a role
 
 Grant a database privilege to a role. The action is the positional argument; valid actions are: access, all-database-privileges, constraint-management, create-constraint, create-index, create-new-node-label, create-new-property-name, create-new-relationship-type, drop-constraint, drop-index, index-management, name-management, show-constraint, show-index, show-transaction, start, stop, terminate-transaction, transaction-management. Scope with --on-database (default *). --role is required.
 
@@ -482,7 +482,7 @@ neo4j-cli admin privilege grant database access --on-database neo4j --role analy
 
 #### neo4j-cli admin privilege grant dbms
 
-Grant a DBMS privilege to a role
+Grant a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) to a role
 
 Grant a DBMS privilege to a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Requires --on-dbms. --role is required.
 
@@ -507,7 +507,7 @@ neo4j-cli admin privilege grant dbms create-role --on-dbms --role analyst --cred
 
 #### neo4j-cli admin privilege grant entity
 
-Grant a graph entity privilege to a role
+Grant a graph entity privilege (create, delete, traverse) to a role
 
 Grant a graph entity privilege to a role. The action is the positional argument; valid actions are: create, delete, traverse. Scope with --on-graph (default *); restrict to entities with --node-label or --relationship-type (mutually exclusive). No property qualifier. --role is required.
 
@@ -534,7 +534,7 @@ neo4j-cli admin privilege grant entity traverse --on-graph * --node-label Person
 
 #### neo4j-cli admin privilege grant graph
 
-Grant a whole-graph privilege to a role
+Grant a whole-graph privilege (all-graph-privileges, write) to a role
 
 Grant a whole-graph privilege to a role. The action is the positional argument; valid actions are: all-graph-privileges, write. Scope with --on-graph (default *). WRITE and ALL GRAPH PRIVILEGES accept no node-label, relationship-type, or property qualifiers. --role is required.
 
@@ -559,7 +559,7 @@ neo4j-cli admin privilege grant graph write --on-graph * --role analyst --creden
 
 #### neo4j-cli admin privilege grant label
 
-Grant a label privilege to a role
+Grant a label privilege (remove-label, set-label) to a role
 
 Grant a label privilege to a role. The action is the positional argument; valid actions are: remove-label, set-label. Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels. --role is required.
 
@@ -585,7 +585,7 @@ neo4j-cli admin privilege grant label set-label --node-label Person --on-graph n
 
 #### neo4j-cli admin privilege grant load
 
-Grant a LOAD privilege to a role
+Grant a LOAD privilege (load) to a role
 
 Grant a LOAD privilege to a role. The action is the positional argument; valid actions are: load. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
 
@@ -610,7 +610,7 @@ neo4j-cli admin privilege grant load load --cidr 127.0.0.1/32 --role analyst --c
 
 #### neo4j-cli admin privilege grant property
 
-Grant a property privilege to a role
+Grant a property privilege (match, merge, read, set-property) to a role
 
 Grant a property privilege to a role. The action is the positional argument; valid actions are: match, merge, read, set-property. Scope with --on-graph (default *); restrict to properties with --property and to entities with --node-label or --relationship-type (mutually exclusive). --role is required.
 
@@ -684,7 +684,7 @@ neo4j-cli admin privilege revoke property read --on-graph * --role analyst --rev
 
 #### neo4j-cli admin privilege revoke database
 
-Revoke a database privilege from a role
+Revoke a database privilege (access, all-database-privileges, constraint-management, … — 19 actions; see --help) from a role
 
 Revoke a database privilege from a role. The action is the positional argument; valid actions are: access, all-database-privileges, constraint-management, create-constraint, create-index, create-new-node-label, create-new-property-name, create-new-relationship-type, drop-constraint, drop-index, index-management, name-management, show-constraint, show-index, show-transaction, start, stop, terminate-transaction, transaction-management. Scope with --on-database (default *). --role is required.
 
@@ -710,7 +710,7 @@ neo4j-cli admin privilege revoke database access --on-database neo4j --role anal
 
 #### neo4j-cli admin privilege revoke dbms
 
-Revoke a DBMS privilege from a role
+Revoke a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) from a role
 
 Revoke a DBMS privilege from a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Requires --on-dbms. --role is required.
 
@@ -736,7 +736,7 @@ neo4j-cli admin privilege revoke dbms create-role --on-dbms --role analyst --cre
 
 #### neo4j-cli admin privilege revoke entity
 
-Revoke a graph entity privilege from a role
+Revoke a graph entity privilege (create, delete, traverse) from a role
 
 Revoke a graph entity privilege from a role. The action is the positional argument; valid actions are: create, delete, traverse. Scope with --on-graph (default *); restrict to entities with --node-label or --relationship-type (mutually exclusive). No property qualifier. --role is required.
 
@@ -764,7 +764,7 @@ neo4j-cli admin privilege revoke entity traverse --on-graph * --node-label Perso
 
 #### neo4j-cli admin privilege revoke graph
 
-Revoke a whole-graph privilege from a role
+Revoke a whole-graph privilege (all-graph-privileges, write) from a role
 
 Revoke a whole-graph privilege from a role. The action is the positional argument; valid actions are: all-graph-privileges, write. Scope with --on-graph (default *). WRITE and ALL GRAPH PRIVILEGES accept no node-label, relationship-type, or property qualifiers. --role is required.
 
@@ -790,7 +790,7 @@ neo4j-cli admin privilege revoke graph write --on-graph * --role analyst --crede
 
 #### neo4j-cli admin privilege revoke label
 
-Revoke a label privilege from a role
+Revoke a label privilege (remove-label, set-label) from a role
 
 Revoke a label privilege from a role. The action is the positional argument; valid actions are: remove-label, set-label. Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels. --role is required.
 
@@ -817,7 +817,7 @@ neo4j-cli admin privilege revoke label set-label --node-label Person --on-graph 
 
 #### neo4j-cli admin privilege revoke load
 
-Revoke a LOAD privilege from a role
+Revoke a LOAD privilege (load) from a role
 
 Revoke a LOAD privilege from a role. The action is the positional argument; valid actions are: load. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
 
@@ -843,7 +843,7 @@ neo4j-cli admin privilege revoke load load --cidr 127.0.0.1/32 --role analyst --
 
 #### neo4j-cli admin privilege revoke property
 
-Revoke a property privilege from a role
+Revoke a property privilege (match, merge, read, set-property) from a role
 
 Revoke a property privilege from a role. The action is the positional argument; valid actions are: match, merge, read, set-property. Scope with --on-graph (default *); restrict to properties with --property and to entities with --node-label or --relationship-type (mutually exclusive). --role is required.
 

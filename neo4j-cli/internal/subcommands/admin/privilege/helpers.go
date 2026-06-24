@@ -4,6 +4,7 @@
 package privilege
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -86,7 +87,7 @@ func newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat act
 
 	cmd := &cobra.Command{
 		Use:       meta.name + " <action>",
-		Short:     verbTitle(word) + " a " + meta.shortNoun + " " + rolePreposition(word) + " a role",
+		Short:     verbTitle(word) + " a " + meta.shortNoun + " " + actionSummary(cat) + " " + rolePreposition(word) + " a role",
 		Long:      categoryLong(word, cat),
 		Example:   renderCategoryExample(word, cat),
 		ValidArgs: kebabActionsForCategory(cat),
@@ -408,6 +409,21 @@ func kebabActionsForCategory(cat actionCategory) []string {
 		out[i] = kebabAction(a)
 	}
 	return out
+}
+
+// actionSummary renders the parenthesised action list spliced into a category
+// leaf's Short so the valid actions are visible in the parent verb's subcommand
+// listing. Small categories (<= 6 actions) list all their kebab actions;
+// larger ones (database, dbms) show the first three plus the total count and
+// point at --help, where categoryLong lists the full set. The threshold and
+// preview count are defined only here.
+func actionSummary(cat actionCategory) string {
+	actions := kebabActionsForCategory(cat)
+	if len(actions) <= 6 {
+		return "(" + strings.Join(actions, ", ") + ")"
+	}
+	preview := strings.Join(actions[:3], ", ")
+	return fmt.Sprintf("(%s, … — %d actions; see --help)", preview, len(actions))
 }
 
 // renderCategoryExample builds a flush-left Example block for the given verb word

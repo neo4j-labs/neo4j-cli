@@ -554,7 +554,8 @@ tasks:
 
   - id: task-022
     title: "Surface each category's valid actions in the leaf Short (truncated for database/dbms) for parent-help discoverability (REQ-F-036/037, REQ-NF-009)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T18:00:00Z
     description: |
       CLI-217 dogfooding found a category's valid actions are only discoverable via ValidArgs
       tab-completion or a `<category> --help` drill-down — running `neo4j-cli admin privilege grant
