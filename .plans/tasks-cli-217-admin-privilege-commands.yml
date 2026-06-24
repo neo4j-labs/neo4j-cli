@@ -445,7 +445,8 @@ tasks:
 
   - id: task-018
     title: "Add the per-category subcommand factory newCategoryCmd with positional action (REQ-F-029/030/031/032/035)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T13:30:00Z
     description: |
       Add `newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat actionCategory) *cobra.Command`
       to helpers.go — the single factory that builds a category leaf for a given verb ("GRANT"/"DENY"/

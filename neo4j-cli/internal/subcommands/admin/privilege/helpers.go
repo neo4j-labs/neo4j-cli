@@ -36,20 +36,27 @@ func outputPrivileges(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn,
 	return nil
 }
 
-// addPrivilegeFlags registers the flag surface shared by grant, deny, and
-// revoke onto cmd. verbWord ("grant", "deny", or "revoke") parameterises the
-// usage strings; the per-command --revoke-type flag is registered by revoke
-// itself.
-func addPrivilegeFlags(cmd *cobra.Command, action, roleName *string, opts *privilegeOpts, verbWord string) {
-	cmd.Flags().StringVar(action, "action", "", "Privilege action to "+verbWord+" (e.g. read, traverse, create_role)")
-	cmd.Flags().StringVar(roleName, "role", "", "Name of the role to "+verbWord+" the privilege "+rolePreposition(verbWord))
-	cmd.Flags().StringVar(&opts.onGraph, "on-graph", "", "Scope the privilege to a graph (use * for all)")
-	cmd.Flags().StringVar(&opts.onDatabase, "on-database", "", "Scope the privilege to a database (use * for all)")
-	cmd.Flags().BoolVar(&opts.onDbms, "on-dbms", false, "Scope the privilege to the DBMS")
-	cmd.Flags().StringArrayVar(&opts.nodeLabels, "node-label", nil, "Restrict a graph privilege to node labels")
-	cmd.Flags().StringArrayVar(&opts.relTypes, "relationship-type", nil, "Restrict a graph privilege to relationship types")
-	cmd.Flags().StringArrayVar(&opts.properties, "property", nil, "Restrict a property privilege to properties")
-	cmd.Flags().StringVar(&opts.cidr, "cidr", "", "Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data)")
+// registerPrivilegeFlag registers a single privilege flag (by its long name)
+// onto cmd, binding it to the matching field of opts. It is the per-flag
+// primitive the category-subcommand factory composes from categoryMeta.flags so
+// each category gets only the flags valid for it.
+func registerPrivilegeFlag(cmd *cobra.Command, opts *privilegeOpts, flag string) {
+	switch flag {
+	case flagOnGraph:
+		cmd.Flags().StringVar(&opts.onGraph, flagOnGraph, "", "Scope the privilege to a graph (use * for all)")
+	case flagOnDatabase:
+		cmd.Flags().StringVar(&opts.onDatabase, flagOnDatabase, "", "Scope the privilege to a database (use * for all)")
+	case flagOnDbms:
+		cmd.Flags().BoolVar(&opts.onDbms, flagOnDbms, false, "Scope the privilege to the DBMS")
+	case flagNodeLabel:
+		cmd.Flags().StringArrayVar(&opts.nodeLabels, flagNodeLabel, nil, "Restrict a graph privilege to node labels")
+	case flagRelType:
+		cmd.Flags().StringArrayVar(&opts.relTypes, flagRelType, nil, "Restrict a graph privilege to relationship types")
+	case flagProperty:
+		cmd.Flags().StringArrayVar(&opts.properties, flagProperty, nil, "Restrict a property privilege to properties")
+	case flagCidr:
+		cmd.Flags().StringVar(&opts.cidr, flagCidr, "", "Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data)")
+	}
 }
 
 func rolePreposition(verbWord string) string {
@@ -57,6 +64,108 @@ func rolePreposition(verbWord string) string {
 		return "from"
 	}
 	return "to"
+}
+
+// addPrivilegeFlags registers the full flag surface shared by the current
+// (single-command) grant, deny, and revoke leaves onto cmd, composing the
+// per-flag helper. verbWord ("grant"/"deny"/"revoke") parameterises the usage
+// strings; revoke registers its own --revoke-type flag.
+func addPrivilegeFlags(cmd *cobra.Command, action, roleName *string, opts *privilegeOpts, verbWord string) {
+	cmd.Flags().StringVar(action, "action", "", "Privilege action to "+verbWord+" (e.g. read, traverse, create_role)")
+	cmd.Flags().StringVar(roleName, "role", "", "Name of the role to "+verbWord+" the privilege "+rolePreposition(verbWord))
+	for _, flag := range []string{flagOnGraph, flagOnDatabase, flagOnDbms, flagNodeLabel, flagRelType, flagProperty, flagCidr} {
+		registerPrivilegeFlag(cmd, opts, flag)
+	}
+}
+
+// newCategoryCmd builds one category leaf for the given verb ("GRANT"/"DENY" or
+// a REVOKE verb base) and action category, driven entirely by categoryMeta[cat].
+// The seven category commands are structurally identical apart from their
+// metadata, so they are data-driven from a single factory rather than each
+// hand-authored in its own file. This is the documented exception to the
+// one-file-per-leaf rule in AGENTS.md ("Cobra Command Layout") recorded by
+// REQ-F-035; grant/deny/revoke each loop over categoryOrder calling this factory.
+func newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat actionCategory) *cobra.Command {
+	meta := categoryMeta[cat]
+	word := verbWord(verb)
+	target := "TO"
+	if word == "revoke" {
+		target = "FROM"
+	}
+
+	var roleName, revokeType string
+	var opts privilegeOpts
+
+	cmd := &cobra.Command{
+		Use:       meta.name + " <action>",
+		Short:     verbTitle(word) + " a " + meta.shortNoun + " " + rolePreposition(word) + " a role",
+		Long:      categoryLong(word, cat),
+		Example:   renderCategoryExample(word, cat),
+		ValidArgs: kebabActionsForCategory(cat),
+		// ValidArgs drives <TAB> completion only; Args is ExactArgs(1) (not
+		// OnlyValidArgs) so a cross-category action reaches RunE and yields the
+		// "use 'admin privilege grant database access'" hint (REQ-F-030) rather
+		// than cobra's generic invalid-argument message.
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			canonical, err := normalizeAction(args[0])
+			if err != nil {
+				return err
+			}
+			if got := validActions[canonical]; got != cat {
+				return clierr.NewUsageError(
+					"%s is a %s; use 'admin privilege %s %s %s'",
+					args[0], categoryMeta[got].shortNoun, word, categoryMeta[got].name, kebabAction(canonical),
+				)
+			}
+			resolvedVerb := verb
+			if word == "revoke" {
+				resolvedVerb, err = revokeVerb(revokeType)
+				if err != nil {
+					return err
+				}
+			}
+			return runPrivilegeMutation(cmd, cfg, *conn, resolvedVerb, canonical, roleName, opts, target)
+		},
+	}
+	cmd.Annotations = map[string]string{"write": "true"}
+
+	cmd.Flags().StringVar(&roleName, "role", "", "Name of the role to "+word+" the privilege "+rolePreposition(word))
+	if word == "revoke" {
+		cmd.Flags().StringVar(&revokeType, "revoke-type", "", "Restrict the revoke to grant or deny privileges (grant|deny); omit to revoke both")
+	}
+	for _, flag := range meta.flags {
+		registerPrivilegeFlag(cmd, &opts, flag)
+	}
+
+	return cmd
+}
+
+// verbWord maps a privilege verb ("GRANT", "DENY", "REVOKE", "REVOKE GRANT",
+// "REVOKE DENY") to the lower-case command word used in help and examples.
+func verbWord(verb string) string {
+	switch {
+	case strings.HasPrefix(verb, "REVOKE"):
+		return "revoke"
+	case verb == "DENY":
+		return "deny"
+	default:
+		return "grant"
+	}
+}
+
+func verbTitle(verbWord string) string {
+	return strings.ToUpper(verbWord[:1]) + verbWord[1:]
+}
+
+// categoryLong builds the Long help for a category subcommand from its metadata:
+// the verb, the category's actions, the scope/qualifier rule, and that --role is
+// required.
+func categoryLong(verbWord string, cat actionCategory) string {
+	meta := categoryMeta[cat]
+	return verbTitle(verbWord) + " a " + meta.shortNoun + " " + rolePreposition(verbWord) + " a role. " +
+		"The action is the positional argument; valid actions are: " + strings.Join(kebabActionsForCategory(cat), ", ") + ". " +
+		meta.longRule + " --role is required."
 }
 
 // runPrivilegeMutation runs the shared write sequence: required-flag checks,
@@ -326,10 +435,10 @@ func renderCategoryExample(verbWord string, cat actionCategory) string {
 	if meta.exampleFlags != "" {
 		flags = " " + meta.exampleFlags
 	}
-	verbTitle := strings.ToUpper(verbWord[:1]) + verbWord[1:]
-	return "# " + verbTitle + " a " + meta.shortNoun + " to the analyst role\n" +
+	title := verbTitle(verbWord)
+	return "# " + title + " a " + meta.shortNoun + " to the analyst role\n" +
 		base + flags + " --role analyst --credential local --rw\n\n" +
-		"# " + verbTitle + " the same privilege, output as JSON\n" +
+		"# " + title + " the same privilege, output as JSON\n" +
 		base + flags + " --role analyst --credential local --rw --format json"
 }
 
