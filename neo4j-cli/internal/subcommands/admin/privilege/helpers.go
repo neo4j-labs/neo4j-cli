@@ -284,16 +284,19 @@ const (
 )
 
 // categoryInfo declares the user-facing surface for one action category: the
-// kebab command name, the flags valid for every action in the category, which of
-// those are required, a Long help fragment describing the category's rules, and
-// a representative action + flag values used to render the Example. It is the
-// single source (alongside validActions) for the per-category subcommand surface
-// introduced by the discoverability redesign (REQ-F-034); the subcommand factory
-// in a later task is its only consumer.
+// kebab command name, the flags valid for every action in the category, a Long
+// help fragment describing the category's rules, and a representative action +
+// flag values used to render the Example. It is the single source (alongside
+// validActions) for the per-category subcommand surface introduced by the
+// discoverability redesign (REQ-F-034); newCategoryCmd is its only consumer.
+//
+// Per-flag requirements (e.g. label needs --node-label, dbms needs --on-dbms)
+// are not declared here: buildPrivilegeCypher already enforces them as usage
+// errors, so a separate requiredFlags field would be a second, unenforced source
+// of the same rule. The longRule text states the requirement for help.
 type categoryInfo struct {
 	name          string
 	flags         []string
-	requiredFlags []string
 	shortNoun     string
 	longRule      string
 	exampleAction string
@@ -332,7 +335,6 @@ var categoryMeta = map[actionCategory]categoryInfo{
 	labelScoped: {
 		name:          "label",
 		flags:         []string{flagOnGraph, flagNodeLabel},
-		requiredFlags: []string{flagNodeLabel},
 		shortNoun:     "label privilege",
 		longRule:      "Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels.",
 		exampleAction: "set-label",
@@ -357,7 +359,6 @@ var categoryMeta = map[actionCategory]categoryInfo{
 	dbms: {
 		name:          "dbms",
 		flags:         []string{flagOnDbms},
-		requiredFlags: []string{flagOnDbms},
 		shortNoun:     "DBMS privilege",
 		longRule:      "Requires --on-dbms.",
 		exampleAction: "create-role",

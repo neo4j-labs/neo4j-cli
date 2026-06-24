@@ -107,17 +107,102 @@ func TestNewCategoryCmd_RevokeResolvesVerb(t *testing.T) {
 	assert.Equal(t, "REVOKE GRANT READ {*} ON GRAPH * ELEMENTS * FROM $role", calls[0].cypher)
 }
 
-func TestNewCategoryCmd_CrossCategoryPositional_NamesCorrectCommand(t *testing.T) {
-	var calls []sequencedCall
-	// "access" is a database privilege invoked on the property category.
-	err := runCategory(t, "GRANT", propertyBearer, "access --role analyst", &calls, nil)
-	require.Error(t, err)
+// TestCategoryCmd_PerCategoryCypherParity drives one representative action per
+// category through the actual category subcommand and asserts the emitted Cypher
+// matches the server-validated fragments (REQ-NF-005/007). The fragments below
+// are server-validated — do not change them to invalid Cypher to make a test
+// pass (see the note atop TestBuildPrivilegeCypher_HappyPaths).
+func TestCategoryCmd_PerCategoryCypherParity(t *testing.T) {
+	cases := []struct {
+		name string
+		cat  actionCategory
+		args string
+		want string
+	}{
+		{
+			name: "propertyBearer",
+			cat:  propertyBearer,
+			args: "read --on-graph * --property name --role analyst",
+			want: "GRANT READ {`name`} ON GRAPH * ELEMENTS * TO $role",
+		},
+		{
+			name: "graphOnly entity",
+			cat:  graphOnly,
+			args: "traverse --on-graph * --node-label Person --role analyst",
+			want: "GRANT TRAVERSE ON GRAPH * NODES `Person` TO $role",
+		},
+		{
+			name: "graphWhole",
+			cat:  graphWhole,
+			args: "write --on-graph * --role analyst",
+			want: "GRANT WRITE ON GRAPH * TO $role",
+		},
+		{
+			name: "labelScoped multi label",
+			cat:  labelScoped,
+			args: "set-label --node-label Person --node-label Movie --on-graph neo4j --role analyst",
+			want: "GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j` TO $role",
+		},
+		{
+			name: "load on cidr",
+			cat:  load,
+			args: "load --cidr 127.0.0.1/32 --role analyst",
+			want: `GRANT LOAD ON CIDR "127.0.0.1/32" TO $role`,
+		},
+		{
+			name: "database",
+			cat:  database,
+			args: "access --on-database neo4j --role analyst",
+			want: "GRANT ACCESS ON DATABASE `neo4j` TO $role",
+		},
+		{
+			name: "dbms",
+			cat:  dbms,
+			args: "create-role --on-dbms --role analyst",
+			want: "GRANT CREATE ROLE ON DBMS TO $role",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []sequencedCall
+			err := runCategory(t, "GRANT", tc.cat, tc.args, &calls, twoOK())
+			require.NoError(t, err)
+			require.Len(t, calls, 2)
+			assert.Equal(t, tc.want, calls[0].cypher)
+			assert.Equal(t, "analyst", calls[0].params["role"])
+			assert.Equal(t, "SHOW ROLE $name PRIVILEGES", calls[1].cypher)
+		})
+	}
+}
 
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 2, ce.Code)
-	assert.Contains(t, ce.Message, "admin privilege grant database access")
-	assert.Empty(t, calls)
+// TestCategoryCmd_CrossCategoryPositional_PerCategory asserts that invoking each
+// category with an action belonging to a different category yields a usage error
+// naming the correct category command (REQ-F-030).
+func TestCategoryCmd_CrossCategoryPositional_PerCategory(t *testing.T) {
+	cases := []struct {
+		name     string
+		on       actionCategory
+		action   string
+		wantHint string
+	}{
+		{name: "property given a database action", on: propertyBearer, action: "access", wantHint: "admin privilege grant database access"},
+		{name: "database given a dbms action", on: database, action: "create-role", wantHint: "admin privilege grant dbms create-role"},
+		{name: "graph given a property action", on: graphWhole, action: "read", wantHint: "admin privilege grant property read"},
+		{name: "load given a graph action", on: load, action: "write", wantHint: "admin privilege grant graph write"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []sequencedCall
+			err := runCategory(t, "GRANT", tc.on, tc.action+" --role analyst", &calls, nil)
+			require.Error(t, err)
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(err, &ce))
+			assert.Equal(t, 2, ce.Code)
+			assert.Contains(t, ce.Message, tc.wantHint)
+			assert.Empty(t, calls)
+		})
+	}
 }
 
 func TestNewCategoryCmd_UnknownAction_ReturnsUnknownActionError(t *testing.T) {

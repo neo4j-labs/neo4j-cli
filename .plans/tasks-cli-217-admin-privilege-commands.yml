@@ -502,7 +502,8 @@ tasks:
 
   - id: task-020
     title: "Migrate and expand privilege tests for the per-category subcommands (REQ-NF-006/007)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T15:30:00Z
     description: |
       Update the privilege package tests for the new surface. (1) Add a structure test (REQ-NF-006)
       asserting each verb registers exactly the seven category subcommands; that each exposes exactly
