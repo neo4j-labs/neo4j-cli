@@ -106,7 +106,7 @@ func newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat act
 					return err
 				}
 			}
-			return runPrivilegeMutation(cmd, cfg, *conn, resolvedVerb, canonical, roleName, opts, target)
+			return runPrivilegeMutation(cmd, cfg, *conn, resolvedVerb, cat, canonical, roleName, opts, target)
 		},
 	}
 	cmd.Annotations = map[string]string{"write": "true"}
@@ -152,14 +152,15 @@ func categoryLong(verbWord string, cat actionCategory) string {
 // runPrivilegeMutation runs the shared write sequence: the --role check,
 // buildPrivilegeCypher, SilenceUsage, exec via the seam (appending the role
 // target with the given keyword, "TO" or "FROM"), then outputPrivileges. verb
-// is the resolved privilege verb ("GRANT", "DENY", "REVOKE", ...) and action is
-// the already-resolved canonical keyword.
-func runPrivilegeMutation(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, verb, action, roleName string, opts privilegeOpts, target string) error {
+// is the resolved privilege verb ("GRANT", "DENY", "REVOKE", ...); cat and
+// action are the resolved category and canonical keyword from
+// resolveCategoryAction.
+func runPrivilegeMutation(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, verb string, cat actionCategory, action, roleName string, opts privilegeOpts, target string) error {
 	if roleName == "" {
 		return clierr.NewUsageError("--role is required")
 	}
 
-	cypher, params, err := buildPrivilegeCypher(verb, action, opts)
+	cypher, params, err := buildPrivilegeCypher(verb, cat, action, opts)
 	if err != nil {
 		return err
 	}
@@ -470,119 +471,69 @@ func canonicalAction(action string) string {
 	return strings.ToUpper(strings.Join(strings.Fields(cleaned), " "))
 }
 
-// normalizeAction resolves an action keyword to its canonical form via
-// canonicalAction, returning an error if the result is not a known action. The
-// category subcommand layer (resolveCategoryAction) owns the user-facing
-// CLI-form, category-scoped error message (REQ-F-039); this error is reached only
-// internally — buildPrivilegeCypher receives an already-resolved action — so it
-// carries no action enumeration.
-func normalizeAction(action string) (string, error) {
-	normalized := canonicalAction(action)
-	if _, ok := validActions[normalized]; !ok {
-		return "", clierr.NewUsageError("unknown action %q", action)
-	}
-	return normalized, nil
-}
-
 // buildPrivilegeCypher constructs the privilege Cypher fragment (without the
 // CYPHER 25 prefix, which RunAdminStatement prepends, and without the trailing
 // TO/FROM $role target, which the leaf command appends) for the given verb
-// ("GRANT", "DENY", "REVOKE", "REVOKE GRANT", or "REVOKE DENY"), action, and
-// flag options. Action and resource are inlined as keywords to match how Neo4j
-// parses privilege Cypher; the returned params map is non-nil and empty (only
-// $role, added by the caller, is parameterised). It returns a usage error for
-// any invalid flag/category combination (REQ-F-011) before producing Cypher.
-func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[string]any, error) {
-	normalized, err := normalizeAction(action)
-	if err != nil {
-		return "", nil, err
-	}
-	category := validActions[normalized]
-
-	if opts.cidr != "" && category != load {
-		return "", nil, clierr.NewUsageError("--cidr is only valid for the LOAD action")
-	}
-
-	hasGraph := opts.onGraph != ""
-	hasDatabase := opts.onDatabase != ""
-	hasNodeLabel := len(opts.nodeLabels) > 0
-	hasRelType := len(opts.relTypes) > 0
-	hasProperty := len(opts.properties) > 0
-
-	if hasGraph && hasDatabase {
-		return "", nil, clierr.NewUsageError("--on-graph and --on-database are mutually exclusive")
+// ("GRANT", "DENY", "REVOKE", "REVOKE GRANT", or "REVOKE DENY"), resolved
+// category, and canonical action. Action and resource are inlined as keywords to
+// match how Neo4j parses privilege Cypher; the returned params map is non-nil and
+// empty (only $role, added by the caller, is parameterised).
+//
+// Precondition: action is already canonical and belongs to cat (the only caller,
+// runPrivilegeMutation, passes the resolveCategoryAction result). Each category
+// leaf registers only categoryMeta[cat].flags, so cross-scope flag combinations
+// are structurally unrepresentable here; the only remaining validation is the two
+// in-category qualifier rules for label/entity scopes. The cat assertion guards
+// against future misuse of the helper, not against any reachable invocation.
+func buildPrivilegeCypher(verb string, cat actionCategory, action string, opts privilegeOpts) (string, map[string]any, error) {
+	if got, ok := validActions[action]; !ok || got != cat {
+		return "", nil, fmt.Errorf("buildPrivilegeCypher: action %q does not belong to category %d", action, cat)
 	}
 
-	if hasNodeLabel && hasRelType {
+	if len(opts.nodeLabels) > 0 && len(opts.relTypes) > 0 {
 		return "", nil, clierr.NewUsageError("--node-label and --relationship-type are mutually exclusive")
 	}
 
-	if category == graphWhole && (hasNodeLabel || hasRelType || hasProperty) {
-		return "", nil, clierr.NewUsageError("%s does not accept node-label, relationship-type, or property qualifiers", normalized)
-	}
-
-	if hasProperty && category != propertyBearer {
-		return "", nil, clierr.NewUsageError("%s does not accept a property qualifier", normalized)
-	}
-
 	var clause string
-	switch category {
+	switch cat {
 	case propertyBearer, graphOnly:
-		if hasDatabase {
-			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
-		}
 		graph := opts.onGraph
 		if graph == "" {
 			graph = "*"
 		}
 		prop := ""
-		if category == propertyBearer {
+		if cat == propertyBearer {
 			prop = " " + propertyClause(opts.properties)
 		}
-		clause = normalized + prop + " ON GRAPH " + cypherIdentifier(graph) + " " + entityClause(opts.nodeLabels, opts.relTypes)
+		clause = action + prop + " ON GRAPH " + cypherIdentifier(graph) + " " + entityClause(opts.nodeLabels, opts.relTypes)
 	case graphWhole:
-		if hasDatabase {
-			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
-		}
 		graph := opts.onGraph
 		if graph == "" {
 			graph = "*"
 		}
-		clause = normalized + " ON GRAPH " + cypherIdentifier(graph)
+		clause = action + " ON GRAPH " + cypherIdentifier(graph)
 	case labelScoped:
-		if hasDatabase {
-			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
-		}
-		if !hasNodeLabel {
-			return "", nil, clierr.NewUsageError("action %s requires --node-label", normalized)
+		if len(opts.nodeLabels) == 0 {
+			return "", nil, clierr.NewUsageError("action %s requires --node-label", action)
 		}
 		graph := opts.onGraph
 		if graph == "" {
 			graph = "*"
 		}
-		clause = normalized + " " + strings.Join(escapeIdentifiers(opts.nodeLabels), ", ") + " ON GRAPH " + cypherIdentifier(graph)
+		clause = action + " " + strings.Join(escapeIdentifiers(opts.nodeLabels), ", ") + " ON GRAPH " + cypherIdentifier(graph)
 	case database:
-		if hasGraph {
-			return "", nil, clierr.NewUsageError("action %s is a database privilege and accepts only --on-database", normalized)
-		}
 		db := opts.onDatabase
 		if db == "" {
 			db = "*"
 		}
-		clause = normalized + " ON DATABASE " + cypherIdentifier(db)
+		clause = action + " ON DATABASE " + cypherIdentifier(db)
 	case dbms:
-		clause = normalized + " ON DBMS"
+		clause = action + " ON DBMS"
 	case load:
-		if hasGraph || hasDatabase {
-			return "", nil, clierr.NewUsageError("action %s does not accept --on-graph or --on-database (use --cidr)", normalized)
-		}
-		if hasNodeLabel || hasRelType {
-			return "", nil, clierr.NewUsageError("action %s does not accept node-label or relationship-type qualifiers", normalized)
-		}
 		if opts.cidr == "" {
-			clause = normalized + " ON ALL DATA"
+			clause = action + " ON ALL DATA"
 		} else {
-			clause = normalized + " ON CIDR " + cypherStringLiteral(opts.cidr)
+			clause = action + " ON CIDR " + cypherStringLiteral(opts.cidr)
 		}
 	}
 

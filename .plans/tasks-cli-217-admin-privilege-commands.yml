@@ -677,7 +677,8 @@ tasks:
 
   - id: task-025
     title: "Collapse buildPrivilegeCypher to single-layer validation; delete unreachable cross-scope guards and redundant normalizeAction"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T20:15:00Z
     source: review
     description: |
       End-of-feature audit (BLOCKING, two findings sharing one root). The per-category command tree

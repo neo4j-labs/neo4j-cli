@@ -64,52 +64,13 @@ func twoOK() []struct {
 	}
 }
 
-func TestNormalizeAction(t *testing.T) {
-	cases := []struct {
-		name   string
-		input  string
-		want   string
-		wantOK bool
-	}{
-		{name: "underscore form", input: "all_graph_privileges", want: "ALL GRAPH PRIVILEGES", wantOK: true},
-		{name: "spaced upper form", input: "ALL GRAPH PRIVILEGES", want: "ALL GRAPH PRIVILEGES", wantOK: true},
-		{name: "lower single word", input: "read", want: "READ", wantOK: true},
-		{name: "mixed case underscore", input: "Set_Label", want: "SET LABEL", wantOK: true},
-		{name: "extra whitespace", input: "  create   role ", want: "CREATE ROLE", wantOK: true},
-		{name: "unknown action", input: "find", wantOK: false},
-		{name: "empty", input: "", wantOK: false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := normalizeAction(tc.input)
-			if tc.wantOK {
-				if err != nil {
-					t.Fatalf("normalizeAction(%q) returned error: %v", tc.input, err)
-				}
-				if got != tc.want {
-					t.Fatalf("normalizeAction(%q) = %q, want %q", tc.input, got, tc.want)
-				}
-				return
-			}
-			if err == nil {
-				t.Fatalf("normalizeAction(%q) = %q, want error", tc.input, got)
-			}
-			var ce *clierr.CLIError
-			if !errors.As(err, &ce) || ce.Code != 2 {
-				t.Fatalf("normalizeAction(%q) error = %v, want usage error (code 2)", tc.input, err)
-			}
-		})
-	}
-}
-
-func TestValidActions_FindAbsent(t *testing.T) {
-	if _, ok := validActions["FIND"]; ok {
-		t.Fatal("FIND must not be a valid action (REQ-F-013)")
-	}
-}
-
-func TestNormalizeAction_HyphenSeparator(t *testing.T) {
+func TestCanonicalAction(t *testing.T) {
 	cases := map[string]string{
+		"all_graph_privileges":    "ALL GRAPH PRIVILEGES",
+		"ALL GRAPH PRIVILEGES":    "ALL GRAPH PRIVILEGES",
+		"read":                    "READ",
+		"Set_Label":               "SET LABEL",
+		"  create   role ":        "CREATE ROLE",
 		"set-property":            "SET PROPERTY",
 		"all-graph-privileges":    "ALL GRAPH PRIVILEGES",
 		"set-label":               "SET LABEL",
@@ -117,13 +78,15 @@ func TestNormalizeAction_HyphenSeparator(t *testing.T) {
 		"all-database-privileges": "ALL DATABASE PRIVILEGES",
 	}
 	for input, want := range cases {
-		got, err := normalizeAction(input)
-		if err != nil {
-			t.Fatalf("normalizeAction(%q) returned error: %v", input, err)
+		if got := canonicalAction(input); got != want {
+			t.Fatalf("canonicalAction(%q) = %q, want %q", input, got, want)
 		}
-		if got != want {
-			t.Fatalf("normalizeAction(%q) = %q, want %q", input, got, want)
-		}
+	}
+}
+
+func TestValidActions_FindAbsent(t *testing.T) {
+	if _, ok := validActions["FIND"]; ok {
+		t.Fatal("FIND must not be a valid action (REQ-F-013)")
 	}
 }
 
@@ -347,7 +310,8 @@ func TestBuildPrivilegeCypher_HappyPaths(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, params, err := buildPrivilegeCypher(tc.verb, tc.action, tc.opts)
+			canonical := canonicalAction(tc.action)
+			got, params, err := buildPrivilegeCypher(tc.verb, validActions[canonical], canonical, tc.opts)
 			if err != nil {
 				t.Fatalf("buildPrivilegeCypher returned error: %v", err)
 			}
@@ -421,7 +385,8 @@ func TestBuildPrivilegeCypher_EscapesIdentifiers(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, _, err := buildPrivilegeCypher(tc.verb, tc.action, tc.opts)
+			canonical := canonicalAction(tc.action)
+			got, _, err := buildPrivilegeCypher(tc.verb, validActions[canonical], canonical, tc.opts)
 			if err != nil {
 				t.Fatalf("buildPrivilegeCypher returned error: %v", err)
 			}
@@ -432,6 +397,12 @@ func TestBuildPrivilegeCypher_EscapesIdentifiers(t *testing.T) {
 	}
 }
 
+// TestBuildPrivilegeCypher_Errors covers the only two usage errors reachable
+// through the command tree: the per-category factory registers only its
+// category's flags, so cross-scope combinations are structurally impossible and
+// no longer guarded here (see buildPrivilegeCypher's precondition comment). What
+// remains are the two genuine in-category rules — label/relationship-type mutual
+// exclusion and labelScoped requiring --node-label.
 func TestBuildPrivilegeCypher_Errors(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -440,29 +411,14 @@ func TestBuildPrivilegeCypher_Errors(t *testing.T) {
 		opts    privilegeOpts
 		wantMsg string
 	}{
-		{name: "unknown action", verb: "GRANT", action: "find", opts: privilegeOpts{onGraph: "*"}, wantMsg: "unknown action"},
-		{name: "graphOnly with on-database", verb: "GRANT", action: "traverse", opts: privilegeOpts{onDatabase: "neo4j"}},
-		{name: "database with on-graph", verb: "GRANT", action: "access", opts: privilegeOpts{onGraph: "neo4j"}},
 		{name: "setLabel missing node-label", verb: "GRANT", action: "set_label", opts: privilegeOpts{onGraph: "neo4j"}, wantMsg: "action SET LABEL requires --node-label"},
 		{name: "removeLabel missing node-label", verb: "GRANT", action: "remove_label", opts: privilegeOpts{onGraph: "neo4j"}, wantMsg: "action REMOVE LABEL requires --node-label"},
-		{name: "graphOnly with property", verb: "GRANT", action: "traverse", opts: privilegeOpts{onGraph: "*", properties: []string{"name"}}, wantMsg: "TRAVERSE does not accept a property qualifier"},
-		{name: "graphWhole with node-label", verb: "GRANT", action: "write", opts: privilegeOpts{onGraph: "*", nodeLabels: []string{"Person"}}, wantMsg: "WRITE does not accept node-label, relationship-type, or property qualifiers"},
-		{name: "graphWhole with relationship-type", verb: "GRANT", action: "all_graph_privileges", opts: privilegeOpts{onGraph: "*", relTypes: []string{"KNOWS"}}, wantMsg: "ALL GRAPH PRIVILEGES does not accept node-label, relationship-type, or property qualifiers"},
-		{name: "graphWhole with property", verb: "GRANT", action: "write", opts: privilegeOpts{onGraph: "*", properties: []string{"name"}}, wantMsg: "WRITE does not accept node-label, relationship-type, or property qualifiers"},
-		{name: "graphWhole with on-database", verb: "GRANT", action: "write", opts: privilegeOpts{onDatabase: "neo4j"}, wantMsg: "action WRITE is a graph privilege and accepts only --on-graph"},
-		{name: "database with property", verb: "GRANT", action: "access", opts: privilegeOpts{properties: []string{"name"}}, wantMsg: "ACCESS does not accept a property qualifier"},
 		{name: "node-label and rel-type both set", verb: "GRANT", action: "read", opts: privilegeOpts{onGraph: "*", nodeLabels: []string{"Person"}, relTypes: []string{"KNOWS"}}, wantMsg: "--node-label and --relationship-type are mutually exclusive"},
-		{name: "two scope flags set", verb: "GRANT", action: "read", opts: privilegeOpts{onGraph: "*", onDatabase: "neo4j"}, wantMsg: "--on-graph and --on-database are mutually exclusive"},
-		{name: "cidr with non-load action", verb: "GRANT", action: "read", opts: privilegeOpts{onGraph: "*", cidr: "127.0.0.1/32"}, wantMsg: "--cidr is only valid for the LOAD action"},
-		{name: "load with on-graph", verb: "GRANT", action: "load", opts: privilegeOpts{onGraph: "*"}, wantMsg: "action LOAD does not accept --on-graph or --on-database"},
-		{name: "load with on-database", verb: "GRANT", action: "load", opts: privilegeOpts{onDatabase: "neo4j"}, wantMsg: "action LOAD does not accept --on-graph or --on-database"},
-		{name: "load with node-label", verb: "GRANT", action: "load", opts: privilegeOpts{nodeLabels: []string{"Person"}}, wantMsg: "action LOAD does not accept node-label or relationship-type qualifiers"},
-		{name: "load with relationship-type", verb: "GRANT", action: "load", opts: privilegeOpts{relTypes: []string{"KNOWS"}}, wantMsg: "action LOAD does not accept node-label or relationship-type qualifiers"},
-		{name: "load with property", verb: "GRANT", action: "load", opts: privilegeOpts{properties: []string{"name"}}, wantMsg: "LOAD does not accept a property qualifier"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := buildPrivilegeCypher(tc.verb, tc.action, tc.opts)
+			canonical := canonicalAction(tc.action)
+			_, _, err := buildPrivilegeCypher(tc.verb, validActions[canonical], canonical, tc.opts)
 			if err == nil {
 				t.Fatal("expected usage error, got nil")
 			}
