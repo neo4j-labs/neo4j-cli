@@ -125,3 +125,7 @@ Added 2 review tasks (task-025..task-026).
 Collapsed buildPrivilegeCypher to single-layer validation: it now takes the resolved (cat, canonical action) as a precondition from runPrivilegeMutation instead of re-normalizing/re-deriving; deleted normalizeAction and the ~9 unreachable cross-scope guard branches plus their hand-built illegal-opts unit tests, keeping only the two reachable in-category rules (label/rel mutual exclusion, labelScoped requires --node-label). A single internal fmt.Errorf assertion guards helper misuse. All gates green; reviewer LGTM.
 Files: ~mod (privilege/helpers.go, privilege/privilege_helpers_test.go)
 Decisions: runPrivilegeMutation now also threads actionCategory through; TestNormalizeAction* retargeted to TestCanonicalAction (the surviving primitive), unknown-action error ownership stays with resolveCategoryAction.
+
+## TASK-026 — 2026-06-24T15:22:19Z
+Relocated the Cypher-rendering functions (buildPrivilegeCypher, propertyClause, entityClause, cypherIdentifier, cypherStringLiteral, escapeIdentifiers) verbatim from helpers.go into a new cypher.go in the same package; helpers.go keeps the factory, metadata, resolution, and output wiring.
+Files: +neo4j-cli/internal/subcommands/admin/privilege/cypher.go, ~neo4j-cli/internal/subcommands/admin/privilege/helpers.go

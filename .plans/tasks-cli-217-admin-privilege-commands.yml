@@ -730,7 +730,8 @@ tasks:
 
   - id: task-026
     title: "Split Cypher-rendering helpers out of helpers.go into their own file"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T15:22:19Z
     source: review
     description: |
       End-of-feature audit (non-blocking). helpers.go carries the entire privilege subsystem — the
