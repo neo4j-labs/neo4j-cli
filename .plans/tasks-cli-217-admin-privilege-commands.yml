@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-24T18:30:00Z
+updated_at: 2026-06-24T19:30:00Z
 
 tasks:
   - id: task-001
@@ -673,4 +673,81 @@ tasks:
       - "The cross-category hint (REQ-F-030) still fires for an action belonging to a different category and remains kebab"
       - "No user-facing privilege usage error renders Cypher-form action keywords; `sortedActions()` Cypher-form enumeration is removed (deleted if unused)"
       - "Tests cover the kebab + category-scoped unknown-action error for at least two categories"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-025
+    title: "Collapse buildPrivilegeCypher to single-layer validation; delete unreachable cross-scope guards and redundant normalizeAction"
+    status: pending
+    source: review
+    description: |
+      End-of-feature audit (BLOCKING, two findings sharing one root). The per-category command tree
+      now makes cross-scope flag/action combinations structurally unrepresentable, yet
+      buildPrivilegeCypher still re-validates them — leaving a wall of dead guard branches plus a
+      redundant re-normalization. Two facts from the current code close the loop: (1)
+      resolveCategoryAction returns a canonical action ONLY when validActions[canonical] == cat, so the
+      action reaching buildPrivilegeCypher via runPrivilegeMutation is always a member of the invoked
+      command's category; (2) each category leaf registers ONLY categoryMeta[cat].flags (newCategoryCmd
+      loop → registerPrivilegeFlag, the sole flag-binding site), so no category registers a flag
+      outside its own scope.
+
+      Cross-referencing the registered-flag sets against the guards, these branches cannot be hit by
+      any real invocation and are dead defensive code: the `--cidr` non-load guard; the
+      `--on-graph`/`--on-database` mutual exclusion; graphWhole rejecting label/rel/property
+      qualifiers; `hasProperty && category != propertyBearer`; every `if hasDatabase` inside the graph
+      cases; `database` rejecting `--on-graph`; and `load` rejecting graph/database/label/rel. Only the
+      `--node-label`/`--relationship-type` mutual exclusion and labelScoped requiring `--node-label`
+      are genuinely reachable. These guards only LOOK tested because the error-path table in
+      privilege_helpers_test.go hand-builds illegal privilegeOpts (e.g. action "read" with cidr, "access"
+      with properties, "load" with onGraph) — combinations no user can produce; the tests pin behavior
+      of unreachable code and mask the dead-ness.
+
+      Second finding (same root): runPrivilegeMutation passes the already-canonical action from
+      resolveCategoryAction into buildPrivilegeCypher, which immediately calls normalizeAction →
+      canonicalAction AGAIN on an already-canonical string and re-looks-up validActions. The
+      re-normalization is a no-op and the `!ok` error branch is unreachable in production.
+
+      Code-judo move (one move, not two): make buildPrivilegeCypher's contract explicit — it receives a
+      canonical action already known to belong to a category (pass the resolved category and/or the
+      canonical keyword as a precondition from the caller). Then: delete the cross-scope guards and
+      their illegal-opts tests; keep only the two reachable in-category rules (label/rel exclusivity,
+      label requires `--node-label`); drop the redundant normalizeAction/canonicalAction re-resolution
+      (delete it or demote to a single internal assertion). The `switch category` then renders Cypher
+      directly. The re-validation, the re-normalization, and the ~9 dead branches all fall out
+      together, and the function shrinks substantially. If belt-and-suspenders defense against future
+      misuse of the helper is wanted, that is one assertion, not eleven bespoke user-facing usage
+      errors. Behavior for every real (command-tree-reachable) invocation must be byte-identical —
+      the emitted Cypher and the genuinely-reachable usage errors are unchanged.
+    dependencies:
+      - task-024
+    acceptance_criteria:
+      - "buildPrivilegeCypher no longer re-derives the category or re-normalizes the action: it takes the canonical action (and/or resolved category) as a precondition from the caller; no second normalizeAction/canonicalAction call on an already-canonical string"
+      - "The unreachable cross-scope guard branches are removed (`--cidr` non-load, on-graph/on-database mutual exclusion, graphWhole qualifier rejection, hasProperty non-propertyBearer, the `if hasDatabase` graph-case guards, database rejecting on-graph, load rejecting graph/database/label/rel) along with their hand-built illegal-opts unit tests"
+      - "The two genuinely-reachable in-category rules remain enforced with tests: `--node-label`/`--relationship-type` mutual exclusion, and labelScoped requiring `--node-label`"
+      - "Emitted Cypher and reachable usage errors are unchanged for every command-tree-reachable invocation (all migrated per-category behavioural/parity tests still pass)"
+      - "Any remaining defensive check against helper misuse is a single assertion, not multiple bespoke usage errors"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-026
+    title: "Split Cypher-rendering helpers out of helpers.go into their own file"
+    status: pending
+    source: review
+    description: |
+      End-of-feature audit (non-blocking). helpers.go carries the entire privilege subsystem — the
+      category-subcommand factory, the categoryMeta/validActions metadata, the validation, AND the
+      Cypher rendering — in one file. It is under the size threshold and cohesive, so this is not a
+      blocker, but the natural split point is to move the Cypher-rendering functions
+      (buildPrivilegeCypher and its rendering helpers: propertyClause, entityClause, cypherIdentifier,
+      cypherStringLiteral, escapeIdentifiers, and any remaining clause-builders) into their own file
+      (e.g. cypher.go) in the same package, leaving helpers.go with the factory, metadata, resolution,
+      and output wiring. Do this AFTER task-025 so the split operates on the already-shrunk,
+      single-layer buildPrivilegeCypher. Pure relocation within the package — no behavior change, no
+      signature change, no exported-symbol change. Keep the Neo4j copyright header on the new file.
+      Mind that the one-file-per-leaf convention does not apply to these shared helpers; this is an
+      internal organisational split of the package's shared code, not a new leaf.
+    dependencies:
+      - task-025
+    acceptance_criteria:
+      - "The Cypher-rendering functions (buildPrivilegeCypher + propertyClause/entityClause/cypherIdentifier/cypherStringLiteral/escapeIdentifiers and related clause-builders) live in a new file in the privilege package; helpers.go retains the factory, metadata, resolution, and output wiring"
+      - "Pure relocation: no behavior, signature, or exported-symbol changes; all existing tests pass unchanged"
+      - "The new file carries the Neo4j copyright header"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"

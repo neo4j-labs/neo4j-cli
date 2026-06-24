@@ -117,3 +117,6 @@ Decisions: dbms.flags set to nil (not empty slice) — wantFlagSet/registration 
 ## TASK-024 — 2026-06-24T15:03:19Z
 Replaced the global Cypher-form unknown-action enumeration with a category-aware resolver (resolveCategoryAction) in newCategoryCmd.RunE: in-category returns canonical, cross-category keeps the kebab hint, unknown yields a category-scoped kebab "unknown <category> action" list. Deleted sortedActions(); normalizeAction now reuses a new canonicalAction helper and carries no enumeration (internal-only).
 Files: ~privilege/helpers.go, ~privilege/category_test.go
+
+## REVIEW — 2026-06-24T19:30:00Z
+Added 2 review tasks (task-025..task-026).
