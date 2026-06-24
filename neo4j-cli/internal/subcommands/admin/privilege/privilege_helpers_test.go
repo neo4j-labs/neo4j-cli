@@ -181,6 +181,16 @@ func TestRenderCategoryExample(t *testing.T) {
 	if strings.HasPrefix(got, " ") || strings.HasPrefix(got, "\t") {
 		t.Fatalf("renderCategoryExample must be flush-left:\n%s", got)
 	}
+
+	// A single-action category (load) omits the action token: the example is
+	// "grant load --cidr ...", never "grant load load ...".
+	loadExample := renderCategoryExample("grant", load)
+	if !strings.Contains(loadExample, "neo4j-cli admin privilege grant load --cidr 127.0.0.1/32 --role analyst --credential local --rw") {
+		t.Fatalf("load example must omit the action token:\n%s", loadExample)
+	}
+	if strings.Contains(loadExample, "grant load load") {
+		t.Fatalf("load example must not repeat the action token:\n%s", loadExample)
+	}
 }
 
 // The expected Cypher fragments below are server-validated: each was confirmed

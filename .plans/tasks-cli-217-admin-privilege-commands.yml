@@ -756,7 +756,8 @@ tasks:
 
   - id: task-027
     title: "Single-action categories take no positional; grant/deny/revoke load drops the redundant action token (REQ-F-040, REQ-NF-011)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T21:15:00Z
     source: extend-prd
     description: |
       Dogfooding: `grant load load` repeats "load" for no information — the load category has exactly

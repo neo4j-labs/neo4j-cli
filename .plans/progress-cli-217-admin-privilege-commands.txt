@@ -129,3 +129,7 @@ Decisions: runPrivilegeMutation now also threads actionCategory through; TestNor
 ## TASK-026 — 2026-06-24T15:22:19Z
 Relocated the Cypher-rendering functions (buildPrivilegeCypher, propertyClause, entityClause, cypherIdentifier, cypherStringLiteral, escapeIdentifiers) verbatim from helpers.go into a new cypher.go in the same package; helpers.go keeps the factory, metadata, resolution, and output wiring.
 Files: +neo4j-cli/internal/subcommands/admin/privilege/cypher.go, ~neo4j-cli/internal/subcommands/admin/privilege/helpers.go
+
+## TASK-027 — 2026-06-24T21:15:00Z
+Single-action categories (data-driven on len(actionsForCategory(cat))==1; today only load) now take no positional: newCategoryCmd sets Use=meta.name, Args=cobra.NoArgs, nil ValidArgs, and RunE resolves the sole action directly. Knock-ons: categoryInvocation helper drops the action token in the cross-category hint, actionSummary returns "" for single-action (no "(load)" suffix), renderCategoryExample and categoryLong omit the action token. LOAD Cypher unchanged; bundle regenerated; all gates green; reviewer LGTM.
+Files: ~mod (privilege/helpers.go, privilege/structure_test.go, privilege/category_test.go, privilege/privilege_helpers_test.go, skill bundle references/admin.md)

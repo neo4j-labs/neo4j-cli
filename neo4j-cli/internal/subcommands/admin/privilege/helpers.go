@@ -83,24 +83,47 @@ func newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat act
 	var roleName, revokeType string
 	var opts privilegeOpts
 
+	// A single-action category (today only load) takes NO positional: its sole
+	// action is implied, so repeating it ("grant load load") carries no
+	// information. The rule is data-driven from the action count, not hardcoded
+	// to load — a future single-action category inherits it automatically.
+	actions := actionsForCategory(cat)
+	singleAction := len(actions) == 1
+
+	use := meta.name + " <action>"
+	args := cobra.ExactArgs(1)
+	validArgs := kebabActionsForCategory(cat)
+	if singleAction {
+		use = meta.name
+		args = cobra.NoArgs
+		validArgs = nil
+	}
+
 	cmd := &cobra.Command{
-		Use:       meta.name + " <action>",
-		Short:     verbTitle(word) + " a " + meta.shortNoun + " " + actionSummary(cat) + " " + rolePreposition(word) + " a role",
+		Use:       use,
+		Short:     categoryShort(word, cat),
 		Long:      categoryLong(word, cat),
 		Example:   renderCategoryExample(word, cat),
-		ValidArgs: kebabActionsForCategory(cat),
-		// ValidArgs drives <TAB> completion only; Args is ExactArgs(1) (not
-		// OnlyValidArgs) so a cross-category action reaches RunE and yields the
-		// "use 'admin privilege grant database access'" hint (REQ-F-030) rather
-		// than cobra's generic invalid-argument message.
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			canonical, err := resolveCategoryAction(cat, args[0], word)
-			if err != nil {
-				return err
+		ValidArgs: validArgs,
+		// For multi-action categories ValidArgs drives <TAB> completion only; Args
+		// is ExactArgs(1) (not OnlyValidArgs) so a cross-category action reaches
+		// RunE and yields the "use 'admin privilege grant database access'" hint
+		// (REQ-F-030) rather than cobra's generic invalid-argument message.
+		Args: args,
+		RunE: func(cmd *cobra.Command, cmdArgs []string) error {
+			var canonical string
+			if singleAction {
+				canonical = actions[0]
+			} else {
+				var err error
+				canonical, err = resolveCategoryAction(cat, cmdArgs[0], word)
+				if err != nil {
+					return err
+				}
 			}
 			resolvedVerb := verb
 			if word == "revoke" {
+				var err error
 				resolvedVerb, err = revokeVerb(revokeType)
 				if err != nil {
 					return err
@@ -144,9 +167,14 @@ func verbTitle(verbWord string) string {
 // required.
 func categoryLong(verbWord string, cat actionCategory) string {
 	meta := categoryMeta[cat]
+	actionText := "The action is the positional argument; valid actions are: " + strings.Join(kebabActionsForCategory(cat), ", ") + ". "
+	// A single-action category takes no positional: the sole action is implied
+	// by the command name, so the Long says so rather than describing an argument.
+	if len(actionsForCategory(cat)) == 1 {
+		actionText = "Takes no action argument. "
+	}
 	return verbTitle(verbWord) + " a " + meta.shortNoun + " " + rolePreposition(verbWord) + " a role. " +
-		"The action is the positional argument; valid actions are: " + strings.Join(kebabActionsForCategory(cat), ", ") + ". " +
-		meta.longRule + " --role is required."
+		actionText + meta.longRule + " --role is required."
 }
 
 // runPrivilegeMutation runs the shared write sequence: the --role check,
@@ -390,6 +418,19 @@ func kebabAction(canonical string) string {
 	return strings.ToLower(strings.ReplaceAll(canonical, " ", "-"))
 }
 
+// categoryInvocation returns the command tail used to invoke a category, e.g.
+// "database access" for a multi-action category or "load" for a single-action
+// category (whose action is implied and takes no positional). Used by the
+// cross-category hint so pointing at a single-action category omits the
+// redundant action token.
+func categoryInvocation(cat actionCategory, canonical string) string {
+	name := categoryMeta[cat].name
+	if len(actionsForCategory(cat)) == 1 {
+		return name
+	}
+	return name + " " + kebabAction(canonical)
+}
+
 // kebabActionsForCategory returns the kebab action keywords for cat, used for a
 // category subcommand's ValidArgs.
 func kebabActionsForCategory(cat actionCategory) []string {
@@ -401,14 +442,30 @@ func kebabActionsForCategory(cat actionCategory) []string {
 	return out
 }
 
+// categoryShort builds a category leaf's Short. The parenthesised action
+// summary is omitted for a single-action category (it would be a redundant
+// "(load)" suffix), so the load Short reads "Grant a LOAD privilege to a role".
+func categoryShort(word string, cat actionCategory) string {
+	meta := categoryMeta[cat]
+	summary := actionSummary(cat)
+	if summary != "" {
+		summary += " "
+	}
+	return verbTitle(word) + " a " + meta.shortNoun + " " + summary + rolePreposition(word) + " a role"
+}
+
 // actionSummary renders the parenthesised action list spliced into a category
 // leaf's Short so the valid actions are visible in the parent verb's subcommand
-// listing. Small categories (<= 6 actions) list all their kebab actions;
-// larger ones (database, dbms) show the first three plus the total count and
-// point at --help, where categoryLong lists the full set. The threshold and
-// preview count are defined only here.
+// listing. A single-action category returns "" (the sole action is implied by
+// the command name — no redundant "(load)" suffix). Small categories (<= 6
+// actions) list all their kebab actions; larger ones (database, dbms) show the
+// first three plus the total count and point at --help, where categoryLong lists
+// the full set. The threshold and preview count are defined only here.
 func actionSummary(cat actionCategory) string {
 	actions := kebabActionsForCategory(cat)
+	if len(actions) == 1 {
+		return ""
+	}
 	if len(actions) <= 6 {
 		return "(" + strings.Join(actions, ", ") + ")"
 	}
@@ -423,7 +480,12 @@ func actionSummary(cat actionCategory) string {
 // non-empty ("grant"/"deny"/"revoke").
 func renderCategoryExample(verbWord string, cat actionCategory) string {
 	meta := categoryMeta[cat]
-	base := "neo4j-cli admin privilege " + verbWord + " " + meta.name + " " + meta.exampleAction
+	base := "neo4j-cli admin privilege " + verbWord + " " + meta.name
+	// A single-action category takes no positional, so the example omits the
+	// action token ("grant load --cidr ...", not "grant load load ...").
+	if len(actionsForCategory(cat)) != 1 {
+		base += " " + meta.exampleAction
+	}
 	flags := ""
 	if meta.exampleFlags != "" {
 		flags = " " + meta.exampleFlags
@@ -451,8 +513,8 @@ func resolveCategoryAction(cat actionCategory, positional, verbWord string) (str
 		return canonical, nil
 	case ok:
 		return "", clierr.NewUsageError(
-			"%s is a %s; use 'admin privilege %s %s %s'",
-			positional, categoryMeta[got].shortNoun, verbWord, categoryMeta[got].name, kebabAction(canonical),
+			"%s is a %s; use 'admin privilege %s %s'",
+			positional, categoryMeta[got].shortNoun, verbWord, categoryInvocation(got, canonical),
 		)
 	default:
 		return "", clierr.NewUsageError(

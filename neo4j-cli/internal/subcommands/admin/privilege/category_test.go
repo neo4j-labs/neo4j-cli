@@ -146,7 +146,7 @@ func TestCategoryCmd_PerCategoryCypherParity(t *testing.T) {
 		{
 			name: "load on cidr",
 			cat:  load,
-			args: "load --cidr 127.0.0.1/32 --role analyst",
+			args: "--cidr 127.0.0.1/32 --role analyst",
 			want: `GRANT LOAD ON CIDR "127.0.0.1/32" TO $role`,
 		},
 		{
@@ -188,7 +188,9 @@ func TestCategoryCmd_CrossCategoryPositional_PerCategory(t *testing.T) {
 		{name: "property given a database action", on: propertyBearer, action: "access", wantHint: "admin privilege grant database access"},
 		{name: "database given a dbms action", on: database, action: "create-role", wantHint: "admin privilege grant dbms create-role"},
 		{name: "graph given a property action", on: graphWhole, action: "read", wantHint: "admin privilege grant property read"},
-		{name: "load given a graph action", on: load, action: "write", wantHint: "admin privilege grant graph write"},
+		// The cross-category hint POINTING AT a single-action category (load)
+		// omits the trailing action token (REQ-F-030 + REQ-F-040).
+		{name: "graph given a load action", on: graphWhole, action: "load", wantHint: "admin privilege grant load"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -203,6 +205,34 @@ func TestCategoryCmd_CrossCategoryPositional_PerCategory(t *testing.T) {
 			assert.Empty(t, calls)
 		})
 	}
+}
+
+// TestCategoryCmd_LoadTakesNoPositional asserts the single-action load category
+// takes no positional: the bare forms emit valid Cypher and a stray positional
+// ("grant load load") is rejected as an unexpected argument (REQ-F-040).
+func TestCategoryCmd_LoadTakesNoPositional(t *testing.T) {
+	t.Run("on cidr", func(t *testing.T) {
+		var calls []sequencedCall
+		err := runCategory(t, "GRANT", load, "--cidr 127.0.0.1/32 --role analyst", &calls, twoOK())
+		require.NoError(t, err)
+		require.Len(t, calls, 2)
+		assert.Equal(t, `GRANT LOAD ON CIDR "127.0.0.1/32" TO $role`, calls[0].cypher)
+	})
+
+	t.Run("on all data by default", func(t *testing.T) {
+		var calls []sequencedCall
+		err := runCategory(t, "GRANT", load, "--role analyst", &calls, twoOK())
+		require.NoError(t, err)
+		require.Len(t, calls, 2)
+		assert.Equal(t, "GRANT LOAD ON ALL DATA TO $role", calls[0].cypher)
+	})
+
+	t.Run("stray positional rejected", func(t *testing.T) {
+		var calls []sequencedCall
+		err := runCategory(t, "GRANT", load, "load --role analyst", &calls, nil)
+		require.Error(t, err)
+		assert.Empty(t, calls)
+	})
 }
 
 // TestNewCategoryCmd_UnknownAction_KebabCategoryScoped asserts that an unknown

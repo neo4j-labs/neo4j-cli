@@ -385,11 +385,11 @@ neo4j-cli admin privilege deny label set-label --node-label Person --on-graph ne
 
 #### neo4j-cli admin privilege deny load
 
-Deny a LOAD privilege (load) to a role
+Deny a LOAD privilege to a role
 
-Deny a LOAD privilege to a role. The action is the positional argument; valid actions are: load. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
+Deny a LOAD privilege to a role. Takes no action argument. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
 
-Usage: `neo4j-cli admin privilege deny load <action> [flags]`
+Usage: `neo4j-cli admin privilege deny load [flags]`
 
 Flags:
 
@@ -402,10 +402,10 @@ Examples:
 
 ```
 # Deny a LOAD privilege to the analyst role
-neo4j-cli admin privilege deny load load --cidr 127.0.0.1/32 --role analyst --credential local --rw
+neo4j-cli admin privilege deny load --cidr 127.0.0.1/32 --role analyst --credential local --rw
 
 # Deny the same privilege, output as JSON
-neo4j-cli admin privilege deny load load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
+neo4j-cli admin privilege deny load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
 ```
 
 #### neo4j-cli admin privilege deny property
@@ -583,11 +583,11 @@ neo4j-cli admin privilege grant label set-label --node-label Person --on-graph n
 
 #### neo4j-cli admin privilege grant load
 
-Grant a LOAD privilege (load) to a role
+Grant a LOAD privilege to a role
 
-Grant a LOAD privilege to a role. The action is the positional argument; valid actions are: load. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
+Grant a LOAD privilege to a role. Takes no action argument. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
 
-Usage: `neo4j-cli admin privilege grant load <action> [flags]`
+Usage: `neo4j-cli admin privilege grant load [flags]`
 
 Flags:
 
@@ -600,10 +600,10 @@ Examples:
 
 ```
 # Grant a LOAD privilege to the analyst role
-neo4j-cli admin privilege grant load load --cidr 127.0.0.1/32 --role analyst --credential local --rw
+neo4j-cli admin privilege grant load --cidr 127.0.0.1/32 --role analyst --credential local --rw
 
 # Grant the same privilege, output as JSON
-neo4j-cli admin privilege grant load load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
+neo4j-cli admin privilege grant load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
 ```
 
 #### neo4j-cli admin privilege grant property
@@ -814,11 +814,11 @@ neo4j-cli admin privilege revoke label set-label --node-label Person --on-graph 
 
 #### neo4j-cli admin privilege revoke load
 
-Revoke a LOAD privilege (load) from a role
+Revoke a LOAD privilege from a role
 
-Revoke a LOAD privilege from a role. The action is the positional argument; valid actions are: load. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
+Revoke a LOAD privilege from a role. Takes no action argument. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
 
-Usage: `neo4j-cli admin privilege revoke load <action> [flags]`
+Usage: `neo4j-cli admin privilege revoke load [flags]`
 
 Flags:
 
@@ -832,10 +832,10 @@ Examples:
 
 ```
 # Revoke a LOAD privilege to the analyst role
-neo4j-cli admin privilege revoke load load --cidr 127.0.0.1/32 --role analyst --credential local --rw
+neo4j-cli admin privilege revoke load --cidr 127.0.0.1/32 --role analyst --credential local --rw
 
 # Revoke the same privilege, output as JSON
-neo4j-cli admin privilege revoke load load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
+neo4j-cli admin privilege revoke load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
 ```
 
 #### neo4j-cli admin privilege revoke property

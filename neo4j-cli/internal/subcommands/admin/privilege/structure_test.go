@@ -118,7 +118,16 @@ func TestCategoryCommands_ValidArgsAreKebabActions(t *testing.T) {
 	for _, cat := range categoryOrder {
 		sub := byName[categoryMeta[cat].name]
 		require.NotNil(t, sub)
-		assert.Equal(t, kebabActionsForCategory(cat), sub.ValidArgs, "ValidArgs for %s", categoryMeta[cat].name)
+
+		// Single-action categories (load) take no positional: Use carries no
+		// <action>, Args is NoArgs, and ValidArgs is nil. Multi-action
+		// categories expose one positional with ValidArgs == kebab actions.
+		if len(actionsForCategory(cat)) == 1 {
+			assert.Nil(t, sub.ValidArgs, "single-action %s must have nil ValidArgs", categoryMeta[cat].name)
+			assert.Equal(t, categoryMeta[cat].name, sub.Use, "single-action %s Use omits <action>", categoryMeta[cat].name)
+		} else {
+			assert.Equal(t, kebabActionsForCategory(cat), sub.ValidArgs, "ValidArgs for %s", categoryMeta[cat].name)
+		}
 
 		for _, canonical := range actionsForCategory(cat) {
 			if prev, dup := seen[canonical]; dup {
@@ -167,7 +176,6 @@ func TestCategoryCommands_ShortIncludesActionSummary(t *testing.T) {
 		"entity":   "(create, delete, traverse)",
 		"graph":    "(all-graph-privileges, write)",
 		"label":    "(remove-label, set-label)",
-		"load":     "(load)",
 	}
 	for name, want := range fullList {
 		t.Run(name, func(t *testing.T) {
@@ -176,6 +184,15 @@ func TestCategoryCommands_ShortIncludesActionSummary(t *testing.T) {
 			assert.Contains(t, sub.Short, want)
 		})
 	}
+
+	// load is single-action: its Short carries no "(load)" action-summary
+	// suffix, just "Grant a LOAD privilege to a role".
+	t.Run("load", func(t *testing.T) {
+		sub := byName["load"]
+		require.NotNil(t, sub)
+		assert.NotContains(t, sub.Short, "(load)")
+		assert.Equal(t, "Grant a LOAD privilege to a role", sub.Short)
+	})
 
 	for _, name := range []string{"database", "dbms"} {
 		t.Run(name, func(t *testing.T) {
@@ -193,7 +210,8 @@ func TestActionSummary(t *testing.T) {
 	assert.Equal(t, "(create, delete, traverse)", actionSummary(graphOnly))
 	assert.Equal(t, "(all-graph-privileges, write)", actionSummary(graphWhole))
 	assert.Equal(t, "(remove-label, set-label)", actionSummary(labelScoped))
-	assert.Equal(t, "(load)", actionSummary(load))
+	// load is single-action: no parenthesised summary (the action is implied).
+	assert.Equal(t, "", actionSummary(load))
 
 	assert.Equal(t, "(access, all-database-privileges, constraint-management, … — 19 actions; see --help)", actionSummary(database))
 	assert.Equal(t, "(all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help)", actionSummary(dbms))
