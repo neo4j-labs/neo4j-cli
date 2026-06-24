@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-24T17:30:00Z
+updated_at: 2026-06-24T18:30:00Z
 
 tasks:
   - id: task-001
@@ -590,3 +590,85 @@ tasks:
       - "A unit test asserts the per-category Short action summaries (full for small categories, truncated+count for database/dbms)"
       - "`go generate ./neo4j-cli/internal/skill/...` produces no diff after commit; `TestGenerator_RoundTrip` passes with the updated bundle"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-023
+    title: "Drop the redundant --on-dbms flag; dbms category emits ON DBMS unconditionally (REQ-F-038, REQ-NF-010)"
+    status: pending
+    description: |
+      CLI-217 dogfooding: with the per-category redesign the `dbms` subcommand already carries the
+      scope in its name, so `--on-dbms` is a boolean that must always be set to true and conveys
+      nothing — a usability wart. Remove it entirely.
+
+      In helpers.go: remove the `flagOnDbms` const, the `registerPrivilegeFlag` `case flagOnDbms`, and
+      the `onDbms` field from `privilegeOpts`. Set `categoryMeta[dbms].flags` to empty (only `--role`
+      is registered separately by the factory; revoke adds `--revoke-type`). Update
+      `categoryMeta[dbms].longRule` (it currently says "Requires --on-dbms.") to state the scope is
+      implied — e.g. "Applies to the whole DBMS; takes no scope flag." Set
+      `categoryMeta[dbms].exampleFlags` to empty so the rendered example is
+      `neo4j-cli admin privilege grant dbms create-role --role analyst --credential local --rw`.
+
+      In `buildPrivilegeCypher`: the `dbms` arm emits `normalized + " ON DBMS"` unconditionally —
+      remove the `if !opts.onDbms { ... requires --on-dbms }` check and the `if hasGraph || hasDatabase`
+      cross-scope guard (those flags are not registered on the dbms command). Remove `opts.onDbms` from
+      the scope-count and any other category's cross-scope guards (e.g. graphOnly/graphWhole/load/
+      database/labelScoped guards that reference `opts.onDbms`) since the field no longer exists; the
+      flags simply cannot coexist now. NOTE: this overlaps the pending end-of-feature audit finding
+      (two-layer validation / unreachable guards) — if both are done together, collapse the dbms
+      cross-scope guards as part of that simplification rather than twice.
+
+      Update tests: delete the "missing --on-dbms" usage-error case; assert
+      `grant dbms create-role --role analyst --rw` emits `GRANT CREATE ROLE ON DBMS TO analyst` with no
+      scope flag; update the REQ-NF-006 structure test so the dbms category's expected flag set is just
+      `--role` (+ `--revoke-type` on revoke). Re-run `go generate ./neo4j-cli/internal/skill/...` (the
+      dbms Long/flags/example change) and commit the regenerated bundle.
+    source: extend-prd
+    dependencies:
+      - task-022
+    acceptance_criteria:
+      - "`--on-dbms` is removed: no `flagOnDbms` const, no `registerPrivilegeFlag` case, no `privilegeOpts.onDbms` field; `categoryMeta[dbms].flags` is empty"
+      - "`grant dbms create-role --role analyst --rw` emits `GRANT CREATE ROLE ON DBMS TO analyst`; the dbms arm of buildPrivilegeCypher has no --on-dbms check"
+      - "The former 'missing --on-dbms' usage-error test is deleted; `grant dbms create-role --rw` (missing --role) still returns exit code 2 with `--role is required`"
+      - "REQ-NF-006 structure test updated: dbms category registers only `--role` (+ `--revoke-type` for revoke); `grant dbms --help` shows no `--on-dbms`"
+      - "categoryMeta[dbms] longRule/exampleFlags updated so the generated Long/Example no longer mention --on-dbms"
+      - "Skill bundle regenerated; `make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-024
+    title: "Make unknown/invalid-action privilege errors CLI-form (kebab) and category-scoped (REQ-F-039, REQ-NF-010)"
+    status: pending
+    description: |
+      CLI-217 dogfooding: `grant dbms aleter-user` returns
+      `unknown action "aleter-user"; valid actions are: ACCESS, ALL DATABASE PRIVILEGES, …` — the list
+      is the canonical `validActions` keys (Cypher spelling, UPPER-CASE, space-separated) spanning all
+      seven categories, not the kebab forms the user types and not scoped to the chosen command. Fix
+      both axes, scoped to the privilege package only (other admin/CLI enum errors already use
+      CLI/config values).
+
+      The offending path is `newCategoryCmd.RunE` calling `normalizeAction(args[0])`, whose error uses
+      `sortedActions()` (Cypher form, global). Replace with category-aware resolution at the command
+      layer: when the positional does not resolve to an action in THIS command's category, return a
+      usage error that lists only the category's kebab actions, e.g.
+      `unknown dbms action "aleter-user"; valid actions are: all-dbms-privileges, alter-user,
+      assign-role, …` (reuse `kebabActionsForCategory(cat)`). Keep the existing cross-category hint
+      (REQ-F-030, already kebab) for an action that resolves to a different category. Remove the
+      global Cypher-form enumeration from user-facing paths — delete `sortedActions()` if it has no
+      remaining caller (and drop normalizeAction's global-list error if the category layer now owns
+      the user-facing message; normalizeAction may keep an internal/never-user-facing error or be
+      simplified per the audit's "resolve once" cleanup).
+
+      NOTE: this dovetails with the pending audit finding #2 (redundant normalizeAction / resolve the
+      positional once at the command layer). If done together, implement a single category-aware
+      resolver in the factory RunE and have buildPrivilegeCypher take the already-canonical action.
+
+      Tests: assert `grant dbms <unknown>` (and one other category) returns exit code 2 with a list
+      containing the category's kebab actions (e.g. `alter-user`) and NOT containing Cypher-form
+      (`ALTER USER`) or other categories' actions (`read`, `access`).
+    source: extend-prd
+    dependencies:
+      - task-023
+    acceptance_criteria:
+      - "Unknown-action error from a category subcommand lists only that category's actions in kebab/CLI form (e.g. `grant dbms aleter-user` → lists `alter-user`, `all-dbms-privileges`, …; never `ALTER USER`)"
+      - "The error does not list actions from other categories (no `read`/`access` in a dbms error)"
+      - "The cross-category hint (REQ-F-030) still fires for an action belonging to a different category and remains kebab"
+      - "No user-facing privilege usage error renders Cypher-form action keywords; `sortedActions()` Cypher-form enumeration is removed (deleted if unused)"
+      - "Tests cover the kebab + category-scoped unknown-action error for at least two categories"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"

@@ -375,7 +375,7 @@ construction core, now invoked with the action resolved from the positional rath
   | `label` (labelScoped) | SET LABEL, REMOVE LABEL | `--on-graph`, `--node-label` (required) |
   | `load` | LOAD | `--cidr` |
   | `database` | ACCESS, START, … (19) | `--on-database` |
-  | `dbms` | CREATE ROLE, … (19) | `--on-dbms` |
+  | `dbms` | CREATE ROLE, … (19) | _(none — `ON DBMS` is implied by the category; see REQ-F-038)_ |
 
   `--role` is registered on every category subcommand and remains required (explicit pre-validation,
   exit code 2, per REQ-F-021). `revoke`'s category subcommands additionally register `--revoke-type`.
@@ -454,6 +454,46 @@ listing.
   are defined once in this helper, and `newCategoryCmd` composes the `Short` from it. Adding a future
   action still means editing `validActions` only; the `Short` updates automatically.
 
+**Post-redesign usability fixes (added after CLI-217 dogfooding)**
+
+Two findings from dogfooding the per-category interface: the `dbms` category's `--on-dbms` flag is
+now a redundant always-true boolean, and the unknown-action error lists internal Cypher-form
+keywords instead of the CLI forms the user actually types.
+
+- REQ-F-038: **Drop `--on-dbms`; the `dbms` category emits `ON DBMS` unconditionally.** With the
+  per-category redesign, scope is carried by the subcommand name, so the `dbms` command's `--on-dbms`
+  is a boolean that must always be set to `true` and conveys nothing. Remove it entirely: the `dbms`
+  category registers **no scope flag** (only `--role`, plus `--revoke-type` on revoke), and the
+  `dbms` arm of `buildPrivilegeCypher` emits `<ACTION> ON DBMS` with no `--on-dbms` check. Remove the
+  `--on-dbms` flag registration, the `flagOnDbms` entry from `categoryMeta[dbms].flags`, the
+  `privilegeOpts.onDbms` field, the `registerPrivilegeFlag` case, and the `dbms`
+  "requires `--on-dbms`" usage error (REQ-F-011). Any remaining `opts.onDbms` references in other
+  categories' cross-scope guards are removed as part of this (those flags no longer exist on any
+  command, so the guards were unreachable — fold into the audit's validation simplification if done
+  together). `--on-graph` and `--on-database` are unaffected: they carry a name (default `*`), so
+  they still convey information. The example for `grant dbms` becomes
+  `neo4j-cli admin privilege grant dbms create-role --role analyst --rw` →
+  `GRANT CREATE ROLE ON DBMS TO analyst`. Supersedes REQ-F-031's `dbms` flag row and the dbms parts
+  of REQ-F-010/011/012.
+
+- REQ-F-039: **Privilege usage errors that enumerate actions use the CLI (kebab) form, scoped to the
+  command's category — never the internal Cypher keywords.** The current unknown-action error
+  (`grant dbms aleter-user` → `unknown action "aleter-user"; valid actions are: ACCESS, ALL DATABASE
+  PRIVILEGES, …`) lists the canonical `validActions` keys (UPPER-CASE, space-separated) drawn from
+  `sortedActions()` — these are the Cypher spellings, not what the user types on the CLI, and the
+  list spans all seven categories. Fix both axes:
+  - **CLI form:** every enumerated action in a privilege usage error is rendered in the kebab form the
+    user types (`alter-user`, `all-dbms-privileges`), via `kebabAction`/`kebabActionsForCategory`.
+  - **Category scope:** when the error originates from a category subcommand (the user already chose
+    `grant dbms`), it lists only **that category's** actions, e.g.
+    `unknown dbms action "aleter-user"; valid dbms actions are: all-dbms-privileges, alter-user,
+    assign-role, …`. The cross-category hint (REQ-F-030, already kebab) is unchanged.
+  - The global Cypher-form enumeration (`sortedActions()`) is removed from all user-facing privilege
+    error paths (it may be deleted if it has no remaining caller). This is scoped to the **privilege
+    package** — other admin/CLI enum errors (`--format`, `--provider`, edition) already use CLI/config
+    values. This dovetails with the audit's "resolve the positional once at the command layer"
+    cleanup: category-scoped resolution naturally produces a category-scoped, kebab error.
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: Unit tests for every leaf command using the `privilegeExecFn` package-level seam
@@ -507,6 +547,18 @@ listing.
   the subcommand listing). Because `Short` text feeds `references/admin.md`, the skill bundle is
   regenerated (`go generate ./neo4j-cli/internal/skill/...`) and `TestGenerator_RoundTrip` passes
   with the updated bundle.
+
+- REQ-NF-010: Tests for the post-redesign usability fixes (REQ-F-038/039):
+  - **`--on-dbms` removal:** the REQ-NF-006 structure test is updated so the `dbms` category command
+    registers no `--on-dbms` flag (only `--role`, plus `--revoke-type` for revoke); a behavioural test
+    asserts `grant dbms create-role --role analyst --rw` still emits `GRANT CREATE ROLE ON DBMS TO
+    analyst` with no scope flag; the former "missing `--on-dbms`" usage-error test is deleted.
+  - **CLI-form category-scoped errors:** a test asserts `grant dbms <unknown>` returns a usage error
+    (exit 2) whose action list is the kebab `dbms` actions only — it contains `alter-user` (not
+    `ALTER USER`) and does not contain other categories' actions such as `read`/`access`.
+  - The skill bundle is regenerated (the `dbms` `Long`/flags and example change) and
+    `TestGenerator_RoundTrip` passes; `make test`, `make fmt-check`, `make lint`, `make license-check`
+    all pass.
 
 ---
 
@@ -804,10 +856,9 @@ lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated
 - [ ] `--action access --role analyst --rw` (no scope flag) → `GRANT ACCESS ON DATABASE * TO analyst` (default `*`)
 - [ ] `--action all_database_privileges --on-database * --role analyst --rw` → `GRANT ALL DATABASE PRIVILEGES ON DATABASE * TO analyst`
 
-**Privilege grant / deny — Cypher construction (dbms scope)**
-- [ ] `--action create_role --on-dbms --role analyst --rw` → `GRANT CREATE ROLE ON DBMS TO analyst`
-- [ ] `--action all_dbms_privileges --on-dbms --role analyst --rw` → `GRANT ALL DBMS PRIVILEGES ON DBMS TO analyst`
-- [ ] `--action create_role --role analyst --rw` (missing `--on-dbms`) → usage error `"action CREATE ROLE requires --on-dbms"`
+**Privilege grant / deny — Cypher construction (dbms scope)** _(`--on-dbms` removed per REQ-F-038; see the per-category ACs for the current `grant dbms <action>` form)_
+- [ ] `grant dbms create-role --role analyst --rw` → `GRANT CREATE ROLE ON DBMS TO analyst` (no scope flag; `ON DBMS` implied by the category)
+- [ ] `grant dbms all-dbms-privileges --role analyst --rw` → `GRANT ALL DBMS PRIVILEGES ON DBMS TO analyst`
 
 **Privilege revoke**
 - [ ] `--action read --on-graph * --role analyst --rw` → `REVOKE READ {*} ON GRAPH * ELEMENTS * FROM analyst`
@@ -851,7 +902,7 @@ lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated
 - [ ] `neo4j-cli admin privilege grant property --help` shows only `--on-graph`, `--node-label`, `--relationship-type`, `--property`, `--role` (plus global flags) and lists the property actions.
 - [ ] `neo4j-cli admin privilege grant graph --help` shows only `--on-graph` and `--role` (no qualifier flags) and lists `write`, `all-graph-privileges`.
 - [ ] `neo4j-cli admin privilege grant load --help` shows only `--cidr` and `--role`.
-- [ ] `neo4j-cli admin privilege grant dbms --help` shows only `--on-dbms` and `--role`.
+- [ ] `neo4j-cli admin privilege grant dbms --help` shows only `--role` (no scope flag; `ON DBMS` implied — REQ-F-038).
 - [ ] `neo4j-cli admin privilege grant database --help` shows only `--on-database` and `--role`.
 - [ ] `neo4j-cli admin privilege grant property read --on-graph * --role analyst --rw` emits `GRANT READ {*} ON GRAPH * ELEMENTS * TO analyst` — identical Cypher to the former `--action read` path.
 - [ ] `neo4j-cli admin privilege grant label set-label --node-label Person --node-label Movie --on-graph neo4j --role analyst --rw` emits ``GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j` TO analyst``.
@@ -873,6 +924,13 @@ lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated
 - [ ] A unit test asserts the per-category `Short` action summaries (full for small categories, truncated+count for `database`/`dbms`).
 - [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff after committing the regenerated bundle (`Short` change flows into `references/admin.md`); `TestGenerator_RoundTrip` passes.
 
+**Post-redesign usability fixes (REQ-F-038/039, REQ-NF-010)**
+- [ ] `neo4j-cli admin privilege grant dbms` registers no `--on-dbms` flag; `grant dbms create-role --role analyst --rw` emits `GRANT CREATE ROLE ON DBMS TO analyst`.
+- [ ] `grant dbms create-role --rw` (missing `--role`) still returns exit code 2 with `"--role is required"`; there is no longer a "missing `--on-dbms`" usage error.
+- [ ] `neo4j-cli admin privilege grant dbms aleter-user --role analyst --rw` returns a usage error (exit 2) listing only the kebab `dbms` actions (contains `alter-user`, not `ALTER USER`; does not contain `read`/`access`).
+- [ ] No privilege usage error lists Cypher-form (UPPER-CASE, space-separated) action keywords; `sortedActions()`'s Cypher-form enumeration is removed from all user-facing paths.
+- [ ] `categoryMeta[dbms].flags` is empty; `privilegeOpts.onDbms` and `flagOnDbms` are removed; skill bundle regenerated; `make test`/`fmt-check`/`lint`/`license-check` and `TestGenerator_RoundTrip` pass.
+
 ---
 
 ## Out of Scope
@@ -890,9 +948,9 @@ lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated
 1. **`--on-graph` default for database-scope actions**: The current spec (REQ-F-010) says
    `database` actions default to `ON DATABASE *` when no scope flag is set. This means omitting
    all scope flags is valid for database actions. For `graphOnly` / `propertyBearer` actions, the
-   default is also `ON GRAPH *`. Only `dbms` actions require an explicit flag (`--on-dbms`). This
-   is intentional (matches `GRANT ... ON GRAPH * / DATABASE *` Cypher defaults) but is worth a
-   final confirmation during review.
+   default is also `ON GRAPH *`. Per REQ-F-038 `dbms` actions no longer take a scope flag at all —
+   `ON DBMS` is implied by the category. This is intentional (matches `GRANT ... ON GRAPH * /
+   DATABASE *` Cypher defaults) but is worth a final confirmation during review.
 
 2. **`immutable` column**: `SHOW PRIVILEGES` returns an `immutable` boolean column on some Neo4j
    versions (for built-in privileges that cannot be revoked). The current `privilegeFields` list
