@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-22T17:30:00Z
+updated_at: 2026-06-24T12:00:00Z
 
 tasks:
   - id: task-001
@@ -412,3 +412,137 @@ tasks:
       - "grant/deny/revoke `Long` text mentions `--cidr` (LOAD-only) and the no-qualifier rule for WRITE / ALL GRAPH PRIVILEGES"
       - "`go generate ./neo4j-cli/internal/skill/...` produces no diff after commit (`TestGenerator_RoundTrip` passes); the bundle reflects `--cidr`"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean"
+
+  - id: task-017
+    title: "Add categoryMeta single-source table for the per-category flag/help/example surface (REQ-F-034)"
+    status: pending
+    description: |
+      Discoverability redesign foundation. Add a `categoryMeta` table to helpers.go keyed by
+      `actionCategory` that, for each of the seven categories, declares: the user-facing command name
+      (property, entity, graph, label, load, database, dbms — final names per REQ-F-029 / Open
+      Question 3), the action keywords it contains (kebab + canonical, derivable from validActions by
+      filtering on the category), the set of flags to register (which of
+      `--on-graph`/`--on-database`/`--on-dbms`/`--node-label`/`--relationship-type`/`--property`/
+      `--cidr` per REQ-F-031's table), which flags are required, a Short/Long help fragment describing
+      the category and its rules, and an Example template (verb word + representative action + flag
+      values). Add a `categoryOrder` slice fixing help/registration order. This becomes the second
+      single-source table alongside `validActions`. Also extend `normalizeAction` to treat `-` as a
+      separator (so the kebab positional `set-property` resolves to `SET PROPERTY`). No command wiring
+      yet — pure additions plus small render helpers (kebab `Use` from a canonical keyword; render an
+      Example for a given verb+category). Existing grant/deny/revoke behaviour unchanged.
+    source: extend-prd
+    dependencies:
+      - task-016
+    acceptance_criteria:
+      - "`categoryMeta` exists in helpers.go keyed by actionCategory, one entry per category, declaring command name, contained actions (kebab+canonical), registered flags, required flags, help fragments, and an Example template matching REQ-F-031"
+      - "`categoryOrder` fixes the seven categories' order; the union of all categories' action lists equals validActions"
+      - "A helper derives the kebab name from a canonical keyword (e.g. \"SET LABEL\" -> \"set-label\", \"ALL GRAPH PRIVILEGES\" -> \"all-graph-privileges\")"
+      - "`normalizeAction` accepts `-` as a separator (e.g. `set-property` -> `SET PROPERTY`) in addition to `_`/whitespace"
+      - "A helper renders a flush-left Example (>= 2 invocations, `# comment`, `neo4j-cli` prefix, `--rw`) for a given verb word + category"
+      - "No behaviour change to existing commands; new symbols may carry a scoped //nolint:unused until task-018 consumes them"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; no bundle drift"
+
+  - id: task-018
+    title: "Add the per-category subcommand factory newCategoryCmd with positional action (REQ-F-029/030/031/032/035)"
+    status: pending
+    description: |
+      Add `newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat actionCategory) *cobra.Command`
+      to helpers.go — the single factory that builds a category leaf for a given verb ("GRANT"/"DENY"/
+      a REVOKE verb base) and category. It looks up `categoryMeta[cat]`, sets `Use` to
+      "<name> <action>", sets `ValidArgs` to the category's kebab action keywords and `Args` to require
+      exactly one positional, builds Short/Long/Example from the metadata (REQ-F-032/033), registers
+      ONLY the permitted flags plus the always-required `--role` (REQ-F-031), sets
+      `Annotations{"write":"true"}` for write verbs, and wires `RunE` to: resolve the positional to its
+      canonical action via normalizeAction + validActions; if the action resolves to a DIFFERENT
+      category, return a usage error naming the correct command ("use 'admin privilege grant database
+      access'") (REQ-F-030); otherwise call `runPrivilegeMutation(cmd, cfg, *conn, verb, canonical,
+      roleName, opts, target)`. For REVOKE verbs it also registers `--revoke-type` and resolves the
+      verb via the existing revokeVerb within the RunE. Add a comment recording the documented
+      one-file-per-leaf exception (REQ-F-035). Refactor `addPrivilegeFlags` into per-flag registration
+      the factory composes from `categoryMeta.flags` (or retire it). buildPrivilegeCypher and
+      runPrivilegeMutation are reused unchanged.
+    source: extend-prd
+    dependencies:
+      - task-017
+    acceptance_criteria:
+      - "`newCategoryCmd` returns a cobra command whose Use is `<name> <action>`, with ValidArgs = the category's kebab actions, Args requiring exactly one positional, Short/Long/Example from categoryMeta, and only the category's permitted flags + `--role` registered"
+      - "REVOKE-verb commands additionally register `--revoke-type` and resolve REVOKE / REVOKE GRANT / REVOKE DENY"
+      - "RunE resolves the positional to the canonical action and delegates to runPrivilegeMutation with the correct TO/FROM target; emitted Cypher is identical to the former --action path for the same inputs"
+      - "A positional that belongs to a different category returns a usage error (exit 2) naming the correct category command; an unknown action returns the existing unknown-action error"
+      - "Write-verb commands carry `Annotations{\"write\":\"true\"}`; `--role` missing still returns exit code 2 (`\"--role is required\"`)"
+      - "A comment at the factory records the documented exception to the one-file-per-leaf rule"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; no bundle drift yet (factory not wired)"
+
+  - id: task-019
+    title: "Restructure grant/deny/revoke into category-subcommand parents; remove --action (REQ-F-029/035)"
+    status: pending
+    description: |
+      Convert grant.go, deny.go, revoke.go so each constructor builds a parent command with no RunE
+      and loops over `categoryOrder` calling newCategoryCmd(cfg, conn, <verb>, cat) to register the
+      seven category subcommands (REQ-F-029). Remove the `--action` flag and the old single-command
+      RunE/flag registration from all three (REQ-F-035) — the action is now a positional on the
+      category command. The parent keeps its own Short and a Long that points at the per-category
+      `--help`. revoke passes its REVOKE verb base to the factory (the factory adds --revoke-type).
+      Update the grant/deny/revoke parent Long/Example to the `grant <category> <action> ...` form and
+      ensure the parent help lists the seven category subcommands. Wiring in privilege.go is unchanged
+      (it still AddCommands the three parents).
+    source: extend-prd
+    dependencies:
+      - task-018
+    acceptance_criteria:
+      - "`grant`/`deny`/`revoke` are parents with no RunE; each registers exactly the seven category subcommands via newCategoryCmd"
+      - "`--action` is removed from all three; `neo4j-cli admin privilege grant --action read` is now an unknown flag"
+      - "`neo4j-cli admin privilege grant` with no category prints help listing the seven categories; `grant property --help` shows only the property flags and lists `read match set-property merge`"
+      - "`grant graph --help` shows only `--on-graph`/`--role`; `grant load --help` only `--cidr`/`--role`; `grant dbms --help` only `--on-dbms`/`--role`; `grant database --help` only `--on-database`/`--role`"
+      - "Emitted Cypher for `grant property read --on-graph * --role analyst --rw` etc. is unchanged from the prior --action behaviour"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean (bundle regenerated in task-021)"
+
+  - id: task-020
+    title: "Migrate and expand privilege tests for the per-category subcommands (REQ-NF-006/007)"
+    status: pending
+    description: |
+      Update the privilege package tests for the new surface. (1) Add a structure test (REQ-NF-006)
+      asserting each verb registers exactly the seven category subcommands; that each exposes exactly
+      its category's permitted flag set (and no others) per REQ-F-031; that each category's ValidArgs
+      equals its kebab action keywords and that the union across categories equals validActions; that
+      revoke's carry --revoke-type; and that every leaf has a non-empty flush-left Example. (2) Migrate
+      the existing grant_test.go/deny_test.go/revoke_test.go cases from the `--action`-flag invocation
+      to the `<category> <action>` form, preserving coverage of exit-code-2 required-flag paths,
+      Enterprise-only error translation, and the two-call mutation+follow-up sequence (REQ-NF-007).
+      (3) Add per-category Cypher-parity cases asserting the category subcommand emits the
+      server-validated fragments from REQ-NF-005, plus the cross-category positional error (REQ-F-030).
+      Use the shared helpers in privilege_helpers_test.go.
+    source: extend-prd
+    dependencies:
+      - task-019
+    acceptance_criteria:
+      - "A structure test asserts exactly seven category subcommands per verb, the exact per-category flag set, ValidArgs == category actions (union == validActions), --revoke-type on revoke categories, and a non-empty Example on every leaf"
+      - "Migrated grant/deny/revoke tests drive the `<category> <action>` form and keep exit-code-2, Enterprise-only, and two-call-sequence coverage"
+      - "Per-category Cypher-parity tests assert the REQ-NF-005 server-valid fragments via the category subcommands; a cross-category positional (e.g. `grant property access`) yields the naming usage error"
+      - "`TestAllLeafCommands_HaveExamples` passes for all 21 leaves"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean"
+
+  - id: task-021
+    title: "Regenerate bundle/agent-context, update README + changelog for the per-category interface (REQ-F-035, REQ-NF-008)"
+    status: pending
+    description: |
+      Close out the discoverability redesign. Run `go generate ./neo4j-cli/internal/skill/...` so the
+      skill bundle reflects the 21 category subcommands and commit it (TestGenerator_RoundTrip). Verify
+      `neo4j-cli agent-context` builds correctly with the new tree. Update the README privilege section
+      and any other in-tree docs/examples to the `grant/deny/revoke <category> <action>` form, removing
+      all `--action` references (REQ-F-035). Update the existing unreleased changelog entry (or add a
+      new Minor entry) to describe the per-category subcommand interface. Verify tab-completion of the
+      category subcommands and their positional actions works (`__complete`). Also update the AGENTS.md
+      Cobra-layout note to record the privilege categories as the documented one-file-per-leaf
+      exception. Run all gates.
+    source: extend-prd
+    dependencies:
+      - task-020
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no diff after commit; `TestGenerator_RoundTrip` passes with the new tree"
+      - "`neo4j-cli agent-context` builds correctly and includes the category subcommands"
+      - "README and all in-tree examples use `grant/deny/revoke <category> <action>`; no `--action` references remain anywhere"
+      - "Changelog describes the per-category `grant/deny/revoke <category> <action>` interface"
+      - "`grant <TAB>` lists the seven categories and `grant property <TAB>` completes its actions (cobra `__complete`)"
+      - "AGENTS.md Cobra-layout note records the privilege categories as the documented one-file-per-leaf exception"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
