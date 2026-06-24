@@ -415,7 +415,8 @@ tasks:
 
   - id: task-017
     title: "Add categoryMeta single-source table for the per-category flag/help/example surface (REQ-F-034)"
-    status: pending
+    status: completed
+    completed_at: 2026-06-24T00:00:00Z
     description: |
       Discoverability redesign foundation. Add a `categoryMeta` table to helpers.go keyed by
       `actionCategory` that, for each of the seven categories, declares: the user-facing command name

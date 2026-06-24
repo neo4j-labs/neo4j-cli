@@ -79,3 +79,8 @@ Files: ~helpers.go, ~privilege_helpers_test.go
 Added a server-validated note atop the buildPrivilegeCypher happy-path test table (all 7 categories already had REQ-NF-005-confirmed cases), and extended grant/deny/revoke Long strings to mention --cidr (LOAD-only) and the no-qualifier rule for WRITE / ALL GRAPH PRIVILEGES; regenerated the skill bundle.
 Files: ~4 (privilege_helpers_test.go, grant.go, deny.go, revoke.go), ~1 generated (bundle/references/admin.md)
 Decisions: No code/grouping comments still mis-classified WRITE/LOAD/ALL GRAPH PRIVILEGES as graphOnly (tasks 13/14 already corrected those), so requirement 2 needed no edit.
+
+## TASK-017 — 2026-06-24T00:00:00Z
+Added the categoryMeta single-source table (name/flags/required/help/example per category) + categoryOrder slice, flag-name consts, actionsForCategory/kebabAction/kebabActionsForCategory/renderCategoryExample helpers, and extended normalizeAction to accept `-` as a separator (kebab positional support). Pure additions; existing grant/deny/revoke behaviour unchanged. New symbols kept live by unit tests (no //nolint). All four gates pass; no bundle drift. Reviewer LGTM.
+Files: ~privilege/helpers.go, ~privilege/privilege_helpers_test.go
+Decisions: category action lists are derived from validActions (not duplicated in categoryMeta); flag long names are shared consts so the per-category flag sets stay in sync with what buildPrivilegeCypher reads.

@@ -89,6 +89,8 @@ func runPrivilegeMutation(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.C
 // is emitted.
 type actionCategory int
 
+// The iota order here is incidental; the user-facing display/registration order
+// of the category subcommands lives in categoryOrder.
 const (
 	propertyBearer actionCategory = iota
 	graphOnly
@@ -173,12 +175,174 @@ type privilegeOpts struct {
 	cidr       string
 }
 
-// normalizeAction upper-cases the action and collapses underscores and runs of
-// whitespace into single spaces, so "all_graph_privileges" and
-// "ALL GRAPH PRIVILEGES" both normalise to "ALL GRAPH PRIVILEGES". It returns a
-// usage error listing the valid keywords if the result is not a known action.
+// privilege flag long names, shared by addPrivilegeFlags and categoryMeta so the
+// per-category registered-flag sets stay in sync with what buildPrivilegeCypher
+// reads.
+const (
+	flagOnGraph    = "on-graph"
+	flagOnDatabase = "on-database"
+	flagOnDbms     = "on-dbms"
+	flagNodeLabel  = "node-label"
+	flagRelType    = "relationship-type"
+	flagProperty   = "property"
+	flagCidr       = "cidr"
+)
+
+// categoryInfo declares the user-facing surface for one action category: the
+// kebab command name, the flags valid for every action in the category, which of
+// those are required, a Long help fragment describing the category's rules, and
+// a representative action + flag values used to render the Example. It is the
+// single source (alongside validActions) for the per-category subcommand surface
+// introduced by the discoverability redesign (REQ-F-034); the subcommand factory
+// in a later task is its only consumer.
+type categoryInfo struct {
+	name          string
+	flags         []string
+	requiredFlags []string
+	shortNoun     string
+	longRule      string
+	exampleAction string
+	exampleFlags  string
+}
+
+// categoryMeta maps each actionCategory to its user-facing surface. The action
+// keywords are derived from validActions (see actionsForCategory), so adding an
+// action only requires editing validActions; only a brand-new category needs an
+// entry here.
+var categoryMeta = map[actionCategory]categoryInfo{
+	propertyBearer: {
+		name:          "property",
+		flags:         []string{flagOnGraph, flagNodeLabel, flagRelType, flagProperty},
+		shortNoun:     "property privilege",
+		longRule:      "Scope with --on-graph (default *); restrict to properties with --property and to entities with --node-label or --relationship-type (mutually exclusive).",
+		exampleAction: "read",
+		exampleFlags:  "--on-graph * --property name",
+	},
+	graphOnly: {
+		name:          "entity",
+		flags:         []string{flagOnGraph, flagNodeLabel, flagRelType},
+		shortNoun:     "graph entity privilege",
+		longRule:      "Scope with --on-graph (default *); restrict to entities with --node-label or --relationship-type (mutually exclusive). No property qualifier.",
+		exampleAction: "traverse",
+		exampleFlags:  "--on-graph * --node-label Person",
+	},
+	graphWhole: {
+		name:          "graph",
+		flags:         []string{flagOnGraph},
+		shortNoun:     "whole-graph privilege",
+		longRule:      "Scope with --on-graph (default *). WRITE and ALL GRAPH PRIVILEGES accept no node-label, relationship-type, or property qualifiers.",
+		exampleAction: "write",
+		exampleFlags:  "--on-graph *",
+	},
+	labelScoped: {
+		name:          "label",
+		flags:         []string{flagOnGraph, flagNodeLabel},
+		requiredFlags: []string{flagNodeLabel},
+		shortNoun:     "label privilege",
+		longRule:      "Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels.",
+		exampleAction: "set-label",
+		exampleFlags:  "--node-label Person --on-graph neo4j",
+	},
+	load: {
+		name:          "load",
+		flags:         []string{flagCidr},
+		shortNoun:     "LOAD privilege",
+		longRule:      "Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags.",
+		exampleAction: "load",
+		exampleFlags:  "--cidr 127.0.0.1/32",
+	},
+	database: {
+		name:          "database",
+		flags:         []string{flagOnDatabase},
+		shortNoun:     "database privilege",
+		longRule:      "Scope with --on-database (default *).",
+		exampleAction: "access",
+		exampleFlags:  "--on-database neo4j",
+	},
+	dbms: {
+		name:          "dbms",
+		flags:         []string{flagOnDbms},
+		requiredFlags: []string{flagOnDbms},
+		shortNoun:     "DBMS privilege",
+		longRule:      "Requires --on-dbms.",
+		exampleAction: "create-role",
+		exampleFlags:  "--on-dbms",
+	},
+}
+
+// categoryOrder fixes the help and registration order of the category
+// subcommands under each verb.
+var categoryOrder = []actionCategory{
+	propertyBearer,
+	graphOnly,
+	graphWhole,
+	labelScoped,
+	load,
+	database,
+	dbms,
+}
+
+// actionsForCategory returns the canonical action keywords belonging to cat,
+// sorted, so categoryMeta need not duplicate the action lists already in
+// validActions.
+func actionsForCategory(cat actionCategory) []string {
+	out := make([]string, 0, len(validActions))
+	for action, c := range validActions {
+		if c == cat {
+			out = append(out, action)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// kebabAction converts a canonical action keyword to its kebab form used for
+// ValidArgs and the positional argument, e.g. "SET LABEL" -> "set-label" and
+// "ALL GRAPH PRIVILEGES" -> "all-graph-privileges".
+func kebabAction(canonical string) string {
+	return strings.ToLower(strings.ReplaceAll(canonical, " ", "-"))
+}
+
+// kebabActionsForCategory returns the kebab action keywords for cat, used for a
+// category subcommand's ValidArgs.
+func kebabActionsForCategory(cat actionCategory) []string {
+	canonical := actionsForCategory(cat)
+	out := make([]string, len(canonical))
+	for i, a := range canonical {
+		out[i] = kebabAction(a)
+	}
+	return out
+}
+
+// renderCategoryExample builds a flush-left Example block for the given verb word
+// ("grant"/"deny"/"revoke") and category, with two invocations: one minimal and
+// one writing JSON. Each invocation has a # comment, the neo4j-cli prefix, and
+// --rw (the category commands are all write commands). verbWord must be
+// non-empty ("grant"/"deny"/"revoke").
+func renderCategoryExample(verbWord string, cat actionCategory) string {
+	meta := categoryMeta[cat]
+	base := "neo4j-cli admin privilege " + verbWord + " " + meta.name + " " + meta.exampleAction
+	flags := ""
+	if meta.exampleFlags != "" {
+		flags = " " + meta.exampleFlags
+	}
+	verbTitle := strings.ToUpper(verbWord[:1]) + verbWord[1:]
+	return "# " + verbTitle + " a " + meta.shortNoun + " to the analyst role\n" +
+		base + flags + " --role analyst --credential local --rw\n\n" +
+		"# " + verbTitle + " the same privilege, output as JSON\n" +
+		base + flags + " --role analyst --credential local --rw --format json"
+}
+
+// normalizeAction upper-cases the action and collapses underscores, hyphens, and
+// runs of whitespace into single spaces, so "all_graph_privileges",
+// "all-graph-privileges", and "ALL GRAPH PRIVILEGES" all normalise to
+// "ALL GRAPH PRIVILEGES". The hyphen separator resolves the kebab positional
+// (e.g. "set-property" -> "SET PROPERTY") used by the category subcommands. It
+// returns a usage error listing the valid keywords if the result is not a known
+// action.
 func normalizeAction(action string) (string, error) {
-	normalized := strings.ToUpper(strings.Join(strings.Fields(strings.ReplaceAll(action, "_", " ")), " "))
+	cleaned := strings.NewReplacer("_", " ", "-", " ").Replace(action)
+	normalized := strings.ToUpper(strings.Join(strings.Fields(cleaned), " "))
 	if _, ok := validActions[normalized]; !ok {
 		return "", clierr.NewUsageError("unknown action %q; valid actions are: %s", action, strings.Join(sortedActions(), ", "))
 	}

@@ -108,6 +108,118 @@ func TestValidActions_FindAbsent(t *testing.T) {
 	}
 }
 
+func TestNormalizeAction_HyphenSeparator(t *testing.T) {
+	cases := map[string]string{
+		"set-property":            "SET PROPERTY",
+		"all-graph-privileges":    "ALL GRAPH PRIVILEGES",
+		"set-label":               "SET LABEL",
+		"create-role":             "CREATE ROLE",
+		"all-database-privileges": "ALL DATABASE PRIVILEGES",
+	}
+	for input, want := range cases {
+		got, err := normalizeAction(input)
+		if err != nil {
+			t.Fatalf("normalizeAction(%q) returned error: %v", input, err)
+		}
+		if got != want {
+			t.Fatalf("normalizeAction(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestKebabAction(t *testing.T) {
+	cases := map[string]string{
+		"SET LABEL":            "set-label",
+		"ALL GRAPH PRIVILEGES": "all-graph-privileges",
+		"READ":                 "read",
+		"CREATE ROLE":          "create-role",
+	}
+	for canonical, want := range cases {
+		if got := kebabAction(canonical); got != want {
+			t.Fatalf("kebabAction(%q) = %q, want %q", canonical, got, want)
+		}
+	}
+}
+
+// TestCategoryMeta_CoversEveryActionExactlyOnce asserts categoryMeta and
+// categoryOrder describe exactly the seven categories and that the union of all
+// categories' actions equals validActions (every action reachable through one
+// category).
+func TestCategoryMeta_CoversEveryActionExactlyOnce(t *testing.T) {
+	if len(categoryOrder) != 7 {
+		t.Fatalf("categoryOrder has %d entries, want 7", len(categoryOrder))
+	}
+	if len(categoryMeta) != 7 {
+		t.Fatalf("categoryMeta has %d entries, want 7", len(categoryMeta))
+	}
+
+	seen := map[string]bool{}
+	for _, cat := range categoryOrder {
+		meta, ok := categoryMeta[cat]
+		if !ok {
+			t.Fatalf("category %d in categoryOrder has no categoryMeta entry", cat)
+		}
+		if meta.name == "" {
+			t.Fatalf("category %d has empty name", cat)
+		}
+		for _, action := range actionsForCategory(cat) {
+			if seen[action] {
+				t.Fatalf("action %q appears in more than one category", action)
+			}
+			seen[action] = true
+		}
+	}
+	if len(seen) != len(validActions) {
+		t.Fatalf("union of category actions has %d entries, want %d (validActions)", len(seen), len(validActions))
+	}
+	for action := range validActions {
+		if !seen[action] {
+			t.Fatalf("action %q in validActions is not covered by any category", action)
+		}
+	}
+}
+
+func TestCategoryMeta_NamesAndKebabActions(t *testing.T) {
+	wantNames := map[actionCategory]string{
+		propertyBearer: "property",
+		graphOnly:      "entity",
+		graphWhole:     "graph",
+		labelScoped:    "label",
+		load:           "load",
+		database:       "database",
+		dbms:           "dbms",
+	}
+	for cat, want := range wantNames {
+		if got := categoryMeta[cat].name; got != want {
+			t.Fatalf("categoryMeta[%d].name = %q, want %q", cat, got, want)
+		}
+	}
+	got := kebabActionsForCategory(propertyBearer)
+	want := []string{"match", "merge", "read", "set-property"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("kebabActionsForCategory(propertyBearer) = %v, want %v", got, want)
+	}
+}
+
+func TestRenderCategoryExample(t *testing.T) {
+	got := renderCategoryExample("grant", propertyBearer)
+	for _, want := range []string{
+		"# Grant a property privilege",
+		"neo4j-cli admin privilege grant property read --on-graph * --property name --role analyst --credential local --rw",
+		"--format json",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("renderCategoryExample missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Count(got, "neo4j-cli") < 2 {
+		t.Fatalf("renderCategoryExample should have >= 2 invocations:\n%s", got)
+	}
+	if strings.HasPrefix(got, " ") || strings.HasPrefix(got, "\t") {
+		t.Fatalf("renderCategoryExample must be flush-left:\n%s", got)
+	}
+}
+
 // The expected Cypher fragments below are server-validated: each was confirmed
 // valid on a real Neo4j 2025.x server (see REQ-NF-005). Do not change them to
 // invalid Cypher just to make a test pass — a green test asserting Cypher the
