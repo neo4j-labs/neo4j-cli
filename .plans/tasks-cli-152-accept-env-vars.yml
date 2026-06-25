@@ -240,3 +240,106 @@ tasks:
       - "Stored credentials are byte-identical before and after enabling accept-env-vars"
       - "make generate-check passes on a clean tree"
     completed_at: 2026-06-25T12:41:53Z
+
+  - id: task-012
+    title: 'Fix embed completeness check to validate the resolved Config (folds in provider-const dedup)'
+    description: |
+      (Review finding #1 BLOCKING + #3 should-fix — the same fix resolves both.)
+      embed.go:244-248 calls credentials.ValidateEmbedEnvSet(os.Getenv), and
+      ValidateEmbedEnvSet (env_spec.go:120-140) only inspects os.Getenv for the
+      API-key vars. But the provider can be set via env while the key legitimately
+      arrives via the .env walk-up or the stored embed credential — both of which
+      Resolve has ALREADY merged into out.APIKey by line 239. Concrete failure:
+      accept-env-vars=true, NEO4J_EMBED_PROVIDER=openai in the environment, key in
+      a .env file (or a stored credential). out.APIKey is correctly populated, but
+      ValidateEmbedEnvSet(os.Getenv) sees no key env var and returns a usage error
+      — the command fails even though the key was resolved. This contradicts the
+      PRD precedence (flag > env > .env > stored) and the README claim that .env is
+      "unaffected by this gate." Contrast the DBMS check in conn.go:172-183, which
+      validates against the RESOLVED uri/username/password (so a flag- or
+      dotenv-supplied piece counts as present) — that is the right shape. Fix:
+      validate against the already-resolved Config inside embed.Resolve — check
+      out.Provider != "" && providerNeedsKey(out.Provider) && out.APIKey == ""
+      — rather than re-reading os.Getenv. This also lets the embed-specific
+      key-completeness policy live in the embed package (which owns the provider
+      taxonomy via ProviderOllama/ProviderVertex), so finding #3 collapses:
+      remove ValidateEmbedEnvSet from common/clicfg/credentials/env_spec.go AND the
+      embedProviderOllama/embedProviderVertex constants that were duplicated there
+      (env_spec.go:37-40) purely to express this rule. Keep Ollama and Vertex (ADC)
+      exempt from the key requirement, matching production resolveAPIKey logic.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "With accept-env-vars=true, NEO4J_EMBED_PROVIDER=openai in the env and the API key supplied via .env (or stored credential), embed resolves successfully — no usage error"
+      - "With accept-env-vars=true, NEO4J_EMBED_PROVIDER=openai and NO key from any source, a usage error is still returned"
+      - "Ollama and Vertex providers never require an API key"
+      - "ValidateEmbedEnvSet and the embedProviderOllama/embedProviderVertex constants are removed from common/clicfg/credentials; the key-completeness policy lives in the embed package"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
+
+  - id: task-013
+    title: 'Consolidate the duplicated gatedGetenv helper and env-var name constants'
+    description: |
+      (Review finding #2 BLOCKING — duplication / missed consolidation.) The PRD's
+      stated goal was "a single shared spec + symmetric behaviour." We got the
+      spec, but the gate mechanism is copy-pasted: gatedGetenv(cfg, name) exists
+      verbatim in dbconn/conn.go:321-326 AND embed/embed.go:318-323 (the embed one
+      adds a cfg == nil guard; otherwise identical, same doc comment). And the
+      env-var name string literals are now in three production copies:
+      credentials/env_spec.go (the canonical home), dbconn/conn.go:34-37, and
+      embed/embed.go:65-73 — plus a fourth in credential/dbms/add.go. NEO4J_URI,
+      NEO4J_EMBED_PROVIDER, OPENAI_API_KEY etc. are each declared 2-4 times. Both
+      dbconn and embed already import common/clicfg/credentials, where the canonical
+      constants live — there is NO internal-package barrier (credentials is under
+      common/ and is already a dependency of both), and the gate is a one-liner
+      depending only on *clicfg.Config (also already imported). Fix: put one shared
+      GatedGetenv(cfg, name) helper in a spot both already import (e.g. the
+      credentials package or a small common helper), have dbconn and embed call it
+      instead of redeclaring, and reference credentials.EnvURI / EnvUsername /
+      EnvEmbedProvider etc. instead of re-declaring the name literals. The local
+      dbconn.EnvURI consts predate this branch, but this feature spread them into a
+      third package — consolidate now rather than entrench the third copy. Result:
+      one gate helper and ~15 fewer redundant const declarations, making "add a new
+      credential env var" a one-place edit. Watch the cfg == nil guard (embed relies
+      on it) — preserve that behaviour in the shared helper. Do this after task-012
+      so the embed file is in its final shape.
+    status: pending
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "A single shared GatedGetenv (or equivalent) helper exists; the duplicate copies in dbconn/conn.go and embed/embed.go are gone"
+      - "Env-var name literals (NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, NEO4J_EMBED_*, provider key vars) are declared once in the canonical credentials package and referenced elsewhere"
+      - "The shared helper preserves the cfg == nil safety guard embed relies on"
+      - "Behaviour is unchanged: gate off => env ignored, gate on => env read; existing tests still pass"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
+
+  - id: task-014
+    title: 'Make the Aura token-cache env-mode check direct instead of store-miss-derived'
+    description: |
+      (Review finding #4 MINOR — note, not blocking; low conviction. Current form is
+      correct and adequately commented.) token.go:44-46 derives envMode from
+      !inStore && cfg.Global.AcceptEnvVars() via a cfg.Credentials.Aura.Get(
+      credential.Name) lookup whose error is the signal. That works, but the
+      synthesized credential is named "env" (aura.go:88) and set via
+      SetActiveCredential — the env-ness is already known at synthesis time.
+      Threading that fact onto the credential (or checking the sentinel name) would
+      be more direct than re-deriving it from a store-miss. Make the check direct
+      (prefer checking the known sentinel name / an explicit ephemeral marker over
+      the store-miss inference), keeping the disk cache scoped to env-mode only and
+      all existing behaviour intact. If, on inspection, threading a marker adds more
+      complexity than the store-miss it replaces, leave a brief justification in the
+      progress note and keep the current form — this is a judgement call.
+    status: pending
+    dependencies:
+      - task-012
+      - task-013
+    acceptance_criteria:
+      - "getToken determines env-mode directly (via the known ephemeral/sentinel credential identity) rather than inferring it solely from a store-miss, OR a documented justification is recorded for keeping the current form"
+      - "The disk JWT cache remains scoped to env-mode only; keyring/insecure credentials never touch it"
+      - "All existing token-cache tests pass unchanged"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null

@@ -50,3 +50,6 @@ Decisions: README does not feed the skill bundle/additions, so no go-generate re
 Convergence: ran go generate ./neo4j-cli/internal/skill/... (and full ./...) — zero bundle drift; the config key change never reached the bundle. All gates pass (make test, fmt-check, lint=0 issues, license-check, generate-check on clean tree). Credential byte-stability already covered by TestMakeRequest_EnvCredentialNotPersisted (task-007); no new test needed.
 Files: ~1 mod (tasks/progress YAML only)
 Decisions: keyring untouched by construction (UpdateAccessToken guarded by !inStore) so no extra keyring assertion added.
+
+## REVIEW — 2026-06-25T12:56:14Z
+Added 3 review tasks (task-012..task-014).
