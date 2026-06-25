@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-24T21:30:00Z
+updated_at: 2026-06-24T23:30:00Z
 
 tasks:
   - id: task-001
@@ -844,3 +844,103 @@ tasks:
       - "validActions remains the single source of action→category; the derived data is computed from it, not hand-maintained"
       - "No behavior change: emitted Cypher, Short/Long/Example, and cross-category hints are byte-identical; all existing privilege tests pass unchanged"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean (no bundle drift)"
+
+  - id: task-029
+    title: "Render the labelScoped 'requires --node-label' usage error in kebab CLI form (REQ-F-041)"
+    status: todo
+    source: qa
+    description: |
+      Second-QA-pass finding 1. The `labelScoped` arm of `buildPrivilegeCypher` in `cypher.go` returns
+      `clierr.NewUsageError("action %s requires --node-label", action)` with `action` being the
+      canonical `validActions` key (`SET LABEL` / `REMOVE LABEL`). The user typed `set-label` /
+      `remove-label`, so the error echoes a Cypher keyword the user never used — the same
+      Cypher-vs-CLI mismatch REQ-F-039 fixed for enumerated action lists, here applied to a single
+      action reference.
+
+      Fix: render the action via `kebabAction(action)` in that message so it reads
+      `action set-label requires --node-label` (and `action remove-label requires --node-label`).
+      This is the only `requires`-style error that inlines an action keyword today; no other category
+      arm needs changing. The cross-category hint (REQ-F-030) and unknown-action enumeration
+      (REQ-F-039) already use kebab and stay as-is.
+
+      Tests: update/extend the `buildPrivilegeCypher` unit case for `labelScoped` with no `--node-label`
+      to assert the message contains `set-label` (and a `remove-label` case) and does NOT contain
+      `SET LABEL` / `REMOVE LABEL`.
+    dependencies:
+      - task-028
+    acceptance_criteria:
+      - "`grant label set-label --on-graph neo4j --role analyst --rw` (no --node-label) returns `action set-label requires --node-label`; the remove-label case returns `action remove-label requires --node-label`"
+      - "The error message never contains the Cypher form `SET LABEL` / `REMOVE LABEL`"
+      - "A buildPrivilegeCypher unit case asserts the kebab form for both set-label and remove-label"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-030
+    title: "Add per-category flag-help override; fix --node-label help on the label category (REQ-F-042)"
+    status: todo
+    source: qa
+    description: |
+      Second-QA-pass finding 3. `registerPrivilegeFlag` registers one shared help string per flag, but
+      `--node-label` means different things per category: on `property`/`entity` it is an optional
+      entity restriction ("Restrict a graph privilege to node labels"); on `label` it is the REQUIRED
+      target of `SET LABEL` / `REMOVE LABEL` (the labels the privilege is granted on), not a
+      restriction. The shared string is misleading on `grant/deny/revoke label --help`.
+
+      Fix (data-driven, single source per REQ-F-034): add an optional `flagHelp map[string]string`
+      (flag long name → help text) to `categoryInfo`. `registerPrivilegeFlag` (or the factory loop in
+      `newCategoryCmd` that calls it) consults `categoryMeta[cat].flagHelp[flag]` and uses it when
+      present, otherwise the existing shared default. Set `labelScoped`'s `flagHelp[flagNodeLabel]` to,
+      e.g., "Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable)".
+      No other category/flag overrides are added. Keep the change confined to categoryMeta + the
+      registration primitive — no per-leaf hand-authoring.
+
+      Because the flag help feeds `grant label --help` and therefore the generated `references/admin.md`,
+      run `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle.
+
+      Tests: assert the `label` category's `--node-label` usage string differs from the shared default
+      (e.g. contains `SET LABEL` / `required`), while `--node-label` on `property`/`entity` keeps the
+      shared "Restrict ... to node labels" string.
+    dependencies:
+      - task-029
+    acceptance_criteria:
+      - "`categoryInfo` gains an optional `flagHelp` map; `registerPrivilegeFlag`/factory uses the per-category override when present, shared default otherwise"
+      - "`grant label --help` (and deny/revoke) describe --node-label as the required SET/REMOVE LABEL target; `grant property --help` / `grant entity --help` keep the 'Restrict ... to node labels' wording"
+      - "Override is data-driven from categoryMeta (no per-leaf hand-authoring); only label/--node-label is overridden"
+      - "Skill bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "A unit test asserts the label --node-label help differs from the property/entity default; `make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-031
+    title: "privilege list --role/--user returns a validation error when the target does not exist (REQ-F-043)"
+    status: todo
+    source: qa
+    description: |
+      Second-QA-pass finding 5. `privilege list --role <name>` / `--user <name>` runs `SHOW ROLE $name
+      PRIVILEGES` / `SHOW USER $name PRIVILEGES`, which returns zero rows for a NON-EXISTENT target.
+      So a typo'd `--role analyst` is indistinguishable from a real role with no privileges — both
+      print `[]` and exit 0.
+
+      Fix (in `list.go`): when a `--role`/`--user` filter is set AND the privileges query returns zero
+      rows, perform a follow-up existence check via the existing `privilegeExecFn` seam and, if the
+      target is absent, return `clierr.NewValidationError("role %q does not exist", name)` /
+      `... user %q ...` (exit 6). Existence-check Cypher (no import of the role/user packages — avoids
+      coupling): `SHOW ROLES YIELD role WHERE role = $name RETURN role` for --role,
+      `SHOW USERS YIELD user WHERE user = $name RETURN user` for --user; zero rows ⇒ does-not-exist.
+      Run the extra query ONLY on the empty-result path so a role with privileges still costs exactly
+      one query. A real role/user with no privileges still exits 0 with an empty list (the check finds
+      it). The unfiltered `SHOW PRIVILEGES` path is unchanged. grant/deny/revoke already surface the
+      server's `Role does not exist` error, so no change there. If the existence-check query itself
+      errors, that error surfaces naturally.
+
+      Tests (privilegeExecFn seam, no live Bolt; use withSequencedPrivilegeExecFn): (a) `list --role
+      missing` — privileges query empty, existence check returns zero rows → validation_error exit 6
+      with `role "missing" does not exist`; (b) analogous `--user` case; (c) role exists but no
+      privileges — existence check returns one row → exit 0 empty list; (d) non-empty privileges result
+      issues exactly one query (no existence round-trip); (e) unfiltered SHOW PRIVILEGES unchanged.
+    dependencies:
+      - task-030
+    acceptance_criteria:
+      - "`list --role <nonexistent>` returns validation_error (exit 6) `role \"<nonexistent>\" does not exist`; `--user <nonexistent>` returns `user \"<nonexistent>\" does not exist`"
+      - "Existence check runs ONLY when a --role/--user filter is set and the privileges query returns zero rows; non-empty and unfiltered paths issue no extra query"
+      - "A real role/user with no privileges exits 0 with an empty list"
+      - "Existence check uses the privilegeExecFn seam with SHOW ROLES/SHOW USERS ... WHERE = $name (no import of the role/user packages)"
+      - "Unit tests cover the nonexistent role, nonexistent user, exists-but-empty, non-empty-no-extra-query, and unfiltered cases"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"

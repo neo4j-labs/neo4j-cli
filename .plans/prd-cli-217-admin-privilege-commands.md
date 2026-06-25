@@ -515,6 +515,56 @@ keywords instead of the CLI forms the user actually types.
     values. This dovetails with the audit's "resolve the positional once at the command layer"
     cleanup: category-scoped resolution naturally produces a category-scoped, kebab error.
 
+**Second-QA-pass usability fixes (CLI-217 live testing, second pass against Neo4j 2025.07 Enterprise + Aura Free/Business Critical — REQ-F-041..043)**
+
+A follow-up QA pass exercised every category against live Docker Enterprise, Docker Community, Aura
+Free, and Aura Business Critical servers. No functional defects were found (all emitted Cypher was
+server-valid, and the REQ-F-023/025/026 fixes were confirmed live), but three usability papercuts
+surfaced. All are scoped to the `privilege` package.
+
+- REQ-F-041: **The `labelScoped` "requires `--node-label`" usage error is rendered in the kebab CLI
+  form, not the Cypher keyword.** `grant label set-label --on-graph neo4j` (no `--node-label`)
+  currently returns `action SET LABEL requires --node-label` — the canonical `validActions` key
+  (`SET LABEL`), not the `set-label` the user actually typed. This is the same Cypher-vs-CLI mismatch
+  REQ-F-039 fixed for *enumerated* action lists, applied here to a *single-action* reference. The
+  `labelScoped` arm of `buildPrivilegeCypher` (`cypher.go`) renders the action via `kebabAction(action)`
+  in the message, yielding `action set-label requires --node-label` (and `action remove-label requires
+  --node-label`). No other category emits an action keyword in a `requires`-style error today, but if a
+  future one does it follows the same rule. The cross-category hint (REQ-F-030) and the unknown-action
+  enumeration (REQ-F-039) already use the kebab form and are unchanged.
+
+- REQ-F-042: **A category may override a flag's help string so the help is accurate for that
+  category's use of the flag.** `registerPrivilegeFlag` uses one shared help string per flag, but
+  `--node-label` means different things across categories: on `property`/`entity` it is an optional
+  entity *restriction* ("Restrict a graph privilege to node labels"), while on `label` it is the
+  **required target** of `SET LABEL` / `REMOVE LABEL` (the labels the privilege is granted on), not a
+  restriction at all. Add a minimal per-category flag-help override mechanism: `categoryInfo` gains an
+  optional `flagHelp map[string]string` (flag long name → help text), and `registerPrivilegeFlag`
+  (or the factory loop that calls it) consults `categoryMeta[cat].flagHelp[flag]` before falling back
+  to the shared default. The `label` category overrides `--node-label` to read, e.g.,
+  `"Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable)"`. Other
+  categories and other flags keep their existing shared help. The override is data-driven from
+  `categoryMeta` (the single source per REQ-F-034), so no per-leaf hand-authoring. Because the flag
+  help feeds `grant label --help` and therefore `references/admin.md`, the skill bundle is regenerated.
+
+- REQ-F-043: **`privilege list --role <name>` / `--user <name>` returns a validation error (exit 6)
+  when the named role/user does not exist, instead of an empty result.** Today `SHOW ROLE $name
+  PRIVILEGES` / `SHOW USER $name PRIVILEGES` for a non-existent target returns zero rows, so a typo'd
+  `--role analyst` is indistinguishable from a real role that simply has no privileges — both print an
+  empty list and exit 0. When (and only when) a `--role`/`--user` filter is set **and** the privileges
+  query returns zero rows, `list` performs a follow-up existence check and, if the target is absent,
+  returns a `validation_error` (exit 6) with the message `role "<name>" does not exist` /
+  `user "<name>" does not exist`. The existence check runs via the existing `privilegeExecFn` seam
+  (no import of the `role`/`user` packages — avoids coupling): `SHOW ROLES YIELD role WHERE role =
+  $name RETURN role` for `--role`, `SHOW USERS YIELD user WHERE user = $name RETURN user` for `--user`;
+  zero rows ⇒ does-not-exist. The extra round-trip is incurred **only** on the empty-result path, so a
+  role with privileges costs exactly one query as before. A real role/user with no privileges still
+  exits 0 with an empty list (the existence check finds it). Unfiltered `list` (`SHOW PRIVILEGES`) is
+  unchanged. `grant`/`deny`/`revoke` already surface the server's `Role does not exist` error on a bad
+  `--role`, so they need no change. The existence check is itself an Enterprise admin command, which is
+  consistent with `privilege list` already being Enterprise-only; if the check query itself errors
+  (e.g. permissions), that error surfaces naturally rather than masking the empty result.
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: Unit tests for every leaf command using the `privilegeExecFn` package-level seam
@@ -595,6 +645,25 @@ keywords instead of the CLI forms the user actually types.
   - The skill bundle is regenerated (the `load` `Use`/`Short`/`Example` change) and
     `TestGenerator_RoundTrip` passes; `make test`, `make fmt-check`, `make lint`, `make license-check`
     all pass.
+
+- REQ-NF-012: Tests for the second-QA-pass usability fixes (REQ-F-041..043):
+  - **Kebab label error (REQ-F-041):** a `buildPrivilegeCypher` unit case asserts that `labelScoped`
+    with no `--node-label` returns a usage error whose message contains `set-label` (and the
+    `remove-label` case `remove-label`) and does **not** contain `SET LABEL` / `REMOVE LABEL`.
+  - **Per-category flag help (REQ-F-042):** a test asserts the `label` category's `--node-label` flag
+    usage string differs from the `property`/`entity` categories' shared string (e.g. contains
+    `SET LABEL` / `required`), while `--node-label` on `property`/`entity` keeps the shared default.
+  - **Existence check (REQ-F-043):** using the `privilegeExecFn` seam (no live Bolt),
+    `withSequencedPrivilegeExecFn` returns empty rows for the privileges query then drives the
+    existence check: (a) `list --role missing` where the follow-up `SHOW ROLES … WHERE role = $name`
+    returns zero rows asserts a `validation_error` (`ce.Code` exit 6) with message
+    `role "missing" does not exist`; (b) the analogous `--user` case; (c) a role that exists but has
+    no privileges (existence check returns one row) exits 0 with an empty list; (d) a non-empty
+    privileges result issues exactly one query (no existence round-trip). The unfiltered
+    `SHOW PRIVILEGES` path is asserted unchanged.
+  - The skill bundle is regenerated (the `grant label --help` `--node-label` text change flows into
+    `references/admin.md`) and `TestGenerator_RoundTrip` passes; `make test`, `make fmt-check`,
+    `make lint`, `make license-check` all pass.
 
 ---
 
@@ -988,6 +1057,14 @@ lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated
 - [ ] The `load` `Short`/`Example` carry no action token (`Short` has no `(load)` suffix; `Example` is `grant load --cidr …`). Same for `deny load`/`revoke load`.
 - [ ] Rule is data-driven from the category's action count (general, not load-hardcoded); skill bundle regenerated; `make test`/`fmt-check`/`lint`/`license-check` and `TestGenerator_RoundTrip` pass.
 
+**Second-QA-pass usability fixes (REQ-F-041..043, REQ-NF-012)**
+- [ ] `neo4j-cli admin privilege grant label set-label --on-graph neo4j --role analyst --rw` (no `--node-label`) returns `action set-label requires --node-label` (kebab form; not `SET LABEL`); `remove-label` likewise.
+- [ ] `neo4j-cli admin privilege grant label --help` describes `--node-label` as the required target of SET/REMOVE LABEL (e.g. "Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable)"), while `grant property --help` / `grant entity --help` keep the "Restrict … to node labels" wording.
+- [ ] `neo4j-cli admin privilege list --role <nonexistent> --credential local` returns a `validation_error` (exit 6) with `role "<nonexistent>" does not exist`; `--user <nonexistent>` returns `user "<nonexistent>" does not exist`.
+- [ ] `neo4j-cli admin privilege list --role <real-role-with-no-privileges>` exits 0 with an empty list (existence check confirms the role exists).
+- [ ] A role/user with privileges and the unfiltered `SHOW PRIVILEGES` path issue no extra existence query (existence check runs only on the empty-filtered-result path).
+- [ ] The per-category flag-help override is data-driven from `categoryMeta` (no per-leaf hand-authoring); skill bundle regenerated (`references/admin.md` `grant label --help` change); `make test`/`fmt-check`/`lint`/`license-check` and `TestGenerator_RoundTrip` pass.
+
 ---
 
 ## Out of Scope
@@ -1028,3 +1105,8 @@ lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated
 5. **Cross-category positional error wording (REQ-F-030)**: confirm the exact phrasing of the
    "action X belongs to category Y, use 'grant Y X'" hint and that it carries the `usage_error` code
    (exit 2), consistent with the other client-side validation errors.
+
+6. **Existence-check exit code (REQ-F-043)**: the nonexistent-`--role`/`--user` case returns a
+   `validation_error` (exit 6), matching how the server's `Role does not exist` surfaces for the write
+   verbs. Confirm exit 6 (not the exit-2 `usage_error` used for client-side flag mistakes) is the right
+   code, given the target is validated against the live database rather than parsed from flags.
