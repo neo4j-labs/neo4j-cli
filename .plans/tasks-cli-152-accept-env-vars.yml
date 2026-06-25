@@ -343,3 +343,37 @@ tasks:
       - "make test, make fmt-check, make lint pass"
     source: review
     completed_at: 2026-06-25T13:16:55Z
+
+  - id: task-015
+    title: 'Length-prefix tokenCacheHash components to prevent separator-injection collisions'
+    description: |
+      (CI security-review finding, [Low] Cryptography — token_cache.go line 39.)
+      tokenCacheHash builds its SHA-256 input by concatenating
+      clientID + "|" + clientSecret + "|" + authURL with an unescaped "|"
+      separator. Because "|" can also appear inside a component, two different
+      credential identities can map to the same digest: e.g.
+      tokenCacheHash("a|b","c",url) and tokenCacheHash("a","b|c",url) collide.
+      The consequence is a wrong cache hit — one invocation receives a cached JWT
+      minted for a DIFFERENT identity and then fails with a 401 from the Aura API.
+      No credential is exposed (the secret is still never written to disk), and
+      severity is Low, but it is a real correctness bug in the cache-identity
+      derivation. Fix: make component boundaries unambiguous by length-prefixing
+      each component before hashing, e.g.
+      fmt.Sprintf("%d:%s|%d:%s|%d:%s", len(clientID), clientID,
+      len(clientSecret), clientSecret, len(authURL), authURL). Apply this
+      consistently to BOTH the filename short-hash and the in-file full-hash if
+      they derive from the same construction, so a changed secret still misses and
+      a same-identity hit still works. Add a focused test asserting the two
+      previously-colliding inputs now produce distinct hashes, and confirm the
+      existing cache hit/miss tests (same id/secret => hit; changed secret => miss)
+      still pass.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "tokenCacheHash length-prefixes each component so clientID|secret boundary ambiguity cannot cause a collision"
+      - "A test asserts that two inputs which collided under the old | concatenation now hash differently"
+      - "Existing token-cache behaviour holds: same id/secret/authURL => cache hit; changed secret => cache miss + fresh mint"
+      - "The raw client secret is still never written to disk; cache file remains 0600"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null

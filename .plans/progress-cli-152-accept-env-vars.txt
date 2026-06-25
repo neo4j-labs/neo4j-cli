@@ -68,3 +68,6 @@ Decisions: The shared helper landed on *clicfg.Config (not credentials) because 
 Made the env-mode check direct: added an Ephemeral bool `json:"-"` marker to credentials.AuraCredential, set true at the single synthesis site (aura.go applyEnvCredential), and getToken now computes envMode := credential.Ephemeral && AcceptEnvVars() instead of inferring it from a !inStore store-miss.
 Files: +0 new, ~4 mod (token.go, aura.go, credentials/aura.go, token_cache_test.go), -0 del
 Decisions: Chose an explicit ephemeral marker over a sentinel-name ("env") check — the name route would false-positive on a real stored credential literally named "env", whereas the marker is unambiguous and only ever set at synthesis. json:"-" keeps it out of credentials.json (no byte drift). The persistence branch now inlines the same Get(name) lookup (pure read, no side effects) to decide UpdateAccessToken, preserving the prior no-panic/no-persist behavior exactly. The token_cache_test.go envCfg helper gained Ephemeral:true to stay a faithful mirror of production synthesis (not a behavior-masking change; reviewer confirmed). All existing token-cache tests pass unchanged.
+
+## REVIEW — 2026-06-25T15:52:38Z
+Added 1 review task (task-015) from CI security-review finding.
