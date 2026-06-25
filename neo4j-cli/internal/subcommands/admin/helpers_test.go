@@ -12,13 +12,17 @@ import (
 )
 
 // fakeQueryRunner is the test double for queryRunner. It returns the
-// configured rows or error without touching a real Bolt connection.
+// configured rows or error without touching a real Bolt connection, and
+// records the *dbconn.Conn it was last invoked with so tests can assert the
+// resolved connection details.
 type fakeQueryRunner struct {
-	rows []map[string]any
-	err  error
+	rows     []map[string]any
+	err      error
+	lastConn *dbconn.Conn
 }
 
-func (f *fakeQueryRunner) run(_ context.Context, _ *dbconn.Conn, _ string, _ map[string]any) ([]map[string]any, error) {
+func (f *fakeQueryRunner) run(_ context.Context, conn *dbconn.Conn, _ string, _ map[string]any) ([]map[string]any, error) {
+	f.lastConn = conn
 	return f.rows, f.err
 }
 

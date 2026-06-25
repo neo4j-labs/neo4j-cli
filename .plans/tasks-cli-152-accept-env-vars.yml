@@ -101,7 +101,7 @@ tasks:
       env vars honoured only when accept-env-vars is true, NEO4J_DATABASE never
       consulted in admin mode, and the partial-set error surfaced identically.
       No production code changes expected here beyond what task-003/004 provide.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -110,7 +110,7 @@ tasks:
       - "With accept-env-vars false, admin commands ignore connection env vars and use the stored default credential"
       - "NEO4J_DATABASE is never consulted in admin mode regardless of accept-env-vars"
       - "Admin tests assert the same partial-set DBMS error as query"
-    completed_at: null
+    completed_at: 2026-06-25T12:03:49Z
 
   - id: task-006
     title: 'Gate embed provider env reads behind accept-env-vars'
