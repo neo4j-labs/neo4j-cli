@@ -31,3 +31,8 @@ Files: ~2 (embed.go, embed_test.go)
 Aura root PersistentPreRunE now synthesizes an ephemeral in-memory AuraCredential ("env") from NEO4J_AURA_CLIENT_ID/SECRET when accept-env-vars is on (validated via ValidateEnvCredentialSet); explicit --credential still wins since its subcommand hook runs after the root hook under EnableTraverseRunHooks.
 Files: +1 new (aura/env_credential_test.go), ~3 mod (aura.go, api/token.go, api/api_test.go, testfs.go)
 Decisions: getToken must skip cfg.Credentials.Aura.UpdateAccessToken when the active credential isn't in the store — otherwise its Get(name) lookup panics for the env-synthesized "env" credential (review-caught). Token stays in-process only; the persistent JWT cache is task-008. Added testfs.GetTestCredentials to assert credentials.json byte-stability.
+
+## TASK-008 — 2026-06-25T12:28:39Z
+Added an identity-bound on-disk Aura JWT token cache (os.TempDir/neo4j-cli-aura-token-<short>.json, 0600) consulted only for env-var-synthesized credentials; getToken refactored to extract a mintToken seam and gate disk caching on (!inStore && AcceptEnvVars). Cache stores token+expiry+full sha256(id|secret|authURL) hash — never the raw secret — with a 60s expiry buffer.
+Files: +neo4j-cli/aura/internal/api/token_cache.go, +token_cache_test.go; ~token.go, ~export_test.go
+Decisions: env-mode = credential not in store AND accept-env-vars true (stored keyring/insecure creds keep store-level token persistence and never touch the disk cache). cacheDirFn/mintToken/cache-path test seams in export_test.go.

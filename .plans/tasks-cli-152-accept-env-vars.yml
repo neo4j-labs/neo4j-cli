@@ -164,7 +164,7 @@ tasks:
       hash and expiry with a 60s buffer; on miss/corrupt/expired/mismatch mint
       fresh and write back. Only consult the cache when the Aura credential came
       from env vars (not keyring/insecure).
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -173,7 +173,7 @@ tasks:
       - "The cache file contains only the JWT (and expiry/hash), never the raw client secret, at 0600 permissions"
       - "An expired cache (past expiry minus 60s buffer) triggers a fresh mint"
       - "The cache is not consulted in keyring/insecure credential modes"
-    completed_at: null
+    completed_at: 2026-06-25T12:28:39Z
 
   - id: task-009
     title: 'Emit one-time discovery hint when env vars present but unset'
