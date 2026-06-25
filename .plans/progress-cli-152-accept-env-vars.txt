@@ -45,3 +45,8 @@ Files: +1 new (env_var_hint_test.go), ~1 mod (app.go)
 Documented the accept-env-vars feature: a Minor changie entry describing the new config key, NEO4J_CLI_ACCEPT_ENV_VARS bootstrap, and the DBMS/embed + CLI-212 breaking changes; a new README "Environment variables" section with the per-type env-var table, precedence, admin coverage, and partial-set/hint notes, plus cross-link notes in the DBMS and embed precedence paragraphs.
 Files: +1 new (.changes/unreleased/neo4j-cli-Minor-20260625-133535.yaml), ~1 mod (README.md)
 Decisions: README does not feed the skill bundle/additions, so no go-generate regeneration needed; changie auto-named the file.
+
+## TASK-011 — 2026-06-25T12:41:53Z
+Convergence: ran go generate ./neo4j-cli/internal/skill/... (and full ./...) — zero bundle drift; the config key change never reached the bundle. All gates pass (make test, fmt-check, lint=0 issues, license-check, generate-check on clean tree). Credential byte-stability already covered by TestMakeRequest_EnvCredentialNotPersisted (task-007); no new test needed.
+Files: ~1 mod (tasks/progress YAML only)
+Decisions: keyring untouched by construction (UpdateAccessToken guarded by !inStore) so no extra keyring assertion added.

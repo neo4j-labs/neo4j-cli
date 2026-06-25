@@ -227,7 +227,7 @@ tasks:
       after command/help changes (new config key affects config command help and
       any --format/Long changes). Ensure the full final gate set passes and that
       stored credentials are provably untouched by toggling accept-env-vars.
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-006
@@ -239,4 +239,4 @@ tasks:
       - "make test, make fmt-check, make lint all pass"
       - "Stored credentials are byte-identical before and after enabling accept-env-vars"
       - "make generate-check passes on a clean tree"
-    completed_at: null
+    completed_at: 2026-06-25T12:41:53Z
