@@ -988,7 +988,8 @@ tasks:
 
   - id: task-033
     title: "Verify the requireExists SHOW ROLES/SHOW USERS probe queries are valid on supported Neo4j versions (audit item 2)"
-    status: todo
+    status: completed
+    completed_at: 2026-06-25T10:20:00Z
     source: review
     description: |
       End-of-feature audit, non-blocking correctness note on task-031. The `requireExists` existence
