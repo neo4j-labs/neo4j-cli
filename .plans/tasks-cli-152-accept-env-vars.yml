@@ -184,7 +184,7 @@ tasks:
       process and surfaces regardless of which command (query, admin, embed) is
       run. Once the key is explicitly set to any value (including false) the hint
       is permanently suppressed.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -193,7 +193,7 @@ tasks:
       - "With accept-env-vars explicitly set to false and NEO4J_URI present, the hint is NOT shown"
       - "The hint fires at most once per process and only when a relevant env var is set"
       - "The hint appears regardless of which command (query/admin/embed) triggers it"
-    completed_at: null
+    completed_at: 2026-06-25T12:33:16Z
 
   - id: task-010
     title: 'Document the new key, env bootstrap, and breaking changes'

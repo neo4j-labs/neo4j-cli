@@ -11,6 +11,7 @@ package app
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
@@ -79,6 +80,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			return err
 		}
 		initCredentialStorageDefault(cfg, cmd.ErrOrStderr())
+		maybeEmitEnvVarHint(cfg, cmd.ErrOrStderr())
 		if shouldRecordHistory(cmd) {
 			history.Record(cfg)
 		}
@@ -125,6 +127,22 @@ func shouldRecordHistory(cmd *cobra.Command) bool {
 		}
 	}
 	return true
+}
+
+// maybeEmitEnvVarHint emits a one-time discovery hint to stderr when the user
+// has credential env vars set but has never explicitly chosen whether to honour
+// them (accept-env-vars never set, including via NEO4J_CLI_ACCEPT_ENV_VARS).
+// It runs once per process from the root PersistentPreRunE, so it surfaces for
+// any command (query/admin/embed/aura). Once the key is explicitly set to any
+// value the hint is permanently suppressed.
+func maybeEmitEnvVarHint(cfg *clicfg.Config, stderr io.Writer) {
+	if cfg.Global.AcceptEnvVarsIsSet() {
+		return
+	}
+	if !credentials.HasAnyCredentialEnvVar(os.Getenv) {
+		return
+	}
+	_, _ = fmt.Fprintln(stderr, "hint: credential env vars detected but accept-env-vars is not set — run 'neo4j-cli config set accept-env-vars true' or set NEO4J_CLI_ACCEPT_ENV_VARS=1")
 }
 
 // initCredentialStorageDefault runs on every invocation before any RunE
