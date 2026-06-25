@@ -121,6 +121,7 @@ func TestAdminConn_PasswordSupplied_SkipsPrompt(t *testing.T) {
 // TestAdminConn_PasswordEnvVar_SkipsPrompt verifies that NEO4J_PASSWORD env var
 // fills the password so the post-resolution prompt is never triggered.
 func TestAdminConn_PasswordEnvVar_SkipsPrompt(t *testing.T) {
+	t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 	t.Setenv(dbconn.EnvURI, "")
 	t.Setenv(dbconn.EnvUsername, "")
 	t.Setenv(dbconn.EnvPassword, "env-password")

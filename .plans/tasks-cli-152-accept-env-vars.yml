@@ -59,7 +59,7 @@ tasks:
       or the explicit --uri/--username/--password/--database flag branches. The
       explicitCount partial-params switch is unchanged. This single gate covers
       query, admin, and desktop since they all call ResolveConn.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -68,7 +68,7 @@ tasks:
       - "With accept-env-vars false, NEO4J_DATABASE no longer overrides a --credential credential's database; --database flag still overrides"
       - "dotenv (--env) values continue to be read regardless of accept-env-vars"
       - "No connection env reads remain in query/connect.go or any admin leaf (REQ-NF-006)"
-    completed_at: null
+    completed_at: 2026-06-25T11:14:05Z
 
   - id: task-004
     title: 'Enforce DBMS env-set completeness in env-var mode'

@@ -60,6 +60,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	tmp := t.TempDir()
 	t.Chdir(tmp)
 
+	t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 	t.Setenv(dbconn.EnvURI, "neo4j://from-env:7687")
 	t.Setenv(dbconn.EnvUsername, "fromenv")
 	t.Setenv(dbconn.EnvPassword, "envpw")
@@ -551,6 +552,7 @@ func TestResolveConn_CredentialFlag_DatabaseOverridePrecedence(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 			t.Setenv(dbconn.EnvURI, "")
 			t.Setenv(dbconn.EnvUsername, "")
 			t.Setenv(dbconn.EnvPassword, "")

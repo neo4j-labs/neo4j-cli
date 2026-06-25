@@ -94,7 +94,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 			if err != nil {
 				return nil, err
 			}
-			applyDBOverride(cmd, c, skipDatabase)
+			applyDBOverride(cmd, cfg, c, skipDatabase)
 			return c, nil
 		}
 
@@ -113,7 +113,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 			if err != nil {
 				return nil, err
 			}
-			applyDBOverride(cmd, c, skipDatabase)
+			applyDBOverride(cmd, cfg, c, skipDatabase)
 			return c, nil
 		}
 
@@ -128,7 +128,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		}
 
 		c := buildConnFromPersistedCred(cred, cfg, cmd)
-		applyDBOverride(cmd, c, skipDatabase)
+		applyDBOverride(cmd, cfg, c, skipDatabase)
 		return c, nil
 	}
 
@@ -142,12 +142,12 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		return nil, err
 	}
 
-	uri := Overlay(dotenvVals[EnvURI], os.Getenv(EnvURI))
-	username := Overlay(dotenvVals[EnvUsername], os.Getenv(EnvUsername))
-	password := Overlay(dotenvVals[EnvPassword], os.Getenv(EnvPassword))
+	uri := Overlay(dotenvVals[EnvURI], gatedGetenv(cfg, EnvURI))
+	username := Overlay(dotenvVals[EnvUsername], gatedGetenv(cfg, EnvUsername))
+	password := Overlay(dotenvVals[EnvPassword], gatedGetenv(cfg, EnvPassword))
 	database := ""
 	if !skipDatabase {
-		database = Overlay(dotenvVals[EnvDatabase], os.Getenv(EnvDatabase))
+		database = Overlay(dotenvVals[EnvDatabase], gatedGetenv(cfg, EnvDatabase))
 	}
 
 	if f := cmd.Flag("uri"); f != nil && f.Changed {
@@ -284,16 +284,28 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *DesktopMa
 
 // applyDBOverride layers a --database flag or NEO4J_DATABASE env override onto
 // c when skipDatabase is false. Used in the credential path so a persisted or
-// Desktop credential's database can be overridden at the call site.
-func applyDBOverride(cmd *cobra.Command, c *Conn, skipDatabase bool) {
+// Desktop credential's database can be overridden at the call site. The
+// NEO4J_DATABASE override is gated behind accept-env-vars (REQ-F-013); the
+// explicit --database flag always wins.
+func applyDBOverride(cmd *cobra.Command, cfg *clicfg.Config, c *Conn, skipDatabase bool) {
 	if skipDatabase {
 		return
 	}
 	if f := cmd.Flag("database"); f != nil && f.Changed {
 		c.Database = f.Value.String()
-	} else if v := os.Getenv(EnvDatabase); v != "" {
+	} else if v := gatedGetenv(cfg, EnvDatabase); v != "" {
 		c.Database = v
 	}
+}
+
+// gatedGetenv returns os.Getenv(name) only when accept-env-vars is enabled;
+// otherwise it returns "" so credential env vars are ignored. The dotenv
+// (--env walk-up) mechanism is intentionally NOT gated by this helper.
+func gatedGetenv(cfg *clicfg.Config, name string) string {
+	if !cfg.Global.AcceptEnvVars() {
+		return ""
+	}
+	return os.Getenv(name)
 }
 
 // applyURINorm normalises uri via NormalizeURI, prints the rewrite info line

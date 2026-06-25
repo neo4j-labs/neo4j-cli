@@ -18,6 +18,10 @@ import (
 	"github.com/neo4j/cli/test/utils/testfs"
 )
 
+// envAcceptEnvVars is the env var bound to the accept-env-vars config key. Tests
+// set it to "1" to opt into reading NEO4J_* connection env vars.
+const envAcceptEnvVars = "NEO4J_CLI_ACCEPT_ENV_VARS"
+
 // newAdminCmd returns a cobra command with the same persistent flags that
 // admin.go registers, wired to the supplied config. This lets tests call
 // ResolveConn(cmd, cfg, true) without importing the admin package (which
@@ -91,6 +95,7 @@ func TestResolveConn_Admin_Defaults(t *testing.T) {
 // NEO4J_DATABASE is set in the environment, admin ResolveConn does not
 // populate conn.Database.
 func TestResolveConn_Admin_NEO4J_DATABASE_Ignored(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
 	t.Setenv(EnvURI, "neo4j://host:7687")
 	t.Setenv(EnvUsername, "user")
 	t.Setenv(EnvPassword, "pass")
@@ -134,6 +139,7 @@ func TestResolveConn_Admin_DirectFlags(t *testing.T) {
 // TestResolveConn_Admin_EnvVars verifies that NEO4J_URI, NEO4J_USERNAME, and
 // NEO4J_PASSWORD environment variables resolve for admin (skipDatabase=true).
 func TestResolveConn_Admin_EnvVars(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
 	t.Setenv(EnvURI, "neo4j://env-host:7687")
 	t.Setenv(EnvUsername, "env-user")
 	t.Setenv(EnvPassword, "env-pass")
@@ -400,6 +406,7 @@ func TestResolveConn_Admin_NoCleartext_DebugOff(t *testing.T) {
 // TestResolveConn_Query_IncludesDatabase verifies that when skipDatabase=false
 // (query mode) NEO4J_DATABASE is respected.
 func TestResolveConn_Query_IncludesDatabase(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
 	t.Setenv(EnvURI, "neo4j://host:7687")
 	t.Setenv(EnvUsername, "user")
 	t.Setenv(EnvPassword, "pass")
@@ -418,6 +425,7 @@ func TestResolveConn_Query_IncludesDatabase(t *testing.T) {
 // skipDatabase=false and no database source (dotenv, env, flag) provides a
 // value, conn.Database is left empty so the server resolves the home database.
 func TestResolveConn_Query_EmptyDatabaseWhenNotProvided(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
 	t.Setenv(EnvURI, "neo4j://host:7687")
 	t.Setenv(EnvUsername, "user")
 	t.Setenv(EnvPassword, "pass")
@@ -450,6 +458,139 @@ func TestResolveConn_Query_CredentialPath_DatabaseOverride(t *testing.T) {
 	conn, err := ResolveConn(cmd, cfg, false)
 	require.NoError(t, err)
 	assert.Equal(t, "override-db", conn.Database, "--database flag must override credential-supplied database")
+}
+
+// TestResolveConn_EnvGate_OffIgnoresEnvVars verifies that with accept-env-vars
+// unset (default) the NEO4J_URI/USERNAME/PASSWORD/DATABASE env vars are ignored
+// and the stored default credential is used instead.
+func TestResolveConn_EnvGate_OffIgnoresEnvVars(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "")
+	t.Setenv(EnvURI, "neo4j://env-host:7687")
+	t.Setenv(EnvUsername, "env-user")
+	t.Setenv(EnvPassword, "env-pass")
+	t.Setenv(EnvDatabase, "env-db")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://stored:7687", conn.URI, "env vars must be ignored when accept-env-vars is off")
+	assert.Equal(t, "storedUser", conn.Username)
+	assert.Equal(t, "storedPass", conn.Password)
+	assert.Equal(t, "storedDB", conn.Database)
+}
+
+// TestResolveConn_EnvGate_OnOverridesStoredCredential verifies that with
+// accept-env-vars enabled the NEO4J_* env vars override the stored default
+// credential at the documented precedence.
+func TestResolveConn_EnvGate_OnOverridesStoredCredential(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "neo4j://env-host:7687")
+	t.Setenv(EnvUsername, "env-user")
+	t.Setenv(EnvPassword, "env-pass")
+	t.Setenv(EnvDatabase, "env-db")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://env-host:7687", conn.URI)
+	assert.Equal(t, "env-user", conn.Username)
+	assert.Equal(t, "env-pass", conn.Password)
+	assert.Equal(t, "env-db", conn.Database)
+}
+
+// TestResolveConn_EnvGate_OffIgnoresNEO4J_DATABASEOnCredentialPath verifies the
+// CLI-212 path (REQ-F-013): with accept-env-vars off, NEO4J_DATABASE no longer
+// overrides a --credential credential's database, but --database still does.
+func TestResolveConn_EnvGate_OffIgnoresNEO4J_DATABASEOnCredentialPath(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "")
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "env-db")
+	t.Chdir(t.TempDir())
+
+	credsJSON := `{"dbms":{"default-credential":"","credentials":[{"name":"myprod","username":"prodUser","password":"prodPass","database-name":"prodDB","uri":"neo4j://prod:7687"}]}}`
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=myprod"}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "prodDB", conn.Database, "NEO4J_DATABASE must not override credential database when accept-env-vars is off")
+}
+
+// TestResolveConn_EnvGate_OnAppliesNEO4J_DATABASEOnCredentialPath verifies that
+// with accept-env-vars on, NEO4J_DATABASE overrides a --credential credential's
+// database (the CLI-212 behaviour, now gated).
+func TestResolveConn_EnvGate_OnAppliesNEO4J_DATABASEOnCredentialPath(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "env-db")
+	t.Chdir(t.TempDir())
+
+	credsJSON := `{"dbms":{"default-credential":"","credentials":[{"name":"myprod","username":"prodUser","password":"prodPass","database-name":"prodDB","uri":"neo4j://prod:7687"}]}}`
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=myprod"}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "env-db", conn.Database, "NEO4J_DATABASE must override credential database when accept-env-vars is on")
+}
+
+// TestResolveConn_EnvGate_FlagDatabaseOverridesRegardlessOfGate verifies that
+// the explicit --database flag overrides a credential's database even when
+// accept-env-vars is off (flags are never gated).
+func TestResolveConn_EnvGate_FlagDatabaseOverridesRegardlessOfGate(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "")
+	t.Setenv(EnvDatabase, "env-db")
+	t.Chdir(t.TempDir())
+
+	credsJSON := `{"dbms":{"default-credential":"","credentials":[{"name":"myprod","username":"prodUser","password":"prodPass","database-name":"prodDB","uri":"neo4j://prod:7687"}]}}`
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=myprod", "--database=flag-db"}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "flag-db", conn.Database, "--database flag must override regardless of accept-env-vars")
+}
+
+// TestResolveConn_EnvGate_DotenvReadRegardlessOfGate verifies that the dotenv
+// (--env walk-up) mechanism is unaffected by accept-env-vars: with the gate off
+// a .env file still supplies connection values.
+func TestResolveConn_EnvGate_DotenvReadRegardlessOfGate(t *testing.T) {
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+	t.Setenv(envAcceptEnvVars, "")
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+
+	cfg, fs := newCfgWithCreds(t, "{}")
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
+		[]byte("NEO4J_URI=neo4j://dotenv-host:7687\nNEO4J_USERNAME=dotenv-user\nNEO4J_PASSWORD=dotenv-pass\nNEO4J_DATABASE=dotenv-db\n"),
+		0644))
+
+	cmd := newQueryCmd(cfg)
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://dotenv-host:7687", conn.URI, "dotenv must be read regardless of accept-env-vars")
+	assert.Equal(t, "dotenv-user", conn.Username)
+	assert.Equal(t, "dotenv-pass", conn.Password)
+	assert.Equal(t, "dotenv-db", conn.Database)
 }
 
 // TestLoadEnvFile_NoEnvReturnsEmpty verifies that when no .env is present the
@@ -546,6 +687,7 @@ func TestNormalizeURI_BoltPassthrough(t *testing.T) {
 // TestResolveConn_Admin_FlagPrecedenceOverEnv verifies that explicit flags beat
 // environment variables for admin.
 func TestResolveConn_Admin_FlagPrecedenceOverEnv(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
 	t.Setenv(EnvURI, "neo4j://env-host:7687")
 	t.Setenv(EnvUsername, "envUser")
 	t.Setenv(EnvPassword, "envPass")

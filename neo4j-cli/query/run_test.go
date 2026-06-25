@@ -915,6 +915,7 @@ func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
 	r.install(t)
 
 	h := newRunHarness(t, "json")
+	t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 	t.Setenv(dbconn.EnvPassword, "from-env")
 	t.Setenv(dbconn.EnvURI, "")
 	t.Setenv(dbconn.EnvUsername, "")

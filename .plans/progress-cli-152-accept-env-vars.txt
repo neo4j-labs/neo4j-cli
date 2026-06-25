@@ -7,3 +7,8 @@ Decisions: Updated two golden config-list tests (key sorts alphabetically first 
 Added common/clicfg/credentials/env_spec.go: EnvCredentialSpec type, Aura/DBMS/Embed specs, HasAnyCredentialEnvVar, ValidateEnvCredentialSet (RequiredGroups completeness -> clierr usage error), ValidateEmbedEnvSet (provider-specific API-key check; ollama+vertex exempt). Env var name constants single-sourced here. getenv is a func param for testability. Helpers are unwired (consumed by tasks 003-009).
 Files: +2 new (env_spec.go, env_spec_test.go)
 Decisions: Vertex exempted from API-key check alongside Ollama (it authenticates via ADC, not the key vars); provider/env-var string constants intentionally duplicated from query/embed since common/ cannot import that package.
+
+## TASK-003 — 2026-06-25T11:14:05Z
+Gated the DBMS connection env reads in dbconn.ResolveConn behind cfg.Global.AcceptEnvVars() via a gatedGetenv helper: the os.Getenv halves of the uri/username/password/database Overlays and os.Getenv(EnvDatabase) in applyDBOverride (CLI-212 path, REQ-F-013). Dotenv walk-up and explicit flags remain ungated; explicitCount switch unchanged. Covers query+admin+desktop via the single chokepoint.
+Files: ~6 mod (conn.go, conn_test.go, admin_conn_test.go, connect_test.go, desktop_test.go, run_test.go)
+Decisions: applyDBOverride gained a *clicfg.Config param (all 3 call sites updated). Existing env-dependent tests across query/admin opt into the gate with t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS","1"); cross-package test files use the raw literal since the dbconn-test const is unreachable from them.
