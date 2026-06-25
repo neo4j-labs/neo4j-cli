@@ -12,3 +12,8 @@ Decisions: Vertex exempted from API-key check alongside Ollama (it authenticates
 Gated the DBMS connection env reads in dbconn.ResolveConn behind cfg.Global.AcceptEnvVars() via a gatedGetenv helper: the os.Getenv halves of the uri/username/password/database Overlays and os.Getenv(EnvDatabase) in applyDBOverride (CLI-212 path, REQ-F-013). Dotenv walk-up and explicit flags remain ungated; explicitCount switch unchanged. Covers query+admin+desktop via the single chokepoint.
 Files: ~6 mod (conn.go, conn_test.go, admin_conn_test.go, connect_test.go, desktop_test.go, run_test.go)
 Decisions: applyDBOverride gained a *clicfg.Config param (all 3 call sites updated). Existing env-dependent tests across query/admin opt into the gate with t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS","1"); cross-package test files use the raw literal since the dbconn-test const is unreachable from them.
+
+## TASK-004 — 2026-06-25T11:21:11Z
+Enforced DBMS env-set completeness in dbconn.ResolveConn when accept-env-vars is on: a partial DBMS set fails naming the missing NEO4J_* vars (REQ-F-010), covering query and admin via the shared resolution chokepoint.
+Files: ~3 mod (conn.go, conn_test.go, admin_conn_test.go)
+Decisions: Validate against resolved uri/username/password (post flag+dotenv overlay) rather than raw os.Getenv so a piece supplied by a flag/dotenv counts as present; updated the admin password-from-env test to supply a complete env set per the new contract.

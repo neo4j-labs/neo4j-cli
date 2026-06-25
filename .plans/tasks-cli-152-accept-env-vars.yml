@@ -80,7 +80,7 @@ tasks:
       partial-params error so env-mode failures name the NEO4J_* vars rather
       than the --flag/ENV dual form. The check is gated to AcceptEnvVars() and
       runs for both query and admin (skipDatabase respected: DATABASE optional).
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -89,7 +89,7 @@ tasks:
       - "Both query and admin surface the same missing-variable error for a partial DBMS env set"
       - "NEO4J_DATABASE remains optional and does not trigger a completeness error"
       - "With accept-env-vars false, no completeness error fires regardless of env vars"
-    completed_at: null
+    completed_at: 2026-06-25T11:21:11Z
 
   - id: task-005
     title: 'Verify admin command tree inherits the gated DBMS behaviour'

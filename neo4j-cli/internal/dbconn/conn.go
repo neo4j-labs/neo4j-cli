@@ -165,6 +165,23 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		}
 	}
 
+	// In env-var mode, reject a partial DBMS set naming the missing NEO4J_*
+	// vars (REQ-F-010). The check runs against the resolved values so a piece
+	// supplied by a flag or dotenv counts as present (e.g. env password with
+	// flag uri/username is complete).
+	if cfg.Global.AcceptEnvVars() {
+		resolved := map[string]string{
+			credentials.EnvURI:      uri,
+			credentials.EnvUsername: username,
+			credentials.EnvPassword: password,
+		}
+		if err := credentials.ValidateEnvCredentialSet(credentials.DBMSEnvSpec, func(name string) string {
+			return resolved[name]
+		}); err != nil {
+			return nil, err
+		}
+	}
+
 	explicitCount := 0
 	if uri != "" {
 		explicitCount++

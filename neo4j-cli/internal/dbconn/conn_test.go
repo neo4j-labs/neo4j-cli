@@ -593,6 +593,115 @@ func TestResolveConn_EnvGate_DotenvReadRegardlessOfGate(t *testing.T) {
 	assert.Equal(t, "dotenv-db", conn.Database)
 }
 
+// TestResolveConn_EnvGate_PartialDBMSSetErrorsNamingVars verifies that with
+// accept-env-vars on and only NEO4J_URI set (no USERNAME/PASSWORD), resolution
+// fails with an error naming the missing NEO4J_* variables (REQ-F-010).
+func TestResolveConn_EnvGate_PartialDBMSSetErrorsNamingVars(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "neo4j://env-host:7687")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	cfg, _ := newCfgWithCreds(t, "{}")
+	cmd := newQueryCmd(cfg)
+
+	_, err := ResolveConn(cmd, cfg, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), EnvURI)
+	assert.Contains(t, err.Error(), EnvUsername)
+	assert.Contains(t, err.Error(), EnvPassword)
+	// Env-mode message names the NEO4J_* vars, not the --flag/ENV dual form.
+	assert.NotContains(t, err.Error(), "--uri")
+}
+
+// TestResolveConn_EnvGate_PartialDBMSSetErrorsAdminAndQuery verifies that both
+// query (skipDatabase=false) and admin (skipDatabase=true) surface the same
+// missing-variable error for a partial DBMS env set.
+func TestResolveConn_EnvGate_PartialDBMSSetErrorsAdminAndQuery(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		skipDatabase bool
+		newCmd       func(*clicfg.Config) *cobra.Command
+	}{
+		{"query", false, newQueryCmd},
+		{"admin", true, newAdminCmd},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(envAcceptEnvVars, "1")
+			t.Setenv(EnvURI, "neo4j://env-host:7687")
+			t.Setenv(EnvUsername, "env-user")
+			t.Setenv(EnvPassword, "")
+			t.Setenv(EnvDatabase, "")
+			t.Chdir(t.TempDir())
+
+			cfg, _ := newCfgWithCreds(t, "{}")
+			cmd := tc.newCmd(cfg)
+
+			_, err := ResolveConn(cmd, cfg, tc.skipDatabase)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), EnvPassword)
+		})
+	}
+}
+
+// TestResolveConn_EnvGate_CompleteDBMSSetNoError verifies that a complete DBMS
+// env set passes the completeness check.
+func TestResolveConn_EnvGate_CompleteDBMSSetNoError(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "neo4j://env-host:7687")
+	t.Setenv(EnvUsername, "env-user")
+	t.Setenv(EnvPassword, "env-pass")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	cfg, _ := newCfgWithCreds(t, "{}")
+	cmd := newQueryCmd(cfg)
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://env-host:7687", conn.URI)
+}
+
+// TestResolveConn_EnvGate_NEO4J_DATABASEAloneNoError verifies that
+// NEO4J_DATABASE alone (no uri/user/pass) does not trigger a completeness
+// error: it is an OptionalVar, not part of the required group.
+func TestResolveConn_EnvGate_NEO4J_DATABASEAloneNoError(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "only-db")
+	t.Chdir(t.TempDir())
+
+	cfg, _ := newCfgWithCreds(t, "{}")
+	cmd := newQueryCmd(cfg)
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "only-db", conn.Database)
+}
+
+// TestResolveConn_EnvGate_OffNoCompletenessError verifies that with
+// accept-env-vars off a partial DBMS env set does not trigger a completeness
+// error (the gate is closed, so env vars are ignored entirely).
+func TestResolveConn_EnvGate_OffNoCompletenessError(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "")
+	t.Setenv(EnvURI, "neo4j://env-host:7687")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	cfg, _ := newCfgWithCreds(t, "{}")
+	cmd := newQueryCmd(cfg)
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultURI, conn.URI, "partial env set must be ignored when accept-env-vars is off")
+}
+
 // TestLoadEnvFile_NoEnvReturnsEmpty verifies that when no .env is present the
 // returned map is empty (not nil).
 func TestLoadEnvFile_NoEnvReturnsEmpty(t *testing.T) {
