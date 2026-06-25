@@ -2,3 +2,8 @@
 Added `accept-env-vars` global config key: ValidConfigKeys entry, Viper.BindEnv("NEO4J_CLI_ACCEPT_ENV_VARS"), AcceptEnvVars()/AcceptEnvVarsIsSet() accessors mirroring CredentialStorage, true/false validation in Set().
 Files: +1 new (accept_env_vars_test.go), ~3 mod (clicfg.go, config/list_test.go, aura standalone_config_test.go)
 Decisions: Updated two golden config-list tests (key sorts alphabetically first in JSON output); no skill-bundle drift (bundle doesn't enumerate config keys).
+
+## TASK-002 — 2026-06-25T11:06:39Z
+Added common/clicfg/credentials/env_spec.go: EnvCredentialSpec type, Aura/DBMS/Embed specs, HasAnyCredentialEnvVar, ValidateEnvCredentialSet (RequiredGroups completeness -> clierr usage error), ValidateEmbedEnvSet (provider-specific API-key check; ollama+vertex exempt). Env var name constants single-sourced here. getenv is a func param for testability. Helpers are unwired (consumed by tasks 003-009).
+Files: +2 new (env_spec.go, env_spec_test.go)
+Decisions: Vertex exempted from API-key check alongside Ollama (it authenticates via ADC, not the key vars); provider/env-var string constants intentionally duplicated from query/embed since common/ cannot import that package.

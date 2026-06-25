@@ -36,7 +36,7 @@ tasks:
       provider-specific API-key completeness check (Ollama needs no key). This
       is the single extensibility hook so a new credential type must declare a
       spec before its env vars are reachable.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -45,7 +45,7 @@ tasks:
       - "ValidateEnvCredentialSet returns a usage error naming missing members of a RequiredGroup when the group is partially set, nil when complete or empty"
       - "ValidateEmbedEnvSet errors when NEO4J_EMBED_PROVIDER requires a key and none of the key vars are set; passes for ollama"
       - "Unit tests in common/clicfg/credentials/env_spec_test.go cover complete/partial/empty cases for each spec"
-    completed_at: null
+    completed_at: 2026-06-25T11:06:39Z
 
   - id: task-003
     title: 'Gate DBMS connection env reads in dbconn.ResolveConn'
