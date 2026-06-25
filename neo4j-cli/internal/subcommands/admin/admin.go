@@ -2,7 +2,7 @@
 // Neo4j Sweden AB [http://neo4j.com]
 
 // Package admin implements the `neo4j-cli admin` subcommand tree for managing
-// Neo4j databases, users, and roles via the system database over Bolt.
+// Neo4j databases, users, roles, and privileges via the system database over Bolt.
 package admin
 
 import (
@@ -10,13 +10,14 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/database"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/privilege"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/role"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/user"
 	"github.com/spf13/cobra"
 )
 
 // NewCmd returns the `admin` parent cobra command. It registers persistent
-// connection flags and mounts the database, user, and role subcommand trees.
+// connection flags and mounts the database, user, role, and privilege subcommand trees.
 // The connection is resolved once in PersistentPreRunE and shared with all
 // leaf commands via the adminConn pointer.
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
@@ -24,7 +25,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "admin",
-		Short: "Manage Neo4j databases, users, and roles",
+		Short: "Manage Neo4j databases, users, roles, and privileges",
 		Long: "Manage Neo4j databases via the system database. " +
 			"Connects over Bolt using the supplied connection flags or a stored dbms credential " +
 			"(use '--credential <name>' for a named credential, " +
@@ -32,7 +33,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"or '--credential desktop-connection:<uuid>' for a saved Desktop connection). " +
 			"Subcommands: `database` (list, get, create, drop, start, stop), " +
 			"`user` (list, get, create, drop, rename, set-password, suspend, activate), " +
-			"`role` (list, get, create, drop, grant, revoke).",
+			"`role` (list, get, create, drop, grant, revoke), " +
+			"`privilege` (list, grant, deny, revoke).",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			conn, err := dbconn.ResolveConn(cmd, cfg, true)
 			if err != nil {
@@ -63,6 +65,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(database.NewCmd(cfg, &adminConn, RunAdminStatement))
 	cmd.AddCommand(user.NewCmd(cfg, &adminConn, RunAdminStatement))
 	cmd.AddCommand(role.NewCmd(cfg, &adminConn, RunAdminStatement))
+	cmd.AddCommand(privilege.NewCmd(cfg, &adminConn, RunAdminStatement))
 
 	return cmd
 }

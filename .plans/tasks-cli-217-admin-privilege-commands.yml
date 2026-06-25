@@ -1,0 +1,1022 @@
+feature: cli-217-admin-privilege-commands
+prd: ./prd-cli-217-admin-privilege-commands.md
+created_at: 2026-06-22T00:00:00Z
+updated_at: 2026-06-25T09:58:31Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold privilege package foundation (seam, helpers, test infrastructure)"
+    status: completed
+    description: |
+      Create the `neo4j-cli/internal/subcommands/admin/privilege/` package with the
+      shared infrastructure that all leaf commands depend on. This includes: `privilege.go`
+      with a skeleton `NewCmd(cfg, conn, execFn)` (no AddCommand calls yet — those are
+      added one per leaf task); `helpers.go` with `privilegeExecFn adminutil.ExecFn`,
+      `privilegeFields`, and `outputPrivileges`; and `privilege_helpers_test.go` with
+      `testConn()`, `withFakePrivilegeExecFn`, and `withSequencedPrivilegeExecFn` mirroring
+      `role/role_helpers_test.go` exactly.
+    dependencies: []
+    acceptance_criteria:
+      - "privilege.go compiles: NewCmd signature is `func NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command`, sets `privilegeExecFn = execFn`, registers no leaf commands yet"
+      - "helpers.go declares `var privilegeExecFn adminutil.ExecFn`, `var privilegeFields = []string{\"access\", \"action\", \"resource\", \"segment\", \"role\"}`, and `outputPrivileges(cmd, cfg, conn, roleName)` that calls SHOW ROLE $name PRIVILEGES via the seam and prints with adminutil.NewRows"
+      - "privilege_helpers_test.go provides testConn(), withFakePrivilegeExecFn(t, rows, err), and withSequencedPrivilegeExecFn(t, responses) — same shape as role/role_helpers_test.go"
+      - "All new .go files carry the Neo4j copyright header"
+      - "`make test` passes (package compiles and test helpers compile)"
+    completed_at: 2026-06-22T00:00:00Z
+
+  - id: task-002
+    title: "Implement buildPrivilegeCypher helper with all action categories and validation"
+    description: |
+      Add `buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[string]any, error)`
+      to `helpers.go` — the central Cypher construction function. Define `privilegeOpts` struct
+      capturing all flag values, `actionCategory` type with constants for all six categories
+      (propertyBearer, graphOnly, setLabel, removeLabel, database, dbms), and `validActions` map
+      classifying every supported action keyword. Implement `normalizeAction` for
+      case-insensitive, underscore-tolerant action input. `buildPrivilegeCypher` returns a
+      usage error for any invalid flag/category combination (all REQ-F-011 cases) before
+      producing Cypher. Write direct unit tests in `privilege_helpers_test.go` covering one
+      happy-path case per category and every error path.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`validActions` covers all categories from REQ-F-010; `FIND` is absent"
+      - "`normalizeAction` converts `\"all_graph_privileges\"` and `\"ALL GRAPH PRIVILEGES\"` both to `\"ALL GRAPH PRIVILEGES\"`; returns error for unrecognised actions"
+      - "propertyBearer category: `buildPrivilegeCypher(\"GRANT\", \"READ\", {onGraph:\"*\"})` → `GRANT READ {*} ON GRAPH * ELEMENTS *`; with --property name → `{name}`; with --node-label Person → `NODES Person`"
+      - "graphOnly category: `buildPrivilegeCypher(\"GRANT\", \"TRAVERSE\", {onGraph:\"*\"})` → `GRANT TRAVERSE ON GRAPH * ELEMENTS *` (no property clause)"
+      - "setLabel/removeLabel: requires --node-label; emits `SET LABEL <label> ON GRAPH <name>`"
+      - "database category: emits `ON DATABASE *` when no --on-database supplied; errors on --on-graph or --on-dbms"
+      - "dbms category: emits `ON DBMS`; returns usage error when --on-dbms is false/absent"
+      - "All REQ-F-011 flag conflict combinations return a usage error (not a DB call)"
+      - "`make test` passes for `privilege_helpers_test.go`"
+    completed_at: 2026-06-22T00:00:00Z
+
+  - id: task-003
+    title: "Implement privilege list command"
+    status: completed
+    description: |
+      Create `list.go` and `list_test.go`. The command executes `SHOW PRIVILEGES` by default;
+      `--role <name>` switches to `SHOW ROLE $name PRIVILEGES`; `--user <name>` switches to
+      `SHOW USER $name PRIVILEGES`. Specifying both `--role` and `--user` returns a usage error
+      before `cmd.SilenceUsage = true`. Output via `adminutil.NewRows(rows, privilegeFields)` +
+      `PrintBodyMap`. Wire `newListCmd` into `privilege.go`. Tests cover: no-filter happy path,
+      `--role` filter, `--user` filter, both-flags usage error, Enterprise-only error translation.
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`privilege list` with no flags sends `SHOW PRIVILEGES` to the seam and renders `access`, `action`, `resource`, `segment`, `role` columns"
+      - "`privilege list --role analyst` sends `SHOW ROLE $name PRIVILEGES` with `params[\"name\"] == \"analyst\"`"
+      - "`privilege list --user alice` sends `SHOW USER $name PRIVILEGES` with `params[\"name\"] == \"alice\"`"
+      - "`privilege list --role analyst --user alice` returns a usage error (exit 2) before any seam call"
+      - "Enterprise-only error (UnsupportedAdministrationCommand) surfaces as validation_error with `(requires Enterprise edition)` hint"
+      - "Flush-left `Example:` field with ≥ 2 invocations including one with `--format json`; `TestAllLeafCommands_HaveExamples` passes"
+    completed_at: 2026-06-22
+
+  - id: task-004
+    title: "Implement privilege grant command"
+    description: |
+      Create `grant.go` and `grant_test.go`. Required flags `--action` and `--role` use explicit
+      pre-validation in `RunE` (before `cmd.SilenceUsage = true`) returning `clierr.NewUsageError`
+      — do NOT use `cmd.MarkFlagRequired`. Resource scope flags: `--on-graph` (string, default
+      empty), `--on-database` (string, default empty), `--on-dbms` (bool). Graph qualifier flags:
+      `--node-label` (string array), `--relationship-type` (string array), `--property` (string
+      array). Delegates to `buildPrivilegeCypher("GRANT", ...)` for Cypher construction, calls the
+      seam with the result, then calls `outputPrivileges` on success. Wire `newGrantCmd` into
+      `privilege.go`. Tests cover at least one case per action category, all required-flag paths
+      (exit code 2), flag conflict errors, Enterprise-only error, and the two-call
+      mutation+follow-up sequence.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`privilege grant --role analyst --rw` (missing --action) returns exit code 2 with message `\"--action is required\"`"
+      - "`privilege grant --action read --rw` (missing --role) returns exit code 2 with message `\"--role is required\"`"
+      - "`privilege grant --action read --on-graph * --role analyst --rw` sends `GRANT READ {*} ON GRAPH * ELEMENTS * TO analyst` then `SHOW ROLE $name PRIVILEGES` and emits the privilege list"
+      - "`privilege grant --action traverse --property name --role analyst --rw` returns a flag-conflict usage error without calling the seam"
+      - "`privilege grant --action create_role --role analyst --rw` (missing --on-dbms) returns a usage error"
+      - "Tests use `withSequencedPrivilegeExecFn` for the two-call flow; mutation exec error propagates and skips follow-up"
+      - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
+    completed_at: 2026-06-22
+
+  - id: task-005
+    title: "Implement privilege deny command"
+    description: |
+      Create `deny.go` and `deny_test.go`. The deny command is a structural mirror of `grant.go`
+      with `DENY` as the verb instead of `GRANT`. Same flag surface, same `buildPrivilegeCypher`
+      delegation, same explicit required-flag pre-validation, same `outputPrivileges` follow-up.
+      Wire `newDenyCmd` into `privilege.go`. Tests mirror the grant test suite using `DENY` Cypher
+      assertions; no need to repeat every category — cover at least one propertyBearer case and one
+      dbms case plus the required-flag and flag-conflict error paths.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`privilege deny --action write --on-graph * --role readonly --rw` sends `DENY WRITE ON GRAPH * ELEMENTS * TO readonly` then `SHOW ROLE $name PRIVILEGES`"
+      - "`privilege deny --role analyst --rw` (missing --action) returns exit code 2"
+      - "`privilege deny --action read --rw` (missing --role) returns exit code 2"
+      - "Mutation exec error propagates and skips follow-up (tested via withSequencedPrivilegeExecFn)"
+      - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
+    completed_at: 2026-06-22
+
+  - id: task-006
+    title: "Implement privilege revoke command"
+    description: |
+      Create `revoke.go` and `revoke_test.go`. Same flag surface as grant/deny plus an optional
+      `--revoke-type` string flag accepting `"grant"` or `"deny"`. When `--revoke-type grant` is
+      set, the verb becomes `REVOKE GRANT`; when `--revoke-type deny`, it becomes `REVOKE DENY`;
+      when absent, plain `REVOKE`. Delegates to `buildPrivilegeCypher` with the resolved verb,
+      calls the seam, then calls `outputPrivileges` on success. Wire `newRevokeCmd` into
+      `privilege.go`. Tests cover plain REVOKE, REVOKE GRANT, REVOKE DENY, missing required flags
+      (exit 2), and the two-call sequence.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`privilege revoke --action read --on-graph * --role analyst --rw` (no --revoke-type) sends `REVOKE READ {*} ON GRAPH * ELEMENTS * FROM analyst`"
+      - "`privilege revoke --action read --on-graph * --role analyst --revoke-type grant --rw` sends `REVOKE GRANT READ {*} ON GRAPH * ELEMENTS * FROM analyst`"
+      - "`privilege revoke --action read --on-graph * --role analyst --revoke-type deny --rw` sends `REVOKE DENY READ {*} ON GRAPH * ELEMENTS * FROM analyst`"
+      - "`privilege revoke --role analyst --rw` (missing --action) returns exit code 2"
+      - "Mutation exec error propagates and skips follow-up"
+      - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
+    completed_at: 2026-06-22
+
+  - id: task-007
+    title: "Wire privilege into admin.go, regenerate skill bundle, add changelog entry"
+    description: |
+      Update `admin/admin.go`: add the `privilege` package import, add
+      `cmd.AddCommand(privilege.NewCmd(cfg, &adminConn, RunAdminStatement))` after the role
+      AddCommand, update `Short` from "Manage Neo4j databases, users, and roles" to "Manage Neo4j
+      databases, users, roles, and privileges", append `` , `privilege` (list, grant, deny,
+      revoke). `` to the `Long` string, and update the package comment. Run
+      `go generate ./neo4j-cli/internal/skill/...` to regenerate the final skill bundle (all four
+      admin subcommand groups). Add a Minor changelog entry via `changie new`. Verify all gates
+      pass: `make test`, `make fmt-check`, `make lint`, `TestGenerator_RoundTrip`.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "`admin.go` Short is `\"Manage Neo4j databases, users, roles, and privileges\"`"
+      - "`admin.go` Long ends with `` `privilege` (list, grant, deny, revoke). ``"
+      - "`neo4j-cli admin privilege --help` is reachable from the CLI binary"
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no diff — `TestGenerator_RoundTrip` passes"
+      - "`.changes/unreleased/` contains a new Minor entry mentioning admin privilege commands"
+      - "`make test`, `make fmt-check`, `make lint` all pass clean"
+    completed_at: 2026-06-22
+
+  - id: task-008
+    title: "Remove dead test helpers from privilege_helpers_test.go"
+    status: completed
+    description: |
+      The end-of-feature audit found that `withFakePrivilegeExecFn` (privilege_helpers_test.go:31)
+      and `withSequencedPrivilegeExecFn` (:46) are both unused. They survive only via
+      `//nolint:unused` with the comment "consumed by leaf command tests added in later tasks" —
+      but the later tasks landed and the leaf tests all use `withRecordingSequencedExecFn` (defined
+      in grant_test.go:27) instead. This is scaffolding from task-001/002 that the final task should
+      have swept: ~30 lines of dead code plus two stale lint suppressions and a now-false comment.
+      Delete both helpers and their `//nolint:unused` pragmas. If anything in them is still wanted,
+      fold it into the one recording helper that's actually used.
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`withFakePrivilegeExecFn` and `withSequencedPrivilegeExecFn` are removed from privilege_helpers_test.go along with their `//nolint:unused` pragmas and the now-false comment"
+      - "No remaining unused test helpers in the privilege package; `make lint` passes with 0 issues and no new `//nolint` directives"
+      - "`make test` passes — all leaf tests still compile and pass using the surviving recording helper"
+    completed_at: 2026-06-22
+
+  - id: task-009
+    title: "De-duplicate grant/deny/revoke write leaves behind shared helpers"
+    status: completed
+    description: |
+      The audit found grant.go and deny.go are byte-identical apart from the verb string, and
+      revoke.go duplicates the same body minus the extra `--revoke-type` flag: the `RunE` body, the
+      validation block, and all eight `cmd.Flags().*Var(&opts...)` lines are duplicated verbatim
+      across all three write leaves. The judo move that fits the existing seam: extract a single
+      private helper in `helpers.go` that registers the shared privilege flags onto a command and a
+      second that runs the build/exec/output sequence, e.g.
+      `addPrivilegeFlags(cmd, &action, &roleName, &opts, verbWord)` for the eight identical
+      `Flags()` calls (only per-command variation is the word "grant"/"deny"/"revoke" in usage
+      strings — make it a parameter), and `runPrivilegeMutation(cmd, cfg, conn, verb, action,
+      roleName, opts, "TO"|"FROM")` for the required-flag checks + `buildPrivilegeCypher` +
+      `SilenceUsage` + exec + `outputPrivileges`. Then grant.go/deny.go/revoke.go keep their own
+      `newXxxCmd` constructor and `Short`/`Long`/`Example` (preserving one-file-per-leaf and
+      per-command docs), but their bodies collapse to a few lines. `revoke` just additionally
+      resolves `revokeVerb(revokeType)` first. Given the strict one-leaf-per-file rule, do NOT merge
+      the files — share the body, keep the shells. Behavior must be unchanged.
+    source: review
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "Shared flag-registration and mutation-sequence helpers live in helpers.go; grant.go/deny.go/revoke.go retain their own constructors, Short/Long/Example, and one-file-per-leaf layout"
+      - "The duplicated RunE body and the eight flag-registration lines no longer appear copy-pasted across grant.go/deny.go/revoke.go"
+      - "revoke resolves its verb (REVOKE / REVOKE GRANT / REVOKE DENY) and uses the shared mutation helper with the FROM target; grant/deny use the TO target"
+      - "All existing grant/deny/revoke tests pass unchanged (behavior identical); `make test`, `make fmt-check`, `make lint`, `make license-check` pass clean"
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no bundle drift — `TestGenerator_RoundTrip` passes"
+    completed_at: 2026-06-22
+
+  - id: task-010
+    title: "Collapse setLabel/removeLabel into a single action category"
+    description: |
+      The audit flagged (non-blocking) that helpers.go:48-49 defines both `setLabel` and
+      `removeLabel` action-category constants, the `validActions` map routes `SET LABEL`/`REMOVE
+      LABEL` to each, and the switch handles them in a single `case setLabel, removeLabel:` arm with
+      identical clause construction. They are never distinguished — one category masquerading as two.
+      Collapse to a single `labelScoped` (or similarly named) category unless a future divergence is
+      concretely planned. The action keywords `SET LABEL` and `REMOVE LABEL` must still both be
+      accepted and produce the same Cypher as before; only the internal category enum collapses.
+    status: completed
+    source: review
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "The two identical category constants are replaced by one (e.g. `labelScoped`); `validActions` routes both `SET LABEL` and `REMOVE LABEL` to it"
+      - "`SET LABEL` and `REMOVE LABEL` still produce the same Cypher as before for grant/deny/revoke (no behavior change)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes"
+    completed_at: 2026-06-22
+
+  - id: task-011
+    title: "Escape user-supplied Cypher identifiers in buildPrivilegeCypher to prevent injection"
+    status: completed
+    description: |
+      The CI security-review check (golang-security skill, review mode) flagged a Medium-severity
+      Cypher injection in `buildPrivilegeCypher` (helpers.go). Five flag values that supply Cypher
+      identifiers — graph name (`--on-graph`), database name (`--on-database`), node labels
+      (`--node-label`), relationship types (`--relationship-type`), and property names
+      (`--property`) — are concatenated directly into the Cypher string without backtick-escaping
+      or format validation. Because the leaf commands append `TO $role` / `FROM $role` AFTER this
+      fragment, Cypher's `--` comment syntax inside a flag value can suppress the trailing `$role`
+      parameter and redirect the privilege to an attacker-controlled role: e.g.
+      `--on-database "neo4j TO adminRole-- "` produces
+      `GRANT ACCESS ON DATABASE neo4j TO adminRole` with the real `$role` commented out. This is
+      exploitable in any automation that passes external/user-supplied input to these flags.
+      Fix: backtick-escape every user-supplied identifier before inlining it (Neo4j Cypher treats
+      backtick-quoted names as opaque identifiers, blocking comment/keyword injection). Add a helper
+      like `cypherIdentifier(id string) string` that returns `*` unchanged (the wildcard is a
+      keyword, not an identifier) and otherwise wraps the value in backticks with internal backticks
+      doubled (`` ` `` → `` `` ``). Apply it to `onGraph`, `onDatabase`, and each element of
+      `nodeLabels`, `relTypes`, and `properties` at every inlining site in helpers.go (the finding
+      cited lines 248, 260, 269, 288, 297, 299 — verify against current code). Add unit tests proving
+      the comment-injection payload no longer escapes the intended scope and that ordinary
+      identifiers and the `*` wildcard render unchanged.
+    source: review
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "A `cypherIdentifier` (or similar) helper backtick-escapes user-supplied identifiers, doubling internal backticks, and returns `*` unchanged"
+      - "`onGraph`, `onDatabase`, every `nodeLabels`/`relTypes`/`properties` element are escaped via the helper at all inlining sites in buildPrivilegeCypher"
+      - "An injection payload like `--on-database \"neo4j TO adminRole-- \"` is rendered as a single backtick-quoted identifier and can no longer comment out the trailing `$role` target"
+      - "Ordinary identifiers and the `*` wildcard still produce the same Cypher as before for the existing happy-path cases (existing tests pass, possibly with backtick-quoted expectations where a non-wildcard identifier is used)"
+      - "New unit test(s) cover the injection payload and the backtick-doubling case"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+    completed_at: 2026-06-22
+
+  - id: task-012
+    title: "Move shared privilege test helpers into privilege_helpers_test.go"
+    status: completed
+    description: |
+      The CI conventions-review check (AGENTS.md gates) flagged a Medium violation: the shared test
+      helpers `sequencedCall`, `withRecordingSequencedExecFn`, and `twoOK` are defined in
+      `grant_test.go` but are used across `deny_test.go` and `revoke_test.go` too. The "Cobra Command
+      Layout" rule in AGENTS.md requires shared test helpers to live in the resource-level
+      `<resource>_helpers_test.go` — here `privilege_helpers_test.go` — not in a single leaf's test
+      file. Move those three shared symbols (and any other helper in grant_test.go that deny/revoke
+      tests depend on) from `grant_test.go` into `privilege_helpers_test.go`, leaving grant_test.go
+      with only its grant-specific test functions. No behavior or assertion changes — pure relocation.
+    source: review
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "`sequencedCall`, `withRecordingSequencedExecFn`, and `twoOK` (plus any other cross-leaf shared helper) are defined in `privilege_helpers_test.go`, not in `grant_test.go`"
+      - "`grant_test.go`, `deny_test.go`, `revoke_test.go` contain only their own per-command test functions and reference the shared helpers from the helpers file"
+      - "No duplicate symbol definitions; the privilege package test build is clean"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+    completed_at: 2026-06-22
+
+  - id: task-013
+    title: "Fix WRITE / ALL GRAPH PRIVILEGES: new graphWhole category with no entity clause (REQ-F-023/024)"
+    status: completed
+    completed_at: 2026-06-23T00:00:00Z
+    description: |
+      CLI-217 QA (live against Neo4j 2025.10 Enterprise + Aura Business Critical) found that
+      `WRITE` and `ALL GRAPH PRIVILEGES` can NEVER be granted: they are in the `graphOnly`
+      category, which unconditionally appends `entityClause(...)` (defaulting to `ELEMENTS *`),
+      and Neo4j rejects `GRANT WRITE ON GRAPH * ELEMENTS * TO role` with
+      `Neo.ClientError.Statement.SyntaxError (Invalid input 'ELEMENTS')`. The correct forms are
+      `GRANT WRITE ON GRAPH * TO role` and `GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j TO role`
+      (both verified live; no `ELEMENTS`/`NODES`/`RELATIONSHIPS` segment allowed).
+      Add a new `graphWhole` constant to the `actionCategory` enum in helpers.go and re-map
+      `WRITE` and `ALL GRAPH PRIVILEGES` in `validActions` from `graphOnly` to `graphWhole`.
+      `TRAVERSE`, `CREATE`, `DELETE` stay on `graphOnly` (they correctly accept the entity clause —
+      verified live). Add a `case graphWhole:` arm to `buildPrivilegeCypher` that: rejects
+      `--on-database`/`--on-dbms` (same as graphOnly); rejects `--node-label`,
+      `--relationship-type`, and `--property` with a usage error like
+      `"<ACTION> does not accept node-label, relationship-type, or property qualifiers"`; and emits
+      `normalized + " ON GRAPH " + cypherIdentifier(graph)` with NO property clause and NO entity
+      clause (default graph `*`). Order the new qualifier check so it fires before the generic
+      `--property` guard at the top of the function (or fold it in) to keep messages sensible.
+    source: review
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "`actionCategory` has a `graphWhole` constant; `WRITE` and `ALL GRAPH PRIVILEGES` map to it in `validActions`; `TRAVERSE`/`CREATE`/`DELETE` remain `graphOnly`"
+      - "`buildPrivilegeCypher` emits `GRANT WRITE ON GRAPH *` and ``GRANT ALL GRAPH PRIVILEGES ON GRAPH `neo4j` `` with no `ELEMENTS *`/entity/property clause (fragment before the leaf appends ` TO $role`)"
+      - "`graphWhole` action with `--node-label`, `--relationship-type`, or `--property` returns a usage error (exit code 2)"
+      - "`graphWhole` action with `--on-database` or `--on-dbms` returns a usage error (only `--on-graph` allowed)"
+      - "Unit cases for WRITE and ALL GRAPH PRIVILEGES assert the server-valid Cypher (no ELEMENTS); the previously bug-encoding assertion at privilege_helpers_test.go is replaced (REQ-F-028)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+
+  - id: task-014
+    title: "Re-categorise LOAD to its real ON ALL DATA / ON CIDR syntax with a --cidr flag (REQ-F-025)"
+    status: completed
+    completed_at: 2026-06-23T00:00:00Z
+    description: |
+      CLI-217 QA found `LOAD` is fundamentally miscategorised: it is NOT a graph privilege. Its
+      grammar is `GRANT LOAD ON ALL DATA TO role` or `GRANT LOAD ON CIDR "<cidr>" TO role` (both
+      verified live; `GRANT LOAD ON GRAPH * ... TO role` fails with a SyntaxError). As currently
+      classified (`graphOnly` → `ON GRAPH`), LOAD is unreachable.
+      Add a `load` constant to the `actionCategory` enum and re-map `LOAD` to it in `validActions`
+      (remove it from graphOnly). Add a `--cidr <value>` flag to the shared flag set
+      (`addPrivilegeFlags`) and a `cidr string` field to `privilegeOpts`. Add a `case load:` arm to
+      `buildPrivilegeCypher` that rejects every scope flag (`--on-graph`/`--on-database`/`--on-dbms`)
+      and every qualifier (`--node-label`/`--relationship-type`/`--property`) with a usage error, and
+      emits `LOAD ON ALL DATA` when `opts.cidr == ""` or `LOAD ON CIDR "<cidr>"` when set. The CIDR
+      value is rendered as a double-quoted Cypher string literal (NOT cypherIdentifier/backticks);
+      escape embedded `"` and backslash for safety, consistent with task-011 hardening. Add a guard
+      near the top of buildPrivilegeCypher: `opts.cidr != "" && category != load` → usage error
+      (`"--cidr is only valid for the LOAD action"`).
+    source: review
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "`actionCategory` has a `load` constant; `LOAD` maps to it; LOAD is removed from `graphOnly`"
+      - "A `--cidr` flag exists on grant/deny/revoke and `privilegeOpts` has a `cidr` field"
+      - "`buildPrivilegeCypher` emits `LOAD ON ALL DATA` by default and `LOAD ON CIDR \"127.0.0.1/32\"` when `--cidr 127.0.0.1/32` is supplied (CIDR is a double-quoted string literal, not backtick-quoted)"
+      - "A `load` action with any of `--on-graph`/`--on-database`/`--on-dbms`/`--node-label`/`--relationship-type`/`--property` returns a usage error (exit code 2)"
+      - "`--cidr` supplied with any non-LOAD action returns a usage error"
+      - "Embedded `\"`/backslash in a `--cidr` value is escaped (no string-literal breakout)"
+      - "Unit cases cover both LOAD forms and the new usage errors; expected Cypher matches the server-valid forms in REQ-NF-005"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+
+  - id: task-015
+    title: "Emit all --node-label values for SET LABEL / REMOVE LABEL (REQ-F-026)"
+    status: completed
+    completed_at: 2026-06-23T00:00:00Z
+    description: |
+      CLI-217 QA found `SET LABEL` / `REMOVE LABEL` silently drop every `--node-label` after the
+      first: the `labelScoped` arm inlines only `opts.nodeLabels[0]`. `--node-label` is a repeatable
+      (StringArray) flag and Neo4j accepts a comma list — `GRANT SET LABEL Person, Movie ON GRAPH
+      neo4j TO role` is valid (verified live) — so additional labels vanish with no error or warning.
+      Change the `labelScoped` arm in `buildPrivilegeCypher` to emit every label, comma-joined, each
+      backtick-escaped via the existing helper:
+      `normalized + " " + strings.Join(escapeIdentifiers(opts.nodeLabels), ", ") + " ON GRAPH " + cypherIdentifier(graph)`.
+      The existing `--node-label`/`--relationship-type` mutual-exclusion and the
+      "requires --node-label" guard are unchanged; `--relationship-type` and `--property` remain
+      invalid for label actions.
+    source: review
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "`labelScoped` emits all `--node-label` values comma-joined, each backtick-escaped (e.g. ``SET LABEL `Person`, `Movie` ``), not just the first"
+      - "A single `--node-label` still renders as before (one backtick-quoted label)"
+      - "Multi-label unit case asserts ``GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j` `` (fragment before ` TO $role`)"
+      - "Missing `--node-label` for SET/REMOVE LABEL still returns a usage error; `--relationship-type` with a label action still errors"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+
+  - id: task-016
+    title: "Add per-category server-validity regression guard and refresh docs/skill bundle (REQ-NF-005, REQ-F-027/028)"
+    status: completed
+    completed_at: 2026-06-23T00:00:00Z
+    description: |
+      Close out the QA fixes. (1) Ensure `buildPrivilegeCypher` unit tests in
+      `privilege_helpers_test.go` have at least one case per category — propertyBearer, graphOnly,
+      graphWhole, labelScoped, database, dbms, load — whose expected Cypher is a string a human has
+      confirmed valid on Neo4j 2025.x (the QA-confirmed fragments are listed in REQ-NF-005). Add a
+      short comment at the top of that test table noting the assertions are server-validated and must
+      not be changed to invalid Cypher to make a test pass. (2) Remove any remaining references to
+      WRITE/LOAD/ALL GRAPH PRIVILEGES under `graphOnly` in code comments and the validActions grouping
+      comments. (3) Re-run `go generate ./neo4j-cli/internal/skill/...` so the regenerated bundle
+      reflects the new `--cidr` flag and any updated `Long`/flag help, and commit it. Update the
+      grant/deny/revoke `Long` strings to mention `--cidr` (LOAD-only) and that WRITE / ALL GRAPH
+      PRIVILEGES accept no qualifiers.
+    source: review
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "Every action category has ≥1 buildPrivilegeCypher unit case with server-valid expected Cypher; a comment documents that these are server-validated"
+      - "No code comment or grouping still classifies WRITE/LOAD/ALL GRAPH PRIVILEGES as graphOnly"
+      - "grant/deny/revoke `Long` text mentions `--cidr` (LOAD-only) and the no-qualifier rule for WRITE / ALL GRAPH PRIVILEGES"
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no diff after commit (`TestGenerator_RoundTrip` passes); the bundle reflects `--cidr`"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean"
+
+  - id: task-017
+    title: "Add categoryMeta single-source table for the per-category flag/help/example surface (REQ-F-034)"
+    status: completed
+    completed_at: 2026-06-24T00:00:00Z
+    description: |
+      Discoverability redesign foundation. Add a `categoryMeta` table to helpers.go keyed by
+      `actionCategory` that, for each of the seven categories, declares: the user-facing command name
+      (property, entity, graph, label, load, database, dbms — final names per REQ-F-029 / Open
+      Question 3), the action keywords it contains (kebab + canonical, derivable from validActions by
+      filtering on the category), the set of flags to register (which of
+      `--on-graph`/`--on-database`/`--on-dbms`/`--node-label`/`--relationship-type`/`--property`/
+      `--cidr` per REQ-F-031's table), which flags are required, a Short/Long help fragment describing
+      the category and its rules, and an Example template (verb word + representative action + flag
+      values). Add a `categoryOrder` slice fixing help/registration order. This becomes the second
+      single-source table alongside `validActions`. Also extend `normalizeAction` to treat `-` as a
+      separator (so the kebab positional `set-property` resolves to `SET PROPERTY`). No command wiring
+      yet — pure additions plus small render helpers (kebab `Use` from a canonical keyword; render an
+      Example for a given verb+category). Existing grant/deny/revoke behaviour unchanged.
+    source: extend-prd
+    dependencies:
+      - task-016
+    acceptance_criteria:
+      - "`categoryMeta` exists in helpers.go keyed by actionCategory, one entry per category, declaring command name, contained actions (kebab+canonical), registered flags, required flags, help fragments, and an Example template matching REQ-F-031"
+      - "`categoryOrder` fixes the seven categories' order; the union of all categories' action lists equals validActions"
+      - "A helper derives the kebab name from a canonical keyword (e.g. \"SET LABEL\" -> \"set-label\", \"ALL GRAPH PRIVILEGES\" -> \"all-graph-privileges\")"
+      - "`normalizeAction` accepts `-` as a separator (e.g. `set-property` -> `SET PROPERTY`) in addition to `_`/whitespace"
+      - "A helper renders a flush-left Example (>= 2 invocations, `# comment`, `neo4j-cli` prefix, `--rw`) for a given verb word + category"
+      - "No behaviour change to existing commands; new symbols may carry a scoped //nolint:unused until task-018 consumes them"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; no bundle drift"
+
+  - id: task-018
+    title: "Add the per-category subcommand factory newCategoryCmd with positional action (REQ-F-029/030/031/032/035)"
+    status: completed
+    completed_at: 2026-06-24T13:30:00Z
+    description: |
+      Add `newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat actionCategory) *cobra.Command`
+      to helpers.go — the single factory that builds a category leaf for a given verb ("GRANT"/"DENY"/
+      a REVOKE verb base) and category. It looks up `categoryMeta[cat]`, sets `Use` to
+      "<name> <action>", sets `ValidArgs` to the category's kebab action keywords and `Args` to require
+      exactly one positional, builds Short/Long/Example from the metadata (REQ-F-032/033), registers
+      ONLY the permitted flags plus the always-required `--role` (REQ-F-031), sets
+      `Annotations{"write":"true"}` for write verbs, and wires `RunE` to: resolve the positional to its
+      canonical action via normalizeAction + validActions; if the action resolves to a DIFFERENT
+      category, return a usage error naming the correct command ("use 'admin privilege grant database
+      access'") (REQ-F-030); otherwise call `runPrivilegeMutation(cmd, cfg, *conn, verb, canonical,
+      roleName, opts, target)`. For REVOKE verbs it also registers `--revoke-type` and resolves the
+      verb via the existing revokeVerb within the RunE. Add a comment recording the documented
+      one-file-per-leaf exception (REQ-F-035). Refactor `addPrivilegeFlags` into per-flag registration
+      the factory composes from `categoryMeta.flags` (or retire it). buildPrivilegeCypher and
+      runPrivilegeMutation are reused unchanged.
+    source: extend-prd
+    dependencies:
+      - task-017
+    acceptance_criteria:
+      - "`newCategoryCmd` returns a cobra command whose Use is `<name> <action>`, with ValidArgs = the category's kebab actions, Args requiring exactly one positional, Short/Long/Example from categoryMeta, and only the category's permitted flags + `--role` registered"
+      - "REVOKE-verb commands additionally register `--revoke-type` and resolve REVOKE / REVOKE GRANT / REVOKE DENY"
+      - "RunE resolves the positional to the canonical action and delegates to runPrivilegeMutation with the correct TO/FROM target; emitted Cypher is identical to the former --action path for the same inputs"
+      - "A positional that belongs to a different category returns a usage error (exit 2) naming the correct category command; an unknown action returns the existing unknown-action error"
+      - "Write-verb commands carry `Annotations{\"write\":\"true\"}`; `--role` missing still returns exit code 2 (`\"--role is required\"`)"
+      - "A comment at the factory records the documented exception to the one-file-per-leaf rule"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; no bundle drift yet (factory not wired)"
+
+  - id: task-019
+    title: "Restructure grant/deny/revoke into category-subcommand parents; remove --action (REQ-F-029/035)"
+    status: completed
+    completed_at: 2026-06-24T14:30:00Z
+    description: |
+      Convert grant.go, deny.go, revoke.go so each constructor builds a parent command with no RunE
+      and loops over `categoryOrder` calling newCategoryCmd(cfg, conn, <verb>, cat) to register the
+      seven category subcommands (REQ-F-029). Remove the `--action` flag and the old single-command
+      RunE/flag registration from all three (REQ-F-035) — the action is now a positional on the
+      category command. The parent keeps its own Short and a Long that points at the per-category
+      `--help`. revoke passes its REVOKE verb base to the factory (the factory adds --revoke-type).
+      Update the grant/deny/revoke parent Long/Example to the `grant <category> <action> ...` form and
+      ensure the parent help lists the seven category subcommands. Wiring in privilege.go is unchanged
+      (it still AddCommands the three parents).
+    source: extend-prd
+    dependencies:
+      - task-018
+    acceptance_criteria:
+      - "`grant`/`deny`/`revoke` are parents with no RunE; each registers exactly the seven category subcommands via newCategoryCmd"
+      - "`--action` is removed from all three; `neo4j-cli admin privilege grant --action read` is now an unknown flag"
+      - "`neo4j-cli admin privilege grant` with no category prints help listing the seven categories; `grant property --help` shows only the property flags and lists `read match set-property merge`"
+      - "`grant graph --help` shows only `--on-graph`/`--role`; `grant load --help` only `--cidr`/`--role`; `grant dbms --help` only `--on-dbms`/`--role`; `grant database --help` only `--on-database`/`--role`"
+      - "Emitted Cypher for `grant property read --on-graph * --role analyst --rw` etc. is unchanged from the prior --action behaviour"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean (bundle regenerated in task-021)"
+
+  - id: task-020
+    title: "Migrate and expand privilege tests for the per-category subcommands (REQ-NF-006/007)"
+    status: completed
+    completed_at: 2026-06-24T15:30:00Z
+    description: |
+      Update the privilege package tests for the new surface. (1) Add a structure test (REQ-NF-006)
+      asserting each verb registers exactly the seven category subcommands; that each exposes exactly
+      its category's permitted flag set (and no others) per REQ-F-031; that each category's ValidArgs
+      equals its kebab action keywords and that the union across categories equals validActions; that
+      revoke's carry --revoke-type; and that every leaf has a non-empty flush-left Example. (2) Migrate
+      the existing grant_test.go/deny_test.go/revoke_test.go cases from the `--action`-flag invocation
+      to the `<category> <action>` form, preserving coverage of exit-code-2 required-flag paths,
+      Enterprise-only error translation, and the two-call mutation+follow-up sequence (REQ-NF-007).
+      (3) Add per-category Cypher-parity cases asserting the category subcommand emits the
+      server-validated fragments from REQ-NF-005, plus the cross-category positional error (REQ-F-030).
+      Use the shared helpers in privilege_helpers_test.go.
+    source: extend-prd
+    dependencies:
+      - task-019
+    acceptance_criteria:
+      - "A structure test asserts exactly seven category subcommands per verb, the exact per-category flag set, ValidArgs == category actions (union == validActions), --revoke-type on revoke categories, and a non-empty Example on every leaf"
+      - "Migrated grant/deny/revoke tests drive the `<category> <action>` form and keep exit-code-2, Enterprise-only, and two-call-sequence coverage"
+      - "Per-category Cypher-parity tests assert the REQ-NF-005 server-valid fragments via the category subcommands; a cross-category positional (e.g. `grant property access`) yields the naming usage error"
+      - "`TestAllLeafCommands_HaveExamples` passes for all 21 leaves"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean"
+
+  - id: task-021
+    title: "Regenerate bundle/agent-context, update README + changelog for the per-category interface (REQ-F-035, REQ-NF-008)"
+    status: completed
+    completed_at: 2026-06-24T16:30:00Z
+    description: |
+      Close out the discoverability redesign. Run `go generate ./neo4j-cli/internal/skill/...` so the
+      skill bundle reflects the 21 category subcommands and commit it (TestGenerator_RoundTrip). Verify
+      `neo4j-cli agent-context` builds correctly with the new tree. Update the README privilege section
+      and any other in-tree docs/examples to the `grant/deny/revoke <category> <action>` form, removing
+      all `--action` references (REQ-F-035). Update the existing unreleased changelog entry (or add a
+      new Minor entry) to describe the per-category subcommand interface. Verify tab-completion of the
+      category subcommands and their positional actions works (`__complete`). Also update the AGENTS.md
+      Cobra-layout note to record the privilege categories as the documented one-file-per-leaf
+      exception. Run all gates.
+    source: extend-prd
+    dependencies:
+      - task-020
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no diff after commit; `TestGenerator_RoundTrip` passes with the new tree"
+      - "`neo4j-cli agent-context` builds correctly and includes the category subcommands"
+      - "README and all in-tree examples use `grant/deny/revoke <category> <action>`; no `--action` references remain anywhere"
+      - "Changelog describes the per-category `grant/deny/revoke <category> <action>` interface"
+      - "`grant <TAB>` lists the seven categories and `grant property <TAB>` completes its actions (cobra `__complete`)"
+      - "AGENTS.md Cobra-layout note records the privilege categories as the documented one-file-per-leaf exception"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-022
+    title: "Surface each category's valid actions in the leaf Short (truncated for database/dbms) for parent-help discoverability (REQ-F-036/037, REQ-NF-009)"
+    status: completed
+    completed_at: 2026-06-24T18:00:00Z
+    description: |
+      CLI-217 dogfooding found a category's valid actions are only discoverable via ValidArgs
+      tab-completion or a `<category> --help` drill-down — running `neo4j-cli admin privilege grant
+      graph` or scanning `grant --help` does not reveal that `graph` accepts write/all-graph-privileges.
+      Put the action list in each category leaf's `Short`, which cobra renders both at the leaf and in
+      the parent verb's subcommand listing.
+
+      Add an `actionSummary(cat actionCategory) string` helper to helpers.go that reuses
+      `kebabActionsForCategory(cat)`: when `len(actions) <= 6` (every category except database/dbms),
+      join all kebab actions in parentheses, e.g. `"(read, match, set-property, merge)"`; otherwise
+      show the first three plus the total count, e.g.
+      `"(access, start, stop, … — 19 actions; see --help)"`. Define the threshold (≤ 6 → full) and the
+      preview count (first 3) only in this helper. Splice `actionSummary(cat)` into the `Short` built
+      by `newCategoryCmd` (currently
+      `verbTitle(word) + " a " + meta.shortNoun + " " + rolePreposition(word) + " a role"`), e.g.
+      `… + meta.shortNoun + " " + actionSummary(cat) + " " + rolePreposition(word) + " a role"`. Leave
+      `categoryLong` unchanged — the leaf `Long` already lists the full action set, so the complete
+      list stays one `--help` away even for the truncated categories.
+
+      Because `Short` text feeds `references/admin.md`, re-run
+      `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle. Add a unit test
+      (REQ-NF-009) asserting the per-category Short summaries: small categories list all their kebab
+      actions; database and dbms show the three-action preview plus the `19 actions` count.
+    source: extend-prd
+    dependencies:
+      - task-021
+    acceptance_criteria:
+      - "An `actionSummary(cat)` helper derives the Short action summary from kebabActionsForCategory; ≤6 actions → full list, otherwise first three + total count + `see --help`; threshold and preview count defined only there"
+      - "`newCategoryCmd` Short includes actionSummary(cat): `grant property` → `(read, match, set-property, merge)`, `grant graph` → `(write, all-graph-privileges)`, `grant entity` → `(traverse, create, delete)`"
+      - "`grant database`/`grant dbms` Short show the truncated preview with `19 actions` and `see --help`; their leaf `Long` still lists the full action set (categoryLong unchanged)"
+      - "Parent `grant`/`deny`/`revoke --help` subcommand listing shows each category's action summary via the child Short"
+      - "A unit test asserts the per-category Short action summaries (full for small categories, truncated+count for database/dbms)"
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no diff after commit; `TestGenerator_RoundTrip` passes with the updated bundle"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-023
+    title: "Drop the redundant --on-dbms flag; dbms category emits ON DBMS unconditionally (REQ-F-038, REQ-NF-010)"
+    status: completed
+    completed_at: 2026-06-24T12:55:31Z
+    description: |
+      CLI-217 dogfooding: with the per-category redesign the `dbms` subcommand already carries the
+      scope in its name, so `--on-dbms` is a boolean that must always be set to true and conveys
+      nothing — a usability wart. Remove it entirely.
+
+      In helpers.go: remove the `flagOnDbms` const, the `registerPrivilegeFlag` `case flagOnDbms`, and
+      the `onDbms` field from `privilegeOpts`. Set `categoryMeta[dbms].flags` to empty (only `--role`
+      is registered separately by the factory; revoke adds `--revoke-type`). Update
+      `categoryMeta[dbms].longRule` (it currently says "Requires --on-dbms.") to state the scope is
+      implied — e.g. "Applies to the whole DBMS; takes no scope flag." Set
+      `categoryMeta[dbms].exampleFlags` to empty so the rendered example is
+      `neo4j-cli admin privilege grant dbms create-role --role analyst --credential local --rw`.
+
+      In `buildPrivilegeCypher`: the `dbms` arm emits `normalized + " ON DBMS"` unconditionally —
+      remove the `if !opts.onDbms { ... requires --on-dbms }` check and the `if hasGraph || hasDatabase`
+      cross-scope guard (those flags are not registered on the dbms command). Remove `opts.onDbms` from
+      the scope-count and any other category's cross-scope guards (e.g. graphOnly/graphWhole/load/
+      database/labelScoped guards that reference `opts.onDbms`) since the field no longer exists; the
+      flags simply cannot coexist now. NOTE: this overlaps the pending end-of-feature audit finding
+      (two-layer validation / unreachable guards) — if both are done together, collapse the dbms
+      cross-scope guards as part of that simplification rather than twice.
+
+      Update tests: delete the "missing --on-dbms" usage-error case; assert
+      `grant dbms create-role --role analyst --rw` emits `GRANT CREATE ROLE ON DBMS TO analyst` with no
+      scope flag; update the REQ-NF-006 structure test so the dbms category's expected flag set is just
+      `--role` (+ `--revoke-type` on revoke). Re-run `go generate ./neo4j-cli/internal/skill/...` (the
+      dbms Long/flags/example change) and commit the regenerated bundle.
+    source: extend-prd
+    dependencies:
+      - task-022
+    acceptance_criteria:
+      - "`--on-dbms` is removed: no `flagOnDbms` const, no `registerPrivilegeFlag` case, no `privilegeOpts.onDbms` field; `categoryMeta[dbms].flags` is empty"
+      - "`grant dbms create-role --role analyst --rw` emits `GRANT CREATE ROLE ON DBMS TO analyst`; the dbms arm of buildPrivilegeCypher has no --on-dbms check"
+      - "The former 'missing --on-dbms' usage-error test is deleted; `grant dbms create-role --rw` (missing --role) still returns exit code 2 with `--role is required`"
+      - "REQ-NF-006 structure test updated: dbms category registers only `--role` (+ `--revoke-type` for revoke); `grant dbms --help` shows no `--on-dbms`"
+      - "categoryMeta[dbms] longRule/exampleFlags updated so the generated Long/Example no longer mention --on-dbms"
+      - "Skill bundle regenerated; `make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-024
+    title: "Make unknown/invalid-action privilege errors CLI-form (kebab) and category-scoped (REQ-F-039, REQ-NF-010)"
+    status: completed
+    completed_at: 2026-06-24T15:03:19Z
+    description: |
+      CLI-217 dogfooding: `grant dbms aleter-user` returns
+      `unknown action "aleter-user"; valid actions are: ACCESS, ALL DATABASE PRIVILEGES, …` — the list
+      is the canonical `validActions` keys (Cypher spelling, UPPER-CASE, space-separated) spanning all
+      seven categories, not the kebab forms the user types and not scoped to the chosen command. Fix
+      both axes, scoped to the privilege package only (other admin/CLI enum errors already use
+      CLI/config values).
+
+      The offending path is `newCategoryCmd.RunE` calling `normalizeAction(args[0])`, whose error uses
+      `sortedActions()` (Cypher form, global). Replace with category-aware resolution at the command
+      layer: when the positional does not resolve to an action in THIS command's category, return a
+      usage error that lists only the category's kebab actions, e.g.
+      `unknown dbms action "aleter-user"; valid actions are: all-dbms-privileges, alter-user,
+      assign-role, …` (reuse `kebabActionsForCategory(cat)`). Keep the existing cross-category hint
+      (REQ-F-030, already kebab) for an action that resolves to a different category. Remove the
+      global Cypher-form enumeration from user-facing paths — delete `sortedActions()` if it has no
+      remaining caller (and drop normalizeAction's global-list error if the category layer now owns
+      the user-facing message; normalizeAction may keep an internal/never-user-facing error or be
+      simplified per the audit's "resolve once" cleanup).
+
+      NOTE: this dovetails with the pending audit finding #2 (redundant normalizeAction / resolve the
+      positional once at the command layer). If done together, implement a single category-aware
+      resolver in the factory RunE and have buildPrivilegeCypher take the already-canonical action.
+
+      Tests: assert `grant dbms <unknown>` (and one other category) returns exit code 2 with a list
+      containing the category's kebab actions (e.g. `alter-user`) and NOT containing Cypher-form
+      (`ALTER USER`) or other categories' actions (`read`, `access`).
+    source: extend-prd
+    dependencies:
+      - task-023
+    acceptance_criteria:
+      - "Unknown-action error from a category subcommand lists only that category's actions in kebab/CLI form (e.g. `grant dbms aleter-user` → lists `alter-user`, `all-dbms-privileges`, …; never `ALTER USER`)"
+      - "The error does not list actions from other categories (no `read`/`access` in a dbms error)"
+      - "The cross-category hint (REQ-F-030) still fires for an action belonging to a different category and remains kebab"
+      - "No user-facing privilege usage error renders Cypher-form action keywords; `sortedActions()` Cypher-form enumeration is removed (deleted if unused)"
+      - "Tests cover the kebab + category-scoped unknown-action error for at least two categories"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-025
+    title: "Collapse buildPrivilegeCypher to single-layer validation; delete unreachable cross-scope guards and redundant normalizeAction"
+    status: completed
+    completed_at: 2026-06-24T20:15:00Z
+    source: review
+    description: |
+      End-of-feature audit (BLOCKING, two findings sharing one root). The per-category command tree
+      now makes cross-scope flag/action combinations structurally unrepresentable, yet
+      buildPrivilegeCypher still re-validates them — leaving a wall of dead guard branches plus a
+      redundant re-normalization. Two facts from the current code close the loop: (1)
+      resolveCategoryAction returns a canonical action ONLY when validActions[canonical] == cat, so the
+      action reaching buildPrivilegeCypher via runPrivilegeMutation is always a member of the invoked
+      command's category; (2) each category leaf registers ONLY categoryMeta[cat].flags (newCategoryCmd
+      loop → registerPrivilegeFlag, the sole flag-binding site), so no category registers a flag
+      outside its own scope.
+
+      Cross-referencing the registered-flag sets against the guards, these branches cannot be hit by
+      any real invocation and are dead defensive code: the `--cidr` non-load guard; the
+      `--on-graph`/`--on-database` mutual exclusion; graphWhole rejecting label/rel/property
+      qualifiers; `hasProperty && category != propertyBearer`; every `if hasDatabase` inside the graph
+      cases; `database` rejecting `--on-graph`; and `load` rejecting graph/database/label/rel. Only the
+      `--node-label`/`--relationship-type` mutual exclusion and labelScoped requiring `--node-label`
+      are genuinely reachable. These guards only LOOK tested because the error-path table in
+      privilege_helpers_test.go hand-builds illegal privilegeOpts (e.g. action "read" with cidr, "access"
+      with properties, "load" with onGraph) — combinations no user can produce; the tests pin behavior
+      of unreachable code and mask the dead-ness.
+
+      Second finding (same root): runPrivilegeMutation passes the already-canonical action from
+      resolveCategoryAction into buildPrivilegeCypher, which immediately calls normalizeAction →
+      canonicalAction AGAIN on an already-canonical string and re-looks-up validActions. The
+      re-normalization is a no-op and the `!ok` error branch is unreachable in production.
+
+      Code-judo move (one move, not two): make buildPrivilegeCypher's contract explicit — it receives a
+      canonical action already known to belong to a category (pass the resolved category and/or the
+      canonical keyword as a precondition from the caller). Then: delete the cross-scope guards and
+      their illegal-opts tests; keep only the two reachable in-category rules (label/rel exclusivity,
+      label requires `--node-label`); drop the redundant normalizeAction/canonicalAction re-resolution
+      (delete it or demote to a single internal assertion). The `switch category` then renders Cypher
+      directly. The re-validation, the re-normalization, and the ~9 dead branches all fall out
+      together, and the function shrinks substantially. If belt-and-suspenders defense against future
+      misuse of the helper is wanted, that is one assertion, not eleven bespoke user-facing usage
+      errors. Behavior for every real (command-tree-reachable) invocation must be byte-identical —
+      the emitted Cypher and the genuinely-reachable usage errors are unchanged.
+    dependencies:
+      - task-024
+    acceptance_criteria:
+      - "buildPrivilegeCypher no longer re-derives the category or re-normalizes the action: it takes the canonical action (and/or resolved category) as a precondition from the caller; no second normalizeAction/canonicalAction call on an already-canonical string"
+      - "The unreachable cross-scope guard branches are removed (`--cidr` non-load, on-graph/on-database mutual exclusion, graphWhole qualifier rejection, hasProperty non-propertyBearer, the `if hasDatabase` graph-case guards, database rejecting on-graph, load rejecting graph/database/label/rel) along with their hand-built illegal-opts unit tests"
+      - "The two genuinely-reachable in-category rules remain enforced with tests: `--node-label`/`--relationship-type` mutual exclusion, and labelScoped requiring `--node-label`"
+      - "Emitted Cypher and reachable usage errors are unchanged for every command-tree-reachable invocation (all migrated per-category behavioural/parity tests still pass)"
+      - "Any remaining defensive check against helper misuse is a single assertion, not multiple bespoke usage errors"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-026
+    title: "Split Cypher-rendering helpers out of helpers.go into their own file"
+    status: completed
+    completed_at: 2026-06-24T15:22:19Z
+    source: review
+    description: |
+      End-of-feature audit (non-blocking). helpers.go carries the entire privilege subsystem — the
+      category-subcommand factory, the categoryMeta/validActions metadata, the validation, AND the
+      Cypher rendering — in one file. It is under the size threshold and cohesive, so this is not a
+      blocker, but the natural split point is to move the Cypher-rendering functions
+      (buildPrivilegeCypher and its rendering helpers: propertyClause, entityClause, cypherIdentifier,
+      cypherStringLiteral, escapeIdentifiers, and any remaining clause-builders) into their own file
+      (e.g. cypher.go) in the same package, leaving helpers.go with the factory, metadata, resolution,
+      and output wiring. Do this AFTER task-025 so the split operates on the already-shrunk,
+      single-layer buildPrivilegeCypher. Pure relocation within the package — no behavior change, no
+      signature change, no exported-symbol change. Keep the Neo4j copyright header on the new file.
+      Mind that the one-file-per-leaf convention does not apply to these shared helpers; this is an
+      internal organisational split of the package's shared code, not a new leaf.
+    dependencies:
+      - task-025
+    acceptance_criteria:
+      - "The Cypher-rendering functions (buildPrivilegeCypher + propertyClause/entityClause/cypherIdentifier/cypherStringLiteral/escapeIdentifiers and related clause-builders) live in a new file in the privilege package; helpers.go retains the factory, metadata, resolution, and output wiring"
+      - "Pure relocation: no behavior, signature, or exported-symbol changes; all existing tests pass unchanged"
+      - "The new file carries the Neo4j copyright header"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-027
+    title: "Single-action categories take no positional; grant/deny/revoke load drops the redundant action token (REQ-F-040, REQ-NF-011)"
+    status: completed
+    completed_at: 2026-06-24T21:15:00Z
+    source: extend-prd
+    description: |
+      Dogfooding: `grant load load` repeats "load" for no information — the load category has exactly
+      one action (LOAD). Make a category whose action set has exactly one member take NO positional;
+      the sole action is implied. This is a general, data-driven rule keyed off the action count in
+      validActions/categoryMeta (today only `load` qualifies), mirroring how task-023 dropped the
+      redundant --on-dbms.
+
+      In `newCategoryCmd` (helpers.go), branch on `len(actionsForCategory(cat)) == 1`:
+      - single-action: `Use: meta.name` (no `<action>`), `Args: cobra.NoArgs`, no `ValidArgs`; RunE
+        resolves the sole action directly via `actionsForCategory(cat)[0]` instead of reading args[0].
+        `grant load --cidr ... --role ... --rw` is the only valid form; `grant load load` must be
+        rejected as an unexpected argument (NoArgs), NOT accepted.
+      - multi-action: unchanged (`Use: "<name> <action>"`, `cobra.ExactArgs(1)`, `ValidArgs`).
+
+      Knock-on changes (all keyed off the action count, so general):
+      - Cross-category hint (REQ-F-030): when the TARGET category is single-action, omit the action
+        token so `grant property load` → "load is a LOAD privilege; use 'admin privilege grant load'"
+        (not "... grant load load"). Cleanest: a small `categoryInvocation(cat[, action])` helper
+        returning `meta.name` for single-action categories and `meta.name + " " + kebabAction(action)`
+        otherwise, used by the hint.
+      - `actionSummary` (REQ-F-037): return empty for a single-action category so the Short carries no
+        redundant `(load)` suffix — `Short` reads "Grant a LOAD privilege to a role".
+      - Example renderer (REQ-F-033/renderCategoryExample): do not append the action token for a
+        single-action category — emit `grant load --cidr 127.0.0.1/32 --role analyst --credential local
+        --rw` (and the deny/revoke variants), not `grant load load ...`. Adjust categoryMeta[load]
+        exampleAction/exampleFlags handling accordingly.
+
+      Behavior for the LOAD privilege Cypher itself is unchanged (still `GRANT LOAD ON ALL DATA` /
+      `GRANT LOAD ON CIDR "<cidr>"`). Re-run `go generate ./neo4j-cli/internal/skill/...` (the load
+      Use/Short/Example change) and commit the regenerated bundle.
+
+      Tests: structure test asserts the single-action (`load`) command has `cobra.NoArgs` and nil
+      ValidArgs while multi-action categories keep one positional + ValidArgs (update the REQ-NF-006
+      union check so load contributes its action without a positional). Behavioural test asserts
+      `grant load --cidr 127.0.0.1/32 --role analyst --rw` and `grant load --role analyst --rw` emit
+      the right Cypher with no positional, and `grant load load` errors. Test the cross-category hint
+      to `load` omits the trailing action.
+    dependencies:
+      - task-026
+    acceptance_criteria:
+      - "A single-action category (load) command sets `Use: \"<name>\"` (no `<action>`), `Args: cobra.NoArgs`, and nil `ValidArgs`; RunE resolves the sole action directly"
+      - "`grant load --cidr 127.0.0.1/32 --role analyst --rw` emits `GRANT LOAD ON CIDR \"127.0.0.1/32\" TO analyst`; `grant load --role analyst --rw` emits `GRANT LOAD ON ALL DATA TO analyst`; `grant load load` returns a non-zero usage error"
+      - "Multi-action categories are unchanged (one positional + ValidArgs); the rule is data-driven from the action count, not hardcoded to load"
+      - "Cross-category hint pointing at load omits the action (`grant property load` → `... use 'admin privilege grant load'`, no trailing `load`)"
+      - "The load `Short` has no `(load)` action-summary suffix; the load `Example` (grant/deny/revoke) is `... grant load --cidr ...` with no action token"
+      - "Skill bundle regenerated; `make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-028
+    title: "Model the single-action-category property once instead of re-deriving len(actionsForCategory)==1 at five call sites"
+    status: completed
+    completed_at: 2026-06-24T22:15:00Z
+    source: review
+    description: |
+      End-of-feature audit (Priority 3, non-blocking — "missing model" smell). The concept "this
+      category's action is implied, not a positional" is a real property of a category, but it
+      currently lives as an ad-hoc `len(actionsForCategory(cat)) == 1` count check (and its
+      `actions[0]`/`!= 1` variants) re-derived as a special-case branch in five functions in
+      helpers.go: newCategoryCmd, categoryLong, categoryInvocation, actionSummary, and
+      renderCategoryExample. Each evaluation of actionsForCategory does a full validActions map scan +
+      sort, and every new surface that cares about single-action categories must remember to add the
+      same branch (task-027 had to touch all five) — debt likely to become permanent.
+
+      Code-judo move: compute the action set (and the single-action property) ONCE per category and
+      hang it off the model, so the help/exec paths read it rather than re-deriving it. Preferred shape
+      (per the auditor): give categoryInfo a derived field — a resolved `actions []string` (kebab
+      and/or canonical) and/or a `singleAction bool` — computed once at package init from validActions
+      (e.g. in an init() or a sync.Once-populated map, keeping validActions the single source of
+      truth). Then categoryLong / categoryInvocation / actionSummary / renderCategoryExample read
+      `meta.singleAction` (and the precomputed actions) instead of each calling
+      `len(actionsForCategory(cat))`. newCategoryCmd already resolves it once; have it use the model
+      field too. The goal: the "single-action" concept appears in the model exactly once and the other
+      sites read it; the four independent recomputations are deleted.
+
+      Constraints: validActions stays the single source of action→category (do not hand-duplicate the
+      action lists in categoryMeta); the derived data must be computed from validActions, not
+      independently maintained. No behavior change — emitted Cypher, help text, Short/Long/Example, and
+      cross-category hints stay byte-identical; existing tests pass unchanged. Pure refactor.
+    dependencies:
+      - task-027
+    acceptance_criteria:
+      - "The single-action property (and the resolved per-category action set) is computed once from validActions and stored on the category model (e.g. a derived categoryInfo field populated at init), not re-derived inline"
+      - "categoryLong, categoryInvocation, actionSummary, renderCategoryExample, and newCategoryCmd read the modelled property instead of each calling `len(actionsForCategory(cat))`; the redundant recomputations are removed"
+      - "validActions remains the single source of action→category; the derived data is computed from it, not hand-maintained"
+      - "No behavior change: emitted Cypher, Short/Long/Example, and cross-category hints are byte-identical; all existing privilege tests pass unchanged"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean (no bundle drift)"
+
+  - id: task-029
+    title: "Render the labelScoped 'requires --node-label' usage error in kebab CLI form (REQ-F-041)"
+    status: completed
+    completed_at: 2026-06-25T00:00:00Z
+    source: qa
+    description: |
+      Second-QA-pass finding 1. The `labelScoped` arm of `buildPrivilegeCypher` in `cypher.go` returns
+      `clierr.NewUsageError("action %s requires --node-label", action)` with `action` being the
+      canonical `validActions` key (`SET LABEL` / `REMOVE LABEL`). The user typed `set-label` /
+      `remove-label`, so the error echoes a Cypher keyword the user never used — the same
+      Cypher-vs-CLI mismatch REQ-F-039 fixed for enumerated action lists, here applied to a single
+      action reference.
+
+      Fix: render the action via `kebabAction(action)` in that message so it reads
+      `action set-label requires --node-label` (and `action remove-label requires --node-label`).
+      This is the only `requires`-style error that inlines an action keyword today; no other category
+      arm needs changing. The cross-category hint (REQ-F-030) and unknown-action enumeration
+      (REQ-F-039) already use kebab and stay as-is.
+
+      Tests: update/extend the `buildPrivilegeCypher` unit case for `labelScoped` with no `--node-label`
+      to assert the message contains `set-label` (and a `remove-label` case) and does NOT contain
+      `SET LABEL` / `REMOVE LABEL`.
+    dependencies:
+      - task-028
+    acceptance_criteria:
+      - "`grant label set-label --on-graph neo4j --role analyst --rw` (no --node-label) returns `action set-label requires --node-label`; the remove-label case returns `action remove-label requires --node-label`"
+      - "The error message never contains the Cypher form `SET LABEL` / `REMOVE LABEL`"
+      - "A buildPrivilegeCypher unit case asserts the kebab form for both set-label and remove-label"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-030
+    title: "Add per-category flag-help override; fix --node-label help on the label category (REQ-F-042)"
+    status: completed
+    completed_at: 2026-06-25T00:00:00Z
+    source: qa
+    description: |
+      Second-QA-pass finding 3. `registerPrivilegeFlag` registers one shared help string per flag, but
+      `--node-label` means different things per category: on `property`/`entity` it is an optional
+      entity restriction ("Restrict a graph privilege to node labels"); on `label` it is the REQUIRED
+      target of `SET LABEL` / `REMOVE LABEL` (the labels the privilege is granted on), not a
+      restriction. The shared string is misleading on `grant/deny/revoke label --help`.
+
+      Fix (data-driven, single source per REQ-F-034): add an optional `flagHelp map[string]string`
+      (flag long name → help text) to `categoryInfo`. `registerPrivilegeFlag` (or the factory loop in
+      `newCategoryCmd` that calls it) consults `categoryMeta[cat].flagHelp[flag]` and uses it when
+      present, otherwise the existing shared default. Set `labelScoped`'s `flagHelp[flagNodeLabel]` to,
+      e.g., "Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable)".
+      No other category/flag overrides are added. Keep the change confined to categoryMeta + the
+      registration primitive — no per-leaf hand-authoring.
+
+      Because the flag help feeds `grant label --help` and therefore the generated `references/admin.md`,
+      run `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle.
+
+      Tests: assert the `label` category's `--node-label` usage string differs from the shared default
+      (e.g. contains `SET LABEL` / `required`), while `--node-label` on `property`/`entity` keeps the
+      shared "Restrict ... to node labels" string.
+    dependencies:
+      - task-029
+    acceptance_criteria:
+      - "`categoryInfo` gains an optional `flagHelp` map; `registerPrivilegeFlag`/factory uses the per-category override when present, shared default otherwise"
+      - "`grant label --help` (and deny/revoke) describe --node-label as the required SET/REMOVE LABEL target; `grant property --help` / `grant entity --help` keep the 'Restrict ... to node labels' wording"
+      - "Override is data-driven from categoryMeta (no per-leaf hand-authoring); only label/--node-label is overridden"
+      - "Skill bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "A unit test asserts the label --node-label help differs from the property/entity default; `make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-031
+    title: "privilege list --role/--user returns a validation error when the target does not exist (REQ-F-043)"
+    status: completed
+    completed_at: 2026-06-25T00:00:00Z
+    source: qa
+    description: |
+      Second-QA-pass finding 5. `privilege list --role <name>` / `--user <name>` runs `SHOW ROLE $name
+      PRIVILEGES` / `SHOW USER $name PRIVILEGES`, which returns zero rows for a NON-EXISTENT target.
+      So a typo'd `--role analyst` is indistinguishable from a real role with no privileges — both
+      print `[]` and exit 0.
+
+      Fix (in `list.go`): when a `--role`/`--user` filter is set AND the privileges query returns zero
+      rows, perform a follow-up existence check via the existing `privilegeExecFn` seam and, if the
+      target is absent, return `clierr.NewValidationError("role %q does not exist", name)` /
+      `... user %q ...` (exit 6). Existence-check Cypher (no import of the role/user packages — avoids
+      coupling): `SHOW ROLES YIELD role WHERE role = $name RETURN role` for --role,
+      `SHOW USERS YIELD user WHERE user = $name RETURN user` for --user; zero rows ⇒ does-not-exist.
+      Run the extra query ONLY on the empty-result path so a role with privileges still costs exactly
+      one query. A real role/user with no privileges still exits 0 with an empty list (the check finds
+      it). The unfiltered `SHOW PRIVILEGES` path is unchanged. grant/deny/revoke already surface the
+      server's `Role does not exist` error, so no change there. If the existence-check query itself
+      errors, that error surfaces naturally.
+
+      Tests (privilegeExecFn seam, no live Bolt; use withSequencedPrivilegeExecFn): (a) `list --role
+      missing` — privileges query empty, existence check returns zero rows → validation_error exit 6
+      with `role "missing" does not exist`; (b) analogous `--user` case; (c) role exists but no
+      privileges — existence check returns one row → exit 0 empty list; (d) non-empty privileges result
+      issues exactly one query (no existence round-trip); (e) unfiltered SHOW PRIVILEGES unchanged.
+    dependencies:
+      - task-030
+    acceptance_criteria:
+      - "`list --role <nonexistent>` returns validation_error (exit 6) `role \"<nonexistent>\" does not exist`; `--user <nonexistent>` returns `user \"<nonexistent>\" does not exist`"
+      - "Existence check runs ONLY when a --role/--user filter is set and the privileges query returns zero rows; non-empty and unfiltered paths issue no extra query"
+      - "A real role/user with no privileges exits 0 with an empty list"
+      - "Existence check uses the privilegeExecFn seam with SHOW ROLES/SHOW USERS ... WHERE = $name (no import of the role/user packages)"
+      - "Unit tests cover the nonexistent role, nonexistent user, exists-but-empty, non-empty-no-extra-query, and unfiltered cases"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-032
+    title: "Simplify the per-category flag-help override: drop flagHelp map + orDefault for a single override (audit item 1)"
+    status: completed
+    completed_at: 2026-06-25T10:01:33Z
+    source: review
+    description: |
+      End-of-feature audit, the one item flagged as worth acting on before merge (thin-abstraction
+      smell). Task-030 added a general per-category flag-help override mechanism to serve EXACTLY ONE
+      override: `--node-label` help on the `label` (labelScoped) category. The machinery is:
+      a `flagHelp map[string]string` field on `categoryInfo`; an `orDefault` helper; six
+      `orDefault(help, "...")` call sites in `registerPrivilegeFlag`; and `meta.flagHelp[flag]`
+      threading in `newCategoryCmd`. So every `categoryInfo` carries a usually-nil map and all six
+      flag registrations carry an override-or-default branch, to serve a single data point. This is
+      generic "magic" hiding simple structure — the real fact is "the label category's --node-label is
+      required, not optional."
+
+      Code-judo move: delete the override map + orDefault + the six branches and special-case the one
+      place that varies. Preferred shape (auditor's first option): keep the per-flag default help inline
+      in `registerPrivilegeFlag` and give the label category's --node-label its required-target help via
+      a single special case (e.g. a one-line branch in registerPrivilegeFlag keyed on cat==labelScoped &&
+      flag==flagNodeLabel, or set it directly after the factory loop in newCategoryCmd). Whatever the
+      shape, the outcome is: no `flagHelp` field, no `orDefault`, no six-site override branch — the
+      label --node-label override appears in exactly one place. The user-visible help text must NOT
+      change: `grant/deny/revoke label --help` keeps the "required SET/REMOVE LABEL target" wording and
+      property/entity keep the shared "Restrict ... to node labels" default. Because help text feeds the
+      skill bundle, run `go generate ./neo4j-cli/internal/skill/...`; the regenerated bundle should be
+      byte-identical to the current one (no diff) since the rendered help is unchanged — confirm
+      TestGenerator_RoundTrip stays green. Update or simplify the task-030 structure test accordingly
+      (it should still assert label's --node-label help differs from the property/entity default).
+    dependencies:
+      - task-031
+    acceptance_criteria:
+      - "`flagHelp` field on categoryInfo, the `orDefault` helper, and the six override-or-default branches in registerPrivilegeFlag are removed; the label --node-label override lives in exactly one place"
+      - "User-visible help is unchanged: `grant label --help` still describes --node-label as the required SET/REMOVE LABEL target; property/entity keep the shared 'Restrict ... to node labels' wording"
+      - "Skill bundle regenerated with no diff (rendered help unchanged); TestGenerator_RoundTrip passes"
+      - "A unit test still asserts label's --node-label help differs from the property/entity default"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-033
+    title: "Verify the requireExists SHOW ROLES/SHOW USERS probe queries are valid on supported Neo4j versions (audit item 2)"
+    status: completed
+    completed_at: 2026-06-25T10:20:00Z
+    source: review
+    description: |
+      End-of-feature audit, non-blocking correctness note on task-031. The `requireExists` existence
+      check in list.go runs `SHOW ROLES YIELD role WHERE role = $name RETURN role` (and the
+      `SHOW USERS YIELD user WHERE user = $name RETURN user` variant) to disambiguate a typo'd target
+      from a real target with no privileges. The DESIGN is sound (auditor confirmed it does not duplicate
+      the ArgumentError-translation paths, and the empty-path-only guard keeps the happy path single-query
+      — no structural change needed). The open question is purely correctness: confirm these two probe
+      queries are actually valid Cypher on the supported Neo4j Enterprise server versions, since the
+      privilege unit tests use the privilegeExecFn seam and never execute the query against a server (the
+      same string-only blind spot that REQ-F-005's live-validation guard exists to cover).
+
+      Verify against a live server: spin up a Docker Neo4j Enterprise container (see AGENTS.md / the docker
+      subcommand: `neo4j-cli docker create --name <n> --edition enterprise --wait --rw`), create a role
+      and a user, and run `neo4j-cli admin privilege list --role <existing>`, `--role <missing>`,
+      `--user <existing>`, `--user <missing>` to confirm: (a) the SHOW ROLES/SHOW USERS YIELD ... WHERE
+      probe queries execute without a SyntaxError, (b) a missing target yields the exit-6
+      `role/user "<name>" does not exist` validation error, and (c) an existing target with no privileges
+      exits 0 with an empty list. If either probe query is rejected by the server, fix the query (e.g. the
+      correct YIELD/WHERE form) and adjust the unit-test expectations to match the server-valid form. Tear
+      down the container afterwards. If no live verification is possible, at minimum cross-check the
+      queries against the Neo4j Cypher manual for the supported versions and record the finding. No
+      structural refactor — this is a correctness confirmation that may or may not require a query fix.
+    dependencies:
+      - task-031
+    acceptance_criteria:
+      - "The SHOW ROLES YIELD role WHERE role = $name RETURN role and SHOW USERS YIELD user WHERE user = $name RETURN user probe queries are confirmed to execute without SyntaxError on a supported Neo4j Enterprise version (live-verified, or query corrected if not)"
+      - "Live check confirms: missing --role/--user yields exit-6 'does not exist'; existing target with no privileges exits 0 empty; existing target with privileges lists them"
+      - "If a probe query was invalid, it is corrected and the unit-test expectations updated to the server-valid form"
+      - "Any test container created for verification is torn down; `make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"

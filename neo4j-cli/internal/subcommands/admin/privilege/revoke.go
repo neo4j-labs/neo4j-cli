@@ -1,0 +1,53 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package privilege
+
+import (
+	"strings"
+
+	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
+	"github.com/spf13/cobra"
+)
+
+func newRevokeCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:         "revoke",
+		Short:       "Revoke a privilege from a role",
+		Annotations: map[string]string{"write": "true"},
+		Long: "Revoke a privilege from a role via REVOKE <privilege> FROM <role> against the system database. " +
+			"The action is a positional argument on a per-category subcommand (property, entity, graph, " +
+			"label, load, database, dbms); run `revoke <category> --help` to see its actions and flags. " +
+			"Use --revoke-type grant or --revoke-type deny to revoke only a previously granted or denied " +
+			"privilege; omit it to revoke both. " +
+			"After the revoke, the role's updated privileges are printed.",
+		Example: `# Revoke READ on all graphs from the analyst role
+neo4j-cli admin privilege revoke property read --on-graph * --role analyst --credential local --rw
+
+# Revoke only a previously granted READ privilege, output as JSON
+neo4j-cli admin privilege revoke property read --on-graph * --role analyst --revoke-type grant --credential local --rw --format json`,
+	}
+
+	for _, cat := range categoryOrder {
+		cmd.AddCommand(newCategoryCmd(cfg, conn, "REVOKE", cat))
+	}
+
+	return cmd
+}
+
+// revokeVerb resolves the --revoke-type flag to the REVOKE verb: empty → REVOKE,
+// grant → REVOKE GRANT, deny → REVOKE DENY. Any other value is a usage error.
+func revokeVerb(revokeType string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(revokeType)) {
+	case "":
+		return "REVOKE", nil
+	case "grant":
+		return "REVOKE GRANT", nil
+	case "deny":
+		return "REVOKE DENY", nil
+	default:
+		return "", clierr.NewUsageError("--revoke-type must be grant or deny")
+	}
+}

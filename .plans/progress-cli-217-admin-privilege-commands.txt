@@ -1,0 +1,168 @@
+## task-001 — 2026-06-22T00:00:00Z
+Scaffolded the privilege package mirroring role/: NewCmd seam (no leaves yet), privilegeExecFn/privilegeFields/outputPrivileges helpers (using adminutil.NewRows), and test helpers (testConn, withFakePrivilegeExecFn, withSequencedPrivilegeExecFn). All four gates pass.
+Files: +privilege/privilege.go, +privilege/helpers.go, +privilege/privilege_helpers_test.go
+Decisions: Foundation symbols are unused until leaf tasks land, so each carries a scoped //nolint:unused with a reason; these drop out as task-003+ consume them.
+
+## task-002 — 2026-06-22T00:00:00Z
+Added buildPrivilegeCypher + privilegeOpts, actionCategory constants, validActions map (FIND absent), normalizeAction, and propertyClause/entityClause helpers; full direct unit tests cover one happy path per category plus all REQ-F-011 error paths with pinned-message assertions. All four gates pass.
+Files: ~privilege/helpers.go, ~privilege/privilege_helpers_test.go
+Decisions: buildPrivilegeCypher returns the Cypher fragment WITHOUT the trailing TO/FROM $role target (leaf commands append it) and a non-nil empty params map — matches the task's acceptance-criteria examples (e.g. "GRANT READ {*} ON GRAPH * ELEMENTS *").
+
+## task-003 — 2026-06-22T00:00:00Z
+Implemented the `admin privilege list` leaf: SHOW PRIVILEGES by default, --role/--user switch to SHOW ROLE/USER $name PRIVILEGES, both-flags usage error before SilenceUsage and any seam call, output via adminutil.NewRows + PrintBodyMap. Wired newListCmd into privilege.go and dropped the now-consumed nolint:unused on privilegeExecFn/privilegeFields. All four gates pass.
+Files: +list.go, +list_test.go, ~privilege.go, ~helpers.go
+Decisions: list_test.go uses a local capturing exec fake (records cypher/params) rather than the shared withFakePrivilegeExecFn, since the acceptance criteria assert on the exact statement and params["name"].
+
+## task-004 — 2026-06-22T00:00:00Z
+Implemented the `admin privilege grant` leaf: required --action/--role pre-validated as clierr.NewUsageError before SilenceUsage, delegates to buildPrivilegeCypher("GRANT", ...), sends `<cypher> TO $role` then outputPrivileges (SHOW ROLE $name PRIVILEGES). Wired newGrantCmd into privilege.go and dropped now-consumed nolint:unused comments on buildPrivilegeCypher/validActions/privilegeOpts/normalizeAction/outputPrivileges/clause helpers and testConn. All four gates pass.
+Files: +grant.go, +grant_test.go, ~privilege.go, ~helpers.go, ~privilege_helpers_test.go
+Decisions: Role target is parameterised (`TO $role`) rather than inlined, mirroring role/grant.go; grant_test uses a local recording sequenced exec fake (captures cypher/params) since acceptance criteria assert exact statements/params.
+
+## task-005 — 2026-06-22T00:00:00Z
+Implemented the `admin privilege deny` leaf as a structural mirror of grant: required --action/--role pre-validated, delegates to buildPrivilegeCypher("DENY", ...), sends `<cypher> TO $role` then outputPrivileges. Wired newDenyCmd into privilege.go. Tests reuse the shared sequencedCall/withRecordingSequencedExecFn/twoOK helpers from grant_test.go (same package) and cover propertyBearer, dbms, required-flag/flag-conflict errors, and mutation-error-skips-follow-up. All four gates pass.
+Files: +deny.go, +deny_test.go, ~privilege.go
+
+## task-006 — 2026-06-22T00:00:00Z
+Implemented the `admin privilege revoke` leaf mirroring grant/deny: required --action/--role pre-validated, optional --revoke-type (grant|deny) resolves the verb via revokeVerb (plain REVOKE / REVOKE GRANT / REVOKE DENY), delegates to buildPrivilegeCypher, sends `<cypher> FROM $role` then outputPrivileges. Wired newRevokeCmd into privilege.go. All four gates pass.
+Files: +revoke.go, +revoke_test.go, ~privilege.go
+Decisions: --revoke-type normalises with ToLower+TrimSpace (consistent with --action leniency); invalid values are a usage error before any seam call.
+
+## task-007 — 2026-06-22T13:40:00Z
+Wired privilege.NewCmd into admin.go (import + AddCommand after role), updated Short to "Manage Neo4j databases, users, roles, and privileges", appended `privilege` (list, grant, deny, revoke) to Long, and refreshed the package/NewCmd doc comments. Regenerated the skill bundle and added a Minor changelog entry. All four gates plus build/--help check pass; reviewer LGTM.
+Files: ~admin.go, +.changes/unreleased/neo4j-cli-Minor-20260622-133720.yaml, ~skill/bundle/SKILL.md, ~skill/bundle/references/admin.md
+
+## REVIEW — 2026-06-22T00:00:00Z
+Added 3 review tasks (task-008..task-010).
+
+## task-008 — 2026-06-22T14:10:00Z
+Deleted the two unused test helpers (withFakePrivilegeExecFn, withSequencedPrivilegeExecFn) plus their //nolint:unused pragmas and stale comment from privilege_helpers_test.go, and trimmed the now-unused context/clicfg imports. Leaf tests already use withRecordingSequencedExecFn from grant_test.go. All four gates pass; reviewer LGTM.
+Files: ~privilege_helpers_test.go
+
+## task-009 — 2026-06-22T14:40:00Z
+Extracted addPrivilegeFlags + runPrivilegeMutation into helpers.go and collapsed the grant/deny/revoke RunE bodies and eight flag registrations to call them; each leaf keeps its own constructor and Short/Long/Example. Emitted Cypher, required-flag validation, and exec sequence unchanged; all existing tests pass. All four gates plus no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~grant.go, ~deny.go, ~revoke.go
+Decisions: verbWord parameterises the flag usage strings (rolePreposition yields to/from); revoke resolves revokeVerb before runPrivilegeMutation per the task spec (a benign reorder of two usage-error messages in an unreachable-in-practice edge).
+
+## task-010 — 2026-06-22T15:10:00Z
+Collapsed the identical setLabel/removeLabel action-category constants into a single labelScoped category; validActions routes both SET LABEL and REMOVE LABEL to it and the switch arm became `case labelScoped:`. Emitted Cypher unchanged (uses the normalized keyword), both keywords still accepted; all four gates pass and no bundle drift. Reviewer LGTM.
+Files: ~helpers.go
+
+## REVIEW — 2026-06-22T16:00:00Z
+Added 1 review task (task-011) from CI security-review (Cypher injection in buildPrivilegeCypher).
+
+## task-011 — 2026-06-22T16:40:00Z
+Added cypherIdentifier helper (returns `*` unchanged; otherwise backtick-wraps with internal backticks doubled) and applied it via escapeIdentifiers to onGraph, onDatabase, and every nodeLabels/relTypes/properties element at all buildPrivilegeCypher inlining sites, closing the `--`-comment injection that could redirect the trailing $role. Updated happy-path/leaf-test expectations to backtick-quoted output and added injection + backtick-doubling unit tests. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~privilege_helpers_test.go, ~grant_test.go
+
+## REVIEW — 2026-06-22T16:30:00Z
+Added 1 review task (task-012) from CI conventions-review (shared test helpers misplaced in grant_test.go).
+
+## task-012 — 2026-06-22T17:00:00Z
+Relocated the cross-leaf shared test helpers (sequencedCall, withRecordingSequencedExecFn, twoOK) verbatim from grant_test.go into privilege_helpers_test.go, satisfying AGENTS.md's resource-level shared-helper rule; grant_test.go keeps only its grant-specific runGrant helper and tests. Moved context/clicfg imports accordingly. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~grant_test.go, ~privilege_helpers_test.go
+
+## task-013 — 2026-06-23T00:00:00Z
+Added a graphWhole action category for WRITE / ALL GRAPH PRIVILEGES that emits `<ACTION> ON GRAPH <name>` with no entity/property clause (the prior graphOnly mapping produced server-invalid `ELEMENTS *`); TRAVERSE/CREATE/DELETE/LOAD stay graphOnly. graphWhole rejects --node-label/--relationship-type/--property and --on-database/--on-dbms; replaced the bug-encoding test assertions. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~privilege_helpers_test.go, ~deny_test.go
+Decisions: The combined-qualifier guard for graphWhole fires before the generic --property guard so the message lists all three rejected qualifiers; license-check run via the gate set.
+
+## task-014 — 2026-06-23T00:00:00Z
+Re-categorised LOAD into a new `load` actionCategory emitting `LOAD ON ALL DATA` (default) or `LOAD ON CIDR "<cidr>"` (via new --cidr flag); load rejects all scope flags and qualifiers, and --cidr on any non-LOAD action is a usage error. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~privilege_helpers_test.go, ~skill/bundle/references/admin.md
+Decisions: CIDR is rendered as a double-quoted Cypher string literal via new cypherStringLiteral (backslash escaped before quote) — NOT backtick-quoted, since ON CIDR takes a string literal not an identifier. The --property guard for load is caught by the pre-switch generic property guard (different message) before the load arm's node-label/rel-type guard.
+
+## task-015 — 2026-06-23T00:00:00Z
+Changed the labelScoped arm of buildPrivilegeCypher to emit all --node-label values comma-joined and backtick-escaped via escapeIdentifiers (was inlining only nodeLabels[0]); added a multi-label unit case. Single-label output unchanged; guards/mutual-exclusion untouched. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~privilege_helpers_test.go
+
+## task-016 — 2026-06-23T00:00:00Z
+Added a server-validated note atop the buildPrivilegeCypher happy-path test table (all 7 categories already had REQ-NF-005-confirmed cases), and extended grant/deny/revoke Long strings to mention --cidr (LOAD-only) and the no-qualifier rule for WRITE / ALL GRAPH PRIVILEGES; regenerated the skill bundle.
+Files: ~4 (privilege_helpers_test.go, grant.go, deny.go, revoke.go), ~1 generated (bundle/references/admin.md)
+Decisions: No code/grouping comments still mis-classified WRITE/LOAD/ALL GRAPH PRIVILEGES as graphOnly (tasks 13/14 already corrected those), so requirement 2 needed no edit.
+
+## TASK-017 — 2026-06-24T00:00:00Z
+Added the categoryMeta single-source table (name/flags/required/help/example per category) + categoryOrder slice, flag-name consts, actionsForCategory/kebabAction/kebabActionsForCategory/renderCategoryExample helpers, and extended normalizeAction to accept `-` as a separator (kebab positional support). Pure additions; existing grant/deny/revoke behaviour unchanged. New symbols kept live by unit tests (no //nolint). All four gates pass; no bundle drift. Reviewer LGTM.
+Files: ~privilege/helpers.go, ~privilege/privilege_helpers_test.go
+Decisions: category action lists are derived from validActions (not duplicated in categoryMeta); flag long names are shared consts so the per-category flag sets stay in sync with what buildPrivilegeCypher reads.
+
+## TASK-018 — 2026-06-24T13:30:00Z
+Added the newCategoryCmd factory (Use "<name> <action>", ValidArgs = kebab actions, ExactArgs(1), Short/Long/Example from categoryMeta, only the category's flags + --role, --revoke-type for REVOKE, write annotation); RunE resolves the positional via normalizeAction and either names the correct category command on a cross-category action or calls runPrivilegeMutation. Refactored addPrivilegeFlags to compose a new per-flag registerPrivilegeFlag; factory NOT wired into grant/deny/revoke yet (task-019). New category_test.go covers structure/flags/cypher-parity/kebab/revoke-verb/cross-category/unknown-action/missing-role. All four gates pass, no bundle drift.
+Files: ~privilege/helpers.go, +privilege/category_test.go
+Decisions: Args is ExactArgs(1) (not OnlyValidArgs) so a cross-category action reaches RunE for the "use 'admin privilege grant database access'" hint (REQ-F-030) instead of cobra's generic invalid-arg error. Short kept terse (full action list lives in ValidArgs/Long) to keep the parent help readable.
+
+## TASK-019 — 2026-06-24T14:30:00Z
+Converted grant/deny/revoke into RunE-less parents that loop categoryOrder registering the seven per-category subcommands via newCategoryCmd; removed --action and the orphaned addPrivilegeFlags helper; migrated the leaf tests to the `<category> <action>` form and regenerated the skill bundle. All four gates pass; reviewer LGTM after removing the now-unreachable `action == ""` check and stale addPrivilegeFlags comments.
+Files: ~grant.go, ~deny.go, ~revoke.go, ~helpers.go, ~grant_test.go, ~deny_test.go, ~revoke_test.go, ~bundle/references/admin.md
+Decisions: Dropped the three MissingAction leaf tests (action is now a positional, no longer a clierr usage error); re-pointed the FlagConflict tests to an in-surface conflict (--node-label + --relationship-type) since --action-on-graphOnly is no longer expressible. Deeper structure/parity tests deferred to task-020.
+
+## TASK-020 — 2026-06-24T15:30:00Z
+Added a per-verb structure test (7-category registration, exact per-category flag set, ValidArgs==kebab actions with union==validActions, --revoke-type only on revoke, flush-left Example per leaf) and a single-table per-category Cypher-parity test plus a per-category cross-category-positional error test; removed the dead categoryInfo.requiredFlags field (buildPrivilegeCypher already enforces those requirements). All gates pass; no bundle drift.
+Files: +privilege/structure_test.go, ~privilege/category_test.go, ~privilege/helpers.go
+Decisions: Removed requiredFlags rather than wiring it (would be a second unenforced source of truth); deleted the now-subsumed TestNewCategoryCmd_CrossCategoryPositional_NamesCorrectCommand per reviewer; kept the parity table (only single-table per-subcommand REQ-NF-005 check) despite partial overlap with grant_test.go.
+
+## TASK-021 — 2026-06-24T16:30:00Z
+Closeout for the per-category redesign: confirmed no bundle/agent-context drift (tasks 018-020 already migrated source+bundle), verified agent-context lists all 21 category subcommands and that `__complete` tab-completion lists the 7 categories and each category's positional actions; rewrote the existing unreleased changelog body to the per-category form and added the AGENTS.md one-file-per-leaf documented exception. README has no privilege content; only --action refs remaining are in .plans/ (historical) and a negative test assertion. All gates green.
+Files: ~AGENTS.md, ~.changes/unreleased/neo4j-cli-Minor-20260622-133720.yaml, ~.plans/tasks-cli-217-admin-privilege-commands.yml
+
+## TASK-022 — 2026-06-24T18:00:00Z
+Added actionSummary(cat) helper (reuses kebabActionsForCategory; <=6 -> full list, else first-three preview + count + "see --help" with U+2026 ellipsis and em dash) and spliced it into the Short built by newCategoryCmd; added unit tests for the helper and the wired Short; regenerated the skill bundle.
+Files: ~2 (privilege/helpers.go, privilege/structure_test.go), ~1 generated (bundle/references/admin.md)
+Decisions: kebabActionsForCategory returns SORTED order, so Short lists are sorted (e.g. "(match, merge, read, set-property)") not the PRD's illustrative reading order — chosen to honor REQ-F-037 (no second ordering source) over the PRD's illustrative examples; tests assert the actual sorted output.
+
+## TASK-023 — 2026-06-24T12:55:31Z
+Dropped the redundant --on-dbms flag: removed flagOnDbms const, the registerPrivilegeFlag case, privilegeOpts.onDbms, and emptied categoryMeta[dbms].flags/exampleFlags + reworded its longRule; the dbms arm of buildPrivilegeCypher now emits "<ACTION> ON DBMS" unconditionally. Deleted the now-impossible opts.onDbms cross-scope guards (scope mutual-exclusion collapsed to hasGraph && hasDatabase) and updated tests + skill bundle. All gates pass.
+Files: ~mod (privilege/helpers.go, grant.go, deny.go, grant_test.go, deny_test.go, category_test.go, privilege_helpers_test.go), ~gen (bundle/references/admin.md), -del (TestGrant_DbmsMissingOnDbms_ReturnsUsageError)
+Decisions: dbms.flags set to nil (not empty slice) — wantFlagSet/registration treat nil the same; the load/mutual-exclusion guard messages were reworded since --on-dbms no longer exists.
+
+## TASK-024 — 2026-06-24T15:03:19Z
+Replaced the global Cypher-form unknown-action enumeration with a category-aware resolver (resolveCategoryAction) in newCategoryCmd.RunE: in-category returns canonical, cross-category keeps the kebab hint, unknown yields a category-scoped kebab "unknown <category> action" list. Deleted sortedActions(); normalizeAction now reuses a new canonicalAction helper and carries no enumeration (internal-only).
+Files: ~privilege/helpers.go, ~privilege/category_test.go
+
+## REVIEW — 2026-06-24T19:30:00Z
+Added 2 review tasks (task-025..task-026).
+
+## TASK-025 — 2026-06-24T20:15:00Z
+Collapsed buildPrivilegeCypher to single-layer validation: it now takes the resolved (cat, canonical action) as a precondition from runPrivilegeMutation instead of re-normalizing/re-deriving; deleted normalizeAction and the ~9 unreachable cross-scope guard branches plus their hand-built illegal-opts unit tests, keeping only the two reachable in-category rules (label/rel mutual exclusion, labelScoped requires --node-label). A single internal fmt.Errorf assertion guards helper misuse. All gates green; reviewer LGTM.
+Files: ~mod (privilege/helpers.go, privilege/privilege_helpers_test.go)
+Decisions: runPrivilegeMutation now also threads actionCategory through; TestNormalizeAction* retargeted to TestCanonicalAction (the surviving primitive), unknown-action error ownership stays with resolveCategoryAction.
+
+## TASK-026 — 2026-06-24T15:22:19Z
+Relocated the Cypher-rendering functions (buildPrivilegeCypher, propertyClause, entityClause, cypherIdentifier, cypherStringLiteral, escapeIdentifiers) verbatim from helpers.go into a new cypher.go in the same package; helpers.go keeps the factory, metadata, resolution, and output wiring.
+Files: +neo4j-cli/internal/subcommands/admin/privilege/cypher.go, ~neo4j-cli/internal/subcommands/admin/privilege/helpers.go
+
+## TASK-027 — 2026-06-24T21:15:00Z
+Single-action categories (data-driven on len(actionsForCategory(cat))==1; today only load) now take no positional: newCategoryCmd sets Use=meta.name, Args=cobra.NoArgs, nil ValidArgs, and RunE resolves the sole action directly. Knock-ons: categoryInvocation helper drops the action token in the cross-category hint, actionSummary returns "" for single-action (no "(load)" suffix), renderCategoryExample and categoryLong omit the action token. LOAD Cypher unchanged; bundle regenerated; all gates green; reviewer LGTM.
+Files: ~mod (privilege/helpers.go, privilege/structure_test.go, privilege/category_test.go, privilege/privilege_helpers_test.go, skill bundle references/admin.md)
+
+## REVIEW — 2026-06-24T21:30:00Z
+Added 1 review task (task-028).
+
+## TASK-028 — 2026-06-24T22:15:00Z
+Modelled the single-action-category property once: a categoryActions struct (canonical/kebab/singleAction) is computed in init() from validActions into categoryActionsByCat, and the five sites that re-derived len(actionsForCategory(cat))==1 (newCategoryCmd, categoryLong, categoryInvocation, actionSummary, renderCategoryExample) now read meta.singleAction; actionsForCategory/kebabActionsForCategory became thin readers. Pure refactor, no behavior change; all gates green and no bundle drift.
+Files: ~mod (privilege/helpers.go)
+Decisions: validActions stays the single source — init() scans it once and preserves the prior sort order, so help/ValidArgs output is byte-identical.
+
+## TASK-029 — 2026-06-25T00:00:00Z
+The labelScoped "requires --node-label" usage error in cypher.go now renders the action via kebabAction(action), so it reads "action set-label requires --node-label" instead of the Cypher form; updated the error unit cases to assert kebab form and added a negative assertion that the message never contains the Cypher form. All four gates pass.
+Files: ~privilege/cypher.go, ~privilege/privilege_helpers_test.go
+
+## TASK-030 — 2026-06-25T00:00:00Z
+Added an optional flagHelp map to categoryInfo; registerPrivilegeFlag now takes a per-flag help override (falling back to the shared default via orDefault) and newCategoryCmd passes meta.flagHelp[flag]. labelScoped overrides --node-label to describe it as the required SET/REMOVE LABEL target; property/entity keep the shared "Restrict ... to node labels" default. Added a structure test and regenerated the skill bundle. All four gates pass; reviewer LGTM.
+Files: ~privilege/helpers.go, ~privilege/structure_test.go, ~bundle/references/admin.md
+
+## TASK-031 — 2026-06-25T00:00:00Z
+privilege list --role/--user now disambiguates a non-existent target from a real one with no privileges: on the empty-result path it runs a follow-up existence check (SHOW ROLES/USERS ... WHERE = $name) via the privilegeExecFn seam and returns clierr.NewValidationError ("role/user %q does not exist", exit 6) when absent. The check runs only when filtered AND empty, so non-empty and unfiltered paths still cost one query.
+Files: ~list.go, ~list_test.go
+Decisions: Added a shared requireExists helper in list.go (no role/user package import — existence Cypher inlined) to avoid duplicating the role/user check bodies.
+
+## REVIEW — 2026-06-25T09:58:31Z
+Added 2 review tasks (task-032..task-033).
+
+## TASK-032 — 2026-06-25T10:01:33Z
+Removed the general per-category flag-help override machinery (flagHelp map on categoryInfo, the orDefault helper, the six override-or-default branches, and the meta.flagHelp[flag] threading) that served a single override; registerPrivilegeFlag now takes the actionCategory and inlines defaults, with the label --node-label required-target help in one cat==labelScoped branch. Rendered help byte-identical (no bundle diff); all gates pass and the task-030 structure test still passes.
+Files: ~privilege/helpers.go
+
+## TASK-033 — 2026-06-25T10:20:00Z
+Verification only — no code change. The PRIMARY live path (CLI-created Docker Neo4j Enterprise container) was BLOCKED: Docker Desktop in this environment enforces an org sign-in ("Sign in to continue using Docker Desktop. Membership in the [neotechnology] organization is required"), so every daemon op and `neo4j-cli docker create/list` fails and I cannot sign in. Per the task's documented fallback, cross-checked both probe queries against the current Neo4j Operations Manual (Manage roles / Manage users): the authoritative grammar `SHOW [ALL|POPULATED] ROLE[S] [YIELD {*|field...} ...] [WHERE expression] [RETURN field...]` (and the SHOW USERS equivalent) with the rule "When using the RETURN clause, the YIELD clause is mandatory" confirms `SHOW ROLES YIELD role WHERE role = $name RETURN role` and `SHOW USERS YIELD user WHERE user = $name RETURN user` are valid Cypher (documented examples: `SHOW ROLES YIELD role ORDER BY role WHERE role ENDS WITH 'r'`, `SHOW USERS YIELD roles, user WHERE 'admin' IN roles RETURN user AS adminUser`). Conclusion: both probe queries valid, no query fix needed, list.go unchanged. CAVEAT (reviewer-flagged): only the query GRAMMAR was verified statically — the live exit-code/empty-list runtime paths (exit 6 "does not exist" for a missing target; exit 0 empty for an existing target with no privileges; non-empty for a target with privileges) were NOT executed end-to-end; that coverage gap remains open until Docker access is available. make test, fmt-check, lint, license-check all pass clean (no code change). No container was created (Docker blocked), so none needed teardown.
+Files: task/progress only
+Decisions: Used the task's sanctioned manual cross-check fallback rather than blocking on the Docker sign-in (access I cannot grant myself); recorded the env block and the grammar-only scope per reviewer guidance.

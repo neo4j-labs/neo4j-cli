@@ -9,6 +9,32 @@
 - [neo4j-cli admin database list](#neo4j-cli-admin-database-list)
 - [neo4j-cli admin database start](#neo4j-cli-admin-database-start)
 - [neo4j-cli admin database stop](#neo4j-cli-admin-database-stop)
+- [neo4j-cli admin privilege](#neo4j-cli-admin-privilege)
+- [neo4j-cli admin privilege deny](#neo4j-cli-admin-privilege-deny)
+- [neo4j-cli admin privilege deny database](#neo4j-cli-admin-privilege-deny-database)
+- [neo4j-cli admin privilege deny dbms](#neo4j-cli-admin-privilege-deny-dbms)
+- [neo4j-cli admin privilege deny entity](#neo4j-cli-admin-privilege-deny-entity)
+- [neo4j-cli admin privilege deny graph](#neo4j-cli-admin-privilege-deny-graph)
+- [neo4j-cli admin privilege deny label](#neo4j-cli-admin-privilege-deny-label)
+- [neo4j-cli admin privilege deny load](#neo4j-cli-admin-privilege-deny-load)
+- [neo4j-cli admin privilege deny property](#neo4j-cli-admin-privilege-deny-property)
+- [neo4j-cli admin privilege grant](#neo4j-cli-admin-privilege-grant)
+- [neo4j-cli admin privilege grant database](#neo4j-cli-admin-privilege-grant-database)
+- [neo4j-cli admin privilege grant dbms](#neo4j-cli-admin-privilege-grant-dbms)
+- [neo4j-cli admin privilege grant entity](#neo4j-cli-admin-privilege-grant-entity)
+- [neo4j-cli admin privilege grant graph](#neo4j-cli-admin-privilege-grant-graph)
+- [neo4j-cli admin privilege grant label](#neo4j-cli-admin-privilege-grant-label)
+- [neo4j-cli admin privilege grant load](#neo4j-cli-admin-privilege-grant-load)
+- [neo4j-cli admin privilege grant property](#neo4j-cli-admin-privilege-grant-property)
+- [neo4j-cli admin privilege list](#neo4j-cli-admin-privilege-list)
+- [neo4j-cli admin privilege revoke](#neo4j-cli-admin-privilege-revoke)
+- [neo4j-cli admin privilege revoke database](#neo4j-cli-admin-privilege-revoke-database)
+- [neo4j-cli admin privilege revoke dbms](#neo4j-cli-admin-privilege-revoke-dbms)
+- [neo4j-cli admin privilege revoke entity](#neo4j-cli-admin-privilege-revoke-entity)
+- [neo4j-cli admin privilege revoke graph](#neo4j-cli-admin-privilege-revoke-graph)
+- [neo4j-cli admin privilege revoke label](#neo4j-cli-admin-privilege-revoke-label)
+- [neo4j-cli admin privilege revoke load](#neo4j-cli-admin-privilege-revoke-load)
+- [neo4j-cli admin privilege revoke property](#neo4j-cli-admin-privilege-revoke-property)
 - [neo4j-cli admin role](#neo4j-cli-admin-role)
 - [neo4j-cli admin role create](#neo4j-cli-admin-role-create)
 - [neo4j-cli admin role drop](#neo4j-cli-admin-role-drop)
@@ -26,9 +52,9 @@
 - [neo4j-cli admin user set-password](#neo4j-cli-admin-user-set-password)
 - [neo4j-cli admin user suspend](#neo4j-cli-admin-user-suspend)
 
-Manage Neo4j databases, users, and roles
+Manage Neo4j databases, users, roles, and privileges
 
-Manage Neo4j databases via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke).
+Manage Neo4j databases via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke), `privilege` (list, grant, deny, revoke).
 
 Usage: `neo4j-cli admin`
 
@@ -192,6 +218,653 @@ neo4j-cli admin database stop mydb --credential local --rw
 
 # Stop a database and wait until it is offline before returning
 neo4j-cli admin database stop mydb --credential local --wait --rw
+```
+
+## neo4j-cli admin privilege
+
+Manage Neo4j privileges
+
+Manage Neo4j Enterprise privileges via the system database. Read commands (list) do not require --rw. Write commands (grant, deny, revoke) require --rw.
+
+Usage: `neo4j-cli admin privilege`
+
+Examples:
+
+```
+# Show help for the privilege subcommands
+neo4j-cli admin privilege --help
+
+# List all privileges (read-only)
+neo4j-cli admin privilege list --credential local --format json
+```
+
+### neo4j-cli admin privilege deny
+
+Deny a privilege to a role
+
+Deny a privilege to a role via DENY <privilege> TO <role> against the system database. The action is a positional argument on a per-category subcommand (property, entity, graph, label, load, database, dbms); run `deny <category> --help` to see its actions and flags. After the deny, the role's updated privileges are printed.
+
+Usage: `neo4j-cli admin privilege deny`
+
+Examples:
+
+```
+# Deny WRITE on all graphs to the readonly role
+neo4j-cli admin privilege deny graph write --on-graph * --role readonly --credential local --rw
+
+# Deny CREATE ROLE (a DBMS privilege) to the analyst role, output as JSON
+neo4j-cli admin privilege deny dbms create-role --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege deny database
+
+Deny a database privilege (access, all-database-privileges, constraint-management, … — 19 actions; see --help) to a role
+
+Deny a database privilege to a role. The action is the positional argument; valid actions are: access, all-database-privileges, constraint-management, create-constraint, create-index, create-new-node-label, create-new-property-name, create-new-relationship-type, drop-constraint, drop-index, index-management, name-management, show-constraint, show-index, show-transaction, start, stop, terminate-transaction, transaction-management. Scope with --on-database (default *). --role is required.
+
+Usage: `neo4j-cli admin privilege deny database <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--on-database` | string | - | Scope the privilege to a database (use * for all) |
+| `--role` | string | - | Name of the role to deny the privilege to |
+
+Examples:
+
+```
+# Deny a database privilege to the analyst role
+neo4j-cli admin privilege deny database access --on-database neo4j --role analyst --credential local --rw
+
+# Deny the same privilege, output as JSON
+neo4j-cli admin privilege deny database access --on-database neo4j --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege deny dbms
+
+Deny a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) to a role
+
+Deny a DBMS privilege to a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Applies to the whole DBMS; takes no scope flag. --role is required.
+
+Usage: `neo4j-cli admin privilege deny dbms <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--role` | string | - | Name of the role to deny the privilege to |
+
+Examples:
+
+```
+# Deny a DBMS privilege to the analyst role
+neo4j-cli admin privilege deny dbms create-role --role analyst --credential local --rw
+
+# Deny the same privilege, output as JSON
+neo4j-cli admin privilege deny dbms create-role --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege deny entity
+
+Deny a graph entity privilege (create, delete, traverse) to a role
+
+Deny a graph entity privilege to a role. The action is the positional argument; valid actions are: create, delete, traverse. Scope with --on-graph (default *); restrict to entities with --node-label or --relationship-type (mutually exclusive). No property qualifier. --role is required.
+
+Usage: `neo4j-cli admin privilege deny entity <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--relationship-type` | stringArray | [] | Restrict a graph privilege to relationship types |
+| `--role` | string | - | Name of the role to deny the privilege to |
+
+Examples:
+
+```
+# Deny a graph entity privilege to the analyst role
+neo4j-cli admin privilege deny entity traverse --on-graph * --node-label Person --role analyst --credential local --rw
+
+# Deny the same privilege, output as JSON
+neo4j-cli admin privilege deny entity traverse --on-graph * --node-label Person --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege deny graph
+
+Deny a whole-graph privilege (all-graph-privileges, write) to a role
+
+Deny a whole-graph privilege to a role. The action is the positional argument; valid actions are: all-graph-privileges, write. Scope with --on-graph (default *). WRITE and ALL GRAPH PRIVILEGES accept no node-label, relationship-type, or property qualifiers. --role is required.
+
+Usage: `neo4j-cli admin privilege deny graph <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--role` | string | - | Name of the role to deny the privilege to |
+
+Examples:
+
+```
+# Deny a whole-graph privilege to the analyst role
+neo4j-cli admin privilege deny graph write --on-graph * --role analyst --credential local --rw
+
+# Deny the same privilege, output as JSON
+neo4j-cli admin privilege deny graph write --on-graph * --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege deny label
+
+Deny a label privilege (remove-label, set-label) to a role
+
+Deny a label privilege to a role. The action is the positional argument; valid actions are: remove-label, set-label. Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels. --role is required.
+
+Usage: `neo4j-cli admin privilege deny label <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable) |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--role` | string | - | Name of the role to deny the privilege to |
+
+Examples:
+
+```
+# Deny a label privilege to the analyst role
+neo4j-cli admin privilege deny label set-label --node-label Person --on-graph neo4j --role analyst --credential local --rw
+
+# Deny the same privilege, output as JSON
+neo4j-cli admin privilege deny label set-label --node-label Person --on-graph neo4j --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege deny load
+
+Deny a LOAD privilege to a role
+
+Deny a LOAD privilege to a role. Takes no action argument. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
+
+Usage: `neo4j-cli admin privilege deny load [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--cidr` | string | - | Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data) |
+| `--role` | string | - | Name of the role to deny the privilege to |
+
+Examples:
+
+```
+# Deny a LOAD privilege to the analyst role
+neo4j-cli admin privilege deny load --cidr 127.0.0.1/32 --role analyst --credential local --rw
+
+# Deny the same privilege, output as JSON
+neo4j-cli admin privilege deny load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege deny property
+
+Deny a property privilege (match, merge, read, set-property) to a role
+
+Deny a property privilege to a role. The action is the positional argument; valid actions are: match, merge, read, set-property. Scope with --on-graph (default *); restrict to properties with --property and to entities with --node-label or --relationship-type (mutually exclusive). --role is required.
+
+Usage: `neo4j-cli admin privilege deny property <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--property` | stringArray | [] | Restrict a property privilege to properties |
+| `--relationship-type` | stringArray | [] | Restrict a graph privilege to relationship types |
+| `--role` | string | - | Name of the role to deny the privilege to |
+
+Examples:
+
+```
+# Deny a property privilege to the analyst role
+neo4j-cli admin privilege deny property read --on-graph * --property name --role analyst --credential local --rw
+
+# Deny the same privilege, output as JSON
+neo4j-cli admin privilege deny property read --on-graph * --property name --role analyst --credential local --rw --format json
+```
+
+### neo4j-cli admin privilege grant
+
+Grant a privilege to a role
+
+Grant a privilege to a role via GRANT <privilege> TO <role> against the system database. The action is a positional argument on a per-category subcommand (property, entity, graph, label, load, database, dbms); run `grant <category> --help` to see its actions and flags. After the grant, the role's updated privileges are printed.
+
+Usage: `neo4j-cli admin privilege grant`
+
+Examples:
+
+```
+# Grant READ on all graphs to the analyst role
+neo4j-cli admin privilege grant property read --on-graph * --role analyst --credential local --rw
+
+# Grant CREATE ROLE (a DBMS privilege) to the admin role, output as JSON
+neo4j-cli admin privilege grant dbms create-role --role admin --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege grant database
+
+Grant a database privilege (access, all-database-privileges, constraint-management, … — 19 actions; see --help) to a role
+
+Grant a database privilege to a role. The action is the positional argument; valid actions are: access, all-database-privileges, constraint-management, create-constraint, create-index, create-new-node-label, create-new-property-name, create-new-relationship-type, drop-constraint, drop-index, index-management, name-management, show-constraint, show-index, show-transaction, start, stop, terminate-transaction, transaction-management. Scope with --on-database (default *). --role is required.
+
+Usage: `neo4j-cli admin privilege grant database <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--on-database` | string | - | Scope the privilege to a database (use * for all) |
+| `--role` | string | - | Name of the role to grant the privilege to |
+
+Examples:
+
+```
+# Grant a database privilege to the analyst role
+neo4j-cli admin privilege grant database access --on-database neo4j --role analyst --credential local --rw
+
+# Grant the same privilege, output as JSON
+neo4j-cli admin privilege grant database access --on-database neo4j --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege grant dbms
+
+Grant a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) to a role
+
+Grant a DBMS privilege to a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Applies to the whole DBMS; takes no scope flag. --role is required.
+
+Usage: `neo4j-cli admin privilege grant dbms <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--role` | string | - | Name of the role to grant the privilege to |
+
+Examples:
+
+```
+# Grant a DBMS privilege to the analyst role
+neo4j-cli admin privilege grant dbms create-role --role analyst --credential local --rw
+
+# Grant the same privilege, output as JSON
+neo4j-cli admin privilege grant dbms create-role --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege grant entity
+
+Grant a graph entity privilege (create, delete, traverse) to a role
+
+Grant a graph entity privilege to a role. The action is the positional argument; valid actions are: create, delete, traverse. Scope with --on-graph (default *); restrict to entities with --node-label or --relationship-type (mutually exclusive). No property qualifier. --role is required.
+
+Usage: `neo4j-cli admin privilege grant entity <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--relationship-type` | stringArray | [] | Restrict a graph privilege to relationship types |
+| `--role` | string | - | Name of the role to grant the privilege to |
+
+Examples:
+
+```
+# Grant a graph entity privilege to the analyst role
+neo4j-cli admin privilege grant entity traverse --on-graph * --node-label Person --role analyst --credential local --rw
+
+# Grant the same privilege, output as JSON
+neo4j-cli admin privilege grant entity traverse --on-graph * --node-label Person --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege grant graph
+
+Grant a whole-graph privilege (all-graph-privileges, write) to a role
+
+Grant a whole-graph privilege to a role. The action is the positional argument; valid actions are: all-graph-privileges, write. Scope with --on-graph (default *). WRITE and ALL GRAPH PRIVILEGES accept no node-label, relationship-type, or property qualifiers. --role is required.
+
+Usage: `neo4j-cli admin privilege grant graph <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--role` | string | - | Name of the role to grant the privilege to |
+
+Examples:
+
+```
+# Grant a whole-graph privilege to the analyst role
+neo4j-cli admin privilege grant graph write --on-graph * --role analyst --credential local --rw
+
+# Grant the same privilege, output as JSON
+neo4j-cli admin privilege grant graph write --on-graph * --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege grant label
+
+Grant a label privilege (remove-label, set-label) to a role
+
+Grant a label privilege to a role. The action is the positional argument; valid actions are: remove-label, set-label. Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels. --role is required.
+
+Usage: `neo4j-cli admin privilege grant label <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable) |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--role` | string | - | Name of the role to grant the privilege to |
+
+Examples:
+
+```
+# Grant a label privilege to the analyst role
+neo4j-cli admin privilege grant label set-label --node-label Person --on-graph neo4j --role analyst --credential local --rw
+
+# Grant the same privilege, output as JSON
+neo4j-cli admin privilege grant label set-label --node-label Person --on-graph neo4j --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege grant load
+
+Grant a LOAD privilege to a role
+
+Grant a LOAD privilege to a role. Takes no action argument. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
+
+Usage: `neo4j-cli admin privilege grant load [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--cidr` | string | - | Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data) |
+| `--role` | string | - | Name of the role to grant the privilege to |
+
+Examples:
+
+```
+# Grant a LOAD privilege to the analyst role
+neo4j-cli admin privilege grant load --cidr 127.0.0.1/32 --role analyst --credential local --rw
+
+# Grant the same privilege, output as JSON
+neo4j-cli admin privilege grant load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege grant property
+
+Grant a property privilege (match, merge, read, set-property) to a role
+
+Grant a property privilege to a role. The action is the positional argument; valid actions are: match, merge, read, set-property. Scope with --on-graph (default *); restrict to properties with --property and to entities with --node-label or --relationship-type (mutually exclusive). --role is required.
+
+Usage: `neo4j-cli admin privilege grant property <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--property` | stringArray | [] | Restrict a property privilege to properties |
+| `--relationship-type` | stringArray | [] | Restrict a graph privilege to relationship types |
+| `--role` | string | - | Name of the role to grant the privilege to |
+
+Examples:
+
+```
+# Grant a property privilege to the analyst role
+neo4j-cli admin privilege grant property read --on-graph * --property name --role analyst --credential local --rw
+
+# Grant the same privilege, output as JSON
+neo4j-cli admin privilege grant property read --on-graph * --property name --role analyst --credential local --rw --format json
+```
+
+### neo4j-cli admin privilege list
+
+List privileges
+
+List privileges via SHOW PRIVILEGES. Use --role to scope to a single role's privileges (SHOW ROLE $name PRIVILEGES) or --user to scope to a single user's privileges (SHOW USER $name PRIVILEGES). --role and --user are mutually exclusive.
+
+Usage: `neo4j-cli admin privilege list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--role` | string | - | Scope output to a single role's privileges |
+| `--user` | string | - | Scope output to a single user's privileges |
+
+Examples:
+
+```
+# List all privileges (read-only)
+neo4j-cli admin privilege list --credential local
+
+# List the privileges of role analyst as JSON
+neo4j-cli admin privilege list --credential local --role analyst --format json
+
+# List the privileges of user alice
+neo4j-cli admin privilege list --credential local --user alice
+```
+
+### neo4j-cli admin privilege revoke
+
+Revoke a privilege from a role
+
+Revoke a privilege from a role via REVOKE <privilege> FROM <role> against the system database. The action is a positional argument on a per-category subcommand (property, entity, graph, label, load, database, dbms); run `revoke <category> --help` to see its actions and flags. Use --revoke-type grant or --revoke-type deny to revoke only a previously granted or denied privilege; omit it to revoke both. After the revoke, the role's updated privileges are printed.
+
+Usage: `neo4j-cli admin privilege revoke`
+
+Examples:
+
+```
+# Revoke READ on all graphs from the analyst role
+neo4j-cli admin privilege revoke property read --on-graph * --role analyst --credential local --rw
+
+# Revoke only a previously granted READ privilege, output as JSON
+neo4j-cli admin privilege revoke property read --on-graph * --role analyst --revoke-type grant --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege revoke database
+
+Revoke a database privilege (access, all-database-privileges, constraint-management, … — 19 actions; see --help) from a role
+
+Revoke a database privilege from a role. The action is the positional argument; valid actions are: access, all-database-privileges, constraint-management, create-constraint, create-index, create-new-node-label, create-new-property-name, create-new-relationship-type, drop-constraint, drop-index, index-management, name-management, show-constraint, show-index, show-transaction, start, stop, terminate-transaction, transaction-management. Scope with --on-database (default *). --role is required.
+
+Usage: `neo4j-cli admin privilege revoke database <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--on-database` | string | - | Scope the privilege to a database (use * for all) |
+| `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
+| `--role` | string | - | Name of the role to revoke the privilege from |
+
+Examples:
+
+```
+# Revoke a database privilege to the analyst role
+neo4j-cli admin privilege revoke database access --on-database neo4j --role analyst --credential local --rw
+
+# Revoke the same privilege, output as JSON
+neo4j-cli admin privilege revoke database access --on-database neo4j --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege revoke dbms
+
+Revoke a DBMS privilege (all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help) from a role
+
+Revoke a DBMS privilege from a role. The action is the positional argument; valid actions are: all-dbms-privileges, alter-user, assign-role, create-database, create-role, create-user, database-management, drop-database, drop-role, drop-user, privilege-management, remove-role, role-management, set-user-home-database, set-user-status, show-privilege, show-role, show-user, user-management. Applies to the whole DBMS; takes no scope flag. --role is required.
+
+Usage: `neo4j-cli admin privilege revoke dbms <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
+| `--role` | string | - | Name of the role to revoke the privilege from |
+
+Examples:
+
+```
+# Revoke a DBMS privilege to the analyst role
+neo4j-cli admin privilege revoke dbms create-role --role analyst --credential local --rw
+
+# Revoke the same privilege, output as JSON
+neo4j-cli admin privilege revoke dbms create-role --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege revoke entity
+
+Revoke a graph entity privilege (create, delete, traverse) from a role
+
+Revoke a graph entity privilege from a role. The action is the positional argument; valid actions are: create, delete, traverse. Scope with --on-graph (default *); restrict to entities with --node-label or --relationship-type (mutually exclusive). No property qualifier. --role is required.
+
+Usage: `neo4j-cli admin privilege revoke entity <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--relationship-type` | stringArray | [] | Restrict a graph privilege to relationship types |
+| `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
+| `--role` | string | - | Name of the role to revoke the privilege from |
+
+Examples:
+
+```
+# Revoke a graph entity privilege to the analyst role
+neo4j-cli admin privilege revoke entity traverse --on-graph * --node-label Person --role analyst --credential local --rw
+
+# Revoke the same privilege, output as JSON
+neo4j-cli admin privilege revoke entity traverse --on-graph * --node-label Person --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege revoke graph
+
+Revoke a whole-graph privilege (all-graph-privileges, write) from a role
+
+Revoke a whole-graph privilege from a role. The action is the positional argument; valid actions are: all-graph-privileges, write. Scope with --on-graph (default *). WRITE and ALL GRAPH PRIVILEGES accept no node-label, relationship-type, or property qualifiers. --role is required.
+
+Usage: `neo4j-cli admin privilege revoke graph <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
+| `--role` | string | - | Name of the role to revoke the privilege from |
+
+Examples:
+
+```
+# Revoke a whole-graph privilege to the analyst role
+neo4j-cli admin privilege revoke graph write --on-graph * --role analyst --credential local --rw
+
+# Revoke the same privilege, output as JSON
+neo4j-cli admin privilege revoke graph write --on-graph * --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege revoke label
+
+Revoke a label privilege (remove-label, set-label) from a role
+
+Revoke a label privilege from a role. The action is the positional argument; valid actions are: remove-label, set-label. Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels. --role is required.
+
+Usage: `neo4j-cli admin privilege revoke label <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable) |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
+| `--role` | string | - | Name of the role to revoke the privilege from |
+
+Examples:
+
+```
+# Revoke a label privilege to the analyst role
+neo4j-cli admin privilege revoke label set-label --node-label Person --on-graph neo4j --role analyst --credential local --rw
+
+# Revoke the same privilege, output as JSON
+neo4j-cli admin privilege revoke label set-label --node-label Person --on-graph neo4j --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege revoke load
+
+Revoke a LOAD privilege from a role
+
+Revoke a LOAD privilege from a role. Takes no action argument. Defaults to ON ALL DATA; restrict to a CIDR range with --cidr. Accepts no scope or entity flags. --role is required.
+
+Usage: `neo4j-cli admin privilege revoke load [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--cidr` | string | - | Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data) |
+| `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
+| `--role` | string | - | Name of the role to revoke the privilege from |
+
+Examples:
+
+```
+# Revoke a LOAD privilege to the analyst role
+neo4j-cli admin privilege revoke load --cidr 127.0.0.1/32 --role analyst --credential local --rw
+
+# Revoke the same privilege, output as JSON
+neo4j-cli admin privilege revoke load --cidr 127.0.0.1/32 --role analyst --credential local --rw --format json
+```
+
+#### neo4j-cli admin privilege revoke property
+
+Revoke a property privilege (match, merge, read, set-property) from a role
+
+Revoke a property privilege from a role. The action is the positional argument; valid actions are: match, merge, read, set-property. Scope with --on-graph (default *); restrict to properties with --property and to entities with --node-label or --relationship-type (mutually exclusive). --role is required.
+
+Usage: `neo4j-cli admin privilege revoke property <action> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
+| `--property` | stringArray | [] | Restrict a property privilege to properties |
+| `--relationship-type` | stringArray | [] | Restrict a graph privilege to relationship types |
+| `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
+| `--role` | string | - | Name of the role to revoke the privilege from |
+
+Examples:
+
+```
+# Revoke a property privilege to the analyst role
+neo4j-cli admin privilege revoke property read --on-graph * --property name --role analyst --credential local --rw
+
+# Revoke the same privilege, output as JSON
+neo4j-cli admin privilege revoke property read --on-graph * --property name --role analyst --credential local --rw --format json
 ```
 
 ## neo4j-cli admin role

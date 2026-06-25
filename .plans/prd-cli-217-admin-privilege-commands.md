@@ -1,0 +1,1112 @@
+# PRD: CLI-217 — Admin Privilege Commands (Enterprise)
+
+Linear: [CLI-217](https://linear.app/neo4j/issue/CLI-217/pr-4-admin-privilege-commands-enterprise)
+Parent: [CLI-128](https://linear.app/neo4j/issue/CLI-128/add-admin-commands-for-userdatabase-management)
+Depends on: CLI-214 ✅ (merged PR #222), CLI-215 ✅ (merged PR #225), CLI-216 ✅ (merged PR #226)
+
+---
+
+## Overview
+
+Fourth and final staged PR completing the `neo4j-cli admin` command tree (CLI-128). Implements
+`neo4j-cli admin privilege list/grant/deny/revoke` for fine-grained RBAC privilege management
+targeting Neo4j Enterprise. All commands execute Cypher against the `system` database via the
+shared `adminutil.ExecFn` seam introduced in CLI-214.
+
+The principal technical challenge is **action-category-aware Cypher construction**: each privilege
+action belongs to one category (propertyBearer, graphOnly, graphWhole, load, labelScoped, database,
+dbms) and each category has different valid resource scopes, qualifier flags, and Cypher templates.
+A `buildPrivilegeCypher` helper in `privilege/helpers.go` centralises this logic and is directly
+unit-tested. **The unit tests assert the generated string only — they do not execute it — so they
+cannot catch a category that emits Cypher a real server rejects; CLI-217 QA found three such defects
+(see "Bug fixes from QA").**
+
+PR #226 (CLI-216, role commands) introduced two infrastructure changes that directly affect
+privilege implementation: (1) `run.go`'s `translateAdminError` now takes a `uri string` parameter
+and handles `Neo.ClientError.Security.Forbidden` with an Aura tier hint — privilege commands
+inherit this automatically via `RunAdminStatement`; (2) the `NewCmd` convention now takes
+`execFn adminutil.ExecFn` as a third parameter injected from `admin.go`, instead of resolving it
+internally. Both patterns must be followed.
+
+**Discoverability redesign (added after CLI-217 dogfooding — see "Discoverability redesign"
+below).** The original `--action <keyword>` interface is hard to discover: the action→category→
+valid-flags matrix lives only in `validActions` + `buildPrivilegeCypher`'s switch, and a user only
+learns a combination is invalid by guessing, submitting, and reading the rejection. That offers
+little over raw Cypher. This redesign replaces the `--action` flag on `grant`/`deny`/`revoke` with
+**one subcommand per action *category*** — the seven groups that each share a single valid-flag
+signature (`property`, `entity`, `graph`, `label`, `load`, `database`, `dbms`). Each category
+subcommand exposes **only the flags valid for every action in that category**, and the action itself
+is a **positional argument** with `ValidArgs` completion (`grant property <TAB>` →
+`read match set-property merge`). So `grant property --help` documents exactly what the property
+privileges accept, invalid flags are unrepresentable, and the tree stays at **7 categories × 3 verbs
+= 21 leaves** (not one-per-action). CLI-217 is **unreleased** (its changelog entry is still in
+`.changes/unreleased/`), so the write interface may change without a deprecation cycle. The emitted
+Cypher and every server-validity guarantee (REQ-F-009..028, REQ-NF-005) are unchanged — only the
+command surface changes.
+
+---
+
+## Goals
+
+1. Complete the admin command surface with Enterprise privilege management (`list`, `grant`, `deny`, `revoke`).
+2. Implement correct per-action-category Cypher construction: the right ON clause, property clause, and entity clause per action type.
+3. Emit the role's updated privilege list after every mutation (same output path as `privilege list --role <name>`).
+4. Provide clear usage errors for incompatible flag combinations before ever hitting the database.
+5. Pass all final gates: `make test`, `make fmt-check`, `make lint`, `TestGenerator_RoundTrip` (skill bundle regenerated with all admin commands).
+6. Emit Cypher that a live Neo4j 2025.x server actually accepts for **every** advertised action — no action category may produce a guaranteed `SyntaxError`, and no qualifier flag may be silently dropped (added after CLI-217 QA found three such defects; see "Bug fixes from QA" below).
+7. Make valid privilege combinations discoverable from the CLI itself: one subcommand per action *category* under `grant`/`deny`/`revoke` (the 7 groups sharing a flag signature), each exposing only the flags valid for that category plus a positional, tab-completable action — so a user learns the valid shape from `--help` and completion rather than by trial-and-error, while the tree stays at 21 leaves (added after CLI-217 dogfooding; see "Discoverability redesign" below).
+8. Preserve all server-validity and validation guarantees from REQ-F-009..028 / REQ-NF-005 through the redesign: the command surface changes, the emitted Cypher does not.
+9. Make a category's valid actions visible without tab-completion or drilling into each `<category> --help`: surface the action list in every category leaf's `Short`, so it appears in the parent `grant`/`deny`/`revoke --help` subcommand listing and at the leaf itself (added after CLI-217 dogfooding found `grant graph`-style categories don't advertise their actions outside completion; see "Action discoverability in help" below).
+
+---
+
+## Non-Goals
+
+- Role CRUD (`admin role list/get/create/drop/grant/revoke`) — that is CLI-216, worked on in parallel.
+- Aura-specific privilege guard: commands execute against Aura connections and surface natural errors (Forbidden, UnsupportedAdministrationCommand) without a pre-execution check.
+- Privilege inheritance / effective-privilege resolution.
+- Wildcard role targeting (granting to multiple roles at once).
+- neo4j-admin binary integration.
+
+---
+
+## Requirements
+
+### Functional Requirements
+
+**`privilege list`**
+
+- REQ-F-001: `neo4j-cli admin privilege list` — executes `CYPHER 25 SHOW PRIVILEGES`. Optional
+  mutually exclusive filters: `--role <name>` executes `CYPHER 25 SHOW ROLE $name PRIVILEGES`;
+  `--user <name>` executes `CYPHER 25 SHOW USER $name PRIVILEGES`. Specifying both is a usage
+  error. Supports `--format json|table|toon`. No `--rw` required.
+
+- REQ-F-002: Output fields for all `privilege list` variants: `access`, `action`, `resource`,
+  `segment`, `role`. Field names are the post-`camelToSnake` form of the Bolt column names
+  returned by `SHOW PRIVILEGES` (these are already snake_case from Neo4j so no transform needed).
+
+**`privilege grant`**
+
+- REQ-F-003: `neo4j-cli admin privilege grant` — executes
+  `CYPHER 25 GRANT <ACTION> [<propClause>] ON <resourceClause> [<entityClause>] TO <role>`.
+  Required flags: `--action <action>`, `--role <name>`. Resource scope flags (mutually exclusive,
+  at most one): `--on-graph <name>`, `--on-database <name>`, `--on-dbms` (boolean). Requires
+  `--rw`. Enterprise-only.
+
+- REQ-F-004: On success, `privilege grant` emits the target role's updated privilege list using the
+  same output path as `privilege list --role <name>` (`CYPHER 25 SHOW ROLE $name PRIVILEGES` via
+  the same `privilegeExecFn` seam).
+
+**`privilege deny`**
+
+- REQ-F-005: `neo4j-cli admin privilege deny` — executes
+  `CYPHER 25 DENY <ACTION> [<propClause>] ON <resourceClause> [<entityClause>] TO <role>`.
+  Same flag surface as `privilege grant` (REQ-F-003). Requires `--rw`. Enterprise-only.
+
+- REQ-F-006: On success, `privilege deny` emits the target role's updated privilege list (same as
+  REQ-F-004).
+
+**`privilege revoke`**
+
+- REQ-F-007: `neo4j-cli admin privilege revoke` — executes
+  `CYPHER 25 REVOKE [GRANT|DENY] <ACTION> [<propClause>] ON <resourceClause> [<entityClause>] FROM <role>`.
+  Same resource and action flags as `privilege grant`. Additional optional flag:
+  `--revoke-type grant|deny` — when set, prefixes the REVOKE with `GRANT` or `DENY`; when absent,
+  emits plain `REVOKE` (revokes both grant and deny). Requires `--rw`. Enterprise-only.
+
+- REQ-F-008: On success, `privilege revoke` emits the target role's updated privilege list (same as
+  REQ-F-004).
+
+**`--action` validation and Cypher construction**
+
+- REQ-F-009: `--action` accepts privilege keyword strings case-insensitively, with `_` accepted
+  as a word separator (e.g. `all_graph_privileges` or `ALL GRAPH PRIVILEGES` both normalise to
+  `ALL GRAPH PRIVILEGES`). An unrecognised action value returns a usage error listing the valid
+  action keywords.
+
+- REQ-F-010: Action category classification — every valid action belongs to exactly one category,
+  which controls what resource scope and qualifier flags are valid and what Cypher template is emitted:
+
+  | Category | Actions | Property clause | Entity clause | Valid resource scope |
+  |---|---|---|---|---|
+  | `propertyBearer` | READ, MATCH, SET PROPERTY, MERGE | `{*}` or `{p1, p2}` | ELEMENTS * / NODES / RELATIONSHIPS | `--on-graph` only |
+  | `graphOnly` | TRAVERSE, CREATE, DELETE | none | ELEMENTS * / NODES / RELATIONSHIPS | `--on-graph` only |
+  | `graphWhole` | WRITE, ALL GRAPH PRIVILEGES | none | none (qualifiers rejected) | `--on-graph` only |
+  | `load` | LOAD | none | none | none — `ON ALL DATA` (default) or `ON CIDR "<cidr>"` via `--cidr` |
+  | `labelScoped` | SET LABEL, REMOVE LABEL | none | `<label1>, <label2>, …` (all `--node-label` values) | `--on-graph` only |
+  | `database` | ACCESS, START, STOP, CREATE INDEX, DROP INDEX, SHOW INDEX, INDEX MANAGEMENT, CREATE CONSTRAINT, DROP CONSTRAINT, SHOW CONSTRAINT, CONSTRAINT MANAGEMENT, CREATE NEW NODE LABEL, CREATE NEW RELATIONSHIP TYPE, CREATE NEW PROPERTY NAME, NAME MANAGEMENT, ALL DATABASE PRIVILEGES, SHOW TRANSACTION, TERMINATE TRANSACTION, TRANSACTION MANAGEMENT | none | none | `--on-database` only (default `*`) |
+  | `dbms` | CREATE ROLE, DROP ROLE, ASSIGN ROLE, REMOVE ROLE, SHOW ROLE, ROLE MANAGEMENT, CREATE USER, DROP USER, SHOW USER, SET USER STATUS, SET USER HOME DATABASE, ALTER USER, USER MANAGEMENT, CREATE DATABASE, DROP DATABASE, DATABASE MANAGEMENT, SHOW PRIVILEGE, PRIVILEGE MANAGEMENT, ALL DBMS PRIVILEGES | none | none | `--on-dbms` only (required) |
+
+- REQ-F-011: Client-side usage errors for flag/category mismatches (checked before sending to the
+  database):
+  - `graphOnly`, `graphWhole`, or `propertyBearer` action with `--on-database` or `--on-dbms` → error
+  - `database` action with `--on-graph` or `--on-dbms` → error
+  - `dbms` action without `--on-dbms` → error: `"action <ACTION> requires --on-dbms"`
+  - `dbms` action with `--on-graph` or `--on-database` → error
+  - `labelScoped` (`SET LABEL`/`REMOVE LABEL`) without `--node-label` → error: `"action SET/REMOVE LABEL requires --node-label"`
+  - any non-`propertyBearer` action with `--property` → error: `"<ACTION> does not accept a property qualifier"`
+  - `graphWhole` (`WRITE`/`ALL GRAPH PRIVILEGES`) with `--node-label` or `--relationship-type` → error (REQ-F-024)
+  - `load` (`LOAD`) with any scope or qualifier flag → error; `--cidr` with any non-`load` action → error (REQ-F-025)
+  - `--node-label` and `--relationship-type` both set → error: `"--node-label and --relationship-type are mutually exclusive"`
+  - `--on-graph`, `--on-database`, and `--on-dbms` more than one set simultaneously → error
+
+- REQ-F-012: Cypher template rules per category:
+
+  **propertyBearer** (`READ`, `MATCH`, `SET PROPERTY`, `MERGE`):
+  ```
+  GRANT READ {*} ON GRAPH * ELEMENTS * TO analyst
+  GRANT READ {name} ON GRAPH neo4j NODES Person TO analyst
+  ```
+  Property clause: `{*}` when no `--property`; `{p1, p2}` when one or more `--property` values.
+  Entity clause: `ELEMENTS *` when neither `--node-label` nor `--relationship-type`; `NODES l1, l2`
+  when only `--node-label`; `RELATIONSHIPS t1, t2` when only `--relationship-type`.
+  Resource: `ON GRAPH <name>` — default name is `*` when `--on-graph` is absent.
+
+  **graphOnly** (`TRAVERSE`, `CREATE`, `DELETE`):
+  ```
+  GRANT TRAVERSE ON GRAPH * ELEMENTS * TO analyst
+  GRANT TRAVERSE ON GRAPH neo4j NODES Movie TO analyst
+  ```
+  No property clause. Entity clause same as propertyBearer. Resource: `ON GRAPH <name>`.
+
+  **graphWhole** (`WRITE`, `ALL GRAPH PRIVILEGES`) — REQ-F-023/024:
+  ```
+  GRANT WRITE ON GRAPH * TO analyst
+  GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j TO analyst
+  ```
+  No property clause AND no entity clause (`ELEMENTS *` / `NODES` / `RELATIONSHIPS` is invalid Cypher
+  for these actions). Resource: `ON GRAPH <name>` — default `*`. `--node-label`,
+  `--relationship-type`, and `--property` are usage errors.
+
+  **load** (`LOAD`) — REQ-F-025:
+  ```
+  GRANT LOAD ON ALL DATA TO analyst
+  GRANT LOAD ON CIDR "127.0.0.1/32" TO analyst
+  ```
+  No scope/entity/property flags. `ON ALL DATA` by default; `ON CIDR "<cidr>"` when `--cidr` is set
+  (CIDR value is a double-quoted string literal, not a backtick identifier). All of `--on-graph`,
+  `--on-database`, `--on-dbms`, `--node-label`, `--relationship-type`, `--property` are usage errors;
+  `--cidr` on any non-LOAD action is a usage error.
+
+  **labelScoped** (`SET LABEL`, `REMOVE LABEL`) — REQ-F-026:
+  ```
+  GRANT SET LABEL Person ON GRAPH neo4j TO analyst
+  GRANT SET LABEL Person, Movie ON GRAPH neo4j TO analyst
+  ```
+  Emits `SET LABEL <l1>, <l2>, …` using **all** `--node-label` values (each backtick-escaped),
+  comma-joined; no entity clause. Resource: `ON GRAPH <name>`. `--relationship-type` and `--property`
+  are invalid.
+
+  **database** scope:
+  ```
+  GRANT ACCESS ON DATABASE neo4j TO analyst
+  GRANT ALL DATABASE PRIVILEGES ON DATABASE * TO analyst
+  ```
+  No property or entity clause. Resource: `ON DATABASE <name>` — default name is `*` when
+  `--on-database` is absent (and no other scope flag is provided).
+
+  **dbms** scope:
+  ```
+  GRANT CREATE ROLE ON DBMS TO analyst
+  GRANT ALL DBMS PRIVILEGES ON DBMS TO analyst
+  ```
+  No property or entity clause. Resource: `ON DBMS`.
+
+- REQ-F-013: `FIND` is not a valid action keyword. It must not appear in `validActions`.
+
+**Required flag validation**
+
+- REQ-F-021: `--action` and `--role` are required for `privilege grant`, `privilege deny`, and
+  `privilege revoke`. Do NOT use `cmd.MarkFlagRequired()`. Instead, add explicit pre-validation in
+  `RunE` before `cmd.SilenceUsage = true`:
+  ```go
+  if action == "" {
+      return clierr.NewUsageError("--action is required")
+  }
+  if roleName == "" {
+      return clierr.NewUsageError("--role is required")
+  }
+  cmd.SilenceUsage = true
+  ```
+  This ensures missing required flags exit with code 2 (`usage_error`), not code 1 (`fatal_error`
+  from cobra's built-in required-flag check). Cobra prints usage automatically when `SilenceUsage`
+  is still false at the time the error is returned. Rationale: established by PR #226 (CLI-216)
+  QA finding REQ-F-027; applied consistently across all admin write commands.
+
+**Aura `Security.Forbidden` handling**
+
+- REQ-F-022: `run.go` (updated by PR #226) already handles `Neo.ClientError.Security.Forbidden`
+  via `translateAdminError(uri, err)` — when the connection URI matches `*.neo4j.io`, it returns a
+  `validation_error` with an actionable Aura BC tier hint. Privilege commands inherit this
+  automatically through `RunAdminStatement`. No per-command Forbidden handling is needed in the
+  privilege package.
+
+**Cross-cutting**
+
+- REQ-F-014: All four `privilege` leaf commands are Enterprise-only. `UnsupportedAdministrationCommand`
+  errors are translated by the existing `translateAdminError` in `admin/run.go` with the hint
+  `"(requires Enterprise edition)"`.
+
+- REQ-F-015: All four `privilege` leaves receive `--format json|table|toon` from the parent
+  `admin` persistent flags (no per-leaf registration needed).
+
+- REQ-F-016: `privilege grant`, `privilege deny`, `privilege revoke` are write commands and require
+  `--rw` (consistent with all other admin write commands).
+
+- REQ-F-017: Every `privilege` leaf command has a flush-left `Example:` field with ≥ 2 invocations,
+  each with a `# comment` line and `neo4j-cli` prefix. Write commands include `--rw`. At least one
+  read example per read command uses `--format json`. Gate: `TestAllLeafCommands_HaveExamples`.
+
+- REQ-F-018: `admin.go` is updated with:
+  1. Import: `"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/privilege"`
+  2. `cmd.AddCommand(privilege.NewCmd(cfg, &adminConn, RunAdminStatement))` after the role `AddCommand`
+  3. `Long` string: append `, \`privilege\` (list, grant, deny, revoke).` to the current Long
+     (current Long ends with `` `role` (list, get, create, drop, grant, revoke).``)
+  4. `Short`: update from `"Manage Neo4j databases, users, and roles"` to
+     `"Manage Neo4j databases, users, roles, and privileges"`
+  5. Package comment: update from `"managing Neo4j databases, users, and roles via the system
+     database over Bolt"` to include `"and privileges"`
+
+- REQ-F-019: `go generate ./neo4j-cli/internal/skill/...` is run after wiring `privilege` into the
+  cobra tree. `TestGenerator_RoundTrip` must pass. This is the final skill bundle regeneration for
+  the admin command tree.
+
+- REQ-F-020: A Minor changelog entry is added via `changie new --projects neo4j-cli --kind Minor
+  --body "..."` describing the new `admin privilege` commands.
+
+**Bug fixes from QA (CLI-217 live testing against Neo4j 2025.10 Enterprise + Aura Free/Professional/Business Critical)**
+
+These requirements correct three defects found during end-to-end QA. All three were *masked* by the
+unit suite because the leaf/`buildPrivilegeCypher` tests assert the generated Cypher *string* and
+never execute it against a server — two of them even assert the broken output as the expected value
+(see REQ-F-028). Every fix below MUST be accompanied by a test whose expected Cypher is valid on a
+real Neo4j 2025.x server.
+
+- REQ-F-023: **`WRITE` and `ALL GRAPH PRIVILEGES` must not emit an entity clause.** These two actions
+  are currently in the `graphOnly` category, which unconditionally appends `entityClause(...)`
+  (defaulting to `ELEMENTS *`). Neo4j rejects this — `GRANT WRITE ON GRAPH * ELEMENTS * TO role`
+  fails with `Neo.ClientError.Statement.SyntaxError (Invalid input 'ELEMENTS')` — so **no invocation
+  of `WRITE` or `ALL GRAPH PRIVILEGES` can ever succeed** today. Introduce a new action category
+  (e.g. `graphWhole`) for these two actions that emits `<ACTION> ON GRAPH <name>` with **no property
+  clause and no entity clause**. Default graph name is `*` when `--on-graph` is absent. The correct
+  forms are `GRANT WRITE ON GRAPH * TO role` and `GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j TO role`
+  (both verified live). `TRAVERSE`, `CREATE`, `DELETE` remain in `graphOnly` (they correctly accept
+  `ELEMENTS *` / `NODES` / `RELATIONSHIPS`, verified live).
+
+- REQ-F-024: **`graphWhole` actions reject entity and property qualifiers with a usage error.** Because
+  `WRITE` / `ALL GRAPH PRIVILEGES` take no segment, passing `--node-label`, `--relationship-type`, or
+  `--property` with one of them is a client-side usage error (checked before hitting the DB), e.g.
+  `"WRITE does not accept node-label, relationship-type, or property qualifiers"`. They still accept
+  `--on-graph` (and only `--on-graph` — `--on-database` / `--on-dbms` remain errors, same as
+  `graphOnly`).
+
+- REQ-F-025: **`LOAD` is re-categorised to its real syntax.** `LOAD` is not a graph privilege; its
+  grammar is `GRANT LOAD ON ALL DATA TO role` or `GRANT LOAD ON CIDR "<cidr>" TO role` (both verified
+  live — `LOAD ON GRAPH *` fails with a `SyntaxError`). Move `LOAD` out of `graphOnly` into a new
+  `load` category that emits:
+  - `LOAD ON ALL DATA` when `--cidr` is absent (default), and
+  - `LOAD ON CIDR "<cidr>"` when `--cidr <value>` is supplied (the CIDR value is rendered as a
+    double-quoted string literal, not a backtick identifier).
+  Add a new `--cidr <value>` flag to the shared privilege flag set (only meaningful for `LOAD`). A
+  `load` action rejects `--on-graph`, `--on-database`, `--on-dbms`, `--node-label`,
+  `--relationship-type`, and `--property` with a usage error; `--cidr` on any non-`LOAD` action is
+  likewise a usage error.
+
+- REQ-F-026: **`SET LABEL` / `REMOVE LABEL` emit all `--node-label` values, not just the first.** The
+  `labelScoped` arm currently inlines only `opts.nodeLabels[0]`, silently dropping any additional
+  `--node-label` values with no error or warning. Neo4j accepts a comma list:
+  `GRANT SET LABEL Person, Movie ON GRAPH neo4j TO role` (verified live). Emit every `--node-label`
+  value, comma-joined, each backtick-escaped via the existing `cypherIdentifier` helper (REQ-F-011's
+  `--node-label`/`--relationship-type` mutual-exclusion still applies; `--relationship-type` remains
+  invalid for label actions).
+
+- REQ-F-027: **The `validActions` category map and the per-category Cypher templates are updated** to
+  reflect REQ-F-023/024/025: `WRITE` and `ALL GRAPH PRIVILEGES` → `graphWhole`; `LOAD` → `load`;
+  `TRAVERSE`, `CREATE`, `DELETE` stay `graphOnly`. The category-classification table in REQ-F-010 and
+  the Cypher-template rules in REQ-F-012 are corrected accordingly (they currently mis-state that
+  `WRITE`, `LOAD`, and `ALL GRAPH PRIVILEGES` take an `ELEMENTS *` clause).
+
+- REQ-F-028: **The bug-encoding test assertions are corrected.** `privilege_helpers_test.go` asserts
+  `"GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j ELEMENTS *"` (the invalid output), and the original
+  acceptance criteria in this PRD encoded `GRANT WRITE ON GRAPH * ELEMENTS * TO analyst` and
+  `GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j ELEMENTS * TO analyst` as expected. These expectations
+  are replaced with the corrected (server-valid) Cypher, and the `graphOnly` happy-path test for
+  `WRITE`/`ALL GRAPH PRIVILEGES` (if any) is moved to the new `graphWhole` cases.
+
+**Discoverability redesign — per-category subcommands with a positional action (added after CLI-217 dogfooding)**
+
+The `--action <keyword>` interface gives little discoverability over raw Cypher: the
+action→category→valid-flags matrix is only learnable by submitting a guess and reading the
+rejection. These requirements replace `--action` on `grant`/`deny`/`revoke` with one subcommand per
+action **category** (the seven groups that share a flag signature), each taking the action as a
+positional argument, so the valid shape is visible from `--help` and tab-completion while the tree
+stays at 21 leaves. CLI-217 is unreleased, so this is not a breaking change. The emitted Cypher and
+all guarantees in REQ-F-009..028 / REQ-NF-005 are unchanged — `buildPrivilegeCypher` remains the
+construction core, now invoked with the action resolved from the positional rather than a flag.
+
+- REQ-F-029: **`grant`, `deny`, and `revoke` become parent commands that register one subcommand per
+  action category.** Each verb registers exactly seven children, named for the category:
+  `property`, `entity`, `graph`, `label`, `load`, `database`, `dbms` (the user-facing names for the
+  internal `propertyBearer`, `graphOnly`, `graphWhole`, `labelScoped`, `load`, `database`, `dbms`
+  categories — final names confirmable in review, see Open Questions). The verb parent has no `RunE`;
+  running `neo4j-cli admin privilege grant` with no category prints help listing the seven category
+  subcommands, and `grant <TAB>` completes them. 7 categories × 3 verbs = **21 leaf commands** total.
+  The `--action` flag is removed from `grant`/`deny`/`revoke` (REQ-F-035).
+
+- REQ-F-030: **The specific action is a required positional argument on each category subcommand**,
+  not a subcommand of its own. Each multi-action category command sets `Use: "<category> <action>"`,
+  `Args` requiring exactly one positional, and `ValidArgs` = the kebab-cased action keywords in that
+  category (e.g. `property` → `read match set-property merge`; `dbms` → `create-role drop-role …`).
+  `ValidArgs` drives `grant property <TAB>` completion and the command's `--help` lists the category's
+  actions. The positional is validated against the category's action set before any DB call:
+  - an action that belongs to a *different* category produces a usage error that names the correct
+    category command (e.g. `grant property access` → `"access is a database privilege; use 'admin
+    privilege grant database access'"`), turning a wrong guess into a discovery hint;
+  - an entirely unknown action (e.g. `find`) produces the existing unknown-action usage error.
+
+  **Single-action categories take no positional (REQ-F-040)** — `load` is the sole example today.
+
+- REQ-F-040: **A category whose action set has exactly one member takes no positional argument; the
+  sole action is implied.** With the per-category redesign, a single-action category makes the
+  positional pure repetition — `grant load load` says "load" twice for no information. Such a category
+  instead sets `Use: "<category>"` (no `<action>`), `Args: cobra.NoArgs`, and no `ValidArgs`, and its
+  `RunE` resolves directly to the category's sole action. `neo4j-cli admin privilege grant load --cidr
+  127.0.0.1/32 --role analyst --rw` is the only valid form; **`grant load load` is rejected** as an
+  unexpected argument (cobra's `NoArgs` error), not silently accepted. This is a **general,
+  data-driven rule** keyed off the action count in `validActions`/`categoryMeta` (today only `load`
+  qualifies, but a future single-action category inherits it automatically), mirroring how REQ-F-038
+  drops the redundant `--on-dbms`. Knock-on effects:
+  - The cross-category discovery hint (REQ-F-030) that points at a single-action category omits the
+    action (e.g. `grant property load` → `"load is a LOAD privilege; use 'admin privilege grant
+    load'"`, **not** `… grant load load`).
+  - The category's `Short` need not carry an action summary (REQ-F-036) — there is no positional to
+    disambiguate — so a single-action category's `Short` reads e.g. `"Grant a LOAD privilege to a
+    role"` with no `(load)` suffix.
+  - The rendered `Example` (REQ-F-033) for the category drops the action token: `grant load --cidr
+    127.0.0.1/32 --role analyst --rw` (not `grant load load …`).
+
+- REQ-F-031: **Each category subcommand registers only the flags valid for that category**, so invalid
+  combinations are unrepresentable rather than rejected after the fact:
+
+  | Category command | Actions | Flags registered (besides `--role`) |
+  |---|---|---|
+  | `property` (propertyBearer) | READ, MATCH, SET PROPERTY, MERGE | `--on-graph`, `--node-label`, `--relationship-type`, `--property` |
+  | `entity` (graphOnly) | TRAVERSE, CREATE, DELETE | `--on-graph`, `--node-label`, `--relationship-type` |
+  | `graph` (graphWhole) | WRITE, ALL GRAPH PRIVILEGES | `--on-graph` |
+  | `label` (labelScoped) | SET LABEL, REMOVE LABEL | `--on-graph`, `--node-label` (required) |
+  | `load` | LOAD | `--cidr` |
+  | `database` | ACCESS, START, … (19) | `--on-database` |
+  | `dbms` | CREATE ROLE, … (19) | _(none — `ON DBMS` is implied by the category; see REQ-F-038)_ |
+
+  `--role` is registered on every category subcommand and remains required (explicit pre-validation,
+  exit code 2, per REQ-F-021). `revoke`'s category subcommands additionally register `--revoke-type`.
+  Write subcommands still require `--rw` (REQ-F-016).
+
+- REQ-F-032: **Each category subcommand's `RunE` resolves the positional to its canonical action and
+  delegates to the existing build/exec/output sequence** (`runPrivilegeMutation` →
+  `buildPrivilegeCypher(verb, <canonical action>, opts)` → seam → `outputPrivileges`). The kebab
+  positional is mapped back to the canonical `validActions` key (e.g. `set-property` → `"SET
+  PROPERTY"`) — either via a small lookup or by extending `normalizeAction` to also treat `-` as a
+  separator. The category validation inside `buildPrivilegeCypher` (REQ-F-011) is retained as
+  defense-in-depth even though most flag-conflict paths are now unreachable (the offending flags no
+  longer exist on the command). Mutual-exclusion that remains reachable within a category (e.g.
+  `--node-label` vs `--relationship-type` on `property`/`entity`) still returns a usage error.
+
+- REQ-F-033: **Each category subcommand carries category-aware help generated from metadata**
+  (not hand-maintained per-category prose):
+  - `Short`: e.g. `"Grant a property privilege (read, match, set-property, merge) to a role"`.
+  - `Long`: lists the category's actions, the flags it accepts (and which are required/default), the
+    scope default, and any category rule — e.g. `graph` (WRITE/ALL GRAPH PRIVILEGES) takes no
+    qualifiers, `label` requires `--node-label`, `load` uses `--cidr` (default all data).
+  - `Example`: flush-left, ≥ 2 invocations, each with a `# comment` line, the `neo4j-cli` prefix, and
+    `--rw`, using a representative action and flag values for the category. Gate
+    `TestAllLeafCommands_HaveExamples` must pass for every leaf.
+
+- REQ-F-034: **A `categoryMeta` table centralises the per-category surface** (in `helpers.go`):
+  for each category, its user-facing command name, the actions it contains (kebab + canonical), the
+  set of valid flags, which are required, the scope description, the qualifier rules, and an `Example`
+  template. The category-subcommand factory, the registered flags (REQ-F-031), the `ValidArgs` action
+  list (REQ-F-030), and the generated help/examples (REQ-F-033) are all derived from this single
+  source — mirroring how `validActions` is the single source for action→category. Adding a future
+  action means editing `validActions` (and, for a brand-new category, `categoryMeta`) only.
+
+- REQ-F-035: **A single factory builds every category leaf**
+  (e.g. `newCategoryCmd(cfg, conn, verb, category) *cobra.Command`); `grant`/`deny`/`revoke` each loop
+  over the seven categories calling it. With only 21 leaves this is a mild, documented exception to
+  the one-file-per-leaf rule in AGENTS.md ("Cobra Command Layout") — the leaves are data-driven from
+  `categoryMeta` rather than hand-authored, because the seven category commands are structurally
+  identical apart from their metadata. A comment at the factory records the exception, and the
+  layout-rule discussion in AGENTS.md notes privilege categories as the documented exception. The
+  `--action` flag is fully removed (not kept as a hidden alias): all in-tree references (`Long`
+  strings, examples, README, skill bundle, agent-context) migrate to the
+  `grant/deny/revoke <category> <action>` form. Rationale: CLI-217 is unreleased, so there are no
+  external callers to preserve, and a parallel `--action` path would re-introduce the
+  low-discoverability surface this redesign removes.
+
+**Action discoverability in help — surface a category's actions in its `Short` (added after CLI-217 dogfooding)**
+
+The per-category redesign (REQ-F-029..035) makes a category's valid actions reachable only via
+`ValidArgs` tab-completion or by running `<category> --help` (which shows the `Long`). A user who
+runs `neo4j-cli admin privilege grant graph` — or scans `grant --help` — has no way to see that
+`graph` accepts `write` / `all-graph-privileges` without shell completion configured or a second
+`--help` drill-down. These requirements put the action list where it is always visible: in each
+category leaf's `Short`, which cobra renders both at the leaf and in the parent verb's subcommand
+listing.
+
+- REQ-F-036: **Each category subcommand's `Short` includes the category's valid actions** (kebab
+  keywords), so the action set is visible in the parent `grant`/`deny`/`revoke --help` subcommand
+  listing (cobra renders each child's `Short` there) and at the leaf itself — without tab-completion
+  or a `<category> --help` drill-down. Rendering follows a length rule so summary surfaces stay
+  readable:
+  - Categories with a **small** action set (≤ 6 actions — every category except `database`/`dbms`)
+    show the **full** kebab action list, e.g. `"Grant a graph privilege (write, all-graph-privileges)
+    to a role"`, `"Grant a property privilege (read, match, set-property, merge) to a role"`.
+  - The **large** `database` and `dbms` categories (19 actions each) show a **truncated preview with
+    the total count**, e.g. `"Grant a database privilege (access, start, stop, … — 19 actions; see
+    --help) to a role"`. The preview shows the first three kebab actions in `categoryMeta`/sorted
+    order.
+  Each category leaf's `Long` continues to list the **full** action set (REQ-F-033), so the complete
+  list is always one `--help` away regardless of truncation. (This also realises the action-listing
+  `Short` that REQ-F-033's example illustrated but the initial implementation omitted.)
+
+- REQ-F-037: **A single helper derives the `Short` action summary from `categoryMeta`/`validActions`**
+  (e.g. `actionSummary(cat string) string`), reusing `kebabActionsForCategory` — no second
+  hand-maintained action list. The truncation threshold (≤ 6 → full) and the preview count (first 3)
+  are defined once in this helper, and `newCategoryCmd` composes the `Short` from it. Adding a future
+  action still means editing `validActions` only; the `Short` updates automatically.
+
+**Post-redesign usability fixes (added after CLI-217 dogfooding)**
+
+Two findings from dogfooding the per-category interface: the `dbms` category's `--on-dbms` flag is
+now a redundant always-true boolean, and the unknown-action error lists internal Cypher-form
+keywords instead of the CLI forms the user actually types.
+
+- REQ-F-038: **Drop `--on-dbms`; the `dbms` category emits `ON DBMS` unconditionally.** With the
+  per-category redesign, scope is carried by the subcommand name, so the `dbms` command's `--on-dbms`
+  is a boolean that must always be set to `true` and conveys nothing. Remove it entirely: the `dbms`
+  category registers **no scope flag** (only `--role`, plus `--revoke-type` on revoke), and the
+  `dbms` arm of `buildPrivilegeCypher` emits `<ACTION> ON DBMS` with no `--on-dbms` check. Remove the
+  `--on-dbms` flag registration, the `flagOnDbms` entry from `categoryMeta[dbms].flags`, the
+  `privilegeOpts.onDbms` field, the `registerPrivilegeFlag` case, and the `dbms`
+  "requires `--on-dbms`" usage error (REQ-F-011). Any remaining `opts.onDbms` references in other
+  categories' cross-scope guards are removed as part of this (those flags no longer exist on any
+  command, so the guards were unreachable — fold into the audit's validation simplification if done
+  together). `--on-graph` and `--on-database` are unaffected: they carry a name (default `*`), so
+  they still convey information. The example for `grant dbms` becomes
+  `neo4j-cli admin privilege grant dbms create-role --role analyst --rw` →
+  `GRANT CREATE ROLE ON DBMS TO analyst`. Supersedes REQ-F-031's `dbms` flag row and the dbms parts
+  of REQ-F-010/011/012.
+
+- REQ-F-039: **Privilege usage errors that enumerate actions use the CLI (kebab) form, scoped to the
+  command's category — never the internal Cypher keywords.** The current unknown-action error
+  (`grant dbms aleter-user` → `unknown action "aleter-user"; valid actions are: ACCESS, ALL DATABASE
+  PRIVILEGES, …`) lists the canonical `validActions` keys (UPPER-CASE, space-separated) drawn from
+  `sortedActions()` — these are the Cypher spellings, not what the user types on the CLI, and the
+  list spans all seven categories. Fix both axes:
+  - **CLI form:** every enumerated action in a privilege usage error is rendered in the kebab form the
+    user types (`alter-user`, `all-dbms-privileges`), via `kebabAction`/`kebabActionsForCategory`.
+  - **Category scope:** when the error originates from a category subcommand (the user already chose
+    `grant dbms`), it lists only **that category's** actions, e.g.
+    `unknown dbms action "aleter-user"; valid dbms actions are: all-dbms-privileges, alter-user,
+    assign-role, …`. The cross-category hint (REQ-F-030, already kebab) is unchanged.
+  - The global Cypher-form enumeration (`sortedActions()`) is removed from all user-facing privilege
+    error paths (it may be deleted if it has no remaining caller). This is scoped to the **privilege
+    package** — other admin/CLI enum errors (`--format`, `--provider`, edition) already use CLI/config
+    values. This dovetails with the audit's "resolve the positional once at the command layer"
+    cleanup: category-scoped resolution naturally produces a category-scoped, kebab error.
+
+**Second-QA-pass usability fixes (CLI-217 live testing, second pass against Neo4j 2025.07 Enterprise + Aura Free/Business Critical — REQ-F-041..043)**
+
+A follow-up QA pass exercised every category against live Docker Enterprise, Docker Community, Aura
+Free, and Aura Business Critical servers. No functional defects were found (all emitted Cypher was
+server-valid, and the REQ-F-023/025/026 fixes were confirmed live), but three usability papercuts
+surfaced. All are scoped to the `privilege` package.
+
+- REQ-F-041: **The `labelScoped` "requires `--node-label`" usage error is rendered in the kebab CLI
+  form, not the Cypher keyword.** `grant label set-label --on-graph neo4j` (no `--node-label`)
+  currently returns `action SET LABEL requires --node-label` — the canonical `validActions` key
+  (`SET LABEL`), not the `set-label` the user actually typed. This is the same Cypher-vs-CLI mismatch
+  REQ-F-039 fixed for *enumerated* action lists, applied here to a *single-action* reference. The
+  `labelScoped` arm of `buildPrivilegeCypher` (`cypher.go`) renders the action via `kebabAction(action)`
+  in the message, yielding `action set-label requires --node-label` (and `action remove-label requires
+  --node-label`). No other category emits an action keyword in a `requires`-style error today, but if a
+  future one does it follows the same rule. The cross-category hint (REQ-F-030) and the unknown-action
+  enumeration (REQ-F-039) already use the kebab form and are unchanged.
+
+- REQ-F-042: **A category may override a flag's help string so the help is accurate for that
+  category's use of the flag.** `registerPrivilegeFlag` uses one shared help string per flag, but
+  `--node-label` means different things across categories: on `property`/`entity` it is an optional
+  entity *restriction* ("Restrict a graph privilege to node labels"), while on `label` it is the
+  **required target** of `SET LABEL` / `REMOVE LABEL` (the labels the privilege is granted on), not a
+  restriction at all. Add a minimal per-category flag-help override mechanism: `categoryInfo` gains an
+  optional `flagHelp map[string]string` (flag long name → help text), and `registerPrivilegeFlag`
+  (or the factory loop that calls it) consults `categoryMeta[cat].flagHelp[flag]` before falling back
+  to the shared default. The `label` category overrides `--node-label` to read, e.g.,
+  `"Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable)"`. Other
+  categories and other flags keep their existing shared help. The override is data-driven from
+  `categoryMeta` (the single source per REQ-F-034), so no per-leaf hand-authoring. Because the flag
+  help feeds `grant label --help` and therefore `references/admin.md`, the skill bundle is regenerated.
+
+- REQ-F-043: **`privilege list --role <name>` / `--user <name>` returns a validation error (exit 6)
+  when the named role/user does not exist, instead of an empty result.** Today `SHOW ROLE $name
+  PRIVILEGES` / `SHOW USER $name PRIVILEGES` for a non-existent target returns zero rows, so a typo'd
+  `--role analyst` is indistinguishable from a real role that simply has no privileges — both print an
+  empty list and exit 0. When (and only when) a `--role`/`--user` filter is set **and** the privileges
+  query returns zero rows, `list` performs a follow-up existence check and, if the target is absent,
+  returns a `validation_error` (exit 6) with the message `role "<name>" does not exist` /
+  `user "<name>" does not exist`. The existence check runs via the existing `privilegeExecFn` seam
+  (no import of the `role`/`user` packages — avoids coupling): `SHOW ROLES YIELD role WHERE role =
+  $name RETURN role` for `--role`, `SHOW USERS YIELD user WHERE user = $name RETURN user` for `--user`;
+  zero rows ⇒ does-not-exist. The extra round-trip is incurred **only** on the empty-result path, so a
+  role with privileges costs exactly one query as before. A real role/user with no privileges still
+  exits 0 with an empty list (the existence check finds it). Unfiltered `list` (`SHOW PRIVILEGES`) is
+  unchanged. `grant`/`deny`/`revoke` already surface the server's `Role does not exist` error on a bad
+  `--role`, so they need no change. The existence check is itself an Enterprise admin command, which is
+  consistent with `privilege list` already being Enterprise-only; if the check query itself errors
+  (e.g. permissions), that error surfaces naturally rather than masking the empty result.
+
+### Non-Functional Requirements
+
+- REQ-NF-001: Unit tests for every leaf command using the `privilegeExecFn` package-level seam
+  (same pattern as `dbExecFn` in `database/` and `userExecFn` in `user/`). No live Bolt connection.
+
+- REQ-NF-002: Direct unit tests for `buildPrivilegeCypher` in `privilege_helpers_test.go` covering
+  one case per action category and all client-side flag validation error paths.
+
+- REQ-NF-003: All new `.go` files carry the Neo4j copyright header.
+
+- REQ-NF-004: `make test`, `make fmt-check`, `make lint` all pass.
+
+- REQ-NF-005: For each action category — `propertyBearer`, `graphOnly`, `graphWhole`, `labelScoped`,
+  `database`, `dbms`, and `load` — at least one `buildPrivilegeCypher` unit case asserts Cypher that
+  is **known-valid on a real Neo4j 2025.x server** (a regression guard against the string-only tests
+  re-encoding invalid output). The expected fragments for the QA-confirmed cases (before the leaf
+  appends ` TO $role` / ` FROM $role`) are:
+
+  ```
+  GRANT WRITE ON GRAPH *
+  GRANT ALL GRAPH PRIVILEGES ON GRAPH `neo4j`
+  GRANT LOAD ON ALL DATA
+  GRANT LOAD ON CIDR "127.0.0.1/32"
+  GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j`
+  ```
+
+**Discoverability redesign (REQ-F-029..035)**
+
+- REQ-NF-006: A structure test asserts that each of `grant`, `deny`, and `revoke` registers exactly
+  the seven category subcommands; that each category command exposes exactly the flag set its category
+  permits per REQ-F-031 (and no others); that each category command's `ValidArgs` equals the kebab
+  action keywords for that category and that the union of all `ValidArgs` across categories equals
+  `validActions` (every action is reachable through exactly one category); that `revoke`'s category
+  commands also carry `--revoke-type`; and that every leaf has a non-empty flush-left `Example`.
+
+- REQ-NF-007: Per-category behavioural tests assert that the category subcommand emits the same Cypher
+  the old `--action` path did, for one representative action per category, reusing the server-validated
+  expected fragments from REQ-NF-005, plus the cross-category positional error (REQ-F-030). Existing
+  `grant`/`deny`/`revoke` `--action` tests are migrated to the `<category> <action>` form (no loss of
+  coverage for required-flag exit-code-2 paths, Enterprise-only translation, or the two-call
+  mutation+follow-up sequence).
+
+- REQ-NF-008: `make test`, `make fmt-check`, `make lint`, `make license-check` all pass;
+  `TestGenerator_RoundTrip` passes with the new command tree; the `neo4j-cli agent-context` build
+  remains correct for the new subcommands.
+
+- REQ-NF-009: A unit test asserts each category leaf's `Short` contains its action summary
+  (REQ-F-036): small categories list all their kebab actions; `database` and `dbms` show the
+  truncated three-action preview plus the `19 actions` count; and the parent `grant`/`deny`/`revoke
+  --help` output includes each category's action summary (since cobra renders child `Short` text in
+  the subcommand listing). Because `Short` text feeds `references/admin.md`, the skill bundle is
+  regenerated (`go generate ./neo4j-cli/internal/skill/...`) and `TestGenerator_RoundTrip` passes
+  with the updated bundle.
+
+- REQ-NF-010: Tests for the post-redesign usability fixes (REQ-F-038/039):
+  - **`--on-dbms` removal:** the REQ-NF-006 structure test is updated so the `dbms` category command
+    registers no `--on-dbms` flag (only `--role`, plus `--revoke-type` for revoke); a behavioural test
+    asserts `grant dbms create-role --role analyst --rw` still emits `GRANT CREATE ROLE ON DBMS TO
+    analyst` with no scope flag; the former "missing `--on-dbms`" usage-error test is deleted.
+  - **CLI-form category-scoped errors:** a test asserts `grant dbms <unknown>` returns a usage error
+    (exit 2) whose action list is the kebab `dbms` actions only — it contains `alter-user` (not
+    `ALTER USER`) and does not contain other categories' actions such as `read`/`access`.
+  - The skill bundle is regenerated (the `dbms` `Long`/flags and example change) and
+    `TestGenerator_RoundTrip` passes; `make test`, `make fmt-check`, `make lint`, `make license-check`
+    all pass.
+
+- REQ-NF-011: Tests for the single-action-category rule (REQ-F-040):
+  - A structure test asserts a single-action category command (i.e. `load`) takes `cobra.NoArgs` and
+    exposes no `ValidArgs`, while every multi-action category still requires exactly one positional
+    with `ValidArgs` equal to its kebab actions. (The REQ-NF-006 union-of-`ValidArgs` check is updated
+    so the single-action category contributes its action without a positional.)
+  - A behavioural test asserts `grant load --cidr 127.0.0.1/32 --role analyst --rw` emits
+    `GRANT LOAD ON CIDR "127.0.0.1/32" TO analyst` (and `grant load --role analyst --rw` emits
+    `GRANT LOAD ON ALL DATA TO analyst`) with no positional, and that `grant load load` returns a
+    non-zero (usage) error.
+  - A test asserts the cross-category hint pointing at `load` omits the action (`grant property load`
+    → `"… use 'admin privilege grant load'"`, no trailing `load`).
+  - The skill bundle is regenerated (the `load` `Use`/`Short`/`Example` change) and
+    `TestGenerator_RoundTrip` passes; `make test`, `make fmt-check`, `make lint`, `make license-check`
+    all pass.
+
+- REQ-NF-012: Tests for the second-QA-pass usability fixes (REQ-F-041..043):
+  - **Kebab label error (REQ-F-041):** a `buildPrivilegeCypher` unit case asserts that `labelScoped`
+    with no `--node-label` returns a usage error whose message contains `set-label` (and the
+    `remove-label` case `remove-label`) and does **not** contain `SET LABEL` / `REMOVE LABEL`.
+  - **Per-category flag help (REQ-F-042):** a test asserts the `label` category's `--node-label` flag
+    usage string differs from the `property`/`entity` categories' shared string (e.g. contains
+    `SET LABEL` / `required`), while `--node-label` on `property`/`entity` keeps the shared default.
+  - **Existence check (REQ-F-043):** using the `privilegeExecFn` seam (no live Bolt),
+    `withSequencedPrivilegeExecFn` returns empty rows for the privileges query then drives the
+    existence check: (a) `list --role missing` where the follow-up `SHOW ROLES … WHERE role = $name`
+    returns zero rows asserts a `validation_error` (`ce.Code` exit 6) with message
+    `role "missing" does not exist`; (b) the analogous `--user` case; (c) a role that exists but has
+    no privileges (existence check returns one row) exits 0 with an empty list; (d) a non-empty
+    privileges result issues exactly one query (no existence round-trip). The unfiltered
+    `SHOW PRIVILEGES` path is asserted unchanged.
+  - The skill bundle is regenerated (the `grant label --help` `--node-label` text change flows into
+    `references/admin.md`) and `TestGenerator_RoundTrip` passes; `make test`, `make fmt-check`,
+    `make lint`, `make license-check` all pass.
+
+---
+
+## Technical Considerations
+
+### Command Tree Layout
+
+```
+neo4j-cli/internal/subcommands/admin/privilege/
+  privilege.go               # NewCmd; registers list/grant/deny/revoke; sets privilegeExecFn
+  list.go                    # SHOW [ROLE <x>|USER <x>] PRIVILEGES
+  list_test.go
+  grant.go                   # GRANT <action> ... TO <role>
+  grant_test.go
+  deny.go                    # DENY <action> ... TO <role>
+  deny_test.go
+  revoke.go                  # REVOKE [GRANT|DENY] <action> ... FROM <role>
+  revoke_test.go
+  helpers.go                 # buildPrivilegeCypher, validActions, actionCategory, outputPrivileges
+  privilege_helpers_test.go  # unit tests for buildPrivilegeCypher
+```
+
+Additions to existing files:
+- `admin/admin.go`: one `cmd.AddCommand(privilege.NewCmd(cfg, conn))` line + Long update
+
+### Package-Level Seam
+
+Mirror the `role.NewCmd` pattern from PR #226 exactly — `execFn` is injected as a parameter,
+not resolved internally:
+
+```go
+// privilege.go
+var privilegeExecFn adminutil.ExecFn
+
+// NewCmd returns the `admin privilege` parent cobra command. execFn is the Cypher
+// execution function injected by the parent (admin.RunAdminStatement in production);
+// passing it here avoids an import cycle. conn is a pointer to the connection
+// resolved by admin's PersistentPreRunE and shared with all leaves.
+func NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command {
+    privilegeExecFn = execFn
+    // ...
+}
+```
+
+In `admin.go`:
+```go
+cmd.AddCommand(privilege.NewCmd(cfg, &adminConn, RunAdminStatement))
+```
+
+Tests override `privilegeExecFn` directly:
+```go
+privilegeExecFn = func(ctx context.Context, cfg *clicfg.Config, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
+    // assert cypher + params; return fake rows
+}
+```
+
+### `buildPrivilegeCypher` Helper
+
+Central function in `helpers.go`. Signature:
+
+```go
+func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[string]any, error)
+```
+
+Where `verb` is `"GRANT"`, `"DENY"`, or `"REVOKE [GRANT|DENY]"` and `opts` captures all flag
+values. Returns:
+- The full Cypher string (without the `CYPHER 25 ` prefix — that is prepended by `run.go`'s `RunAdminStatement`)
+- A params map (only `$role` is parameterised; action and resource are always inlined as keywords
+  to match how Neo4j parses privilege Cypher)
+- A usage error for any invalid flag combination (checked before the caller sends anything to the DB)
+
+Because `RunAdminStatement` prepends `CYPHER 25 `, `buildPrivilegeCypher` should NOT include it.
+
+### Output Fields and `outputPrivileges` Helper
+
+The output helper in `helpers.go` (uses `adminutil.NewRows` for field filtering, unlike role's
+`adminutil.Rows` — see "Output: `adminutil.NewRows` vs `adminutil.Rows`" above):
+
+```go
+var privilegeFields = []string{"access", "action", "resource", "segment", "role"}
+
+func outputPrivileges(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, roleName string) error {
+    rows, err := privilegeExecFn(cmd.Context(), cfg, conn, "SHOW ROLE $name PRIVILEGES", map[string]any{"name": roleName})
+    if err != nil {
+        return err
+    }
+    commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRows(rows, privilegeFields), privilegeFields)
+    return nil
+}
+```
+
+Grant, deny, and revoke all call `outputPrivileges` after a successful mutation. This uses the same
+`privilegeExecFn` seam so tests can assert both the mutation Cypher and the follow-up query.
+
+### Test Approach
+
+Each leaf test file (`list_test.go`, `grant_test.go`, etc.) follows the pattern confirmed by the
+merged `role/` package:
+1. Override `privilegeExecFn` at test setup (no `TestMain` needed — just set before each test case)
+2. Table-driven test cases covering the happy path, Enterprise-only error translation, and flag
+   validation errors
+3. For write commands: use a `withSequencedPrivilegeExecFn` helper (mirrors `withSequencedExecFn`
+   in `role/role_helpers_test.go`) to return different results for the mutation call vs the
+   follow-up `SHOW ROLE $name PRIVILEGES` call
+4. Missing required flags test cases assert `ce.Code == 2` and message containing
+   `"--action is required"` / `"--role is required"` — NOT cobra's built-in required-flag message
+
+`privilege_helpers_test.go` — shared test infrastructure (mirrors `role/role_helpers_test.go`
+exactly, scoped to `privilegeExecFn`):
+```go
+func testConn() *dbconn.Conn { ... }
+func withFakePrivilegeExecFn(t *testing.T, rows []map[string]any, err error) { ... }
+func withSequencedPrivilegeExecFn(t *testing.T, responses []struct{ rows ...; err error }) { ... }
+```
+
+`privilege_helpers_test.go` also contains direct unit tests for `buildPrivilegeCypher` — one table
+per action category, all error paths — without needing a cobra command.
+
+Note: Aura `Security.Forbidden` translation is already covered by `run_test.go`; no
+privilege-specific test is needed for it.
+
+### Output: `adminutil.NewRows` vs `adminutil.Rows`
+
+The `role/helpers.go` output helpers use `adminutil.Rows(rows)` directly (the role/member columns
+from `SHOW ROLES WITH USERS` are already lowercase and the desired full set). For privilege, use
+`adminutil.NewRows(rows, privilegeFields)` instead — `SHOW PRIVILEGES` also returns an `immutable`
+column that should be excluded from default output, and `NewRows` applies camelToSnake
+normalization and field filtering in one step. This is consistent with the `database/` package.
+
+### `run.go` Signature (Post-PR #226)
+
+`translateAdminError` and `translateNeo4jError` in `run.go` now take a `uri string` parameter.
+`RunAdminStatement` passes `conn.URI` internally. Privilege commands never call these functions
+directly — they go through `RunAdminStatement` / the `privilegeExecFn` seam. No changes to
+`run.go` are expected for this PR.
+
+### Dependency on CLI-216 (Role Commands)
+
+CLI-216 merged as PR #226 — `main` now has the complete `admin database`, `admin user`, and
+`admin role` trees. Branch directly from `main`. The `privilege/` package has no code-level import
+of the `role/` package; the only coupling is that `admin.go` wiring must happen after the
+privilege package compiles.
+
+### Skill Bundle
+
+After wiring `privilege.NewCmd` into `admin.go`, run:
+```
+go generate ./neo4j-cli/internal/skill/...
+```
+This produces the final skill bundle with all admin subcommands. Commit the source files and the
+regenerated bundle together.
+
+### QA Bug-Fix Implementation Notes (REQ-F-023..028, REQ-NF-005)
+
+- **New categories in `helpers.go`**: add `graphWhole` and `load` to the `actionCategory` enum. In
+  `validActions`, re-map `WRITE` and `ALL GRAPH PRIVILEGES` from `graphOnly` → `graphWhole`, and
+  `LOAD` from `graphOnly` → `load`. Leave `TRAVERSE`, `CREATE`, `DELETE` on `graphOnly`.
+- **`buildPrivilegeCypher` switch arms**:
+  - `graphWhole`: reject `--on-database`/`--on-dbms` (as `graphOnly` does) AND reject
+    `--node-label`/`--relationship-type`/`--property`. Emit
+    `normalized + " ON GRAPH " + cypherIdentifier(graph)` with no property/entity clause.
+  - `load`: reject every scope flag (`--on-graph`/`--on-database`/`--on-dbms`) and every qualifier
+    (`--node-label`/`--relationship-type`/`--property`). Emit `LOAD ON ALL DATA`, or
+    `LOAD ON CIDR "<cidr>"` when `opts.cidr != ""`. The CIDR value is wrapped in double quotes as a
+    Cypher string literal — NOT `cypherIdentifier` (which uses backticks). Consider escaping embedded
+    `"`/backslash in the CIDR value for safety, consistent with task-011's injection-hardening.
+  - `labelScoped`: change `opts.nodeLabels[0]` to `strings.Join(escapeIdentifiers(opts.nodeLabels), ", ")`
+    so every label is emitted.
+- **New flag**: add `--cidr` to `addPrivilegeFlags` (or register it only where it applies); add
+  `cidr string` to `privilegeOpts`. Guard: `opts.cidr != ""` with `category != load` → usage error
+  (mirror the existing `--property` non-propertyBearer guard at the top of `buildPrivilegeCypher`).
+- **The `--property` guard** currently fires for any `category != propertyBearer`; verify it still
+  produces a sensible message for `graphWhole`/`load` (REQ-F-024 wants a combined entity+property
+  message for `graphWhole`, so order the new `graphWhole` qualifier check before or alongside it).
+- **Tests (REQ-NF-005)**: update the `graphOnly` table in `privilege_helpers_test.go` to drop
+  `WRITE`/`ALL GRAPH PRIVILEGES`/`LOAD`; add `graphWhole`, `load`, and multi-label `labelScoped`
+  cases with the server-valid expected fragments listed in REQ-NF-005; add the new usage-error cases
+  (REQ-F-024/025). The corrected expectations replace the previously bug-encoding assertions
+  (REQ-F-028). No live Bolt connection — but the expected strings must be ones a human has confirmed
+  valid on Neo4j 2025.x (they were, during CLI-217 QA).
+- **Skill bundle + Long/help**: `--cidr` and the new behaviour change `grant`/`deny`/`revoke` flag
+  help, so re-run `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle
+  (`TestGenerator_RoundTrip`). Mention `--cidr` (LOAD-only) and that `WRITE`/`ALL GRAPH PRIVILEGES`
+  take no qualifiers in the relevant `Long` strings.
+
+### Discoverability redesign — per-category subcommand factory (REQ-F-029..035)
+
+**Command tree.** `grant`/`deny`/`revoke` keep their own files (`grant.go`, `deny.go`, `revoke.go`)
+but their constructors stop registering `--action` and the shared single-command flag set. Instead
+each loops over the seven categories and calls the new factory:
+
+```go
+// helpers.go
+func newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat actionCategory) *cobra.Command
+```
+
+```go
+// grant.go (deny/revoke mirror: deny → "DENY"; revoke passes its REVOKE verb + the factory adds --revoke-type)
+func newGrantCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
+    cmd := &cobra.Command{Use: "grant", Short: "Grant a privilege to a role", ...}
+    for _, cat := range categoryOrder {
+        cmd.AddCommand(newCategoryCmd(cfg, conn, "GRANT", cat))
+    }
+    return cmd
+}
+```
+
+`newCategoryCmd` reads `categoryMeta[cat]` for the surface, sets `Use` to `"<name> <action>"`, sets
+`ValidArgs` to the category's kebab action keywords and `Args` to require exactly one valid
+positional, builds `Short`/`Long`/`Example` from the metadata, registers only the permitted flags
+(`--role` always; `--revoke-type` when `verb` is a REVOKE), sets `Annotations{"write":"true"}` for
+the write verbs, and wires `RunE` to: resolve the positional → canonical action (with a
+cross-category check that yields the "use 'grant database access'" hint), then call
+`runPrivilegeMutation(verb, canonicalAction, ...)`.
+
+**`categoryMeta`.** A table keyed by `actionCategory` holding, per category: the user-facing command
+name (`property`/`entity`/`graph`/`label`/`load`/`database`/`dbms`), the action keywords it contains
+(derivable from `validActions` by filtering on the category, or listed explicitly), `flags []string`
+(which of `--on-graph`/`--on-database`/`--on-dbms`/`--node-label`/`--relationship-type`/`--property`/
+`--cidr` to register), required-flag markers, `Short`/`Long` fragments, and an `Example` template
+(verb word + representative action + flag values substituted). This is the second single-source table
+alongside `validActions`; the factory is its only consumer. A `categoryOrder` slice fixes the
+help/registration order.
+
+**Action resolution & kebab naming.** `ValidArgs` and the displayed action lists use the kebab form
+(`"SET PROPERTY"` → `set-property`, `"ALL GRAPH PRIVILEGES"` → `all-graph-privileges`), satisfying the
+input-casing gate. `RunE` maps the kebab positional back to the canonical `validActions` key — extend
+`normalizeAction` to also treat `-` as a separator (it already collapses `_`/whitespace), so
+`set-property` → `SET PROPERTY`, then look up `validActions`. A positional whose canonical form lands
+in a *different* category is a usage error naming that category's command; an unknown one falls
+through to the existing unknown-action error.
+
+**Single-action category takes no positional (REQ-F-040).** `newCategoryCmd` branches on
+`len(actionsForCategory(cat)) == 1`: for a single-action category it sets `Use: meta.name` (no
+`<action>`), `Args: cobra.NoArgs`, leaves `ValidArgs` nil, and the `RunE` resolves the sole action
+directly (`actionsForCategory(cat)[0]`) instead of reading `args[0]`. Multi-action categories keep
+`Use: "<name> <action>"`, `cobra.ExactArgs(1)`, and `ValidArgs`. The cross-category hint builder must
+omit the action token when the *target* category is single-action (so `grant property load` →
+`… grant load`, not `… grant load load`); the cleanest implementation is a small `categoryInvocation(cat)`
+helper returning `meta.name` for single-action categories and `meta.name + " " + kebabAction(action)`
+otherwise, used by both the hint and any generated docs. `actionSummary` (REQ-F-037) should return
+empty for a single-action category so the `Short` carries no redundant `(load)` suffix, and the
+`Example` renderer must not append the action token for single-action categories. All of this keys off
+the action count, so it is general (today only `load`).
+
+**Shared `runPrivilegeMutation`/`addPrivilegeFlags` reuse.** `runPrivilegeMutation` (task-009) is
+reused verbatim. `addPrivilegeFlags` is refactored into per-flag registration the factory composes
+from `categoryMeta.flags`, so each category gets only its valid flags rather than the full set
+(or it is retired in favour of inline per-flag registration driven by the metadata).
+
+**Action discoverability in `Short` (REQ-F-036/037).** `newCategoryCmd` currently builds `Short` as
+`verbTitle(word) + " a " + meta.shortNoun + " " + rolePreposition(word) + " a role"` — no action
+list. Add an `actionSummary(cat)` helper in `helpers.go` that reuses `kebabActionsForCategory(cat)`:
+if `len(actions) <= 6` it joins them all (`"(read, match, set-property, merge)"`); otherwise it joins
+the first three and appends the count (`"(access, start, stop, … — 19 actions; see --help)"`). Splice
+the result into `Short` (e.g. `… + " " + meta.shortNoun + " " + actionSummary(cat) + " " + …`). The
+threshold and preview count live only in this helper. The `Long` already lists the full set via
+`categoryLong`, so no change there. Note: changing `Short` changes `references/admin.md`, so re-run
+`go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle.
+
+**Skill bundle / agent-context size.** The tree grows by only 7 categories × 3 verbs = 21 leaves (a
+modest, bounded increase, not the ~150 a per-action tree would add). `go generate` enlarges
+`references/admin.md` proportionally and `agent-context` lists the 21 category commands; the action
+lists live in each category command's `Long`/`ValidArgs`. Commit the regenerated bundle; confirm
+`TestGenerator_RoundTrip` and `TestAllLeafCommands_HaveExamples` pass.
+
+---
+
+## Acceptance Criteria
+
+**Privilege list**
+- [ ] `neo4j-cli admin privilege list --credential local` executes `SHOW PRIVILEGES` and renders all privilege records.
+- [ ] `neo4j-cli admin privilege list --role analyst --credential local` executes `SHOW ROLE analyst PRIVILEGES`.
+- [ ] `neo4j-cli admin privilege list --user alice --credential local` executes `SHOW USER alice PRIVILEGES`.
+- [ ] `--role` and `--user` together return a usage error.
+- [ ] All privilege commands return `"(requires Enterprise edition)"` on Community.
+
+**Privilege grant / deny — Cypher construction (propertyBearer)**
+- [ ] `--action read --on-graph * --role analyst --rw` → `GRANT READ {*} ON GRAPH * ELEMENTS * TO analyst`
+- [ ] `--action read --on-graph neo4j --node-label Person --property name --role analyst --rw` → `GRANT READ {name} ON GRAPH neo4j NODES Person TO analyst`
+- [ ] `--action match --on-graph neo4j --relationship-type KNOWS --property weight --role analyst --rw` → `GRANT MATCH {weight} ON GRAPH neo4j RELATIONSHIPS KNOWS TO analyst`
+- [ ] `--action read --node-label Person --role analyst --rw` (no explicit `--on-graph`) → `GRANT READ {*} ON GRAPH * NODES Person TO analyst` (default graph `*`)
+
+**Privilege grant / deny — Cypher construction (graphOnly: TRAVERSE, CREATE, DELETE)**
+- [ ] `--action traverse --on-graph * --role analyst --rw` → `GRANT TRAVERSE ON GRAPH * ELEMENTS * TO analyst` (no `{*}`)
+- [ ] `--action traverse --on-graph neo4j --node-label Movie --role analyst --rw` → ``GRANT TRAVERSE ON GRAPH `neo4j` NODES `Movie` TO analyst``
+
+**Privilege grant / deny — Cypher construction (graphWhole: WRITE, ALL GRAPH PRIVILEGES) — REQ-F-023/024**
+- [ ] `--action write --on-graph * --role analyst --rw` → `GRANT WRITE ON GRAPH * TO analyst` (no `ELEMENTS *`; executes successfully on a live server)
+- [ ] `--action all_graph_privileges --on-graph neo4j --role analyst --rw` → ``GRANT ALL GRAPH PRIVILEGES ON GRAPH `neo4j` TO analyst`` (no `ELEMENTS *`)
+- [ ] `--action write --on-graph * --node-label Person --role analyst --rw` → usage error (WRITE does not accept entity/property qualifiers)
+- [ ] `--action write --on-graph * --property name --role analyst --rw` → usage error
+
+**Privilege grant / deny — Cypher construction (load: LOAD) — REQ-F-025**
+- [ ] `--action load --role analyst --rw` → `GRANT LOAD ON ALL DATA TO analyst` (executes successfully on a live server)
+- [ ] `--action load --cidr 127.0.0.1/32 --role analyst --rw` → `GRANT LOAD ON CIDR "127.0.0.1/32" TO analyst`
+- [ ] `--action load --on-graph * --role analyst --rw` → usage error (LOAD takes no scope/entity flags)
+- [ ] `--cidr 127.0.0.1/32` on any non-LOAD action → usage error
+
+**Privilege grant / deny — Cypher construction (labelScoped: SET LABEL / REMOVE LABEL) — REQ-F-026**
+- [ ] `--action set_label --node-label Person --on-graph neo4j --role analyst --rw` → ``GRANT SET LABEL `Person` ON GRAPH `neo4j` TO analyst``
+- [ ] `--action set_label --node-label Person --node-label Movie --on-graph neo4j --role analyst --rw` → ``GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j` TO analyst`` (all labels emitted, none dropped)
+- [ ] `--action remove_label --node-label Person --on-graph neo4j --role analyst --rw` → ``GRANT REMOVE LABEL `Person` ON GRAPH `neo4j` TO analyst``
+- [ ] `--action set_label --role analyst --rw` (missing `--node-label`) → usage error
+
+**Privilege grant / deny — Cypher construction (database scope)**
+- [ ] `--action access --on-database neo4j --role analyst --rw` → `GRANT ACCESS ON DATABASE neo4j TO analyst`
+- [ ] `--action access --role analyst --rw` (no scope flag) → `GRANT ACCESS ON DATABASE * TO analyst` (default `*`)
+- [ ] `--action all_database_privileges --on-database * --role analyst --rw` → `GRANT ALL DATABASE PRIVILEGES ON DATABASE * TO analyst`
+
+**Privilege grant / deny — Cypher construction (dbms scope)** _(`--on-dbms` removed per REQ-F-038; see the per-category ACs for the current `grant dbms <action>` form)_
+- [ ] `grant dbms create-role --role analyst --rw` → `GRANT CREATE ROLE ON DBMS TO analyst` (no scope flag; `ON DBMS` implied by the category)
+- [ ] `grant dbms all-dbms-privileges --role analyst --rw` → `GRANT ALL DBMS PRIVILEGES ON DBMS TO analyst`
+
+**Privilege revoke**
+- [ ] `--action read --on-graph * --role analyst --rw` → `REVOKE READ {*} ON GRAPH * ELEMENTS * FROM analyst`
+- [ ] `--action read --on-graph * --role analyst --revoke-type grant --rw` → `REVOKE GRANT READ {*} ON GRAPH * ELEMENTS * FROM analyst`
+- [ ] `--action read --on-graph * --role analyst --revoke-type deny --rw` → `REVOKE DENY READ {*} ON GRAPH * ELEMENTS * FROM analyst`
+
+**Flag conflict validation**
+- [ ] `--action traverse --property name --role analyst --rw` → usage error (`TRAVERSE` does not accept a property qualifier)
+- [ ] `--action find --role analyst --rw` → unknown action usage error (`FIND` is not a valid keyword)
+- [ ] `--action access --on-graph neo4j --role analyst --rw` → usage error (database-scope action with graph scope)
+- [ ] `--action create_role --on-graph neo4j --role analyst --rw` → usage error (dbms action with graph scope)
+- [ ] `--on-graph *` and `--on-database neo4j` together → usage error (mutually exclusive scopes)
+- [ ] `--node-label Person --relationship-type KNOWS` together → usage error (mutually exclusive qualifiers)
+
+**Mutation output**
+- [ ] `privilege grant --action read --on-graph * --role analyst --rw` emits analyst's updated privilege list on success.
+- [ ] `privilege deny --action write --on-graph * --role readonly --rw` emits readonly's updated privilege list on success.
+- [ ] `privilege revoke --action read --on-graph * --role analyst --rw` emits analyst's updated privilege list on success.
+
+**Required flag validation (exit code 2)**
+- [ ] `privilege grant --role analyst --on-graph * --credential local --rw` (missing `--action`) returns exit code 2 and prints usage.
+- [ ] `privilege grant --action read --on-graph * --credential local --rw` (missing `--role`) returns exit code 2 and prints usage.
+- [ ] `privilege deny --role analyst --on-graph * --credential local --rw` (missing `--action`) returns exit code 2 and prints usage.
+- [ ] `privilege revoke --role analyst --on-graph * --credential local --rw` (missing `--action`) returns exit code 2 and prints usage.
+- [ ] Unit tests for the above assert `ce.Code == 2` and message content (`"--action is required"`, `"--role is required"`), not cobra's built-in required-flag message.
+
+**Aura Forbidden (handled by run.go, inherited automatically)**
+- [ ] `admin privilege list` against an Aura Free or Professional instance that returns `Security.Forbidden` produces a `validation_error` with the Aura BC tier hint (verified via `run_test.go` existing coverage — no new privilege-specific test needed).
+- [ ] `admin.go` `Short` updated to "Manage Neo4j databases, users, roles, and privileges".
+- [ ] `admin.go` `Long` description ends with `` `privilege` (list, grant, deny, revoke). ``.
+
+**General**
+- [ ] All four privilege leaf commands have non-empty flush-left `Example:` fields (passes `TestAllLeafCommands_HaveExamples`).
+- [ ] `make test`, `make fmt-check`, `make lint` all pass.
+- [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff (passes `TestGenerator_RoundTrip`).
+- [ ] Changelog entry added.
+
+**Discoverability redesign — per-category subcommands (REQ-F-029..035)**
+- [ ] `neo4j-cli admin privilege grant` (no category) prints help listing the seven category subcommands; `grant <TAB>` completes `property entity graph label load database dbms`.
+- [ ] `neo4j-cli admin privilege grant property <TAB>` completes `read match set-property merge`; `grant dbms <TAB>` completes the dbms actions.
+- [ ] `neo4j-cli admin privilege grant property --help` shows only `--on-graph`, `--node-label`, `--relationship-type`, `--property`, `--role` (plus global flags) and lists the property actions.
+- [ ] `neo4j-cli admin privilege grant graph --help` shows only `--on-graph` and `--role` (no qualifier flags) and lists `write`, `all-graph-privileges`.
+- [ ] `neo4j-cli admin privilege grant load --help` shows only `--cidr` and `--role`.
+- [ ] `neo4j-cli admin privilege grant dbms --help` shows only `--role` (no scope flag; `ON DBMS` implied — REQ-F-038).
+- [ ] `neo4j-cli admin privilege grant database --help` shows only `--on-database` and `--role`.
+- [ ] `neo4j-cli admin privilege grant property read --on-graph * --role analyst --rw` emits `GRANT READ {*} ON GRAPH * ELEMENTS * TO analyst` — identical Cypher to the former `--action read` path.
+- [ ] `neo4j-cli admin privilege grant label set-label --node-label Person --node-label Movie --on-graph neo4j --role analyst --rw` emits ``GRANT SET LABEL `Person`, `Movie` ON GRAPH `neo4j` TO analyst``.
+- [ ] `neo4j-cli admin privilege revoke property read --on-graph * --role analyst --revoke-type grant --rw` emits `REVOKE GRANT READ {*} ON GRAPH * ELEMENTS * FROM analyst`.
+- [ ] `neo4j-cli admin privilege grant property --on-dbms ...` fails as an unknown flag (`--on-dbms` is not registered on the `property` category) rather than reaching the database.
+- [ ] `neo4j-cli admin privilege grant property access ...` returns a usage error naming the correct command (`use 'admin privilege grant database access'`).
+- [ ] `neo4j-cli admin privilege grant property read --rw` (missing `--role`) returns exit code 2 with `"--role is required"`.
+- [ ] The `--action` flag no longer exists on `grant`/`deny`/`revoke`; no README/bundle/example references it.
+- [ ] Every category subcommand has a flush-left `Example` (`TestAllLeafCommands_HaveExamples` passes for all 21 leaves).
+- [ ] Structure test (REQ-NF-006) and per-category Cypher-parity tests (REQ-NF-007) pass.
+- [ ] `make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass with the new tree; README, skill bundle, and agent-context regenerated/updated.
+
+**Action discoverability in help (REQ-F-036/037, REQ-NF-009)**
+- [ ] `neo4j-cli admin privilege grant graph --help` and the parent `grant --help` subcommand listing both show `graph`'s actions, e.g. `"Grant a graph privilege (write, all-graph-privileges) to a role"`.
+- [ ] `grant property`'s `Short` lists `(read, match, set-property, merge)`; `grant entity`'s lists `(traverse, create, delete)`.
+- [ ] `grant database`'s `Short` shows a truncated preview with a count, e.g. `(access, start, stop, … — 19 actions; see --help)`; `grant dbms`'s likewise shows `19 actions`.
+- [ ] `neo4j-cli admin privilege grant --help` (and `deny`/`revoke --help`) lists all seven category subcommands each annotated with its action summary.
+- [ ] The full action list for `database`/`dbms` is still shown by their leaf `--help` (`Long`), not truncated.
+- [ ] A unit test asserts the per-category `Short` action summaries (full for small categories, truncated+count for `database`/`dbms`).
+- [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff after committing the regenerated bundle (`Short` change flows into `references/admin.md`); `TestGenerator_RoundTrip` passes.
+
+**Post-redesign usability fixes (REQ-F-038/039, REQ-NF-010)**
+- [ ] `neo4j-cli admin privilege grant dbms` registers no `--on-dbms` flag; `grant dbms create-role --role analyst --rw` emits `GRANT CREATE ROLE ON DBMS TO analyst`.
+- [ ] `grant dbms create-role --rw` (missing `--role`) still returns exit code 2 with `"--role is required"`; there is no longer a "missing `--on-dbms`" usage error.
+- [ ] `neo4j-cli admin privilege grant dbms aleter-user --role analyst --rw` returns a usage error (exit 2) listing only the kebab `dbms` actions (contains `alter-user`, not `ALTER USER`; does not contain `read`/`access`).
+- [ ] No privilege usage error lists Cypher-form (UPPER-CASE, space-separated) action keywords; `sortedActions()`'s Cypher-form enumeration is removed from all user-facing paths.
+- [ ] `categoryMeta[dbms].flags` is empty; `privilegeOpts.onDbms` and `flagOnDbms` are removed; skill bundle regenerated; `make test`/`fmt-check`/`lint`/`license-check` and `TestGenerator_RoundTrip` pass.
+
+**Single-action category takes no positional (REQ-F-040, REQ-NF-011)**
+- [ ] `neo4j-cli admin privilege grant load --cidr 127.0.0.1/32 --role analyst --rw` emits `GRANT LOAD ON CIDR "127.0.0.1/32" TO analyst` with no positional; `grant load --role analyst --rw` emits `GRANT LOAD ON ALL DATA TO analyst`.
+- [ ] `neo4j-cli admin privilege grant load load …` is rejected as an unexpected argument (cobra `NoArgs`), not accepted.
+- [ ] The `load` command's `Use` is `load` (no `<action>`), `Args` is `cobra.NoArgs`, and it exposes no `ValidArgs`; multi-action categories are unchanged (one positional + `ValidArgs`).
+- [ ] The cross-category hint pointing at `load` omits the action: `grant property load` → `"… use 'admin privilege grant load'"` (no trailing `load`).
+- [ ] The `load` `Short`/`Example` carry no action token (`Short` has no `(load)` suffix; `Example` is `grant load --cidr …`). Same for `deny load`/`revoke load`.
+- [ ] Rule is data-driven from the category's action count (general, not load-hardcoded); skill bundle regenerated; `make test`/`fmt-check`/`lint`/`license-check` and `TestGenerator_RoundTrip` pass.
+
+**Second-QA-pass usability fixes (REQ-F-041..043, REQ-NF-012)**
+- [ ] `neo4j-cli admin privilege grant label set-label --on-graph neo4j --role analyst --rw` (no `--node-label`) returns `action set-label requires --node-label` (kebab form; not `SET LABEL`); `remove-label` likewise.
+- [ ] `neo4j-cli admin privilege grant label --help` describes `--node-label` as the required target of SET/REMOVE LABEL (e.g. "Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable)"), while `grant property --help` / `grant entity --help` keep the "Restrict … to node labels" wording.
+- [ ] `neo4j-cli admin privilege list --role <nonexistent> --credential local` returns a `validation_error` (exit 6) with `role "<nonexistent>" does not exist`; `--user <nonexistent>` returns `user "<nonexistent>" does not exist`.
+- [ ] `neo4j-cli admin privilege list --role <real-role-with-no-privileges>` exits 0 with an empty list (existence check confirms the role exists).
+- [ ] A role/user with privileges and the unfiltered `SHOW PRIVILEGES` path issue no extra existence query (existence check runs only on the empty-filtered-result path).
+- [ ] The per-category flag-help override is data-driven from `categoryMeta` (no per-leaf hand-authoring); skill bundle regenerated (`references/admin.md` `grant label --help` change); `make test`/`fmt-check`/`lint`/`license-check` and `TestGenerator_RoundTrip` pass.
+
+---
+
+## Out of Scope
+
+- Role CRUD — CLI-216 (parallel).
+- Aura-specific privilege checks beyond natural error surfacing.
+- Privilege filtering by label, relationship type, or property in `privilege list` (only --role and --user filters).
+- `DENY` removal semantics subtleties (handled by Neo4j; CLI just emits the correct verb).
+- Per-action subcommands for `privilege list` — `list` stays a single command with `--role`/`--user` filters (the redesign in REQ-F-029..035 applies only to `grant`/`deny`/`revoke`).
+
+---
+
+## Open Questions
+
+1. **`--on-graph` default for database-scope actions**: The current spec (REQ-F-010) says
+   `database` actions default to `ON DATABASE *` when no scope flag is set. This means omitting
+   all scope flags is valid for database actions. For `graphOnly` / `propertyBearer` actions, the
+   default is also `ON GRAPH *`. Per REQ-F-038 `dbms` actions no longer take a scope flag at all —
+   `ON DBMS` is implied by the category. This is intentional (matches `GRANT ... ON GRAPH * /
+   DATABASE *` Cypher defaults) but is worth a final confirmation during review.
+
+2. **`immutable` column**: `SHOW PRIVILEGES` returns an `immutable` boolean column on some Neo4j
+   versions (for built-in privileges that cannot be revoked). The current `privilegeFields` list
+   excludes it for brevity. Add it to the fields list if it proves useful during live testing.
+
+3. **Category command names (REQ-F-029)**: the proposed user-facing names are `property`, `entity`,
+   `graph`, `label`, `load`, `database`, `dbms`. The three graph-scoped names (`property` for
+   READ/MATCH/SET PROPERTY/MERGE, `entity` for TRAVERSE/CREATE/DELETE, `graph` for WRITE/ALL GRAPH
+   PRIVILEGES) are the least self-evident — confirm or rename during review (e.g. `graph-property` /
+   `graph-entity` / `graph` for an explicit prefix). Whatever is chosen must stay kebab-case (input
+   casing gate) and be reflected in `categoryMeta`, help, examples, and the bundle.
+
+4. **Help-text generation per category (REQ-F-033)**: the `Long`/`Example` is generated from
+   `categoryMeta` templates. Confirm the generated prose and the chosen representative action per
+   category read well during review; if a category needs bespoke wording, allow a per-category
+   override in `categoryMeta`.
+
+5. **Cross-category positional error wording (REQ-F-030)**: confirm the exact phrasing of the
+   "action X belongs to category Y, use 'grant Y X'" hint and that it carries the `usage_error` code
+   (exit 2), consistent with the other client-side validation errors.
+
+6. **Existence-check exit code (REQ-F-043)**: the nonexistent-`--role`/`--user` case returns a
+   `validation_error` (exit 6), matching how the server's `Role does not exist` surfaces for the write
+   verbs. Confirm exit 6 (not the exit-2 `usage_error` used for client-side flag mistakes) is the right
+   code, given the target is validated against the live database rather than parsed from flags.
