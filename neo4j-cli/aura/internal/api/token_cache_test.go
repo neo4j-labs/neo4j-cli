@@ -40,6 +40,7 @@ func envCfg(t *testing.T, serverURL, clientID, clientSecret string) *clicfg.Conf
 		Name:         "env",
 		ClientId:     clientID,
 		ClientSecret: clientSecret,
+		Ephemeral:    true,
 	})
 	return cfg
 }

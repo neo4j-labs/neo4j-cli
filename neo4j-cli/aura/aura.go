@@ -88,6 +88,7 @@ func applyEnvCredential(cfg *clicfg.Config) error {
 		Name:         "env",
 		ClientId:     clientID,
 		ClientSecret: clientSecret,
+		Ephemeral:    true,
 	})
 	return nil
 }

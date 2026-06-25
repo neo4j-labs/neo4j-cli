@@ -36,14 +36,13 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW 
 		return "", clierr.NewUsageError("aura auth-url rejected: %s", err.Error())
 	}
 
-	// An env-var-synthesized credential (accept-env-vars mode) is not in the
-	// store. For such credentials the derived JWT is cached on disk keyed by the
-	// (id|secret|authURL) identity so repeated short-lived CI invocations reuse
-	// one mint. Stored (keyring/insecure) credentials are persisted via the
-	// store instead and never touch this disk cache.
-	_, getErr := cfg.Credentials.Aura.Get(credential.Name)
-	inStore := getErr == nil
-	envMode := !inStore && cfg.Global.AcceptEnvVars()
+	// An env-var-synthesized credential (accept-env-vars mode) carries the
+	// Ephemeral marker set at synthesis. For such credentials the derived JWT is
+	// cached on disk keyed by the (id|secret|authURL) identity so repeated
+	// short-lived CI invocations reuse one mint. Stored (keyring/insecure)
+	// credentials are persisted via the store instead and never touch this disk
+	// cache.
+	envMode := credential.Ephemeral && cfg.Global.AcceptEnvVars()
 
 	var fullHash, cachePath string
 	if envMode {
@@ -78,7 +77,7 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW 
 	// A not-in-store credential outside env-var mode (e.g. an in-process active
 	// credential) is kept in-memory only — UpdateAccessToken would panic on its
 	// missing Get lookup.
-	if inStore {
+	if _, getErr := cfg.Credentials.Aura.Get(credential.Name); getErr == nil {
 		if _, saveErr := cfg.Credentials.Aura.UpdateAccessToken(credential, grant.AccessToken, grant.ExpiresIn); saveErr != nil {
 			fmt.Fprintf(warnW, "Warning: failed to persist access token to keyring: %v\n", saveErr) //nolint:errcheck
 		}

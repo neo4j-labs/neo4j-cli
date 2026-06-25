@@ -332,7 +332,7 @@ tasks:
       all existing behaviour intact. If, on inspection, threading a marker adds more
       complexity than the store-miss it replaces, leave a brief justification in the
       progress note and keep the current form — this is a judgement call.
-    status: pending
+    status: completed
     dependencies:
       - task-012
       - task-013
@@ -342,4 +342,4 @@ tasks:
       - "All existing token-cache tests pass unchanged"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-25T13:16:55Z
