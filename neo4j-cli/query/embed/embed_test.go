@@ -505,7 +505,67 @@ func TestResolve_EnvGate_OnMissingKeyErrors(t *testing.T) {
 
 	_, err := Resolve(cmd, cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "requires an API key")
+	assert.Contains(t, err.Error(), "missing embed API key")
+}
+
+// TestResolve_EnvGate_OnProviderFromEnvKeyFromDotenv is the bug case from the
+// review: provider arrives via NEO4J_EMBED_PROVIDER while the key arrives via
+// the .env walk-up. The resolved Config has a key, so it must resolve cleanly.
+func TestResolve_EnvGate_OnProviderFromEnvKeyFromDotenv(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(envEmbedProvider, "openai")
+
+	cfg := newTestCfg(t, "{}")
+	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_API_KEY=dotenv-key\n")
+
+	cmd := newTestCmd(t)
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "openai", got.Provider)
+	assert.Equal(t, "dotenv-key", got.APIKey, "key from .env must satisfy the env-mode check")
+}
+
+// TestResolve_EnvGate_OnProviderFromEnvKeyFromStored covers the other resolved
+// source: provider via env, key from the stored embed credential.
+func TestResolve_EnvGate_OnProviderFromEnvKeyFromStored(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(envEmbedProvider, "openai")
+
+	creds := `{"embed":{"default-credential":"d","credentials":[` +
+		`{"name":"d","provider":"openai","model":"stored-model",` +
+		`"base-url":"https://stored.example/v1","dimensions":256,"api-key":"stored-key"}` +
+		`]}}`
+	cfg := newTestCfg(t, creds)
+	cmd := newTestCmd(t)
+
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "openai", got.Provider)
+	assert.Equal(t, "stored-key", got.APIKey, "key from stored cred must satisfy the env-mode check")
+}
+
+// TestResolve_EnvGate_OnNoKeyProvidersExempt verifies Ollama and Vertex never
+// require a key even in env-var mode with no key from any source.
+func TestResolve_EnvGate_OnNoKeyProvidersExempt(t *testing.T) {
+	for _, provider := range []string{"ollama", "vertex"} {
+		t.Run(provider, func(t *testing.T) {
+			clearEmbedEnv(t)
+			t.Chdir(t.TempDir())
+			t.Setenv(envAcceptEnvVars, "1")
+			t.Setenv(envEmbedProvider, provider)
+
+			cfg := newTestCfg(t, "{}")
+			cmd := newTestCmd(t)
+
+			got, err := Resolve(cmd, cfg)
+			require.NoError(t, err)
+			assert.Equal(t, provider, got.Provider)
+			assert.Empty(t, got.APIKey)
+		})
+	}
 }
 
 // TestResolve_EnvGate_OffDotenvUnaffected verifies the .env walk-up still

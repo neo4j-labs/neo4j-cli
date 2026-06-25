@@ -31,14 +31,6 @@ const (
 	EnvGoogleKey       = "GOOGLE_API_KEY"
 )
 
-// Embed provider names. Duplicated from neo4j-cli/query/embed so this
-// package (under common/, which cannot import neo4j-cli/internal or query)
-// can express the provider-specific API-key rule.
-const (
-	embedProviderOllama = "ollama"
-	embedProviderVertex = "vertex"
-)
-
 // EnvCredentialSpec describes the env vars for one credential type.
 type EnvCredentialSpec struct {
 	// Sentinel is the single env var whose presence triggers the hint.
@@ -111,32 +103,6 @@ func ValidateEnvCredentialSet(spec EnvCredentialSpec, getenv func(string) string
 		}
 	}
 	return nil
-}
-
-// ValidateEmbedEnvSet enforces provider-specific API-key completeness. When
-// NEO4J_EMBED_PROVIDER names a provider that needs an API key (all except
-// ollama and vertex, which authenticate via Application Default Credentials),
-// at least one applicable key var must be set.
-func ValidateEmbedEnvSet(getenv func(string) string) error {
-	provider := getenv(EnvEmbedProvider)
-	if provider == "" {
-		return nil
-	}
-	switch strings.ToLower(provider) {
-	case embedProviderOllama, embedProviderVertex:
-		return nil
-	}
-
-	keys := []string{EnvEmbedAPIKey, EnvOpenAIKey, EnvHFToken, EnvGeminiKey, EnvGoogleKey}
-	for _, name := range keys {
-		if getenv(name) != "" {
-			return nil
-		}
-	}
-	return clierr.NewUsageError(
-		"incomplete credential environment: %s=%q requires an API key — set one of %s",
-		EnvEmbedProvider, provider, strings.Join(keys, ", "),
-	)
 }
 
 func plural(n int) string {

@@ -15,6 +15,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/subosito/gotenv"
@@ -238,12 +239,20 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	// we read .env first then OS env.
 	out.APIKey = resolveAPIKey(cfg, out.Provider, out.APIKey, dotenvVals)
 
-	// In env-var mode, a NEO4J_EMBED_PROVIDER that needs an API key but has
-	// none set is a usage error (REQ-F-010 embed group). Gated to env-var mode
-	// so the .env / stored-credential paths are unaffected.
+	// In env-var mode, a provider that needs an API key but resolved none from
+	// any source (flag / env / .env / stored) is a usage error (REQ-F-010 embed
+	// group). Validate the RESOLVED Config — not raw os.Getenv — so a key
+	// supplied via .env or a stored credential counts as present, matching the
+	// DBMS check in dbconn.ResolveConn and the documented precedence. Gated to
+	// env-var mode so the .env / stored-credential paths are otherwise
+	// unaffected.
 	if cfg != nil && cfg.Global.AcceptEnvVars() {
-		if err := credentials.ValidateEmbedEnvSet(os.Getenv); err != nil {
-			return Config{}, err
+		if out.Provider != "" && providerNeedsKey(out.Provider) && out.APIKey == "" {
+			return Config{}, clierr.NewUsageError(
+				"missing embed API key for provider %q: set --embed-provider's key via "+
+					"NEO4J_EMBED_API_KEY (or the provider-specific variable), a .env file, "+
+					"or a stored embed credential",
+				out.Provider)
 		}
 	}
 
@@ -255,6 +264,18 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	out.UserAgent = "neo4j-cli/v" + version
 
 	return out, nil
+}
+
+// providerNeedsKey reports whether a provider requires an API key. Ollama
+// needs none and Vertex authenticates via Application Default Credentials, so
+// both are exempt — matching the resolveAPIKey logic below.
+func providerNeedsKey(provider string) bool {
+	switch strings.ToLower(provider) {
+	case ProviderOllama, ProviderVertex:
+		return false
+	default:
+		return true
+	}
 }
 
 // resolveAPIKey applies provider-specific API key resolution. OpenAI,

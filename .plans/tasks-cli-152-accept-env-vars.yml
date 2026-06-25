@@ -267,7 +267,7 @@ tasks:
       embedProviderOllama/embedProviderVertex constants that were duplicated there
       (env_spec.go:37-40) purely to express this rule. Keep Ollama and Vertex (ADC)
       exempt from the key requirement, matching production resolveAPIKey logic.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "With accept-env-vars=true, NEO4J_EMBED_PROVIDER=openai in the env and the API key supplied via .env (or stored credential), embed resolves successfully — no usage error"
@@ -276,7 +276,7 @@ tasks:
       - "ValidateEmbedEnvSet and the embedProviderOllama/embedProviderVertex constants are removed from common/clicfg/credentials; the key-completeness policy lives in the embed package"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-25T13:02:16Z
 
   - id: task-013
     title: 'Consolidate the duplicated gatedGetenv helper and env-var name constants'

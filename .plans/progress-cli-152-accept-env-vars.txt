@@ -53,3 +53,8 @@ Decisions: keyring untouched by construction (UpdateAccessToken guarded by !inSt
 
 ## REVIEW — 2026-06-25T12:56:14Z
 Added 3 review tasks (task-012..task-014).
+
+## TASK-012 — 2026-06-25T13:02:16Z
+Replaced the embed env-mode key check with one that validates the RESOLVED Config (out.Provider set + providerNeedsKey + out.APIKey=="") instead of re-reading os.Getenv, so a key from .env or a stored credential now satisfies it (fixes the bug + matches the dbconn.ResolveConn shape). Moved the provider-needs-a-key policy into embed (new providerNeedsKey, Ollama/Vertex exempt) and removed credentials.ValidateEmbedEnvSet + the embedProviderOllama/Vertex constants.
+Files: ~4 mod (embed.go, embed_test.go, env_spec.go, env_spec_test.go)
+Decisions: providerNeedsKey lowercases (preserving old ValidateEmbedEnvSet leniency); error text changed to "missing embed API key".
