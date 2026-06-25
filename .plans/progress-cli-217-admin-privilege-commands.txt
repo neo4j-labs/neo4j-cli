@@ -149,3 +149,8 @@ Files: ~privilege/cypher.go, ~privilege/privilege_helpers_test.go
 ## TASK-030 — 2026-06-25T00:00:00Z
 Added an optional flagHelp map to categoryInfo; registerPrivilegeFlag now takes a per-flag help override (falling back to the shared default via orDefault) and newCategoryCmd passes meta.flagHelp[flag]. labelScoped overrides --node-label to describe it as the required SET/REMOVE LABEL target; property/entity keep the shared "Restrict ... to node labels" default. Added a structure test and regenerated the skill bundle. All four gates pass; reviewer LGTM.
 Files: ~privilege/helpers.go, ~privilege/structure_test.go, ~bundle/references/admin.md
+
+## TASK-031 — 2026-06-25T00:00:00Z
+privilege list --role/--user now disambiguates a non-existent target from a real one with no privileges: on the empty-result path it runs a follow-up existence check (SHOW ROLES/USERS ... WHERE = $name) via the privilegeExecFn seam and returns clierr.NewValidationError ("role/user %q does not exist", exit 6) when absent. The check runs only when filtered AND empty, so non-empty and unfiltered paths still cost one query.
+Files: ~list.go, ~list_test.go
+Decisions: Added a shared requireExists helper in list.go (no role/user package import — existence Cypher inlined) to avoid duplicating the role/user check bodies.

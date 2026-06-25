@@ -143,6 +143,119 @@ func TestList_BothFilters_UsageError(t *testing.T) {
 	assert.False(t, cap.called, "seam must not be called when both filters are set")
 }
 
+// runListSequenced builds the `admin privilege list` command tree with a fake
+// conn and a recording sequenced exec-fn, then executes it with args. It returns
+// the recorded calls so tests can assert the existence-check round-trip.
+func runListSequenced(t *testing.T, args string, responses []struct {
+	rows []map[string]any
+	err  error
+}) (*[]sequencedCall, error) {
+	t.Helper()
+
+	calls := &[]sequencedCall{}
+	withRecordingSequencedExecFn(t, calls, responses)
+
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, privilegeExecFn)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	cmd.SetOut(bytes.NewBuffer(nil))
+	cmd.SetErr(bytes.NewBuffer(nil))
+
+	argv, splitErr := shlex.Split(args)
+	require.NoError(t, splitErr)
+	cmd.SetArgs(append([]string{"list"}, argv...))
+
+	return calls, cmd.Execute()
+}
+
+func TestList_RoleFilter_Nonexistent_ValidationError(t *testing.T) {
+	calls, err := runListSequenced(t, "--role missing --format json", []struct {
+		rows []map[string]any
+		err  error
+	}{
+		{rows: []map[string]any{}, err: nil},
+		{rows: []map[string]any{}, err: nil},
+	})
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 6, ce.Code)
+	assert.Contains(t, ce.Message, `role "missing" does not exist`)
+
+	require.Len(t, *calls, 2)
+	assert.Equal(t, "SHOW ROLE $name PRIVILEGES", (*calls)[0].cypher)
+	assert.Equal(t, "SHOW ROLES YIELD role WHERE role = $name RETURN role", (*calls)[1].cypher)
+	assert.Equal(t, "missing", (*calls)[1].params["name"])
+}
+
+func TestList_UserFilter_Nonexistent_ValidationError(t *testing.T) {
+	calls, err := runListSequenced(t, "--user ghost --format json", []struct {
+		rows []map[string]any
+		err  error
+	}{
+		{rows: []map[string]any{}, err: nil},
+		{rows: []map[string]any{}, err: nil},
+	})
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 6, ce.Code)
+	assert.Contains(t, ce.Message, `user "ghost" does not exist`)
+
+	require.Len(t, *calls, 2)
+	assert.Equal(t, "SHOW USER $name PRIVILEGES", (*calls)[0].cypher)
+	assert.Equal(t, "SHOW USERS YIELD user WHERE user = $name RETURN user", (*calls)[1].cypher)
+	assert.Equal(t, "ghost", (*calls)[1].params["name"])
+}
+
+func TestList_RoleFilter_ExistsButNoPrivileges_EmptyOK(t *testing.T) {
+	calls, err := runListSequenced(t, "--role analyst --format json", []struct {
+		rows []map[string]any
+		err  error
+	}{
+		{rows: []map[string]any{}, err: nil},
+		{rows: []map[string]any{{"role": "analyst"}}, err: nil},
+	})
+	require.NoError(t, err)
+
+	require.Len(t, *calls, 2)
+	assert.Equal(t, "SHOW ROLE $name PRIVILEGES", (*calls)[0].cypher)
+	assert.Equal(t, "SHOW ROLES YIELD role WHERE role = $name RETURN role", (*calls)[1].cypher)
+}
+
+func TestList_RoleFilter_NonEmpty_NoExistenceCheck(t *testing.T) {
+	rows := []map[string]any{
+		{"access": "GRANTED", "action": "match", "resource": "graph", "segment": "NODE(*)", "role": "analyst"},
+	}
+	calls, err := runListSequenced(t, "--role analyst --format json", []struct {
+		rows []map[string]any
+		err  error
+	}{
+		{rows: rows, err: nil},
+	})
+	require.NoError(t, err)
+
+	require.Len(t, *calls, 1, "a target with privileges must not trigger an existence check")
+	assert.Equal(t, "SHOW ROLE $name PRIVILEGES", (*calls)[0].cypher)
+}
+
+func TestList_NoFilter_Empty_NoExistenceCheck(t *testing.T) {
+	calls, err := runListSequenced(t, "--format json", []struct {
+		rows []map[string]any
+		err  error
+	}{
+		{rows: []map[string]any{}, err: nil},
+	})
+	require.NoError(t, err)
+
+	require.Len(t, *calls, 1, "unfiltered SHOW PRIVILEGES must not trigger an existence check")
+	assert.Equal(t, "SHOW PRIVILEGES", (*calls)[0].cypher)
+}
+
 func TestList_EnterpriseOnlyError_PropagatesValidationError(t *testing.T) {
 	enterpriseErr := clierr.NewValidationError("SHOW PRIVILEGES is not supported (requires Enterprise edition)")
 	cap := &capture{}
