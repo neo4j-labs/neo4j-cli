@@ -145,3 +145,7 @@ Decisions: validActions stays the single source — init() scans it once and pre
 ## TASK-029 — 2026-06-25T00:00:00Z
 The labelScoped "requires --node-label" usage error in cypher.go now renders the action via kebabAction(action), so it reads "action set-label requires --node-label" instead of the Cypher form; updated the error unit cases to assert kebab form and added a negative assertion that the message never contains the Cypher form. All four gates pass.
 Files: ~privilege/cypher.go, ~privilege/privilege_helpers_test.go
+
+## TASK-030 — 2026-06-25T00:00:00Z
+Added an optional flagHelp map to categoryInfo; registerPrivilegeFlag now takes a per-flag help override (falling back to the shared default via orDefault) and newCategoryCmd passes meta.flagHelp[flag]. labelScoped overrides --node-label to describe it as the required SET/REMOVE LABEL target; property/entity keep the shared "Restrict ... to node labels" default. Added a structure test and regenerated the skill bundle. All four gates pass; reviewer LGTM.
+Files: ~privilege/helpers.go, ~privilege/structure_test.go, ~bundle/references/admin.md

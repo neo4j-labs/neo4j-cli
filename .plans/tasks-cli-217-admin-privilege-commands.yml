@@ -877,7 +877,8 @@ tasks:
 
   - id: task-030
     title: "Add per-category flag-help override; fix --node-label help on the label category (REQ-F-042)"
-    status: todo
+    status: completed
+    completed_at: 2026-06-25T00:00:00Z
     source: qa
     description: |
       Second-QA-pass finding 3. `registerPrivilegeFlag` registers one shared help string per flag, but

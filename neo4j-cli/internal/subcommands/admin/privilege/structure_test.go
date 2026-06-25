@@ -217,6 +217,32 @@ func TestActionSummary(t *testing.T) {
 	assert.Equal(t, "(all-dbms-privileges, alter-user, assign-role, … — 19 actions; see --help)", actionSummary(dbms))
 }
 
+// TestCategoryCommands_NodeLabelHelpOverride asserts the label category overrides
+// the shared --node-label help (it is the required SET/REMOVE LABEL target there)
+// while property/entity keep the shared "Restrict ... to node labels" default
+// (REQ-F-042).
+func TestCategoryCommands_NodeLabelHelpOverride(t *testing.T) {
+	const sharedDefault = "Restrict a graph privilege to node labels"
+
+	for _, word := range []string{"grant", "deny", "revoke"} {
+		parent := verbParent(t, word)
+		byName := map[string]*cobra.Command{}
+		for _, sub := range parent.Commands() {
+			byName[strings.Fields(sub.Use)[0]] = sub
+		}
+
+		labelHelp := byName["label"].Flags().Lookup(flagNodeLabel).Usage
+		assert.NotEqual(t, sharedDefault, labelHelp, "%s label --node-label must override the shared help", word)
+		assert.Contains(t, labelHelp, "SET LABEL")
+		assert.Contains(t, labelHelp, "required")
+
+		for _, name := range []string{"property", "entity"} {
+			assert.Equal(t, sharedDefault, byName[name].Flags().Lookup(flagNodeLabel).Usage,
+				"%s %s --node-label keeps the shared default", word, name)
+		}
+	}
+}
+
 // TestCategoryCommands_HaveFlushLeftExample asserts every category leaf carries a
 // non-empty flush-left Example (REQ-NF-006; mirrors TestAllLeafCommands_HaveExamples
 // scoped to this tree).

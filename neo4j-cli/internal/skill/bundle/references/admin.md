@@ -369,7 +369,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--node-label` | stringArray | [] | Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable) |
 | `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
 | `--role` | string | - | Name of the role to deny the privilege to |
 
@@ -567,7 +567,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--node-label` | stringArray | [] | Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable) |
 | `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
 | `--role` | string | - | Name of the role to grant the privilege to |
 
@@ -797,7 +797,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--node-label` | stringArray | [] | Restrict a graph privilege to node labels |
+| `--node-label` | stringArray | [] | Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable) |
 | `--on-graph` | string | - | Scope the privilege to a graph (use * for all) |
 | `--revoke-type` | string | - | Restrict the revoke to grant or deny privileges (grant\|deny); omit to revoke both |
 | `--role` | string | - | Name of the role to revoke the privilege from |

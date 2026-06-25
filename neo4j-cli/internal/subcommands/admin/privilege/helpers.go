@@ -40,22 +40,31 @@ func outputPrivileges(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn,
 // registerPrivilegeFlag registers a single privilege flag (by its long name)
 // onto cmd, binding it to the matching field of opts. It is the per-flag
 // primitive the category-subcommand factory composes from categoryMeta.flags so
-// each category gets only the flags valid for it.
-func registerPrivilegeFlag(cmd *cobra.Command, opts *privilegeOpts, flag string) {
+// each category gets only the flags valid for it. help overrides the shared
+// default help text when non-empty (e.g. --node-label means a required target on
+// the label category, not an optional restriction).
+func registerPrivilegeFlag(cmd *cobra.Command, opts *privilegeOpts, flag, help string) {
 	switch flag {
 	case flagOnGraph:
-		cmd.Flags().StringVar(&opts.onGraph, flagOnGraph, "", "Scope the privilege to a graph (use * for all)")
+		cmd.Flags().StringVar(&opts.onGraph, flagOnGraph, "", orDefault(help, "Scope the privilege to a graph (use * for all)"))
 	case flagOnDatabase:
-		cmd.Flags().StringVar(&opts.onDatabase, flagOnDatabase, "", "Scope the privilege to a database (use * for all)")
+		cmd.Flags().StringVar(&opts.onDatabase, flagOnDatabase, "", orDefault(help, "Scope the privilege to a database (use * for all)"))
 	case flagNodeLabel:
-		cmd.Flags().StringArrayVar(&opts.nodeLabels, flagNodeLabel, nil, "Restrict a graph privilege to node labels")
+		cmd.Flags().StringArrayVar(&opts.nodeLabels, flagNodeLabel, nil, orDefault(help, "Restrict a graph privilege to node labels"))
 	case flagRelType:
-		cmd.Flags().StringArrayVar(&opts.relTypes, flagRelType, nil, "Restrict a graph privilege to relationship types")
+		cmd.Flags().StringArrayVar(&opts.relTypes, flagRelType, nil, orDefault(help, "Restrict a graph privilege to relationship types"))
 	case flagProperty:
-		cmd.Flags().StringArrayVar(&opts.properties, flagProperty, nil, "Restrict a property privilege to properties")
+		cmd.Flags().StringArrayVar(&opts.properties, flagProperty, nil, orDefault(help, "Restrict a property privilege to properties"))
 	case flagCidr:
-		cmd.Flags().StringVar(&opts.cidr, flagCidr, "", "Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data)")
+		cmd.Flags().StringVar(&opts.cidr, flagCidr, "", orDefault(help, "Scope a LOAD privilege to a CIDR range (LOAD only; defaults to all data)"))
 	}
+}
+
+func orDefault(override, def string) string {
+	if override != "" {
+		return override
+	}
+	return def
 }
 
 func rolePreposition(verbWord string) string {
@@ -139,7 +148,7 @@ func newCategoryCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb string, cat act
 		cmd.Flags().StringVar(&revokeType, "revoke-type", "", "Restrict the revoke to grant or deny privileges (grant|deny); omit to revoke both")
 	}
 	for _, flag := range meta.flags {
-		registerPrivilegeFlag(cmd, &opts, flag)
+		registerPrivilegeFlag(cmd, &opts, flag, meta.flagHelp[flag])
 	}
 
 	return cmd
@@ -316,6 +325,7 @@ const (
 type categoryInfo struct {
 	name          string
 	flags         []string
+	flagHelp      map[string]string
 	shortNoun     string
 	longRule      string
 	exampleAction string
@@ -352,8 +362,11 @@ var categoryMeta = map[actionCategory]categoryInfo{
 		exampleFlags:  "--on-graph *",
 	},
 	labelScoped: {
-		name:          "label",
-		flags:         []string{flagOnGraph, flagNodeLabel},
+		name:  "label",
+		flags: []string{flagOnGraph, flagNodeLabel},
+		flagHelp: map[string]string{
+			flagNodeLabel: "Node label(s) the SET LABEL / REMOVE LABEL privilege applies to (required; repeatable)",
+		},
 		shortNoun:     "label privilege",
 		longRule:      "Scope with --on-graph (default *); --node-label is required and may be repeated to cover multiple labels.",
 		exampleAction: "set-label",
