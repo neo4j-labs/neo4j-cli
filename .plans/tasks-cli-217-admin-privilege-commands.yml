@@ -1,7 +1,7 @@
 feature: cli-217-admin-privilege-commands
 prd: ./prd-cli-217-admin-privilege-commands.md
 created_at: 2026-06-22T00:00:00Z
-updated_at: 2026-06-24T23:30:00Z
+updated_at: 2026-06-25T09:58:31Z
 
 tasks:
   - id: task-001
@@ -947,3 +947,74 @@ tasks:
       - "Existence check uses the privilegeExecFn seam with SHOW ROLES/SHOW USERS ... WHERE = $name (no import of the role/user packages)"
       - "Unit tests cover the nonexistent role, nonexistent user, exists-but-empty, non-empty-no-extra-query, and unfiltered cases"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `TestGenerator_RoundTrip` all pass clean"
+
+  - id: task-032
+    title: "Simplify the per-category flag-help override: drop flagHelp map + orDefault for a single override (audit item 1)"
+    status: todo
+    source: review
+    description: |
+      End-of-feature audit, the one item flagged as worth acting on before merge (thin-abstraction
+      smell). Task-030 added a general per-category flag-help override mechanism to serve EXACTLY ONE
+      override: `--node-label` help on the `label` (labelScoped) category. The machinery is:
+      a `flagHelp map[string]string` field on `categoryInfo`; an `orDefault` helper; six
+      `orDefault(help, "...")` call sites in `registerPrivilegeFlag`; and `meta.flagHelp[flag]`
+      threading in `newCategoryCmd`. So every `categoryInfo` carries a usually-nil map and all six
+      flag registrations carry an override-or-default branch, to serve a single data point. This is
+      generic "magic" hiding simple structure — the real fact is "the label category's --node-label is
+      required, not optional."
+
+      Code-judo move: delete the override map + orDefault + the six branches and special-case the one
+      place that varies. Preferred shape (auditor's first option): keep the per-flag default help inline
+      in `registerPrivilegeFlag` and give the label category's --node-label its required-target help via
+      a single special case (e.g. a one-line branch in registerPrivilegeFlag keyed on cat==labelScoped &&
+      flag==flagNodeLabel, or set it directly after the factory loop in newCategoryCmd). Whatever the
+      shape, the outcome is: no `flagHelp` field, no `orDefault`, no six-site override branch — the
+      label --node-label override appears in exactly one place. The user-visible help text must NOT
+      change: `grant/deny/revoke label --help` keeps the "required SET/REMOVE LABEL target" wording and
+      property/entity keep the shared "Restrict ... to node labels" default. Because help text feeds the
+      skill bundle, run `go generate ./neo4j-cli/internal/skill/...`; the regenerated bundle should be
+      byte-identical to the current one (no diff) since the rendered help is unchanged — confirm
+      TestGenerator_RoundTrip stays green. Update or simplify the task-030 structure test accordingly
+      (it should still assert label's --node-label help differs from the property/entity default).
+    dependencies:
+      - task-031
+    acceptance_criteria:
+      - "`flagHelp` field on categoryInfo, the `orDefault` helper, and the six override-or-default branches in registerPrivilegeFlag are removed; the label --node-label override lives in exactly one place"
+      - "User-visible help is unchanged: `grant label --help` still describes --node-label as the required SET/REMOVE LABEL target; property/entity keep the shared 'Restrict ... to node labels' wording"
+      - "Skill bundle regenerated with no diff (rendered help unchanged); TestGenerator_RoundTrip passes"
+      - "A unit test still asserts label's --node-label help differs from the property/entity default"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"
+
+  - id: task-033
+    title: "Verify the requireExists SHOW ROLES/SHOW USERS probe queries are valid on supported Neo4j versions (audit item 2)"
+    status: todo
+    source: review
+    description: |
+      End-of-feature audit, non-blocking correctness note on task-031. The `requireExists` existence
+      check in list.go runs `SHOW ROLES YIELD role WHERE role = $name RETURN role` (and the
+      `SHOW USERS YIELD user WHERE user = $name RETURN user` variant) to disambiguate a typo'd target
+      from a real target with no privileges. The DESIGN is sound (auditor confirmed it does not duplicate
+      the ArgumentError-translation paths, and the empty-path-only guard keeps the happy path single-query
+      — no structural change needed). The open question is purely correctness: confirm these two probe
+      queries are actually valid Cypher on the supported Neo4j Enterprise server versions, since the
+      privilege unit tests use the privilegeExecFn seam and never execute the query against a server (the
+      same string-only blind spot that REQ-F-005's live-validation guard exists to cover).
+
+      Verify against a live server: spin up a Docker Neo4j Enterprise container (see AGENTS.md / the docker
+      subcommand: `neo4j-cli docker create --name <n> --edition enterprise --wait --rw`), create a role
+      and a user, and run `neo4j-cli admin privilege list --role <existing>`, `--role <missing>`,
+      `--user <existing>`, `--user <missing>` to confirm: (a) the SHOW ROLES/SHOW USERS YIELD ... WHERE
+      probe queries execute without a SyntaxError, (b) a missing target yields the exit-6
+      `role/user "<name>" does not exist` validation error, and (c) an existing target with no privileges
+      exits 0 with an empty list. If either probe query is rejected by the server, fix the query (e.g. the
+      correct YIELD/WHERE form) and adjust the unit-test expectations to match the server-valid form. Tear
+      down the container afterwards. If no live verification is possible, at minimum cross-check the
+      queries against the Neo4j Cypher manual for the supported versions and record the finding. No
+      structural refactor — this is a correctness confirmation that may or may not require a query fix.
+    dependencies:
+      - task-031
+    acceptance_criteria:
+      - "The SHOW ROLES YIELD role WHERE role = $name RETURN role and SHOW USERS YIELD user WHERE user = $name RETURN user probe queries are confirmed to execute without SyntaxError on a supported Neo4j Enterprise version (live-verified, or query corrected if not)"
+      - "Live check confirms: missing --role/--user yields exit-6 'does not exist'; existing target with no privileges exits 0 empty; existing target with privileges lists them"
+      - "If a probe query was invalid, it is corrected and the unit-test expectations updated to the server-valid form"
+      - "Any test container created for verification is torn down; `make test`, `make fmt-check`, `make lint`, `make license-check` all pass clean"

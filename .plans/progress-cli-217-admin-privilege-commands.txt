@@ -154,3 +154,6 @@ Files: ~privilege/helpers.go, ~privilege/structure_test.go, ~bundle/references/a
 privilege list --role/--user now disambiguates a non-existent target from a real one with no privileges: on the empty-result path it runs a follow-up existence check (SHOW ROLES/USERS ... WHERE = $name) via the privilegeExecFn seam and returns clierr.NewValidationError ("role/user %q does not exist", exit 6) when absent. The check runs only when filtered AND empty, so non-empty and unfiltered paths still cost one query.
 Files: ~list.go, ~list_test.go
 Decisions: Added a shared requireExists helper in list.go (no role/user package import — existence Cypher inlined) to avoid duplicating the role/user check bodies.
+
+## REVIEW — 2026-06-25T09:58:31Z
+Added 2 review tasks (task-032..task-033).
