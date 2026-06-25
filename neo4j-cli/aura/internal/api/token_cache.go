@@ -36,7 +36,11 @@ type tokenCacheEntry struct {
 // and verified on read) and a 16-char short prefix used to name the file. The
 // raw secret never leaves this function.
 func tokenCacheHash(clientID, clientSecret, authURL string) (full string, short string) {
-	sum := sha256.Sum256([]byte(clientID + "|" + clientSecret + "|" + authURL))
+	// Length-prefix each component so the "|" separator cannot be forged from
+	// within a component — otherwise ("a|b","c") and ("a","b|c") would collide
+	// and one identity could receive another's cached JWT.
+	input := fmt.Sprintf("%d:%s|%d:%s|%d:%s", len(clientID), clientID, len(clientSecret), clientSecret, len(authURL), authURL)
+	sum := sha256.Sum256([]byte(input))
 	full = hex.EncodeToString(sum[:])
 	return full, full[:16]
 }

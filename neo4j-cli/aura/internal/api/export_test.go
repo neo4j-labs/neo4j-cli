@@ -58,3 +58,9 @@ func TokenCachePathForTest(clientID, clientSecret, authURL string) string {
 	_, short := tokenCacheHash(clientID, clientSecret, authURL)
 	return tokenCachePath(short)
 }
+
+// TokenCacheHashForTest exposes the identity hash for assertions.
+func TokenCacheHashForTest(clientID, clientSecret, authURL string) string {
+	full, _ := tokenCacheHash(clientID, clientSecret, authURL)
+	return full
+}

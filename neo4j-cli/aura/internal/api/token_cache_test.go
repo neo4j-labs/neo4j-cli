@@ -215,6 +215,20 @@ func TestTokenCache_NotConsultedWhenAcceptEnvVarsOff(t *testing.T) {
 	assert.Empty(t, entries)
 }
 
+// TestTokenCacheHash_NoSeparatorCollision pins the length-prefixing fix: two
+// identities that differ only by where the "|" falls between clientID and
+// clientSecret must not share a digest (and thus a cached JWT).
+func TestTokenCacheHash_NoSeparatorCollision(t *testing.T) {
+	const url = "https://example.com/oauth/token"
+	a := api.TokenCacheHashForTest("a|b", "c", url)
+	b := api.TokenCacheHashForTest("a", "b|c", url)
+	assert.NotEqual(t, a, b, "separator-injection inputs must hash differently")
+
+	// Same identity still produces a stable hit; a changed secret still misses.
+	assert.Equal(t, api.TokenCacheHashForTest("id", "secret", url), api.TokenCacheHashForTest("id", "secret", url))
+	assert.NotEqual(t, api.TokenCacheHashForTest("id", "secret", url), api.TokenCacheHashForTest("id", "other", url))
+}
+
 // guards against any drift in the buffer constant's interaction with expiry.
 func TestTokenCache_FreshTokenIsReused(t *testing.T) {
 	dir := t.TempDir()

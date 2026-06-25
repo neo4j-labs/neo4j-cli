@@ -71,3 +71,7 @@ Decisions: Chose an explicit ephemeral marker over a sentinel-name ("env") check
 
 ## REVIEW — 2026-06-25T15:52:38Z
 Added 1 review task (task-015) from CI security-review finding.
+
+## TASK-015 — 2026-06-25T15:55:43Z
+Length-prefixed each tokenCacheHash component (clientID/clientSecret/authURL) so the "|" separator can't be forged from within a component, eliminating the cache-identity collision that caused wrong cache hits / 401s. Both the filename short-hash and in-file full-hash benefit (shared construction). Added a focused collision test plus a TokenCacheHashForTest seam.
+Files: +0 new, ~4 mod, -0 del

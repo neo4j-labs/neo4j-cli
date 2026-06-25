@@ -367,7 +367,7 @@ tasks:
       previously-colliding inputs now produce distinct hashes, and confirm the
       existing cache hit/miss tests (same id/secret => hit; changed secret => miss)
       still pass.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "tokenCacheHash length-prefixes each component so clientID|secret boundary ambiguity cannot cause a collision"
@@ -376,4 +376,4 @@ tasks:
       - "The raw client secret is still never written to disk; cache file remains 0600"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-25T15:55:43Z
