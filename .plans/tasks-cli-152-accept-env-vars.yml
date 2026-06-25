@@ -209,7 +209,7 @@ tasks:
       experimental project (REQ-NF-007). Create it with
       'changie new --projects neo4j-cli --kind Minor --body <body>'; the body must
       still describe the breaking behaviour clearly.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-006
@@ -218,7 +218,7 @@ tasks:
       - "Changelog entry documents the new config key, env bootstrap, and the DBMS/embed and CLI-212 breaking changes"
       - "README Environment variables section describes the gate and that it covers the admin command tree"
       - "Changelog created via changie with --kind Minor (NOT Major), body describing the breaking behaviour"
-    completed_at: null
+    completed_at: 2026-06-25T12:38:06Z
 
   - id: task-011
     title: 'Regenerate skill bundle and pass all final gates'

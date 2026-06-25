@@ -90,6 +90,29 @@ neo4j-cli credential embed use openai-shared
 neo4j-cli credential embed remove openai-shared
 ```
 
+## Environment variables
+
+By default `neo4j-cli` ignores credential environment variables and resolves connections, Aura access, and embedding from stored credentials (and explicit flags / `.env` files). To let env vars override stored credentials, enable `accept-env-vars`:
+
+```bash
+neo4j-cli config set accept-env-vars true --rw   # persist to config
+NEO4J_CLI_ACCEPT_ENV_VARS=1 neo4j-cli query ...  # one-off / CI, no config file
+```
+
+When enabled, the gate applies uniformly to all three credential types with the precedence **flag → env var → stored credential**:
+
+| Type  | Env vars |
+| ----- | -------- |
+| Aura  | `NEO4J_AURA_CLIENT_ID`, `NEO4J_AURA_CLIENT_SECRET` (both required; synthesized into an ephemeral in-memory credential, never persisted) |
+| DBMS  | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE` |
+| Embed | `NEO4J_EMBED_PROVIDER`, `NEO4J_EMBED_MODEL`, `NEO4J_EMBED_BASE_URL`, `NEO4J_EMBED_DIMENSIONS`, `NEO4J_EMBED_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
+
+The DBMS gate lives at the shared connection-resolution layer, so it covers `neo4j-cli query` **and the entire `admin` command tree** (`admin database`/`user`/`role`/`privilege`) identically — there is no per-command env handling. A partial set for any type (e.g. `NEO4J_URI` without `NEO4J_USERNAME`/`NEO4J_PASSWORD`, or one Aura var without the other) is rejected with an error naming the missing variables rather than silently falling back to a stored credential.
+
+This is a **breaking change**: the DBMS and embed env vars were previously read unconditionally. Additionally, the `NEO4J_DATABASE` override applied alongside `--credential` (the CLI-212 behaviour) now also requires `accept-env-vars`; the explicit `--database` flag is never gated. Enabling or disabling `accept-env-vars` never modifies stored credentials — it only changes the runtime resolution path. The `.env` file walk-up (controlled by `--env`) is independent of this gate and unaffected.
+
+If a credential env var is present while `accept-env-vars` has never been set, the CLI prints a one-time stderr hint pointing you here.
+
 ## Aura
 
 Manage Neo4j Aura instances from the terminal. Requires an `aura-client` credential — create one in your Aura [Account Settings](https://console.neo4j.io/#account) and add it via [Credentials](#credentials) above.
@@ -343,6 +366,8 @@ echo 'MATCH (n) RETURN count(n)' | neo4j-cli query
 
 Flags, env vars, and `.env` files are optional overrides — useful for one-offs or CI without persisting a credential. When a stored credential exists, an override must supply **all four** of URI/username/password/database (any partial set is rejected). Without a stored credential, resolution is flag → env var → `.env` file (auto-discovered walking up from cwd) → built-in default.
 
+> **Env var reads require opt-in.** The `NEO4J_*` connection env vars below are only read when `accept-env-vars` is enabled — see [Environment variables](#environment-variables). Explicit flags and `.env` files are unaffected by this gate.
+
 `.env` discovery walks up from cwd and stops at the first `.git` ancestor or your `$HOME` boundary (whichever comes first), so a `.env` outside your repo or above your home directory is never loaded. When the loaded `.env` lives strictly above cwd, an `info: loading .env from <path>` line is printed to stderr so the overlay is never silent.
 
 | Setting  | Flag         | Env var          | Default                   |
@@ -400,7 +425,7 @@ neo4j-cli query :embed "hello world" --format json
 echo "hello world" | neo4j-cli query :embed --format toon
 ```
 
-Embedding settings resolve with this precedence (highest first): flag → env var → `.env` file → stored embed credential → provider built-in default.
+Embedding settings resolve with this precedence (highest first): flag → env var → `.env` file → stored embed credential → provider built-in default. The `NEO4J_EMBED_*` and provider API-key env vars are only read when `accept-env-vars` is enabled — see [Environment variables](#environment-variables); flags and `.env` files are unaffected.
 
 | Setting    | Flag                  | Env var                  |
 | ---------- | --------------------- | ------------------------ |

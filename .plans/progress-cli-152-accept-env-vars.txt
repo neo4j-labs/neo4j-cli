@@ -40,3 +40,8 @@ Decisions: env-mode = credential not in store AND accept-env-vars true (stored k
 ## TASK-009 — 2026-06-25T12:33:16Z
 Added maybeEmitEnvVarHint in app.go root PersistentPreRunE: emits the one-time stderr discovery hint (REQ-F-007 exact text) when AcceptEnvVarsIsSet() is false AND credentials.HasAnyCredentialEnvVar(os.Getenv) is true; once-per-process is structural (root hook runs once per invocation, mirroring initCredentialStorageDefault). Writer seam (io.Writer) for testability.
 Files: +1 new (env_var_hint_test.go), ~1 mod (app.go)
+
+## TASK-010 — 2026-06-25T12:38:06Z
+Documented the accept-env-vars feature: a Minor changie entry describing the new config key, NEO4J_CLI_ACCEPT_ENV_VARS bootstrap, and the DBMS/embed + CLI-212 breaking changes; a new README "Environment variables" section with the per-type env-var table, precedence, admin coverage, and partial-set/hint notes, plus cross-link notes in the DBMS and embed precedence paragraphs.
+Files: +1 new (.changes/unreleased/neo4j-cli-Minor-20260625-133535.yaml), ~1 mod (README.md)
+Decisions: README does not feed the skill bundle/additions, so no go-generate regeneration needed; changie auto-named the file.
