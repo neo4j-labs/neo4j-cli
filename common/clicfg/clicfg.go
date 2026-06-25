@@ -559,6 +559,19 @@ func (config *GlobalConfig) AcceptEnvVarsIsSet() bool {
 	return config.viper.IsSet("accept-env-vars")
 }
 
+// GatedGetenv returns os.Getenv(name) only when accept-env-vars is enabled;
+// otherwise it returns "" so credential env vars are ignored. It is the single
+// gate shared by the DBMS connection and embed resolvers; the dotenv (--env
+// walk-up) mechanism is intentionally NOT routed through it. The receiver and
+// its Global are nil-checked so callers can pass a partially constructed Config
+// (the embed :embed leaf relies on this).
+func (c *Config) GatedGetenv(name string) string {
+	if c == nil || c.Global == nil || !c.Global.AcceptEnvVars() {
+		return ""
+	}
+	return os.Getenv(name)
+}
+
 func (config *GlobalConfig) BindFormat(flag *pflag.Flag) {
 	if err := config.viper.BindPFlag("format", flag); err != nil {
 		panic(err)

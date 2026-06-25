@@ -58,3 +58,8 @@ Added 3 review tasks (task-012..task-014).
 Replaced the embed env-mode key check with one that validates the RESOLVED Config (out.Provider set + providerNeedsKey + out.APIKey=="") instead of re-reading os.Getenv, so a key from .env or a stored credential now satisfies it (fixes the bug + matches the dbconn.ResolveConn shape). Moved the provider-needs-a-key policy into embed (new providerNeedsKey, Ollama/Vertex exempt) and removed credentials.ValidateEmbedEnvSet + the embedProviderOllama/Vertex constants.
 Files: ~4 mod (embed.go, embed_test.go, env_spec.go, env_spec_test.go)
 Decisions: providerNeedsKey lowercases (preserving old ValidateEmbedEnvSet leniency); error text changed to "missing embed API key".
+
+## TASK-013 — 2026-06-25T13:11:08Z
+Consolidated the duplicated gatedGetenv helper into one shared (*clicfg.Config).GatedGetenv and single-sourced the credential env-var name constants in common/clicfg/credentials/env_spec.go; dbconn, embed, and credential/dbms/add.go now reference credentials.Env* and call cfg.GatedGetenv.
+Files: +0 new, ~5 mod (clicfg.go, dbconn/conn.go, embed/embed.go, credential/dbms/add.go, accept_env_vars_test.go + embed_test.go alias block), -0 del
+Decisions: The shared helper landed on *clicfg.Config (not credentials) because clicfg imports credentials in production — a credentials-hosted helper depending on *clicfg.Config would cycle. The method is nil-safe on receiver and c.Global (preserves+hardens embed's cfg==nil guard). dbconn's exported EnvURI/etc. and embed_test's lowercase env consts are kept as aliases of credentials.Env* (literal lives only in credentials) to avoid churning ~130 test references.

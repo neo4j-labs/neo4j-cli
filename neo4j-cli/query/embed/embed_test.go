@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/test/utils/testfs"
 )
@@ -23,6 +24,20 @@ import (
 // envAcceptEnvVars is the env var bound to the accept-env-vars config key.
 // Tests that exercise the env-var path set it to "1".
 const envAcceptEnvVars = "NEO4J_CLI_ACCEPT_ENV_VARS"
+
+// Embed env-var name aliases for the tests. The literals are single-sourced in
+// the credentials package; these short local names keep the table tests terse.
+const (
+	envEmbedProvider   = credentials.EnvEmbedProvider
+	envEmbedModel      = credentials.EnvEmbedModel
+	envEmbedBaseURL    = credentials.EnvEmbedBaseURL
+	envEmbedDimensions = credentials.EnvEmbedDimensions
+	envEmbedAPIKey     = credentials.EnvEmbedAPIKey
+	envOpenAIKey       = credentials.EnvOpenAIKey
+	envHFToken         = credentials.EnvHFToken
+	envGeminiKey       = credentials.EnvGeminiKey
+	envGoogleKey       = credentials.EnvGoogleKey
+)
 
 // newTestCmd builds a cobra.Command carrying the same persistent flag set the
 // real `query` parent registers (so cmd.Flag(...).Changed semantics line up

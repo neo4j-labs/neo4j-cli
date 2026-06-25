@@ -30,11 +30,15 @@ const (
 	DefaultURI      = "neo4j://localhost:7687"
 	DefaultUsername = "neo4j"
 	DefaultDatabase = "neo4j"
+)
 
-	EnvURI      = "NEO4J_URI"
-	EnvUsername = "NEO4J_USERNAME"
-	EnvPassword = "NEO4J_PASSWORD"
-	EnvDatabase = "NEO4J_DATABASE"
+// Connection env-var names are single-sourced in the credentials package; these
+// are re-exported here for the dbconn tests that drive resolution via t.Setenv.
+const (
+	EnvURI      = credentials.EnvURI
+	EnvUsername = credentials.EnvUsername
+	EnvPassword = credentials.EnvPassword
+	EnvDatabase = credentials.EnvDatabase
 )
 
 // Conn holds the resolved Neo4j connection details. It does not carry an open
@@ -142,12 +146,12 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		return nil, err
 	}
 
-	uri := Overlay(dotenvVals[EnvURI], gatedGetenv(cfg, EnvURI))
-	username := Overlay(dotenvVals[EnvUsername], gatedGetenv(cfg, EnvUsername))
-	password := Overlay(dotenvVals[EnvPassword], gatedGetenv(cfg, EnvPassword))
+	uri := Overlay(dotenvVals[credentials.EnvURI], cfg.GatedGetenv(credentials.EnvURI))
+	username := Overlay(dotenvVals[credentials.EnvUsername], cfg.GatedGetenv(credentials.EnvUsername))
+	password := Overlay(dotenvVals[credentials.EnvPassword], cfg.GatedGetenv(credentials.EnvPassword))
 	database := ""
 	if !skipDatabase {
-		database = Overlay(dotenvVals[EnvDatabase], gatedGetenv(cfg, EnvDatabase))
+		database = Overlay(dotenvVals[credentials.EnvDatabase], cfg.GatedGetenv(credentials.EnvDatabase))
 	}
 
 	if f := cmd.Flag("uri"); f != nil && f.Changed {
@@ -310,19 +314,9 @@ func applyDBOverride(cmd *cobra.Command, cfg *clicfg.Config, c *Conn, skipDataba
 	}
 	if f := cmd.Flag("database"); f != nil && f.Changed {
 		c.Database = f.Value.String()
-	} else if v := gatedGetenv(cfg, EnvDatabase); v != "" {
+	} else if v := cfg.GatedGetenv(credentials.EnvDatabase); v != "" {
 		c.Database = v
 	}
-}
-
-// gatedGetenv returns os.Getenv(name) only when accept-env-vars is enabled;
-// otherwise it returns "" so credential env vars are ignored. The dotenv
-// (--env walk-up) mechanism is intentionally NOT gated by this helper.
-func gatedGetenv(cfg *clicfg.Config, name string) string {
-	if !cfg.Global.AcceptEnvVars() {
-		return ""
-	}
-	return os.Getenv(name)
 }
 
 // applyURINorm normalises uri via NormalizeURI, prints the rewrite info line

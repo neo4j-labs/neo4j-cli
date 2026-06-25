@@ -60,20 +60,6 @@ const (
 	ProviderVertex      = "vertex"
 )
 
-// Environment variable names. Keep these grouped here so a single grep across
-// the package finds every external variable read.
-const (
-	envEmbedProvider   = "NEO4J_EMBED_PROVIDER"
-	envEmbedModel      = "NEO4J_EMBED_MODEL"
-	envEmbedBaseURL    = "NEO4J_EMBED_BASE_URL"
-	envEmbedDimensions = "NEO4J_EMBED_DIMENSIONS"
-	envEmbedAPIKey     = "NEO4J_EMBED_API_KEY"
-	envOpenAIKey       = "OPENAI_API_KEY"
-	envHFToken         = "HF_TOKEN"
-	envGeminiKey       = "GEMINI_API_KEY"
-	envGoogleKey       = "GOOGLE_API_KEY"
-)
-
 // providerFactory is the test seam for producer-side substitution. Production
 // callers (run.go and the :embed leaf) call providerFactory(cfg); tests swap
 // it for a closure that returns a stub Provider.
@@ -190,10 +176,10 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 			*dst = v
 		}
 	}
-	apply(envEmbedProvider, &out.Provider)
-	apply(envEmbedModel, &out.Model)
-	apply(envEmbedBaseURL, &out.BaseURL)
-	if v, ok := dotenvVals[envEmbedDimensions]; ok && v != "" {
+	apply(credentials.EnvEmbedProvider, &out.Provider)
+	apply(credentials.EnvEmbedModel, &out.Model)
+	apply(credentials.EnvEmbedBaseURL, &out.BaseURL)
+	if v, ok := dotenvVals[credentials.EnvEmbedDimensions]; ok && v != "" {
 		if n, ok := parseDimensions(v); ok {
 			out.Dimensions = n
 		}
@@ -201,16 +187,16 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 
 	// 3. OS environment (gated behind accept-env-vars; the .env walk-up above
 	// is intentionally NOT gated).
-	if v := gatedGetenv(cfg, envEmbedProvider); v != "" {
+	if v := cfg.GatedGetenv(credentials.EnvEmbedProvider); v != "" {
 		out.Provider = v
 	}
-	if v := gatedGetenv(cfg, envEmbedModel); v != "" {
+	if v := cfg.GatedGetenv(credentials.EnvEmbedModel); v != "" {
 		out.Model = v
 	}
-	if v := gatedGetenv(cfg, envEmbedBaseURL); v != "" {
+	if v := cfg.GatedGetenv(credentials.EnvEmbedBaseURL); v != "" {
 		out.BaseURL = v
 	}
-	if v := gatedGetenv(cfg, envEmbedDimensions); v != "" {
+	if v := cfg.GatedGetenv(credentials.EnvEmbedDimensions); v != "" {
 		if n, ok := parseDimensions(v); ok {
 			out.Dimensions = n
 		}
@@ -293,25 +279,25 @@ func resolveAPIKey(cfg *clicfg.Config, provider, storedKey string, dotenv map[st
 	stages := []map[string]string{dotenv, osEnvSnapshot(cfg)}
 	for _, stage := range stages {
 		// Generic key applies to any provider that needs an API key.
-		if v := stage[envEmbedAPIKey]; v != "" {
+		if v := stage[credentials.EnvEmbedAPIKey]; v != "" {
 			out = v
 		}
 		switch provider {
 		case ProviderOpenAI:
-			if v := stage[envOpenAIKey]; v != "" {
+			if v := stage[credentials.EnvOpenAIKey]; v != "" {
 				out = v
 			}
 		case ProviderHuggingFace:
-			if v := stage[envHFToken]; v != "" {
+			if v := stage[credentials.EnvHFToken]; v != "" {
 				out = v
 			}
 		case ProviderGemini:
 			// GOOGLE_API_KEY first, then GEMINI_API_KEY so the
 			// gemini-specific var wins inside this stage.
-			if v := stage[envGoogleKey]; v != "" {
+			if v := stage[credentials.EnvGoogleKey]; v != "" {
 				out = v
 			}
-			if v := stage[envGeminiKey]; v != "" {
+			if v := stage[credentials.EnvGeminiKey]; v != "" {
 				out = v
 			}
 		}
@@ -325,22 +311,12 @@ func resolveAPIKey(cfg *clicfg.Config, provider, storedKey string, dotenv map[st
 // off every value is empty so the stored credential / .env path wins.
 func osEnvSnapshot(cfg *clicfg.Config) map[string]string {
 	return map[string]string{
-		envEmbedAPIKey: gatedGetenv(cfg, envEmbedAPIKey),
-		envOpenAIKey:   gatedGetenv(cfg, envOpenAIKey),
-		envHFToken:     gatedGetenv(cfg, envHFToken),
-		envGeminiKey:   gatedGetenv(cfg, envGeminiKey),
-		envGoogleKey:   gatedGetenv(cfg, envGoogleKey),
+		credentials.EnvEmbedAPIKey: cfg.GatedGetenv(credentials.EnvEmbedAPIKey),
+		credentials.EnvOpenAIKey:   cfg.GatedGetenv(credentials.EnvOpenAIKey),
+		credentials.EnvHFToken:     cfg.GatedGetenv(credentials.EnvHFToken),
+		credentials.EnvGeminiKey:   cfg.GatedGetenv(credentials.EnvGeminiKey),
+		credentials.EnvGoogleKey:   cfg.GatedGetenv(credentials.EnvGoogleKey),
 	}
-}
-
-// gatedGetenv returns os.Getenv(name) only when accept-env-vars is enabled;
-// otherwise it returns "" so credential env vars are ignored. The dotenv
-// (--env walk-up) mechanism is intentionally NOT gated by this helper.
-func gatedGetenv(cfg *clicfg.Config, name string) string {
-	if cfg == nil || !cfg.Global.AcceptEnvVars() {
-		return ""
-	}
-	return os.Getenv(name)
 }
 
 // loadDotenv walks up from cwd looking for a `.env` file via the shared

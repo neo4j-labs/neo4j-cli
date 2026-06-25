@@ -5,6 +5,7 @@ package dbms
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/envfile"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
@@ -30,10 +31,12 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		embedCredentialFlag = "embed-credential"
 		envFlag             = "env"
 
-		envURI          = "NEO4J_URI"
-		envUsername     = "NEO4J_USERNAME"
-		envPassword     = "NEO4J_PASSWORD"
-		envDatabase     = "NEO4J_DATABASE"
+		// Env-var names are single-sourced in the credentials package; aliased
+		// here as terse locals paired with the flag-name consts above.
+		envURI          = credentials.EnvURI
+		envUsername     = credentials.EnvUsername
+		envPassword     = credentials.EnvPassword
+		envDatabase     = credentials.EnvDatabase
 		envInstanceName = "AURA_INSTANCENAME"
 	)
 
@@ -157,11 +160,11 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 
 func filterAuraEnvKeys(vals map[string]string, present map[string]bool) (map[string]string, map[string]bool) {
 	recognised := map[string]bool{
-		"NEO4J_URI":         true,
-		"NEO4J_USERNAME":    true,
-		"NEO4J_PASSWORD":    true,
-		"NEO4J_DATABASE":    true,
-		"AURA_INSTANCENAME": true,
+		credentials.EnvURI:      true,
+		credentials.EnvUsername: true,
+		credentials.EnvPassword: true,
+		credentials.EnvDatabase: true,
+		"AURA_INSTANCENAME":     true,
 	}
 	filteredVals := map[string]string{}
 	filteredPresent := map[string]bool{}

@@ -304,7 +304,7 @@ tasks:
       credential env var" a one-place edit. Watch the cfg == nil guard (embed relies
       on it) — preserve that behaviour in the shared helper. Do this after task-012
       so the embed file is in its final shape.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -314,7 +314,7 @@ tasks:
       - "Behaviour is unchanged: gate off => env ignored, gate on => env read; existing tests still pass"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-25T13:11:08Z
 
   - id: task-014
     title: 'Make the Aura token-cache env-mode check direct instead of store-miss-derived'
