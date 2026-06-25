@@ -1,0 +1,242 @@
+feature: cli-152-accept-env-vars
+prd: ./prd-cli-152-accept-env-vars.md
+created_at: 2026-06-25T10:50:25Z
+updated_at: 2026-06-25T10:53:00Z
+
+tasks:
+  - id: task-001
+    title: 'Add accept-env-vars config key, env binding, and accessors'
+    description: |
+      Wire the new global config key into common/clicfg/clicfg.go. Add
+      "accept-env-vars" to GlobalConfig.ValidConfigKeys, bind the env var
+      NEO4J_CLI_ACCEPT_ENV_VARS via Viper.BindEnv in the existing env-binding
+      path, and add the GlobalConfig.AcceptEnvVars() bool accessor
+      (Viper.GetBool) plus AcceptEnvVarsIsSet() bool (mirrors the existing
+      CredentialStorageIsSet() pattern). Add validation in GlobalConfig.Set()
+      so only true/false are accepted, returning a usage error otherwise.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "'neo4j-cli config set accept-env-vars true' succeeds and 'config get accept-env-vars' returns true"
+      - "'config set accept-env-vars notabool' returns a usage error"
+      - "NEO4J_CLI_ACCEPT_ENV_VARS=1 makes AcceptEnvVars() return true with no config file write"
+      - "AcceptEnvVars() defaults to false; AcceptEnvVarsIsSet() is false until set via config or env"
+      - "accept-env-vars appears in 'config get accept-env-vars' and the full config listing"
+    completed_at: null
+
+  - id: task-002
+    title: 'Add EnvCredentialSpec metadata and shared env-spec helpers'
+    description: |
+      Create common/clicfg/credentials/env_spec.go defining the
+      EnvCredentialSpec type (Sentinel, RequiredGroups, OptionalVars) and the
+      package-level AuraEnvSpec, DBMSEnvSpec, EmbedEnvSpec vars per the PRD.
+      Implement HasAnyCredentialEnvVar(getenv) for hint detection and
+      ValidateEnvCredentialSet(spec, getenv) returning a clierr usage error
+      naming missing vars. Add ValidateEmbedEnvSet(getenv) for the
+      provider-specific API-key completeness check (Ollama needs no key). This
+      is the single extensibility hook so a new credential type must declare a
+      spec before its env vars are reachable.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "AuraEnvSpec, DBMSEnvSpec, EmbedEnvSpec are defined in common/clicfg/credentials/"
+      - "HasAnyCredentialEnvVar returns true when any sentinel var (NEO4J_AURA_CLIENT_ID, NEO4J_URI, NEO4J_EMBED_PROVIDER) is set"
+      - "ValidateEnvCredentialSet returns a usage error naming missing members of a RequiredGroup when the group is partially set, nil when complete or empty"
+      - "ValidateEmbedEnvSet errors when NEO4J_EMBED_PROVIDER requires a key and none of the key vars are set; passes for ollama"
+      - "Unit tests in common/clicfg/credentials/env_spec_test.go cover complete/partial/empty cases for each spec"
+    completed_at: null
+
+  - id: task-003
+    title: 'Gate DBMS connection env reads in dbconn.ResolveConn'
+    description: |
+      In neo4j-cli/internal/dbconn/conn.go gate the os.Getenv reads behind
+      cfg.Global.AcceptEnvVars(). Introduce a gatedGetenv(cfg, name) helper
+      returning "" when AcceptEnvVars() is false, and use it for the
+      os.Getenv halves of the Overlay calls at ~145-150 (uri/username/password/
+      database) and for os.Getenv(EnvDatabase) in applyDBOverride (~294, the
+      CLI-212 path, REQ-F-013). Do NOT gate the dotenvVals (--env walk-up) half
+      or the explicit --uri/--username/--password/--database flag branches. The
+      explicitCount partial-params switch is unchanged. This single gate covers
+      query, admin, and desktop since they all call ResolveConn.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "With accept-env-vars false, NEO4J_URI/USERNAME/PASSWORD/DATABASE are ignored and the stored default credential is used"
+      - "With accept-env-vars true, NEO4J_URI/USERNAME/PASSWORD/DATABASE override the stored DBMS credential"
+      - "With accept-env-vars false, NEO4J_DATABASE no longer overrides a --credential credential's database; --database flag still overrides"
+      - "dotenv (--env) values continue to be read regardless of accept-env-vars"
+      - "No connection env reads remain in query/connect.go or any admin leaf (REQ-NF-006)"
+    completed_at: null
+
+  - id: task-004
+    title: 'Enforce DBMS env-set completeness in env-var mode'
+    description: |
+      When accept-env-vars is true, call ValidateEnvCredentialSet(DBMSEnvSpec,
+      os.Getenv) inside dbconn.ResolveConn before resolution so a partial DBMS
+      env set fails with a message naming the missing NEO4J_* variables
+      (REQ-F-010 DBMS group). Reconcile this with ResolveConn's existing
+      partial-params error so env-mode failures name the NEO4J_* vars rather
+      than the --flag/ENV dual form. The check is gated to AcceptEnvVars() and
+      runs for both query and admin (skipDatabase respected: DATABASE optional).
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "With accept-env-vars true and only NEO4J_URI set (no USERNAME/PASSWORD), a usage error names the missing variables"
+      - "Both query and admin surface the same missing-variable error for a partial DBMS env set"
+      - "NEO4J_DATABASE remains optional and does not trigger a completeness error"
+      - "With accept-env-vars false, no completeness error fires regardless of env vars"
+    completed_at: null
+
+  - id: task-005
+    title: 'Verify admin command tree inherits the gated DBMS behaviour'
+    description: |
+      Confirm the admin command tree (admin database/user/role/privilege)
+      resolves connections via dbconn.ResolveConn with skipDatabase=true and
+      therefore inherits the env-var gate with no admin-specific code
+      (REQ-F-011/F-012). Add admin-level tests asserting parity with query:
+      env vars honoured only when accept-env-vars is true, NEO4J_DATABASE never
+      consulted in admin mode, and the partial-set error surfaced identically.
+      No production code changes expected here beyond what task-003/004 provide.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "'neo4j-cli admin user list' honours NEO4J_URI/USERNAME/PASSWORD only when accept-env-vars is true"
+      - "With accept-env-vars false, admin commands ignore connection env vars and use the stored default credential"
+      - "NEO4J_DATABASE is never consulted in admin mode regardless of accept-env-vars"
+      - "Admin tests assert the same partial-set DBMS error as query"
+    completed_at: null
+
+  - id: task-006
+    title: 'Gate embed provider env reads behind accept-env-vars'
+    description: |
+      In neo4j-cli/query/embed/ (embed.go plus provider files openai.go,
+      huggingface.go, gemini.go) gate all os.Getenv reads for embed params and
+      provider API keys (NEO4J_EMBED_*, OPENAI_API_KEY, HF_TOKEN, GEMINI_API_KEY,
+      GOOGLE_API_KEY) behind cfg.Global.AcceptEnvVars(). Do NOT gate the .env
+      file walk-up / dotenv mechanism. When accept-env-vars is true and
+      NEO4J_EMBED_PROVIDER is set, run ValidateEmbedEnvSet before resolution so a
+      missing required API key produces a usage error. Maintain the documented
+      precedence: explicit flag > env var > stored embed credential.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "With accept-env-vars false, embed env vars are ignored and the stored embed credential is used"
+      - "With accept-env-vars true and NEO4J_EMBED_API_KEY set, embed uses that key over the stored credential"
+      - "With accept-env-vars true and NEO4J_EMBED_PROVIDER=openai but no API key var, a usage error is returned"
+      - "The .env walk-up mechanism is unaffected by accept-env-vars"
+      - "Explicit embed flags still take precedence over env vars"
+    completed_at: null
+
+  - id: task-007
+    title: 'Synthesize ephemeral Aura credential from env vars'
+    description: |
+      In the Aura API area (neo4j-cli/aura/internal/api/ and the aura root
+      PersistentPreRunE) read NEO4J_AURA_CLIENT_ID + NEO4J_AURA_CLIENT_SECRET
+      when accept-env-vars is true, validate completeness via
+      ValidateEnvCredentialSet(AuraEnvSpec, os.Getenv), and on success construct
+      an ephemeral *credentials.AuraCredential and call
+      cfg.Aura.SetActiveCredential(...) before getToken runs. Secrets are never
+      persisted to disk or keyring. One var without the other is a usage error.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "With accept-env-vars true and both NEO4J_AURA_CLIENT_ID and NEO4J_AURA_CLIENT_SECRET set, Aura commands succeed with no stored credential"
+      - "Setting only NEO4J_AURA_CLIENT_ID (or only the secret) returns a usage error naming the missing variable"
+      - "With accept-env-vars false, the Aura env vars are ignored"
+      - "The synthesized credential is in-memory only; credentials.json and keyring are unchanged"
+    completed_at: null
+
+  - id: task-008
+    title: 'Add identity-bound Aura JWT token cache for env-var mode'
+    description: |
+      Add neo4j-cli/aura/internal/api/token_cache.go caching the derived OAuth
+      JWT (never the client secret) to os.TempDir()/neo4j-cli-aura-token-<hash>.json
+      at mode 0600. shortHash = first 16 hex of sha256(clientID|clientSecret|authURL);
+      cache file stores token, expiry, and full hash. On read verify the full
+      hash and expiry with a 60s buffer; on miss/corrupt/expired/mismatch mint
+      fresh and write back. Only consult the cache when the Aura credential came
+      from env vars (not keyring/insecure).
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "Two sequential env-var Aura invocations with the same client ID/secret result in one OAuth token mint (second hits cache)"
+      - "Changing NEO4J_AURA_CLIENT_SECRET causes a cache miss and a fresh mint"
+      - "The cache file contains only the JWT (and expiry/hash), never the raw client secret, at 0600 permissions"
+      - "An expired cache (past expiry minus 60s buffer) triggers a fresh mint"
+      - "The cache is not consulted in keyring/insecure credential modes"
+    completed_at: null
+
+  - id: task-009
+    title: 'Emit one-time discovery hint when env vars present but unset'
+    description: |
+      At startup (root PersistentPreRunE / NewConfig) emit the single-line
+      stderr hint when AcceptEnvVarsIsSet() is false AND
+      HasAnyCredentialEnvVar(os.Getenv) is true. The hint fires at most once per
+      process and surfaces regardless of which command (query, admin, embed) is
+      run. Once the key is explicitly set to any value (including false) the hint
+      is permanently suppressed.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "With accept-env-vars never set and NEO4J_URI present, stderr includes the hint text"
+      - "With accept-env-vars explicitly set to false and NEO4J_URI present, the hint is NOT shown"
+      - "The hint fires at most once per process and only when a relevant env var is set"
+      - "The hint appears regardless of which command (query/admin/embed) triggers it"
+    completed_at: null
+
+  - id: task-010
+    title: 'Document the new key, env bootstrap, and breaking changes'
+    description: |
+      Update the changelog (changie, user-facing) and README to document the
+      accept-env-vars config key, the NEO4J_CLI_ACCEPT_ENV_VARS=1 CI bootstrap,
+      and both breaking changes: DBMS/embed env reads now require opt-in (covering
+      query AND the admin command tree) and the CLI-212 NEO4J_DATABASE-with-
+      --credential override now requires accept-env-vars. Update the README
+      "Environment variables" section to describe the gate and admin coverage.
+      The changelog entry MUST be a Minor changie kind, not Major: this breaking
+      change is accepted under a minor bump by explicit decision for this
+      experimental project (REQ-NF-007). Create it with
+      'changie new --projects neo4j-cli --kind Minor --body <body>'; the body must
+      still describe the breaking behaviour clearly.
+    status: pending
+    dependencies:
+      - task-003
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "Changelog entry documents the new config key, env bootstrap, and the DBMS/embed and CLI-212 breaking changes"
+      - "README Environment variables section describes the gate and that it covers the admin command tree"
+      - "Changelog created via changie with --kind Minor (NOT Major), body describing the breaking behaviour"
+    completed_at: null
+
+  - id: task-011
+    title: 'Regenerate skill bundle and pass all final gates'
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... to refresh the skill bundle
+      after command/help changes (new config key affects config command help and
+      any --format/Long changes). Ensure the full final gate set passes and that
+      stored credentials are provably untouched by toggling accept-env-vars.
+    status: pending
+    dependencies:
+      - task-005
+      - task-006
+      - task-008
+      - task-009
+      - task-010
+    acceptance_criteria:
+      - "'go generate ./neo4j-cli/internal/skill/...' produces no bundle drift"
+      - "make test, make fmt-check, make lint all pass"
+      - "Stored credentials are byte-identical before and after enabling accept-env-vars"
+      - "make generate-check passes on a clean tree"
+    completed_at: null
