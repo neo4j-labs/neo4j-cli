@@ -157,3 +157,7 @@ Decisions: Added a shared requireExists helper in list.go (no role/user package 
 
 ## REVIEW — 2026-06-25T09:58:31Z
 Added 2 review tasks (task-032..task-033).
+
+## TASK-032 — 2026-06-25T10:01:33Z
+Removed the general per-category flag-help override machinery (flagHelp map on categoryInfo, the orDefault helper, the six override-or-default branches, and the meta.flagHelp[flag] threading) that served a single override; registerPrivilegeFlag now takes the actionCategory and inlines defaults, with the label --node-label required-target help in one cat==labelScoped branch. Rendered help byte-identical (no bundle diff); all gates pass and the task-030 structure test still passes.
+Files: ~privilege/helpers.go

@@ -950,7 +950,8 @@ tasks:
 
   - id: task-032
     title: "Simplify the per-category flag-help override: drop flagHelp map + orDefault for a single override (audit item 1)"
-    status: todo
+    status: completed
+    completed_at: 2026-06-25T10:01:33Z
     source: review
     description: |
       End-of-feature audit, the one item flagged as worth acting on before merge (thin-abstraction
