@@ -26,3 +26,8 @@ Decisions: Extended fakeQueryRunner to capture lastConn (the existing adminRunne
 ## TASK-006 — 2026-06-25T12:09:54Z
 Gated all embed OS env reads (NEO4J_EMBED_* + provider API keys) behind cfg.Global.AcceptEnvVars() via a local gatedGetenv helper mirroring dbconn; the .env walk-up stays ungated. In env-var mode Resolve now calls credentials.ValidateEmbedEnvSet so a provider needing a key with none set is a usage error.
 Files: ~2 (embed.go, embed_test.go)
+
+## TASK-007 — 2026-06-25T12:20:12Z
+Aura root PersistentPreRunE now synthesizes an ephemeral in-memory AuraCredential ("env") from NEO4J_AURA_CLIENT_ID/SECRET when accept-env-vars is on (validated via ValidateEnvCredentialSet); explicit --credential still wins since its subcommand hook runs after the root hook under EnableTraverseRunHooks.
+Files: +1 new (aura/env_credential_test.go), ~3 mod (aura.go, api/token.go, api/api_test.go, testfs.go)
+Decisions: getToken must skip cfg.Credentials.Aura.UpdateAccessToken when the active credential isn't in the store — otherwise its Get(name) lookup panics for the env-synthesized "env" credential (review-caught). Token stays in-process only; the persistent JWT cache is task-008. Added testfs.GetTestCredentials to assert credentials.json byte-stability.

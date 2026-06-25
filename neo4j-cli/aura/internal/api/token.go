@@ -86,8 +86,13 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW 
 		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
 	}
 
-	if _, saveErr := cfg.Credentials.Aura.UpdateAccessToken(credential, grant.AccessToken, grant.ExpiresIn); saveErr != nil {
-		fmt.Fprintf(warnW, "Warning: failed to persist access token to keyring: %v\n", saveErr) //nolint:errcheck
+	// An env-var-synthesized credential (accept-env-vars mode) is not in the
+	// store, so UpdateAccessToken would panic on its Get lookup. Such tokens are
+	// kept in-process only and never written to credentials.json/keyring.
+	if _, getErr := cfg.Credentials.Aura.Get(credential.Name); getErr == nil {
+		if _, saveErr := cfg.Credentials.Aura.UpdateAccessToken(credential, grant.AccessToken, grant.ExpiresIn); saveErr != nil {
+			fmt.Fprintf(warnW, "Warning: failed to persist access token to keyring: %v\n", saveErr) //nolint:errcheck
+		}
 	}
 	return grant.AccessToken, err
 }

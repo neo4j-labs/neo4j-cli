@@ -140,6 +140,36 @@ func TestMakeRequest_CredentialResolution(t *testing.T) {
 	}
 }
 
+// TestMakeRequest_EnvCredentialNotPersisted drives a full request with an
+// active credential that is NOT in the store (mirroring accept-env-vars
+// synthesis). It must succeed (no panic from the UpdateAccessToken store
+// lookup) and leave credentials.json untouched.
+func TestMakeRequest_EnvCredentialNotPersisted(t *testing.T) {
+	srv, capturedClientID := setupServer(t)
+
+	const emptyCreds = `{"aura":{"credentials":[],"default-credential":""}}`
+	cfg := buildTestConfig(t, srv.URL, emptyCreds)
+	cfg.Aura.SetActiveCredential(&credentials.AuraCredential{
+		Name:         "env",
+		ClientId:     "env-client",
+		ClientSecret: "env-secret",
+	})
+
+	before, err := testfs.GetTestCredentials(cfg.Aura.Fs())
+	require.NoError(t, err)
+
+	_, _, err = api.MakeRequest(cfg, "instances", &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion1,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "env-client", *capturedClientID)
+
+	after, err := testfs.GetTestCredentials(cfg.Aura.Fs())
+	require.NoError(t, err)
+	assert.Equal(t, before, after, "env-synthesized token must not be persisted to credentials.json")
+}
+
 // TestMakeRequest_Timeout asserts the http.Client timeout fires when the
 // server stalls past the configured cap. Uses the test seam to dial the cap
 // down to milliseconds so the assertion runs in <1s; production keeps the 60s

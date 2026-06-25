@@ -144,7 +144,7 @@ tasks:
       an ephemeral *credentials.AuraCredential and call
       cfg.Aura.SetActiveCredential(...) before getToken runs. Secrets are never
       persisted to disk or keyring. One var without the other is a usage error.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -152,7 +152,7 @@ tasks:
       - "Setting only NEO4J_AURA_CLIENT_ID (or only the secret) returns a usage error naming the missing variable"
       - "With accept-env-vars false, the Aura env vars are ignored"
       - "The synthesized credential is in-memory only; credentials.json and keyring are unchanged"
-    completed_at: null
+    completed_at: 2026-06-25T12:20:12Z
 
   - id: task-008
     title: 'Add identity-bound Aura JWT token cache for env-var mode'

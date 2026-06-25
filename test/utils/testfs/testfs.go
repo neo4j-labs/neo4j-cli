@@ -53,10 +53,18 @@ func GetTestFs(config string, credentials string) (afero.Fs, error) {
 	return fs, nil
 }
 
-func GetTestConfig(fs afero.Fs) (string, error) {
-	configPath := filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "config.json")
+func GetTestCredentials(fs afero.Fs) (string, error) {
+	return readTestFile(fs, "credentials.json")
+}
 
-	file, err := fs.Open(configPath)
+func GetTestConfig(fs afero.Fs) (string, error) {
+	return readTestFile(fs, "config.json")
+}
+
+func readTestFile(fs afero.Fs, name string) (string, error) {
+	path := filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", name)
+
+	file, err := fs.Open(path)
 	if err != nil {
 		return "", err
 	}
