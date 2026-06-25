@@ -53,7 +53,7 @@ func buildPrivilegeCypher(verb string, cat actionCategory, action string, opts p
 		clause = action + " ON GRAPH " + cypherIdentifier(graph)
 	case labelScoped:
 		if len(opts.nodeLabels) == 0 {
-			return "", nil, clierr.NewUsageError("action %s requires --node-label", action)
+			return "", nil, clierr.NewUsageError("action %s requires --node-label", kebabAction(action))
 		}
 		graph := opts.onGraph
 		if graph == "" {

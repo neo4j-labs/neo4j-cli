@@ -847,7 +847,8 @@ tasks:
 
   - id: task-029
     title: "Render the labelScoped 'requires --node-label' usage error in kebab CLI form (REQ-F-041)"
-    status: todo
+    status: completed
+    completed_at: 2026-06-25T00:00:00Z
     source: qa
     description: |
       Second-QA-pass finding 1. The `labelScoped` arm of `buildPrivilegeCypher` in `cypher.go` returns

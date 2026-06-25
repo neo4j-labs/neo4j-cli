@@ -420,9 +420,10 @@ func TestBuildPrivilegeCypher_Errors(t *testing.T) {
 		action  string
 		opts    privilegeOpts
 		wantMsg string
+		notMsg  string
 	}{
-		{name: "setLabel missing node-label", verb: "GRANT", action: "set_label", opts: privilegeOpts{onGraph: "neo4j"}, wantMsg: "action SET LABEL requires --node-label"},
-		{name: "removeLabel missing node-label", verb: "GRANT", action: "remove_label", opts: privilegeOpts{onGraph: "neo4j"}, wantMsg: "action REMOVE LABEL requires --node-label"},
+		{name: "setLabel missing node-label", verb: "GRANT", action: "set_label", opts: privilegeOpts{onGraph: "neo4j"}, wantMsg: "action set-label requires --node-label", notMsg: "SET LABEL"},
+		{name: "removeLabel missing node-label", verb: "GRANT", action: "remove_label", opts: privilegeOpts{onGraph: "neo4j"}, wantMsg: "action remove-label requires --node-label", notMsg: "REMOVE LABEL"},
 		{name: "node-label and rel-type both set", verb: "GRANT", action: "read", opts: privilegeOpts{onGraph: "*", nodeLabels: []string{"Person"}, relTypes: []string{"KNOWS"}}, wantMsg: "--node-label and --relationship-type are mutually exclusive"},
 	}
 	for _, tc := range cases {
@@ -438,6 +439,9 @@ func TestBuildPrivilegeCypher_Errors(t *testing.T) {
 			}
 			if tc.wantMsg != "" && !strings.Contains(err.Error(), tc.wantMsg) {
 				t.Fatalf("error = %q, want substring %q", err.Error(), tc.wantMsg)
+			}
+			if tc.notMsg != "" && strings.Contains(err.Error(), tc.notMsg) {
+				t.Fatalf("error = %q, must not contain %q", err.Error(), tc.notMsg)
 			}
 		})
 	}

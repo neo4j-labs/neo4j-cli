@@ -141,3 +141,7 @@ Added 1 review task (task-028).
 Modelled the single-action-category property once: a categoryActions struct (canonical/kebab/singleAction) is computed in init() from validActions into categoryActionsByCat, and the five sites that re-derived len(actionsForCategory(cat))==1 (newCategoryCmd, categoryLong, categoryInvocation, actionSummary, renderCategoryExample) now read meta.singleAction; actionsForCategory/kebabActionsForCategory became thin readers. Pure refactor, no behavior change; all gates green and no bundle drift.
 Files: ~mod (privilege/helpers.go)
 Decisions: validActions stays the single source — init() scans it once and preserves the prior sort order, so help/ValidArgs output is byte-identical.
+
+## TASK-029 — 2026-06-25T00:00:00Z
+The labelScoped "requires --node-label" usage error in cypher.go now renders the action via kebabAction(action), so it reads "action set-label requires --node-label" instead of the Cypher form; updated the error unit cases to assert kebab form and added a negative assertion that the message never contains the Cypher form. All four gates pass.
+Files: ~privilege/cypher.go, ~privilege/privilege_helpers_test.go
