@@ -198,17 +198,18 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 		}
 	}
 
-	// 3. OS environment.
-	if v := os.Getenv(envEmbedProvider); v != "" {
+	// 3. OS environment (gated behind accept-env-vars; the .env walk-up above
+	// is intentionally NOT gated).
+	if v := gatedGetenv(cfg, envEmbedProvider); v != "" {
 		out.Provider = v
 	}
-	if v := os.Getenv(envEmbedModel); v != "" {
+	if v := gatedGetenv(cfg, envEmbedModel); v != "" {
 		out.Model = v
 	}
-	if v := os.Getenv(envEmbedBaseURL); v != "" {
+	if v := gatedGetenv(cfg, envEmbedBaseURL); v != "" {
 		out.BaseURL = v
 	}
-	if v := os.Getenv(envEmbedDimensions); v != "" {
+	if v := gatedGetenv(cfg, envEmbedDimensions); v != "" {
 		if n, ok := parseDimensions(v); ok {
 			out.Dimensions = n
 		}
@@ -235,7 +236,16 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	// API key — provider-specific env beats generic embed env beats stored
 	// credential. .env entries override the stored cred but not OS env, so
 	// we read .env first then OS env.
-	out.APIKey = resolveAPIKey(out.Provider, out.APIKey, dotenvVals)
+	out.APIKey = resolveAPIKey(cfg, out.Provider, out.APIKey, dotenvVals)
+
+	// In env-var mode, a NEO4J_EMBED_PROVIDER that needs an API key but has
+	// none set is a usage error (REQ-F-010 embed group). Gated to env-var mode
+	// so the .env / stored-credential paths are unaffected.
+	if cfg != nil && cfg.Global.AcceptEnvVars() {
+		if err := credentials.ValidateEmbedEnvSet(os.Getenv); err != nil {
+			return Config{}, err
+		}
+	}
 
 	// User agent matches the rest of the query package (`neo4j-cli/v<version>`).
 	version := "dev"
@@ -253,13 +263,13 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 // Vertex authenticates via ADC). For Gemini, GEMINI_API_KEY beats
 // GOOGLE_API_KEY beats NEO4J_EMBED_API_KEY beats stored within each stage.
 // Returns the highest-precedence non-empty value, falling back to storedKey.
-func resolveAPIKey(provider, storedKey string, dotenv map[string]string) string {
+func resolveAPIKey(cfg *clicfg.Config, provider, storedKey string, dotenv map[string]string) string {
 	out := storedKey
 
 	// Stage values in lowest → highest precedence (.env < OS env). Apply
 	// per-provider keys before the generic one in each stage so a per-
 	// provider variable always wins inside its precedence tier.
-	stages := []map[string]string{dotenv, osEnvSnapshot()}
+	stages := []map[string]string{dotenv, osEnvSnapshot(cfg)}
 	for _, stage := range stages {
 		// Generic key applies to any provider that needs an API key.
 		if v := stage[envEmbedAPIKey]; v != "" {
@@ -290,15 +300,26 @@ func resolveAPIKey(provider, storedKey string, dotenv map[string]string) string 
 
 // osEnvSnapshot returns the subset of os.Getenv values relevant to API-key
 // resolution. Built on demand so a test that calls t.Setenv before Resolve
-// sees the change.
-func osEnvSnapshot() map[string]string {
+// sees the change. Reads are gated behind accept-env-vars; when the gate is
+// off every value is empty so the stored credential / .env path wins.
+func osEnvSnapshot(cfg *clicfg.Config) map[string]string {
 	return map[string]string{
-		envEmbedAPIKey: os.Getenv(envEmbedAPIKey),
-		envOpenAIKey:   os.Getenv(envOpenAIKey),
-		envHFToken:     os.Getenv(envHFToken),
-		envGeminiKey:   os.Getenv(envGeminiKey),
-		envGoogleKey:   os.Getenv(envGoogleKey),
+		envEmbedAPIKey: gatedGetenv(cfg, envEmbedAPIKey),
+		envOpenAIKey:   gatedGetenv(cfg, envOpenAIKey),
+		envHFToken:     gatedGetenv(cfg, envHFToken),
+		envGeminiKey:   gatedGetenv(cfg, envGeminiKey),
+		envGoogleKey:   gatedGetenv(cfg, envGoogleKey),
 	}
+}
+
+// gatedGetenv returns os.Getenv(name) only when accept-env-vars is enabled;
+// otherwise it returns "" so credential env vars are ignored. The dotenv
+// (--env walk-up) mechanism is intentionally NOT gated by this helper.
+func gatedGetenv(cfg *clicfg.Config, name string) string {
+	if cfg == nil || !cfg.Global.AcceptEnvVars() {
+		return ""
+	}
+	return os.Getenv(name)
 }
 
 // loadDotenv walks up from cwd looking for a `.env` file via the shared

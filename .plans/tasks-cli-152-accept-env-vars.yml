@@ -123,7 +123,7 @@ tasks:
       NEO4J_EMBED_PROVIDER is set, run ValidateEmbedEnvSet before resolution so a
       missing required API key produces a usage error. Maintain the documented
       precedence: explicit flag > env var > stored embed credential.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -132,7 +132,7 @@ tasks:
       - "With accept-env-vars true and NEO4J_EMBED_PROVIDER=openai but no API key var, a usage error is returned"
       - "The .env walk-up mechanism is unaffected by accept-env-vars"
       - "Explicit embed flags still take precedence over env vars"
-    completed_at: null
+    completed_at: 2026-06-25T12:09:54Z
 
   - id: task-007
     title: 'Synthesize ephemeral Aura credential from env vars'
