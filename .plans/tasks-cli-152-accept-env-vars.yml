@@ -14,7 +14,7 @@ tasks:
       (Viper.GetBool) plus AcceptEnvVarsIsSet() bool (mirrors the existing
       CredentialStorageIsSet() pattern). Add validation in GlobalConfig.Set()
       so only true/false are accepted, returning a usage error otherwise.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "'neo4j-cli config set accept-env-vars true' succeeds and 'config get accept-env-vars' returns true"
@@ -22,7 +22,7 @@ tasks:
       - "NEO4J_CLI_ACCEPT_ENV_VARS=1 makes AcceptEnvVars() return true with no config file write"
       - "AcceptEnvVars() defaults to false; AcceptEnvVarsIsSet() is false until set via config or env"
       - "accept-env-vars appears in 'config get accept-env-vars' and the full config listing"
-    completed_at: null
+    completed_at: 2026-06-25T00:00:00Z
 
   - id: task-002
     title: 'Add EnvCredentialSpec metadata and shared env-spec helpers'

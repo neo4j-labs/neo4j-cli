@@ -178,6 +178,7 @@ func TestStandaloneConfigList(t *testing.T) {
 			command: "config list",
 			// format is "json" → JSON rendering showing all keys
 			wantOut: fmt.Sprintf(`{
+	"accept-env-vars": null,
 	"auth-url": "%s",
 	"base-url": "%s",
 	"credential-storage": null,

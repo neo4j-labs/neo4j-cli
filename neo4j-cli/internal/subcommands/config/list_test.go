@@ -24,6 +24,7 @@ func TestConfigList(t *testing.T) {
 			command: "config list",
 			// "default" auto-detects: non-TTY test stdout → JSON rendering
 			wantOut: `{
+	"accept-env-vars": null,
 	"aura.auth-url": "https://api.neo4j.io/oauth/token",
 	"aura.base-url": "https://api.neo4j.io",
 	"aura.default-workspace": null,
@@ -44,6 +45,7 @@ func TestConfigList(t *testing.T) {
 			},
 			command: "config list --format json",
 			wantOut: `{
+	"accept-env-vars": null,
 	"aura.auth-url": "https://api.neo4j.io/oauth/token",
 	"aura.base-url": "https://api.neo4j.io",
 	"aura.default-workspace": null,

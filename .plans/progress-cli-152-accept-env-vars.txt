@@ -1,0 +1,4 @@
+## TASK-001 — 2026-06-25T00:00:00Z
+Added `accept-env-vars` global config key: ValidConfigKeys entry, Viper.BindEnv("NEO4J_CLI_ACCEPT_ENV_VARS"), AcceptEnvVars()/AcceptEnvVarsIsSet() accessors mirroring CredentialStorage, true/false validation in Set().
+Files: +1 new (accept_env_vars_test.go), ~3 mod (clicfg.go, config/list_test.go, aura standalone_config_test.go)
+Decisions: Updated two golden config-list tests (key sorts alphabetically first in JSON output); no skill-bundle drift (bundle doesn't enumerate config keys).
