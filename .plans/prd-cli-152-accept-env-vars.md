@@ -24,10 +24,12 @@ stored credentials.
   runner needs — no setup command, no committed config file required.
 - Non-destructive: stored credentials are untouched; env var credentials are ephemeral and
   never persisted.
-- Self-explanatory: messages, hints, and config display must accurately reflect the gate's
-  state — no error advertises a variable the gate is ignoring, the override-completeness
-  rule matches the documented "database optional" contract across flags and env vars, and
-  the discovery hint suggests a command that actually works in CI.
+- Self-explanatory: messages, hints, config display, AND flag `--help` must accurately
+  reflect the gate's state — no error or flag-usage string advertises a variable the gate is
+  ignoring, the override-completeness rule matches the documented "database optional"
+  contract across flags and env vars, partial-override errors name the source the user
+  actually used (flags vs env), and the discovery hint suggests a command that actually
+  works in CI.
 
 ## Non-Goals
 
@@ -258,6 +260,64 @@ stored credentials.
   the token is empty. With REQ-F-019 in place a failed mint returns an error before the cache
   write is reached, so this is belt-and-braces; keep the guard so the cache layer is correct
   independent of caller behaviour.
+
+> The requirements below (REQ-F-021..022) were added after a third round of QA
+> (2026-06-26, run against the built binary with live local Docker/Desktop and live Aura)
+> surfaced two message/help-text inconsistencies in the same family as REQ-F-015..018: the
+> gate's existence is not reflected in the flag `--help` surface, and the on-mode partial
+> DBMS override message misattributes flag-only mistakes to environment variables.
+
+- **REQ-F-021** (QA Finding 1 — flag `--help` advertises gated env vars unconditionally):
+  The per-flag usage strings for the gated connection and embed flags currently append a
+  `[env: NEO4J_*]` clause with no indication the read is gated — `--uri` (`[env: NEO4J_URI]`),
+  `--username` (`[env: NEO4J_USERNAME]`), `--password` (`[env: NEO4J_PASSWORD]`), `--database`
+  (`[env: NEO4J_DATABASE]`), `--embed-provider` (`[env: NEO4J_EMBED_PROVIDER]`),
+  `--embed-model`, `--embed-base-url`, `--embed-dimensions`. Because `accept-env-vars` is
+  **off by default**, this is the same defect REQ-F-015/017/018 fixed for error messages —
+  `--help` advertises a variable the gate is ignoring — and it is the most-read discovery
+  surface. It is compounded by the sentinel-only hint (REQ-NF-009): a user who follows
+  `--help` and sets only a non-sentinel var such as `NEO4J_PASSWORD` gets **no effect AND no
+  hint**. Required behaviour:
+  - REMOVE the `[env: NEO4J_*]` clause from each gated-flag usage string (connection +
+    embed flags listed above).
+  - Do NOT simply drop the discoverability: document the gated env vars ONCE, in a
+    consolidated, gate-aware paragraph in the relevant top-level command `Long`
+    descriptions (at minimum the `query` command and the `admin` root; the `NEO4J_EMBED_*`
+    set on `query`). That paragraph MUST name the env vars AND state they are only read when
+    `accept-env-vars` is enabled, pointing at `neo4j-cli config set accept-env-vars true --rw`
+    / `NEO4J_CLI_ACCEPT_ENV_VARS=1` and the README "Environment variables" section.
+  - The non-gated `--debug` clause (`[env: NEO4J_DEBUG (set to 1 to enable)]`) is CORRECT —
+    `NEO4J_DEBUG` is resolved separately and is never gated — and MUST be left unchanged.
+  - Removing the per-flag clauses and editing the `Long`s changes generated help, so the
+    skill bundle drifts: run `go generate ./neo4j-cli/internal/skill/...` and commit the
+    regenerated bundle. The input/output casing gates and the `Example:`/leaf-example gates
+    must stay green.
+
+- **REQ-F-022** (QA Finding 2 — on-mode partial flag override names env vars; dead dual-form
+  branch): With `accept-env-vars` **on**, a flag-only partial DBMS override (e.g. only
+  `--uri`, with no `NEO4J_*` set) currently produces the env-only `ValidateEnvCredentialSet`
+  message — `"incomplete credential environment: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+  must be set when NEO4J_URI is provided (missing: NEO4J_USERNAME, NEO4J_PASSWORD)"` — because
+  that check runs against the **resolved** values (flag-or-env) before the partial-params
+  switch in `dbconn.ResolveConn`. So a user who clearly used `--flags` is told to set
+  `NEO4J_*` env vars. As a consequence, the on-mode dual-form branch added for REQ-F-018
+  (`conn.go` ~231-235, `"--uri/NEO4J_URI ... all three (--uri, --username, --password) are
+  required"`) is **unreachable dead code**, and its preceding comment (~225-230, claiming the
+  branch "only fires for explicit --flag subsets") states the **opposite** of actual
+  behaviour. Required behaviour: the partial-override error MUST name the source the user
+  actually used. Reconcile the env-completeness check and the partial switch so that:
+  - When the incomplete pieces came **only from flags** (no `NEO4J_*` contributed any of
+    uri/username/password), the message names only the `--flags` (the REQ-F-018 off-mode
+    wording), in BOTH gate states.
+  - When one or more pieces came from `NEO4J_*` env vars, the message names the missing
+    `NEO4J_*` variable(s) (preserving REQ-F-010 / REQ-F-014). A mixed subset (e.g. `--uri`
+    flag + `NEO4J_USERNAME` env, missing password) names the missing `NEO4J_PASSWORD`.
+  - Implement by making the completeness check source-aware (e.g. run `ValidateEnvCredentialSet`
+    only over the env-sourced half, letting a purely-flag subset fall through to the
+    flag-named partial branch) and REMOVE the now-dead reconciliation branch so no dead code
+    remains; correct the misleading comment.
+  - The off-mode behaviour (names only `--flags`) and the three-required-params /
+    database-optional completeness decision (REQ-F-014) are unchanged.
 
 ### Non-Functional Requirements
 
@@ -541,6 +601,37 @@ behaviour and leave resolution untouched.
   branch may not even reach the write — keep the guard regardless so the cache layer is correct
   in isolation.
 
+### Third-round QA fixes (REQ-F-021..022)
+
+- **Flag help env-var clauses (REQ-F-021)**: find every flag whose `Usage` string ends with a
+  gated `[env: NEO4J_*]` clause and strip that clause. These live on the `query` flag set
+  (`--uri`/`--username`/`--password`/`--database` and the `--embed-*` flags) and any shared
+  helper that builds the same flags for the `admin` tree — grep for `[env: NEO4J_` to find
+  them all; do NOT touch `--debug`'s `[env: NEO4J_DEBUG ...]`. Then add a single gate-aware
+  "Environment variables" paragraph to the top-level `Long` of `query` and the `admin` root
+  (covering connection vars; embed vars on `query`) stating the vars are read only when
+  `accept-env-vars` is enabled and how to enable it. Because flag usage strings + `Long`s feed
+  the generated skill bundle, regenerate (`go generate ./neo4j-cli/internal/skill/...`) and
+  commit; keep the `query`/`credential`/leaf `Example:` gates and the input/output casing
+  gates green. Keep the new `Long` prose flush-left where the skill renderer requires it
+  (see AGENTS.md skill notes).
+
+- **Source-aware partial message (REQ-F-022)**: in `dbconn.ResolveConn`, the on-mode
+  `ValidateEnvCredentialSet(DBMSEnvSpec, …)` check (currently run over the RESOLVED
+  uri/username/password) fires before the partial switch and so intercepts flag-only subsets
+  with an env-named message, leaving the REQ-F-018 on-mode dual-form branch dead. Fix by
+  scoping the env-completeness check to the **env-sourced** values only: build the validation
+  map from `cfg.GatedGetenv(...)`/dotenv-derived values (the env half) rather than the
+  post-flag resolved values, so a purely-flag subset does NOT trip it and instead falls
+  through to the partial switch, which names the `--flags`. A subset that includes any
+  `NEO4J_*` value still trips `ValidateEnvCredentialSet` and names the missing `NEO4J_*`
+  var(s). Then DELETE the unreachable dual-form arm of the partial switch (so both gate states
+  share the single `--flag`-named partial message) and fix the now-correct comment. Preserve
+  the three-required-params/database-optional completeness (REQ-F-014) and the off-mode
+  wording (REQ-F-018). Add `conn` tests: on-mode `--uri`-only (no env) → `--flag` message;
+  on-mode `NEO4J_URI`-only (no flags) → `NEO4J_*` message; on-mode `--uri` flag +
+  `NEO4J_USERNAME` env, missing password → names missing `NEO4J_PASSWORD`.
+
 ### Breaking change handling
 
 `DBMS` and embed env var reads are currently unconditional. Gating them is a breaking
@@ -643,8 +734,9 @@ Mitigations:
   `accept-env-vars` on it may name `NEO4J_EMBED_PROVIDER` (REQ-F-017).
 - [ ] With `accept-env-vars` off, a partial flag-only DBMS override (one or two of
   `--uri`/`--username`/`--password`) is rejected with a message naming only the `--flags`, not
-  `NEO4J_URI`/`NEO4J_USERNAME`/`NEO4J_PASSWORD`; with `accept-env-vars` on the message may use the
-  `--flag/NEO4J_*` dual form (REQ-F-018).
+  `NEO4J_URI`/`NEO4J_USERNAME`/`NEO4J_PASSWORD` (REQ-F-018). NOTE: REQ-F-022 supersedes the
+  original "on-mode may use the dual form" wording — a flag-only subset now names only the
+  `--flags` in BOTH gate states; only env-sourced subsets name `NEO4J_*`.
 - [ ] An Aura OAuth mint returning 401 yields the invalid-credentials auth error; a 403 yields a
   distinct "forbidden / not authorized" error (NOT the 401 wording, and NOT mentioning a wrong
   Aura environment); any other non-2xx (e.g. 422/500) and a 2xx with an empty `access_token`
@@ -656,6 +748,25 @@ Mitigations:
   `token_cache_test.go` covers the empty-token case (REQ-F-020).
 - [ ] `make test`, `make fmt-check`, `make lint` pass; `go generate ./neo4j-cli/internal/skill/...`
   produces no bundle drift after the message changes.
+
+### Third-round QA additions (REQ-F-021..022)
+
+- [ ] No gated-flag `--help` usage string advertises a `[env: NEO4J_*]` clause:
+  `query --help` and the `admin` leaves no longer show `[env: NEO4J_URI/USERNAME/PASSWORD/
+  DATABASE]` or `[env: NEO4J_EMBED_*]` on the individual flags (REQ-F-021).
+- [ ] The gated env vars are still documented — the `query` and `admin` top-level `Long`
+  descriptions carry a gate-aware "Environment variables" paragraph naming them and stating
+  they are read only when `accept-env-vars` is enabled (REQ-F-021).
+- [ ] `--debug` still shows its `[env: NEO4J_DEBUG ...]` clause unchanged (REQ-F-021).
+- [ ] With `accept-env-vars` **on**, a flag-only partial override (e.g. only `--uri`, no
+  `NEO4J_*` set) is rejected with a message naming only the `--flags` — NOT
+  `NEO4J_URI`/`NEO4J_USERNAME`/`NEO4J_PASSWORD` (REQ-F-022).
+- [ ] With `accept-env-vars` **on**, a partial override that includes any `NEO4J_*` value
+  (env-only or mixed flag+env) names the missing `NEO4J_*` variable(s) (REQ-F-010/F-022).
+- [ ] The unreachable on-mode dual-form partial branch in `dbconn.ResolveConn` is removed and
+  its comment corrected; no dead code remains (REQ-F-022).
+- [ ] `make test`, `make fmt-check`, `make lint` pass; `go generate
+  ./neo4j-cli/internal/skill/...` produces no bundle drift after the help/message changes.
 
 ## Out of Scope
 
