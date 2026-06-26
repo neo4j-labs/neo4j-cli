@@ -24,6 +24,10 @@ stored credentials.
   runner needs — no setup command, no committed config file required.
 - Non-destructive: stored credentials are untouched; env var credentials are ephemeral and
   never persisted.
+- Self-explanatory: messages, hints, and config display must accurately reflect the gate's
+  state — no error advertises a variable the gate is ignoring, the override-completeness
+  rule matches the documented "database optional" contract across flags and env vars, and
+  the discovery hint suggests a command that actually works in CI.
 
 ## Non-Goals
 
@@ -132,6 +136,52 @@ stored credentials.
   behavioural change to CLI-212 and must be called out in the changelog/README (see
   REQ-NF-003).
 
+> The requirements below (REQ-F-014 onward and REQ-NF-008/009) were added after QA of the
+> implemented feature surfaced a behavioural bug and several message/display inconsistencies.
+
+- **REQ-F-014** (QA Finding 1 — completeness bug): On the **default resolution path** (no
+  `--credential`), a *complete* connection override is the THREE required params
+  `--uri`/`NEO4J_URI`, `--username`/`NEO4J_USERNAME`, `--password`/`NEO4J_PASSWORD`. The
+  database (`--database`/`NEO4J_DATABASE`) is ALWAYS optional and is never required to
+  complete the set — when supplied it is applied, when omitted the server resolves the
+  connecting user's home database. This rule applies **uniformly to BOTH explicit flags and
+  env vars** (env vars remain gated behind `accept-env-vars` per REQ-F-011); the user
+  explicitly chose uniform flag+env behaviour over an env-only relaxation. Specifically:
+  - When a stored default credential exists, supplying all three of uri/username/password
+    (via flags or env) bypasses the stored credential cleanly; `NEO4J_DATABASE`/`--database`
+    is not required.
+  - Supplying a strict subset (one or two of the three) remains a rejected partial override.
+  - This fixes the contradiction where `dbconn.ResolveConn`'s legacy `explicitCount` /
+    `fullCount` switch treated a complete set as **four** (uri/user/pass/database) in query
+    mode and so rejected the three-var override that REQ-F-010 (database optional) mandates.
+  - Admin mode (`skipDatabase=true`) already counts exactly the three required params and is
+    unchanged.
+  - This **intentionally relaxes the pre-existing flag-only contract** (previously documented
+    and enforced as "all four when a stored credential exists") down to three; it must be
+    reflected in the README (REQ-NF-003). CLI-212 (`--credential` + database override,
+    REQ-F-013) is a separate code path (`applyDBOverride`) and is unaffected.
+
+- **REQ-F-015** (QA Finding 2 — misleading off-mode messages): When `accept-env-vars` is
+  **off**, error messages that prompt for a missing connection or embed value MUST NOT
+  advertise the gated environment variables (`NEO4J_PASSWORD`, `NEO4J_URI`,
+  `NEO4J_USERNAME`, `NEO4J_EMBED_*`, etc.) as if setting them would help — the gate is
+  ignoring them, so telling a user to "set `NEO4J_PASSWORD`" while it is already set is
+  misleading. Off-mode messages must instead reference explicit flags / `.env` files and,
+  where useful, point at `accept-env-vars` (e.g. "set `--password`, or enable
+  `accept-env-vars` to read `NEO4J_PASSWORD`"). When `accept-env-vars` is **on** the
+  messages may continue to name the env vars. Affected sites identified in QA:
+  `neo4j-cli/query/run.go` (`promptPassword`, ~line 203), `admin/admin.go` (~line 45), and
+  `neo4j-cli/internal/dbconn/helpers.go` (~line 38). The change must not regress the
+  one-time discovery hint (REQ-F-007).
+
+- **REQ-F-016** (QA Finding 3 — hint command fails in CI): The discovery hint (REQ-F-007)
+  MUST suggest a command that succeeds in the non-interactive / agent / CI contexts where
+  the hint most often surfaces. The `config set accept-env-vars true` suggestion MUST include
+  the `--rw` flag (auto-applied in an interactive TTY, but REQUIRED under an agent harness or
+  non-interactive script). The hint becomes:
+  `... run 'neo4j-cli config set accept-env-vars true --rw' or set NEO4J_CLI_ACCEPT_ENV_VARS=1`.
+  The `NEO4J_CLI_ACCEPT_ENV_VARS=1` alternative is retained as the zero-write CI path.
+
 ### Non-Functional Requirements
 
 - **REQ-NF-001**: Changing `accept-env-vars` has no side effects on credential storage.
@@ -172,6 +222,22 @@ stored credentials.
   metadata declared once per type, shared logic consuming the metadata. A new credential
   type MUST add an `EnvCredentialSpec` var before its env vars are reachable — absence is
   a compile-time gap, not a runtime one.
+
+- **REQ-NF-008** (QA Finding 4 — config display): `neo4j-cli config get accept-env-vars` and
+  the full `config list` SHOULD render the value consistently with sibling boolean config
+  keys (e.g. `telemetry`, which displays as an unquoted `true`/`false`) rather than as a
+  quoted string, and the `NEO4J_CLI_ACCEPT_ENV_VARS=1`/`0` bootstrap MUST NOT surface as the
+  raw `"1"`/`"0"` literal. This is a **pre-existing** `config set` behaviour (it stores all
+  values as strings), so the fix MAY be scoped to normalising the display of boolean-typed
+  keys; if a safe, low-risk global fix is not feasible, the known display quirk MUST instead
+  be documented. Resolution functionality (`Viper.GetBool` already treats `"true"`/`"1"` as
+  true) is correct and must not regress.
+
+- **REQ-NF-009** (QA Finding 5 — sentinel-only hint, by design): The one-time discovery hint
+  fires only when a *sentinel* env var is present (`NEO4J_URI`, `NEO4J_AURA_CLIENT_ID`,
+  `NEO4J_EMBED_PROVIDER`). Setting only a non-sentinel var (e.g. `NEO4J_PASSWORD` alone) does
+  not trigger it. This is intended (sentinel-based detection per REQ-NF-005) and MUST be
+  documented as expected behaviour rather than changed.
 
 ## Technical Considerations
 
@@ -320,6 +386,47 @@ check in the Aura root `PersistentPreRunE` and the DBMS/Embed checks in `connect
 usage-style message. Validation order: check for any type-specific env var first; if any
 are found but the set is incomplete, error immediately rather than falling through.
 
+### Default-path completeness fix (REQ-F-014)
+
+`dbconn.ResolveConn` computes `fullCount = 4` (uri/user/pass/database) in query mode
+(`skipDatabase=false`) and rejects any `explicitCount` strictly between 1 and `fullCount`
+when a stored credential exists (the `default:` "partial connection params" branch). Because
+the new `ValidateEnvCredentialSet(DBMSEnvSpec, …)` check already treats uri/user/pass as the
+required group with database optional, the two rules disagree: a three-var override
+(uri/user/pass, no database) passes the new check but is then rejected by the old switch as
+"all four required". Fix: base the completeness decision on the **three required params**
+only — i.e. count uri/username/password toward `explicitCount` and treat database as an
+always-optional extra that is applied when present but never required and never counted toward
+"completeness". Concretely, a set of the three required params (regardless of database) is
+"complete" and bypasses the stored credential; one or two of them is "partial". Apply this in
+query mode for both flags and env (admin's `skipDatabase=true` path already counts three and
+is unchanged). After the fix the only remaining partial errors are genuine subsets (≤2), so
+ensure the env-mode partial message names the missing `NEO4J_*` vars (via
+`ValidateEnvCredentialSet`, REQ-F-010) and the flag-mode partial message names the `--flags`.
+Add tests for: three env vars + stored cred → override succeeds; three flags + stored cred →
+override succeeds; two of three (env and flag) → partial error; database supplied is applied
+but never required.
+
+### Off-mode message rewording (REQ-F-015)
+
+Thread `cfg.Global.AcceptEnvVars()` (or a derived bool) into the message-construction sites so
+the env-var clause is conditional on the gate being on. Sites: `query/run.go` `promptPassword`
+(~203), `admin/admin.go` (~45), `dbconn/helpers.go` (~38). Keep the on-mode wording (which may
+name the env vars) and only suppress/redirect the env-var suggestion when the gate is off.
+
+### Hint command (REQ-F-016)
+
+Update the hint string in `app.go` `maybeEmitEnvVarHint` to suggest
+`neo4j-cli config set accept-env-vars true --rw`. Update `neo4j-cli/app/env_var_hint_test.go`
+to assert the new string (including `--rw`).
+
+### Config display (REQ-NF-008)
+
+Inspect the `config get` / `config list` rendering in the config subcommands. Prefer rendering
+known boolean keys via their bool accessor (so `accept-env-vars` shows `true`/`false`, never
+`"1"`/`"0"`); if a global normalisation is risky, document the quirk in the README/known
+behaviour and leave resolution untouched.
+
 ### Breaking change handling
 
 `DBMS` and embed env var reads are currently unconditional. Gating them is a breaking
@@ -390,6 +497,30 @@ Mitigations:
   decision to accept this breaking change as a minor for this experimental project
   (REQ-NF-007), while still describing the breaking behaviour in the body.
 
+### QA-driven additions (REQ-F-014..016, REQ-NF-008/009)
+
+- [ ] With `accept-env-vars=true` and a stored default credential,
+  `NEO4J_URI`+`NEO4J_USERNAME`+`NEO4J_PASSWORD` (no `NEO4J_DATABASE`) overrides the stored
+  credential and resolves without an "all four required" error (REQ-F-014).
+- [ ] The same three supplied as `--uri`/`--username`/`--password` flags (no `--database`)
+  override a stored default credential without an "all four required" error (REQ-F-014).
+- [ ] Supplying only one or two of uri/username/password (via env OR flags) with a stored
+  default credential is still rejected as a partial override, naming the missing values
+  (`NEO4J_*` in env mode, `--flags` in flag mode) (REQ-F-014).
+- [ ] `--database`/`NEO4J_DATABASE`, when supplied, is applied to the connection but is never
+  required to complete an override (REQ-F-014).
+- [ ] With `accept-env-vars` off and a connection value missing, the error message does not
+  tell the user to set a gated env var as if it would work; it references flags/`.env` and/or
+  `accept-env-vars` (REQ-F-015).
+- [ ] The discovery hint suggests `neo4j-cli config set accept-env-vars true --rw`, and that
+  exact command succeeds when run non-interactively (REQ-F-016).
+- [ ] `config get accept-env-vars` renders consistently with sibling boolean keys (or the
+  display quirk is documented), and `NEO4J_CLI_ACCEPT_ENV_VARS=1` does not surface as `"1"`
+  (REQ-NF-008).
+- [ ] Sentinel-only hint detection is documented as intended behaviour (REQ-NF-009).
+- [ ] README updated for the three-param override (database optional) across flags and env
+  vars, the off-mode message behaviour, and the hint `--rw`.
+
 ## Out of Scope
 
 - `credential-storage: env` as a storage mode (explicitly abandoned in favour of this
@@ -411,3 +542,16 @@ None — all questions resolved during PRD refinement:
   (REQ-F-011/F-012).
 - The CLI-212 `NEO4J_DATABASE`-with-`--credential` override is gated behind `accept-env-vars`
   for consistency, accepting the behavioural change to CLI-212 (REQ-F-013).
+
+Resolved during post-implementation QA (2026-06-26):
+- The default-path override-completeness contradiction (QA Finding 1) is fixed by making the
+  three required params (uri/username/password) the "complete" set with database always
+  optional, applied **uniformly to both flags and env vars** — the user chose uniform
+  behaviour over an env-only relaxation, intentionally relaxing the older flag-only "all four"
+  contract (REQ-F-014). CLI-212's `--credential` + database-override path (`applyDBOverride`,
+  REQ-F-013) is separate and unchanged.
+- Off-mode error messages are reworded to not advertise gated env vars; they reference flags/
+  `.env` and `accept-env-vars` instead (QA Finding 2, REQ-F-015).
+- The discovery hint includes `--rw` so it works non-interactively (QA Finding 3, REQ-F-016).
+- The `config get`/`list` display quirk and the sentinel-only hint behaviour are addressed
+  (normalise-or-document; document-as-intended respectively) (QA Findings 4/5, REQ-NF-008/009).

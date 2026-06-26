@@ -1,7 +1,7 @@
 feature: cli-152-accept-env-vars
 prd: ./prd-cli-152-accept-env-vars.md
 created_at: 2026-06-25T10:50:25Z
-updated_at: 2026-06-25T10:53:00Z
+updated_at: 2026-06-26T09:14:52Z
 
 tasks:
   - id: task-001
@@ -377,3 +377,155 @@ tasks:
       - "make test, make fmt-check, make lint pass"
     source: review
     completed_at: 2026-06-25T15:55:43Z
+
+  - id: task-016
+    title: 'Fix default-path override completeness: three params complete, database optional, for flags AND env'
+    description: |
+      (QA Finding 1 [Medium-High] — confirmed behavioural bug. REQ-F-014.)
+      On the default resolution path (no --credential), dbconn.ResolveConn
+      (neo4j-cli/internal/dbconn/conn.go) treats a "complete" override as all
+      FOUR params (uri/username/password/database) in query mode via the
+      explicitCount / fullCount switch, so when a stored default credential
+      exists a three-var override (uri/user/pass, no database) is rejected with
+      "partial connection params: ...all four are required". This contradicts
+      REQ-F-010 (NEO4J_DATABASE optional) and the acceptance criterion that env
+      vars override the stored credential: the new ValidateEnvCredentialSet check
+      passes for three, but the legacy switch then rejects.
+
+      Fix: base the completeness decision on the THREE required params
+      (uri/username/password) only; treat database (--database / NEO4J_DATABASE)
+      as an always-optional extra that is applied when present but never required
+      and never counted toward completeness. A set of the three required params
+      (regardless of database) bypasses the stored credential cleanly; one or two
+      of them remains a partial override. Per the user's explicit decision, apply
+      this UNIFORMLY to both explicit --flags and env vars (intentionally relaxing
+      the older flag-only "all four when a stored credential exists" contract down
+      to three). Admin mode (skipDatabase=true) already counts three and must stay
+      unchanged. CLI-212's applyDBOverride (--credential path, REQ-F-013) is a
+      separate path and must NOT be touched.
+
+      Reconcile the partial-params messaging: after the fix the only remaining
+      partial errors are genuine subsets (<=2 of the three). Ensure the env-mode
+      partial error names the missing NEO4J_* vars (via ValidateEnvCredentialSet,
+      REQ-F-010) and the flag-mode partial error names the --flags.
+
+      Update README: the "must supply all four" statement for the connection
+      override (and the embed/env sections as needed) must change to "all three of
+      URI/username/password, database optional" across both flags and env vars.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "accept-env-vars=true + stored default cred + NEO4J_URI/USERNAME/PASSWORD (no NEO4J_DATABASE) overrides the stored cred and resolves without an 'all four' error"
+      - "Stored default cred + --uri/--username/--password flags (no --database) overrides the stored cred without an 'all four' error"
+      - "One or two of uri/user/pass (env OR flags) with a stored default cred is still a rejected partial override, naming the missing values (NEO4J_* in env mode, --flags in flag mode)"
+      - "--database / NEO4J_DATABASE, when supplied, is applied to conn.Database but is never required to complete an override"
+      - "Admin mode (skipDatabase=true) behaviour is unchanged; CLI-212 applyDBOverride path is untouched"
+      - "No stored credential: three-var override still works (no regression)"
+      - "New tests cover three-env + stored cred, three-flag + stored cred, two-of-three partial (env and flag), and database-applied-but-optional"
+      - "README updated to 'three required, database optional' for both flags and env vars"
+      - "make test, make fmt-check, make lint pass; go generate produces no bundle drift"
+    source: qa
+
+  - id: task-017
+    title: 'Reword off-mode error messages so they do not advertise gated env vars'
+    description: |
+      (QA Finding 2 [Medium]. REQ-F-015.)
+      When accept-env-vars is off, error messages that prompt for a missing
+      connection/embed value still tell users to "set NEO4J_PASSWORD" /
+      "set NEO4J_URI" etc. — env vars the gate is ignoring (and which may already
+      be set). With accept-env-vars explicitly false there is not even a discovery
+      hint, so the user is told to set a variable that does nothing. Rework the
+      affected messages so that, when the gate is OFF, the env-var suggestion is
+      dropped or redirected (reference --flags / .env and/or point at
+      accept-env-vars, e.g. "set --password, or enable accept-env-vars to read
+      NEO4J_PASSWORD"); when the gate is ON the messages may continue to name the
+      env vars. Thread cfg.Global.AcceptEnvVars() (or a derived bool) into the
+      message-construction sites.
+
+      Sites identified in QA:
+        - neo4j-cli/query/run.go promptPassword (~line 203:
+          "password is required: set --password, NEO4J_PASSWORD, or add it to a .env file")
+        - neo4j-cli/internal/subcommands/admin/admin.go (~line 45:
+          "--password is required or run interactively")
+        - neo4j-cli/internal/dbconn/helpers.go (~line 38)
+      Must not regress the one-time discovery hint (REQ-F-007). Update/extend the
+      tests asserting these message strings.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "With accept-env-vars off and a missing connection value, the error does NOT suggest setting a gated env var as an effective remedy"
+      - "Off-mode messages reference explicit flags / .env and/or accept-env-vars"
+      - "With accept-env-vars on, messages may still name the relevant env vars"
+      - "query, admin, and dbconn helper message sites are all updated consistently"
+      - "The one-time discovery hint (REQ-F-007) still behaves per spec"
+      - "Tests asserting the affected message strings are updated; make test, make fmt-check, make lint pass"
+
+    source: qa
+
+  - id: task-018
+    title: 'Add --rw to the discovery hint config-set suggestion'
+    description: |
+      (QA Finding 3 [Low-Medium]. REQ-F-016.)
+      The one-time discovery hint suggests
+      "run 'neo4j-cli config set accept-env-vars true'" without --rw. In the
+      non-interactive / agent / CI contexts where the hint most often surfaces,
+      that command fails with "this command writes; pass --rw to allow it". Update
+      the hint string in neo4j-cli/app/app.go maybeEmitEnvVarHint to suggest
+      "neo4j-cli config set accept-env-vars true --rw" (retaining the
+      NEO4J_CLI_ACCEPT_ENV_VARS=1 alternative). Update
+      neo4j-cli/app/env_var_hint_test.go to assert the new string. Note: the
+      command also feeds the skill bundle/agent surfaces only if it appears in a
+      Long/Example — the hint is runtime stderr text, so confirm whether
+      go generate drift applies; if a generated reference embeds the hint, run
+      go generate and commit the regenerated bundle.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "The hint reads: ...run 'neo4j-cli config set accept-env-vars true --rw' or set NEO4J_CLI_ACCEPT_ENV_VARS=1"
+      - "Running the suggested command verbatim succeeds in a non-interactive/agent context"
+      - "env_var_hint_test.go asserts the new string including --rw"
+      - "make test, make fmt-check, make lint pass; go generate produces no bundle drift"
+    source: qa
+
+  - id: task-019
+    title: 'Normalise or document accept-env-vars config get/list display'
+    description: |
+      (QA Finding 4 [Low/cosmetic]. REQ-NF-008.)
+      'config get accept-env-vars' renders the value as a quoted string
+      ("accept-env-vars": "true"), and the NEO4J_CLI_ACCEPT_ENV_VARS=1/0 bootstrap
+      surfaces as the raw "1"/"0" literal, whereas sibling boolean keys (e.g.
+      telemetry) display as unquoted true/false. This stems from pre-existing
+      config-set behaviour (all values stored as strings). Prefer rendering known
+      boolean keys via their bool accessor so accept-env-vars shows true/false and
+      never "1"/"0" in config get and config list. If a safe, low-risk global
+      change to boolean-key display is not feasible, instead document the known
+      display quirk (README/known behaviour) and leave it. Resolution via
+      Viper.GetBool already works and must not regress. Check the casing/output
+      gates (snake_case keys) are unaffected.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "config get accept-env-vars and config list render the value consistently with sibling boolean keys, OR the quirk is explicitly documented"
+      - "NEO4J_CLI_ACCEPT_ENV_VARS=1 does not surface as the literal \"1\" in config get/list (if normalisation chosen)"
+      - "AcceptEnvVars() resolution is unchanged (true for true/1, false for false/0/unset)"
+      - "Output casing/format gates still pass; make test, make fmt-check, make lint pass"
+    source: qa
+
+  - id: task-020
+    title: 'Document sentinel-only discovery-hint detection as intended behaviour'
+    description: |
+      (QA Finding 5 [Low/by-design]. REQ-NF-009.)
+      The discovery hint fires only when a sentinel env var is present
+      (NEO4J_URI, NEO4J_AURA_CLIENT_ID, NEO4J_EMBED_PROVIDER); setting only a
+      non-sentinel var (e.g. NEO4J_PASSWORD alone) does not trigger it. This is
+      intended (sentinel-based detection per REQ-NF-005). Document it as expected
+      behaviour in the README "Environment variables" section (and/or alongside
+      the hint description) so it is not mistaken for a bug. Do NOT change the
+      sentinel-based detection design.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "README documents that the hint is triggered by sentinel vars (NEO4J_URI / NEO4J_AURA_CLIENT_ID / NEO4J_EMBED_PROVIDER) and not by non-sentinel vars alone"
+      - "No code change to HasAnyCredentialEnvVar / the sentinel design"
+      - "make fmt-check passes; go generate produces no bundle drift if README feeds any generated surface"
+    source: qa
