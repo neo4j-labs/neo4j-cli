@@ -91,5 +91,32 @@ func writeTokenCache(path, fullHash, token string, expiresInSeconds int64) error
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+	// os.WriteFile only applies the perm argument when CREATING a file; an
+	// existing cache file keeps its current (possibly widened) permissions. Write
+	// to a fresh 0600 temp file in the same dir and rename over the target so the
+	// result is always 0600 and the swap is atomic (no partial-write window).
+	tmp, err := os.CreateTemp(filepath.Dir(path), "neo4j-cli-aura-token-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()        //nolint:errcheck,gosec // best-effort cleanup
+		os.Remove(tmpPath) //nolint:errcheck,gosec // best-effort cleanup
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()        //nolint:errcheck,gosec // best-effort cleanup
+		os.Remove(tmpPath) //nolint:errcheck,gosec // best-effort cleanup
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath) //nolint:errcheck,gosec // best-effort cleanup
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath) //nolint:errcheck,gosec // best-effort cleanup
+		return err
+	}
+	return nil
 }

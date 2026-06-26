@@ -683,7 +683,8 @@ tasks:
       (task-015 length-prefixes the hash components) and needs no further work.
       Add a token_cache_test.go case: pre-create the cache file with 0644, perform a
       write, and assert the resulting mode is 0600.
-    status: pending
+    status: completed
+    completed_at: 2026-06-26T17:30:00Z
     dependencies: []
     acceptance_criteria:
       - "Writing the token cache over a pre-existing file whose mode was widened (e.g. 0644) results in mode 0600"

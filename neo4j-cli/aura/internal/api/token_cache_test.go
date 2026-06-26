@@ -249,6 +249,39 @@ func TestTokenCache_EnvMode_EmptyTokenNotWritten(t *testing.T) {
 	assert.Empty(t, entries, "an empty minted token must not be written to the disk cache")
 }
 
+// TestTokenCache_EnvMode_WidenedFileReEnforced0600 pins the defense-in-depth
+// fix: writing over a pre-existing cache file whose mode was widened (0644) must
+// re-enforce 0600. os.WriteFile alone would have preserved the wider perms.
+func TestTokenCache_EnvMode_WidenedFileReEnforced0600(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX file modes are not meaningful on Windows")
+	}
+	dir := t.TempDir()
+	api.SetTokenCacheDirForTest(t, dir)
+
+	api.SetMintTokenForTest(t, func() (api.Grant, error) {
+		return api.Grant{AccessToken: "minted-jwt", ExpiresIn: 3600}, nil
+	})
+
+	srv := instancesOnlyServer(t)
+	const clientID, clientSecret = "id", "super-secret-value"
+	path := api.TokenCachePathForTest(clientID, clientSecret, srv+"/oauth/token")
+
+	// Pre-create the cache file with widened permissions, as if a previous run's
+	// file had been chmodded or written under a permissive umask.
+	require.NoError(t, os.WriteFile(path, []byte(`{"token":"stale","expiry":"2000-01-01T00:00:00Z","hash":"x"}`), 0o644))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o644), info.Mode().Perm(), "precondition: file starts widened")
+
+	// A request triggers a fresh mint (stale entry is expired) and a cache write.
+	doRequest(t, envCfg(t, srv, clientID, clientSecret))
+
+	info, err = os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "write over a widened file must re-enforce 0600")
+}
+
 // guards against any drift in the buffer constant's interaction with expiry.
 func TestTokenCache_FreshTokenIsReused(t *testing.T) {
 	dir := t.TempDir()
