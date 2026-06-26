@@ -752,7 +752,8 @@ tasks:
       correct the misleading comment. Do not change the three-required-params /
       database-optional completeness decision (REQ-F-014) or the off-mode wording
       (REQ-F-018).
-    status: pending
+    status: completed
+    completed_at: 2026-06-26T19:45:00Z
     dependencies: []
     acceptance_criteria:
       - "On-mode --uri-only (no NEO4J_* set) is rejected with a message naming only the --flags, not NEO4J_URI/USERNAME/PASSWORD"

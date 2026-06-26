@@ -146,9 +146,20 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		return nil, err
 	}
 
-	uri := Overlay(dotenvVals[credentials.EnvURI], cfg.GatedGetenv(credentials.EnvURI))
-	username := Overlay(dotenvVals[credentials.EnvUsername], cfg.GatedGetenv(credentials.EnvUsername))
-	password := Overlay(dotenvVals[credentials.EnvPassword], cfg.GatedGetenv(credentials.EnvPassword))
+	// The env half (dotenv walk-up + gated OS env). Tracked separately from the
+	// post-flag resolved values so the partial-override error can name the
+	// source the user actually used: an incomplete set that includes any
+	// env/dotenv-sourced piece is named with NEO4J_* vars; a purely-flag subset
+	// is named with --flags (REQ-F-022). dotenv uses the same NEO4J_* keys, so
+	// dotenv-supplied pieces count as env-sourced.
+	envURI := Overlay(dotenvVals[credentials.EnvURI], cfg.GatedGetenv(credentials.EnvURI))
+	envUsername := Overlay(dotenvVals[credentials.EnvUsername], cfg.GatedGetenv(credentials.EnvUsername))
+	envPassword := Overlay(dotenvVals[credentials.EnvPassword], cfg.GatedGetenv(credentials.EnvPassword))
+	envSourced := envURI != "" || envUsername != "" || envPassword != ""
+
+	uri := envURI
+	username := envUsername
+	password := envPassword
 	database := ""
 	if !skipDatabase {
 		database = Overlay(dotenvVals[credentials.EnvDatabase], cfg.GatedGetenv(credentials.EnvDatabase))
@@ -169,23 +180,6 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		}
 	}
 
-	// In env-var mode, reject a partial DBMS set naming the missing NEO4J_*
-	// vars (REQ-F-010). The check runs against the resolved values so a piece
-	// supplied by a flag or dotenv counts as present (e.g. env password with
-	// flag uri/username is complete).
-	if cfg.Global.AcceptEnvVars() {
-		resolved := map[string]string{
-			credentials.EnvURI:      uri,
-			credentials.EnvUsername: username,
-			credentials.EnvPassword: password,
-		}
-		if err := credentials.ValidateEnvCredentialSet(credentials.DBMSEnvSpec, func(name string) string {
-			return resolved[name]
-		}); err != nil {
-			return nil, err
-		}
-	}
-
 	// Completeness is decided on the three required params only
 	// (uri/username/password). database is always optional: it is applied when
 	// present but never required and never counted toward completeness, in both
@@ -199,6 +193,25 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 	}
 	if password != "" {
 		requiredCount++
+	}
+
+	// In env-var mode, reject an incomplete DBMS set that includes any
+	// env/dotenv-sourced piece by naming the missing NEO4J_* vars (REQ-F-010).
+	// This fires regardless of a stored credential ("must not silently fall
+	// back"). A complete set (all three from any source) and a purely-flag
+	// subset both skip this — the latter falls through to the partial switch,
+	// which names the --flags (REQ-F-022).
+	if cfg.Global.AcceptEnvVars() && requiredCount != 3 && envSourced {
+		resolved := map[string]string{
+			credentials.EnvURI:      uri,
+			credentials.EnvUsername: username,
+			credentials.EnvPassword: password,
+		}
+		if err := credentials.ValidateEnvCredentialSet(credentials.DBMSEnvSpec, func(name string) string {
+			return resolved[name]
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	storedCred, _ := cfg.Credentials.Dbms.GetDefault()
@@ -223,16 +236,11 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		// All three required params provided — bypass stored credential entirely.
 
 	default:
-		// Partial override of a stored credential — reject. In env-var mode the
-		// completeness check above already named the missing NEO4J_* vars, so this
-		// only fires for explicit --flag subsets. When the gate is off, gated env
-		// vars contribute nothing, so name only the --flags rather than the
-		// misleading --flag/NEO4J_* dual form (REQ-F-018).
-		if cfg.Global.AcceptEnvVars() {
-			return nil, fmt.Errorf(
-				"partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
-					"or --password/NEO4J_PASSWORD is provided, all three (--uri, --username, --password) are required")
-		}
+		// Partial override of a stored credential — reject. Any subset that
+		// included a NEO4J_*/dotenv-sourced value was already named by the
+		// env-completeness check above, so this branch only fires for a
+		// purely-flag subset and names only the --flags, in both gate states
+		// (REQ-F-018/REQ-F-022).
 		return nil, fmt.Errorf(
 			"partial connection params: when any of --uri, --username, or --password is provided, " +
 				"all three (--uri, --username, --password) are required")

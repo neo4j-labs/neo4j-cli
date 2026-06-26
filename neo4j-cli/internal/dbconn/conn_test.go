@@ -816,12 +816,12 @@ func TestResolveConn_Query_PartialFlagOverrideRejected(t *testing.T) {
 	}
 }
 
-// TestResolveConn_Query_PartialOverrideOnMode_NamesEnvVars verifies REQ-F-018:
-// with accept-env-vars on, a partial override (any subset of the three required)
-// is caught by the ValidateEnvCredentialSet completeness check, which names the
-// missing NEO4J_* vars (the gate-aware partial-params branch is reserved for the
-// off path). A flag-supplied piece counts as present in the resolved set.
-func TestResolveConn_Query_PartialOverrideOnMode_NamesEnvVars(t *testing.T) {
+// TestResolveConn_Query_PartialFlagOnlyOnMode_NamesFlags verifies REQ-F-022:
+// with accept-env-vars on, a flag-only partial override (only --uri, no NEO4J_*
+// set) names ONLY the --flags — the env-completeness check is scoped to the
+// env-sourced half so a purely-flag subset does not trip it, and the partial
+// switch names the flags in both gate states.
+func TestResolveConn_Query_PartialFlagOnlyOnMode_NamesFlags(t *testing.T) {
 	t.Setenv(envAcceptEnvVars, "1")
 	t.Setenv(EnvURI, "")
 	t.Setenv(EnvUsername, "")
@@ -836,9 +836,55 @@ func TestResolveConn_Query_PartialOverrideOnMode_NamesEnvVars(t *testing.T) {
 
 	_, err := ResolveConn(cmd, cfg, false)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), EnvUsername,
-		"on-mode partial override names the missing NEO4J_* vars (REQ-F-010/F-018)")
+	assert.Contains(t, err.Error(), "partial connection params")
+	assert.Contains(t, err.Error(), "--uri")
+	assert.NotContains(t, err.Error(), "NEO4J_",
+		"on-mode flag-only partial override names the --flags, not NEO4J_* (REQ-F-022)")
+}
+
+// TestResolveConn_Query_PartialEnvOnlyOnMode_NamesEnvVars verifies REQ-F-010/F-022:
+// with accept-env-vars on, an env-only partial override (only NEO4J_URI, no flags)
+// names the missing NEO4J_* vars via the env-completeness check.
+func TestResolveConn_Query_PartialEnvOnlyOnMode_NamesEnvVars(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "neo4j://env-host:7687")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+
+	_, err := ResolveConn(cmd, cfg, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), EnvUsername)
 	assert.Contains(t, err.Error(), EnvPassword)
+	assert.NotContains(t, err.Error(), "--uri", "env-only partial error names NEO4J_* vars, not --flags")
+}
+
+// TestResolveConn_Query_PartialMixedOnMode_NamesMissingEnvVar verifies REQ-F-022:
+// with accept-env-vars on and a mixed subset (--uri flag + NEO4J_USERNAME env,
+// no password), the env-completeness check fires because an env-sourced value is
+// present, naming the missing NEO4J_PASSWORD.
+func TestResolveConn_Query_PartialMixedOnMode_NamesMissingEnvVar(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "env-user")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--uri=neo4j://flag:7687"}))
+
+	_, err := ResolveConn(cmd, cfg, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), EnvPassword,
+		"mixed subset with an env-sourced value names the missing NEO4J_* var (REQ-F-022)")
 }
 
 // TestResolveConn_Query_PartialEnvOverrideRejectedNamingVars verifies REQ-F-014:

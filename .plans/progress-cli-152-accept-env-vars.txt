@@ -130,3 +130,8 @@ Decisions: explicit tmp.Chmod(0o600) (not relying on CreateTemp's default mode) 
 ## TASK-026 — 2026-06-26T18:55:00Z
 Removed the gated [env: NEO4J_*] / (env: NEO4J_*) clauses from the query and admin connection/embed flag usage strings (left --debug's NEO4J_DEBUG clause intact) and added a single gate-aware "Environment variables" paragraph to the query and admin top-level Long descriptions; regenerated the skill bundle.
 Files: ~4 (query.go, admin/admin.go, bundle/references/query.md, bundle/references/admin.md)
+
+## TASK-027 — 2026-06-26T19:45:00Z
+Made the on-mode partial DBMS override message name the source actually used (REQ-F-022): the env-completeness check now fires only when accept-env-vars is on AND the resolved set is incomplete (requiredCount != 3) AND at least one of uri/username/password came from an env/dotenv source — so a purely-flag partial subset falls through to the partial switch (names --flags) while any env-sourced partial still names NEO4J_*. Deleted the unreachable on-mode dual-form partial branch and corrected its comment.
+Files: ~2 mod (neo4j-cli/internal/dbconn/conn.go, neo4j-cli/internal/dbconn/conn_test.go)
+Decisions: Tracked completeness on the resolved requiredCount (not the env-sourced half alone) so the legitimate mixed-complete case (env password + flag uri/username) is not falsely rejected — the prior "env-sourced-half-only" framing broke TestRunQuery_PasswordFromEnvSkipsPrompt; guarding on requiredCount != 3 + an envSourced bool gives the right source-aware message in all cases while preserving REQ-F-010 (no silent fallback) regardless of a stored credential.
