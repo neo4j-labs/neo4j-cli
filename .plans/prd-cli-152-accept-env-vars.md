@@ -365,6 +365,73 @@ stored credentials.
   - The on-path (key resolved) and the resolution precedence (flag > env > `.env` > stored) are
     untouched. The Authorization header / key value must never appear in any message (unchanged).
 
+> The requirements below (REQ-F-024..025) were added after a fifth round of QA (2026-06-26, run
+> against the built binary with live local Enterprise containers) found two further
+> partial-override message inconsistencies in `dbconn.ResolveConn`, in the same family as
+> REQ-F-018/022: the source-aware completeness reporting is incomplete for `.env`-sourced and
+> mixed flag+env subsets. (A third audit finding — `config get accept-env-vars` rendering `null`
+> for a never-set value while sibling boolean keys render their effective default — was reviewed
+> and deliberately NOT adopted: the display is acceptable as-is and resolution already treats
+> unset as `false`.)
+
+- **REQ-F-024** (QA Finding 1 — off-mode partial `.env` override is reported with the
+  `--flag`-named message and a different exit code): The DBMS partial-override completeness
+  check in `dbconn.ResolveConn` (`ValidateEnvCredentialSet(DBMSEnvSpec, …)`, conn.go ~204) is
+  currently gated behind `cfg.Global.AcceptEnvVars()`, so it runs only in on-mode. But the
+  `.env` (dotenv `--env` walk-up) mechanism is **never gated** — a `.env` file is read and
+  honoured in BOTH gate states (REQ-F-011 / Out of Scope), and it uses the same `NEO4J_*` keys.
+  Consequently the SAME user action — a `.env` containing only `NEO4J_URI` (a partial set, no
+  flags) — yields two different errors depending on the gate:
+  - **on**: `"incomplete credential environment: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD must
+    be set when NEO4J_URI is provided (missing: NEO4J_USERNAME, NEO4J_PASSWORD)"` (a
+    `clierr.UsageError`, exit 2).
+  - **off**: `"partial connection params: when any of --uri, --username, or --password is
+    provided, all three (--uri, --username, --password) are required"` (exit 1) — naming
+    `--flags` the user never used, not the `.env`/`NEO4J_*` source they did.
+
+  This directly contradicts the existing conn.go ~149-154 comment ("dotenv-supplied pieces
+  count as env-sourced … so the partial-override error can name the source the user actually
+  used"): in off-mode the `envSourced` signal is computed but never consulted, because its only
+  use site (the completeness check) is gated off. Required behaviour: the env/dotenv
+  completeness check MUST fire whenever an env- or dotenv-sourced piece contributed to an
+  incomplete required set, in BOTH gate states — i.e. drop the `AcceptEnvVars()` condition on
+  that check and trigger it on `envSourced` (which already folds dotenv together with the gated
+  OS env via `Overlay(dotenvVals[…], cfg.GatedGetenv(…))`). A partial set that includes any
+  `.env`/`NEO4J_*` piece is therefore rejected with the `NEO4J_*`-named `clierr.UsageError`
+  (exit 2) in off-mode too — the same message and exit code as on-mode for the same `.env`. A
+  **purely-flag** subset (no env/dotenv piece — `envSourced` false) is unchanged: it still
+  falls through to the `--flags`-named `partial connection params` branch (REQ-F-018/022) in
+  both modes. The three-required-params / database-optional completeness decision (REQ-F-014) is
+  unchanged. Note: in off-mode OS env vars contribute nothing (gated to `""`), so the only
+  env-sourced pieces that can trigger this off-mode are dotenv ones — which is exactly the
+  desired behaviour, since dotenv is the only ungated env source.
+
+- **REQ-F-025** (QA Finding 2 — env-named partial message mis-attributes a flag value to its
+  `NEO4J_*` env var): The env completeness check is run over the post-flag **resolved**
+  uri/username/password map (conn.go ~205-209), so a value supplied via a `--flag` is reported
+  as though it came from the corresponding `NEO4J_*` env var. With `accept-env-vars` on, a
+  subset mixing a `--uri` **flag** with a `NEO4J_USERNAME` **env var** (no password) currently
+  produces: `"… must be set when NEO4J_URI, NEO4J_USERNAME are provided (missing:
+  NEO4J_PASSWORD)"` — listing `NEO4J_URI` as a provided env var when the user actually passed
+  `--uri`. The actionable `missing: NEO4J_PASSWORD` part is correct (and satisfies REQ-F-022),
+  but the "provided" attribution is wrong: it names an env var the user never set. Required
+  behaviour: the env-named completeness message MUST attribute only the pieces that genuinely
+  came from an env/dotenv source, and MUST name only the genuinely-missing required piece(s)
+  (those still empty after both flags and env are applied):
+  - A `--uri` flag + `NEO4J_USERNAME` env, missing password → names the missing `NEO4J_PASSWORD`
+    and MUST NOT list `NEO4J_URI` (a flag) among the provided env vars.
+  - A purely env/dotenv subset (e.g. only `NEO4J_URI`, or `NEO4J_URI` + `NEO4J_USERNAME`) is
+    unchanged: it names the env vars that were set and the missing `NEO4J_*` value(s).
+  - A purely-flag subset still gets the `--flags` message (REQ-F-018/022; `envSourced` false).
+
+  Implement by deriving the "provided (env-sourced)" set from the env/dotenv half (`envURI`/
+  `envUsername`/`envPassword`, computed pre-flag at conn.go ~155-158) and the "missing" set from
+  the genuinely-empty required params (resolved), rather than feeding the whole resolved map to
+  `ValidateEnvCredentialSet`. The completeness decision (three required params, database
+  optional — REQ-F-014) and the off-mode `--flag` wording (REQ-F-018) are unchanged. REQ-F-024
+  and REQ-F-025 share the same code site; implement them together and keep the env-named branch
+  the single source of the `NEO4J_*`-named message for any subset with an env/dotenv piece.
+
 ### Non-Functional Requirements
 
 - **REQ-NF-001**: Changing `accept-env-vars` has no side effects on credential storage.
@@ -701,6 +768,37 @@ behaviour and leave resolution untouched.
     advertise the OS key var as a direct fix; ON + no key → message may name the env vars; a
     `.env`-supplied key off-mode resolves with no error.
 
+### Fifth-round QA fixes (REQ-F-024..025)
+
+Both fixes live at the single completeness site in `dbconn.ResolveConn` (`conn.go` ~155-215)
+and should be implemented together.
+
+- **Ungate the env/dotenv completeness check (REQ-F-024)**: remove the
+  `cfg.Global.AcceptEnvVars()` condition from the `if … && requiredCount != 3 && envSourced`
+  guard (conn.go ~204) so the check runs whenever `envSourced` is true and the required set is
+  incomplete, in both gate states. `envSourced`/`envURI`/`envUsername`/`envPassword` are already
+  computed via `Overlay(dotenvVals[…], cfg.GatedGetenv(…))` (conn.go ~155-158), so in off-mode
+  they reflect dotenv-only contributions (OS env is gated to `""`) and in on-mode they fold in
+  the OS env — exactly the set that should be named with `NEO4J_*`. The `clierr.UsageError`
+  (exit 2) then fires uniformly for any `.env`/`NEO4J_*`-sourced partial set; a purely-flag
+  subset (`envSourced` false) still falls through to the `--flags` `partial connection params`
+  branch (exit 1). No change to the three-required-params/database-optional decision
+  (REQ-F-014) or the off-mode `--flag` wording for purely-flag subsets (REQ-F-018/022).
+
+- **Source-accurate provided/missing attribution (REQ-F-025)**: stop feeding the post-flag
+  resolved map to the env completeness check. Build the "provided (env-sourced)" view from the
+  pre-flag `envURI`/`envUsername`/`envPassword` half, and the "missing" view from the
+  genuinely-empty required params after flags+env are applied, so a flag-supplied `--uri` is
+  never reported as a provided `NEO4J_URI` and only the truly-absent piece (e.g.
+  `NEO4J_PASSWORD`) is named as missing. This may mean computing the message inline rather than
+  calling `ValidateEnvCredentialSet` over the resolved map, or extending the helper to take a
+  separate present-set and missing-set; keep the on-mode `NEO4J_*` wording and the off-mode
+  `--flag` wording intact. Add `conn` tests: off-mode `.env` with only `NEO4J_URI` (no flags) →
+  `NEO4J_*`-named UsageError (exit 2), same as on-mode (REQ-F-024); off-mode purely-flag `--uri`
+  only → `--flags` message (exit 1, unchanged); on-mode `--uri` flag + `NEO4J_USERNAME` env,
+  missing password → names missing `NEO4J_PASSWORD`, does NOT list `NEO4J_URI` as a provided env
+  var (REQ-F-025).
+
 ### Breaking change handling
 
 `DBMS` and embed env var reads are currently unconditional. Gating them is a breaking
@@ -854,6 +952,23 @@ Mitigations:
   env var off-mode (REQ-F-023).
 - [ ] `make test`, `make fmt-check`, `make lint` pass; `go generate
   ./neo4j-cli/internal/skill/...` produces no bundle drift (REQ-F-023).
+
+### Fifth-round QA additions (REQ-F-024..025)
+
+- [ ] A `.env` file containing only `NEO4J_URI` (a partial set, no flags) is rejected with the
+  `NEO4J_*`-named completeness error (`clierr.UsageError`, exit 2) with `accept-env-vars`
+  **off**, identical to the on-mode result — not the `--flags`-named `partial connection params`
+  error (exit 1) (REQ-F-024).
+- [ ] A purely-flag partial subset (e.g. only `--uri`, no env/dotenv) still produces the
+  `--flags`-named `partial connection params` message (exit 1) in BOTH gate states
+  (REQ-F-018/022 unchanged) (REQ-F-024).
+- [ ] With `accept-env-vars` **on**, a `--uri` flag + `NEO4J_USERNAME` env var (missing
+  password) names the missing `NEO4J_PASSWORD` and does NOT list `NEO4J_URI` (a flag) among the
+  provided env vars (REQ-F-025).
+- [ ] A purely env/dotenv partial subset still names the env vars that were set and the missing
+  `NEO4J_*` value(s) (REQ-F-025).
+- [ ] `make test`, `make fmt-check`, `make lint` pass; `go generate
+  ./neo4j-cli/internal/skill/...` produces no bundle drift (REQ-F-024/025).
 
 ## Out of Scope
 
