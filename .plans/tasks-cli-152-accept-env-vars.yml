@@ -1,7 +1,7 @@
 feature: cli-152-accept-env-vars
 prd: ./prd-cli-152-accept-env-vars.md
 created_at: 2026-06-25T10:50:25Z
-updated_at: 2026-06-26T19:15:00Z
+updated_at: 2026-06-26T21:30:00Z
 
 tasks:
   - id: task-001
@@ -798,7 +798,8 @@ tasks:
       resolved) and precedence (flag > env > .env > stored) are untouched. Run
       `go generate ./neo4j-cli/internal/skill/...` if any Long/help changed (the
       runtime error strings are not in the bundle, but verify no drift).
-    status: pending
+    status: completed
+    completed_at: 2026-06-26T21:35:00Z
     dependencies: []
     acceptance_criteria:
       - "OFF + 'query --embed-provider openai' with OPENAI_API_KEY/NEO4J_EMBED_API_KEY only in OS env (gated): error references a .env file / stored embed credential (and may mention enabling accept-env-vars), and does NOT advertise the OS env vars as a direct fix"
@@ -807,5 +808,73 @@ tasks:
       - "OFF: a key supplied via a .env file resolves successfully with no missing-key error (dotenv never gated)"
       - "The empty-key check is centralized in Resolve() for both gate states AND the three provider Embed() backstop messages are gate-aware; the WithSuggestion text is gated too"
       - "No API-key message or suggestion advertises a gated env var as a direct fix when accept-env-vars is off; key/Authorization value never appears in any message"
+      - "make test, make fmt-check, make lint pass; go generate ./neo4j-cli/internal/skill/... produces no bundle drift"
+    source: qa
+
+  - id: task-029
+    title: 'Fix partial-override source attribution in dbconn.ResolveConn: ungate dotenv completeness + name only env-sourced pieces'
+    description: |
+      (Fifth-round QA findings, REQ-F-024 and REQ-F-025. Both live at the single
+      completeness site in neo4j-cli/internal/dbconn/conn.go (~155-247) and MUST
+      be implemented together — REQ-F-025's expected outputs depend on REQ-F-024's
+      ungating.)
+
+      Two partial-override message defects remain after REQ-F-018/022:
+
+      (1) REQ-F-024 — the env/dotenv completeness check
+      `ValidateEnvCredentialSet(DBMSEnvSpec, …)` (conn.go ~204) is gated behind
+      `cfg.Global.AcceptEnvVars()`, but the .env (--env walk-up) mechanism is
+      NEVER gated and uses the same NEO4J_* keys. So the SAME action — a .env with
+      only NEO4J_URI (partial, no flags) — gives two different errors:
+        - on : "incomplete credential environment: NEO4J_URI, NEO4J_USERNAME,
+          NEO4J_PASSWORD must be set when NEO4J_URI is provided (missing:
+          NEO4J_USERNAME, NEO4J_PASSWORD)" (clierr.UsageError, exit 2)
+        - off: "partial connection params: when any of --uri, --username, or
+          --password is provided, all three (--uri, --username, --password) are
+          required" (exit 1) — names --flags the user never used.
+      This contradicts the conn.go ~149-154 comment ("dotenv-supplied pieces count
+      as env-sourced … so the partial-override error can name the source the user
+      actually used"): in off-mode `envSourced` is computed but never consulted
+      because its only use site is gated off.
+      Fix: REMOVE the `cfg.Global.AcceptEnvVars()` condition from the guard at
+      conn.go ~204 so the check runs whenever `envSourced` is true and
+      `requiredCount != 3`, in BOTH gate states. `envURI`/`envUsername`/
+      `envPassword`/`envSourced` are already `Overlay(dotenvVals[…],
+      cfg.GatedGetenv(…))` (conn.go ~155-158), so off-mode reflects dotenv-only
+      (OS env gated to "") and on-mode folds in OS env — exactly the set to name
+      with NEO4J_*. A purely-flag subset (`envSourced` false) is unchanged: it
+      still falls through to the --flags `partial connection params` branch
+      (exit 1).
+
+      (2) REQ-F-025 — the env completeness check is run over the post-flag RESOLVED
+      uri/username/password map (conn.go ~205-209), so a value supplied via --flag
+      is reported as a provided NEO4J_* env var. With accept-env-vars on, a --uri
+      FLAG + NEO4J_USERNAME ENV (missing password) currently yields "… when
+      NEO4J_URI, NEO4J_USERNAME are provided (missing: NEO4J_PASSWORD)" — listing
+      NEO4J_URI (a flag) as a provided env var. The "missing: NEO4J_PASSWORD" part
+      is correct; the "provided" attribution is wrong.
+      Fix: derive the "provided (env-sourced)" view from the pre-flag env half
+      (envURI/envUsername/envPassword) and the "missing" view from the
+      genuinely-empty required params after flags+env, so a flag-supplied --uri is
+      never named as a provided NEO4J_URI and only the truly-absent piece is named
+      missing. Compute the message inline, or extend ValidateEnvCredentialSet to
+      accept a separate present-set and missing-set; keep the existing on-mode
+      NEO4J_* wording and off-mode --flag wording intact.
+
+      Keep the env-named branch the single source of the NEO4J_*-named message for
+      any subset with an env/dotenv piece. Do NOT change the three-required-params /
+      database-optional completeness decision (REQ-F-014), the off-mode --flag
+      wording for purely-flag subsets (REQ-F-018/022), or the credential/desktop
+      paths. The runtime error strings are not in the skill bundle, but run
+      `go generate ./neo4j-cli/internal/skill/...` to confirm no drift.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "OFF: a .env with only NEO4J_URI (no flags) is rejected with the NEO4J_*-named completeness UsageError (exit 2), identical to on-mode — not the --flags partial connection params error (exit 1) (REQ-F-024)"
+      - "Purely-flag partial subset (e.g. only --uri, no env/dotenv) still produces the --flags partial connection params message (exit 1) in BOTH gate states (REQ-F-018/022 unchanged) (REQ-F-024)"
+      - "ON: --uri flag + NEO4J_USERNAME env (missing password) names the missing NEO4J_PASSWORD and does NOT list NEO4J_URI (a flag) among the provided env vars (REQ-F-025)"
+      - "A purely env/dotenv partial subset still names the env vars that were set and the missing NEO4J_* value(s) (REQ-F-025)"
+      - "Three-required-params/database-optional completeness (REQ-F-014) and credential/desktop paths are unchanged; no dead code introduced"
+      - "New dbconn conn_test.go cases cover off-mode dotenv-partial, off/on purely-flag partial, and on-mode mixed flag+env partial"
       - "make test, make fmt-check, make lint pass; go generate ./neo4j-cli/internal/skill/... produces no bundle drift"
     source: qa

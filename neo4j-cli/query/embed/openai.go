@@ -61,9 +61,8 @@ type openAIEmbedResponse struct {
 // header value never appears in any error text.
 func (p *openAIProvider) Embed(ctx context.Context, text string) ([]float32, error) {
 	if p.cfg.APIKey == "" {
-		return nil, clierr.NewAuthError(
-			"missing API key for openai: set OPENAI_API_KEY, NEO4J_EMBED_API_KEY, or store one with `neo4j-cli credential embed add`").
-			WithSuggestion("provide a key via an env var, or see `neo4j-cli credential embed add --help` to store one")
+		return nil, clierr.NewAuthError("%s", missingAPIKeyMessage(ProviderOpenAI, p.cfg.AcceptEnvVars)).
+			WithSuggestion(missingAPIKeySuggestion(p.cfg.AcceptEnvVars))
 	}
 
 	base := p.cfg.BaseURL

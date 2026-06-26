@@ -231,21 +231,18 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	// we read .env first then OS env.
 	out.APIKey = resolveAPIKey(cfg, out.Provider, out.APIKey, dotenvVals)
 
-	// In env-var mode, a provider that needs an API key but resolved none from
-	// any source (flag / env / .env / stored) is a usage error (REQ-F-010 embed
-	// group). Validate the RESOLVED Config — not raw os.Getenv — so a key
-	// supplied via .env or a stored credential counts as present, matching the
-	// DBMS check in dbconn.ResolveConn and the documented precedence. Gated to
-	// env-var mode so the .env / stored-credential paths are otherwise
-	// unaffected.
-	if cfg != nil && cfg.Global.AcceptEnvVars() {
-		if out.Provider != "" && providerNeedsKey(out.Provider) && out.APIKey == "" {
-			return Config{}, clierr.NewUsageError(
-				"missing embed API key for provider %q: set --embed-provider's key via "+
-					"NEO4J_EMBED_API_KEY (or the provider-specific variable), a .env file, "+
-					"or a stored embed credential",
-				out.Provider)
-		}
+	out.AcceptEnvVars = cfg != nil && cfg.Global.AcceptEnvVars()
+
+	// A provider that needs an API key but resolved none from any source (flag /
+	// env / .env / stored) is a usage error (REQ-F-010 / REQ-F-023 embed group).
+	// Validate the RESOLVED Config — not raw os.Getenv — so a key supplied via
+	// .env or a stored credential counts as present, matching the DBMS check in
+	// dbconn.ResolveConn and the documented precedence. The check fires in BOTH
+	// gate states; the message wording is gate-aware so the off-mode form never
+	// advertises a gated OS env var as a direct fix.
+	if out.Provider != "" && providerNeedsKey(out.Provider) && out.APIKey == "" {
+		return Config{}, clierr.NewUsageError(
+			"%s", missingAPIKeyMessage(out.Provider, out.AcceptEnvVars))
 	}
 
 	// User agent matches the rest of the query package (`neo4j-cli/v<version>`).
@@ -255,9 +252,56 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	}
 	out.UserAgent = "neo4j-cli/v" + version
 
-	out.AcceptEnvVars = cfg != nil && cfg.Global.AcceptEnvVars()
-
 	return out, nil
+}
+
+// providerKeyEnvVars lists the OS environment variables each provider reads for
+// its API key, highest-precedence first. Named only in the on-mode message and
+// inside the off-mode "enable accept-env-vars to read ..." clause — never as a
+// direct off-mode fix (REQ-F-023).
+func providerKeyEnvVars(provider string) []string {
+	switch strings.ToLower(provider) {
+	case ProviderOpenAI:
+		return []string{credentials.EnvOpenAIKey, credentials.EnvEmbedAPIKey}
+	case ProviderHuggingFace:
+		return []string{credentials.EnvHFToken, credentials.EnvEmbedAPIKey}
+	case ProviderGemini:
+		return []string{credentials.EnvGeminiKey, credentials.EnvGoogleKey, credentials.EnvEmbedAPIKey}
+	default:
+		return []string{credentials.EnvEmbedAPIKey}
+	}
+}
+
+// missingAPIKeyMessage builds the gate-aware missing-API-key error body shared
+// by Resolve and the per-provider Embed backstops (REQ-F-023). Off-mode points
+// at a .env file and a stored credential (dotenv is never gated) and only
+// mentions the OS env vars behind an "enable accept-env-vars" clause; on-mode
+// names the env vars directly. The key value never appears in either form.
+func missingAPIKeyMessage(provider string, acceptEnvVars bool) string {
+	vars := strings.Join(providerKeyEnvVars(provider), ", ")
+	if acceptEnvVars {
+		return fmt.Sprintf(
+			"missing API key for %s: set %s, add it to a .env file, "+
+				"or store one with `neo4j-cli credential embed add`",
+			provider, vars)
+	}
+	return fmt.Sprintf(
+		"missing API key for %s: add it to a .env file, "+
+			"or store one with `neo4j-cli credential embed add` "+
+			"(or enable accept-env-vars to read %s)",
+		provider, vars)
+}
+
+// missingAPIKeySuggestion is the gate-aware WithSuggestion text for the
+// per-provider Embed backstops (REQ-F-023).
+func missingAPIKeySuggestion(acceptEnvVars bool) string {
+	if acceptEnvVars {
+		return "provide a key via an env var or a .env file, " +
+			"or see `neo4j-cli credential embed add --help` to store one"
+	}
+	return "provide a key via a .env file, " +
+		"or see `neo4j-cli credential embed add --help` to store one " +
+		"(or enable accept-env-vars to read the provider's key env vars)"
 }
 
 // providerNeedsKey reports whether a provider requires an API key. Ollama

@@ -550,7 +550,48 @@ func TestResolve_EnvGate_OnMissingKeyErrors(t *testing.T) {
 
 	_, err := Resolve(cmd, cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "missing embed API key")
+	msg := err.Error()
+	assert.Contains(t, msg, "missing API key for openai")
+	assert.Contains(t, msg, "OPENAI_API_KEY", "on-mode message may name the env vars")
+}
+
+// TestResolve_EnvGate_OffProviderViaFlagMissingKey is the REQ-F-023 off-mode
+// case: provider supplied via the never-gated --embed-provider flag while the
+// only keys live in (gated) OS env. The centralized check fires and the message
+// must reference a .env file / stored credential, not advertise the OS env var.
+func TestResolve_EnvGate_OffProviderViaFlagMissingKey(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(envEmbedAPIKey, "ignored-os-key")
+	t.Setenv(envOpenAIKey, "ignored-os-key")
+
+	cfg := newTestCfg(t, "{}")
+	cmd := newTestCmd(t, "--embed-provider=openai")
+
+	_, err := Resolve(cmd, cfg)
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "missing API key for openai")
+	assert.Contains(t, msg, ".env")
+	assert.Contains(t, msg, "credential embed add")
+	assert.Contains(t, msg, "enable accept-env-vars")
+	assert.NotContains(t, msg, "set OPENAI_API_KEY",
+		"off-mode message must not advertise the OS env var as a direct fix")
+}
+
+// TestResolve_EnvGate_OffProviderViaFlagKeyFromDotenv confirms dotenv is never
+// gated: provider via flag, gate off, key from .env resolves cleanly.
+func TestResolve_EnvGate_OffProviderViaFlagKeyFromDotenv(t *testing.T) {
+	clearEmbedEnv(t)
+
+	cfg := newTestCfg(t, "{}")
+	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_API_KEY=dotenv-key\n")
+
+	cmd := newTestCmd(t, "--embed-provider=openai")
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "openai", got.Provider)
+	assert.Equal(t, "dotenv-key", got.APIKey, "key from .env must satisfy the check even off-mode")
 }
 
 // TestResolve_EnvGate_OnProviderFromEnvKeyFromDotenv is the bug case from the
