@@ -1,7 +1,7 @@
 feature: cli-152-accept-env-vars
 prd: ./prd-cli-152-accept-env-vars.md
 created_at: 2026-06-25T10:50:25Z
-updated_at: 2026-06-26T09:14:52Z
+updated_at: 2026-06-26T15:30:00Z
 
 tasks:
   - id: task-001
@@ -534,3 +534,120 @@ tasks:
       - "make fmt-check passes; go generate produces no bundle drift if README feeds any generated surface"
     source: qa
     completed_at: 2026-06-26T14:30:00Z
+
+  - id: task-021
+    title: 'Make embed missing-provider error gate-aware in off-mode'
+    description: |
+      (Second-round QA Finding 1 [Medium]. REQ-F-017.)
+      The "missing embed provider" error in neo4j-cli/query/embed/embed.go (New(),
+      currently the unconditional string "missing embed provider: set
+      --embed-provider, NEO4J_EMBED_PROVIDER, or pick a stored embed credential")
+      advertises a GATED env var even when accept-env-vars is off. Repro: gate off
+      + NEO4J_EMBED_PROVIDER=openai set (ignored) -> the message tells the user to
+      set the very var that was just ignored. REQ-F-015 was applied to the
+      connection/password sites (query/run.go promptPassword, admin/admin.go,
+      dbconn/helpers.go) but missed this embed provider message; the embed API-key
+      message (embed.go ~237) is already correctly gated to on-mode.
+      New() takes a resolved Config WITHOUT the gate flag, so thread the gate in:
+      either add an AcceptEnvVars bool to the embed Config (set in Resolve from
+      cfg.Global.AcceptEnvVars()) and branch the message on it, or move the
+      empty-provider check up into Resolve (which already has cfg). Off-mode wording
+      must mirror the existing promptPassword pattern: reference --embed-provider /
+      .env / stored embed credential, and MAY say "enable accept-env-vars to read
+      NEO4J_EMBED_PROVIDER"; on-mode MAY keep naming NEO4J_EMBED_PROVIDER. Do not
+      change the resolved (provider present) path.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Gate off + no resolvable provider: error references --embed-provider / .env / stored cred and does NOT advertise NEO4J_EMBED_PROVIDER as a fix (may mention enabling accept-env-vars)"
+      - "Gate on + no resolvable provider: error MAY name NEO4J_EMBED_PROVIDER"
+      - "Embed unit test covers both gate states for the missing-provider message"
+      - "The provider-resolved path is unchanged; make test, make fmt-check, make lint pass; no bundle drift"
+    source: qa
+
+  - id: task-022
+    title: 'Make DBMS partial-params error not advertise gated env vars off-mode'
+    description: |
+      (Second-round QA Finding 4 [Low/cosmetic]. REQ-F-018.)
+      The partial-override error in dbconn.ResolveConn (the default: branch:
+      "partial connection params: when any of --uri/NEO4J_URI,
+      --username/NEO4J_USERNAME, or --password/NEO4J_PASSWORD is provided, all three
+      (--uri, --username, --password) are required") names gated NEO4J_* env vars
+      even when accept-env-vars is off. In off-mode only --flags can have reached
+      this branch (gated env vars contribute nothing to requiredCount), so the
+      dual form is misleading. Make the message gate-aware via
+      cfg.Global.AcceptEnvVars(): off -> name only --uri/--username/--password;
+      on -> keep the --flag/NEO4J_* dual form. Wording-only change; the
+      requiredCount / completeness logic (three required params, database optional;
+      REQ-F-014) is unchanged. Ensure on-mode env-supplied subsets still surface the
+      missing NEO4J_* vars via the existing ValidateEnvCredentialSet path (which
+      fires before this branch for env sets).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Gate off + partial flag override (1-2 of --uri/--username/--password): error names only the --flags, not NEO4J_*"
+      - "Gate on: message may use the --flag/NEO4J_* dual form; env-supplied subsets still named by ValidateEnvCredentialSet (REQ-F-010/F-014)"
+      - "requiredCount/completeness behaviour unchanged (three required, database optional)"
+      - "dbconn conn_test.go covers both gate states; make test, make fmt-check, make lint pass"
+    source: qa
+
+  - id: task-023
+    title: 'Fix OAuth mint to return clear per-status errors and never an empty token'
+    description: |
+      (Second-round QA Finding 3 [Medium, pre-existing]. REQ-F-019.)
+      mintTokenHTTP (neo4j-cli/aura/internal/api/token.go) special-cases only HTTP
+      401 (auth error) and 404 (panic); its case http.StatusBadRequest: and
+      case http.StatusForbidden: arms are EMPTY, so 400/403 (and any other unlisted
+      non-2xx e.g. 422/500) fall through, the body is parsed into a Grant, and an
+      EMPTY AccessToken is returned WITH NO ERROR. Downstream this yields an
+      "Authorization: Bearer " (empty) request and the generic
+      "unexpected status code 422 ... please report an issue". Repro confirmed in QA
+      with a staging client credential returning 403 against api.neo4j.io.
+      Rework the status switch so every non-2xx returns a clear, actionable error
+      and an empty access_token after a 2xx is also treated as an error:
+        - 401 -> existing auth error ("credentials invalid/expired/revoked").
+        - 403 -> a DISTINCT forbidden error: credentials valid but not authorized for
+          this request (insufficient permission); NOT the 401 wording. MUST NOT mention
+          a wrong/mismatched Aura environment - that is a niche cause mainly affecting
+          internal users and would clutter the user-facing message. Suggested:
+          "forbidden (HTTP 403): the credentials are valid but not authorized for this
+          request (insufficient permission)."
+        - any other non-2xx (incl. 400/422/5xx) and any 2xx with empty access_token ->
+          clear error naming the status (or "empty token"), reusing existing
+          response-error helpers rather than the generic "please report" panic.
+      Decision (confirmed): fix ALL mint paths (single mintTokenHTTP chokepoint), not
+      env-var-only, so stored keyring/insecure credentials benefit identically; and
+      distinguish 401 vs 403 vs other. Add tests via the mintToken seam for 401, 403,
+      another non-2xx (422 or 500), and a 200-with-empty-token response. Verify any
+      new debug/error text obeys the AGENTS.md redaction rule (no <secretword>:/=
+      prefix immediately before a word).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "401 -> invalid-credentials auth error; 403 -> distinct 'forbidden / not authorized' error (NOT the 401 wording, and NOT mentioning a wrong Aura environment)"
+      - "Other non-2xx (e.g. 422/500) and a 2xx with empty access_token -> clear error naming the status, NOT the generic 'please report' panic"
+      - "No code path returns an empty AccessToken as success; no downstream 'Authorization: Bearer ' (empty) request occurs"
+      - "Fix applies to both env-var-synthesized and stored-credential mints (single chokepoint)"
+      - "Tests via the mintToken seam cover 401, 403, another non-2xx, and empty-token; make test, make fmt-check, make lint pass; no new redaction regressions"
+    source: qa
+
+  - id: task-024
+    title: 'Skip writing an empty token to the Aura on-disk token cache'
+    description: |
+      (Second-round QA Finding 2 [Low, branch-introduced]. REQ-F-020.)
+      In env-var mode getToken calls writeTokenCache(..., grant.AccessToken, ...)
+      after a mint regardless of whether a token was obtained, so a failed/empty
+      mint writes a junk {"token":"","expiry":...} file into os.TempDir() on every
+      invocation. readTokenCache already rejects empty tokens (token_cache.go ~66),
+      so there is no cache poisoning, but the cache MUST NOT persist an empty token.
+      Guard the write: in writeTokenCache (or the getToken envMode caller) skip the
+      write when token == "". With task-023 (REQ-F-019) in place a failed mint
+      returns an error before the write is reached, so this is belt-and-braces; keep
+      the guard so the cache layer is correct independent of caller behaviour.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "No on-disk token-cache file is created when the minted token is empty"
+      - "token_cache_test.go adds a case asserting no file is written for an empty token"
+      - "Non-empty tokens still cache as before (0600, identity-bound, hit/miss semantics unchanged); make test, make fmt-check, make lint pass"
+    source: qa

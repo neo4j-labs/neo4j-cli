@@ -182,6 +182,83 @@ stored credentials.
   `... run 'neo4j-cli config set accept-env-vars true --rw' or set NEO4J_CLI_ACCEPT_ENV_VARS=1`.
   The `NEO4J_CLI_ACCEPT_ENV_VARS=1` alternative is retained as the zero-write CI path.
 
+> The requirements below (REQ-F-017 onward) were added after a second round of QA
+> (2026-06-26, run against live local Neo4j Enterprise and live Aura) surfaced two
+> message inconsistencies and two Aura OAuth/token-cache defects not caught by the first
+> QA pass. They build on REQ-F-015 (off-mode message hygiene) and the Aura token cache
+> (REQ-F-006).
+
+- **REQ-F-017** (QA Finding 1 — embed off-mode message advertises a gated env var): The
+  "missing embed provider" error raised when no provider can be resolved
+  (`neo4j-cli/query/embed/embed.go`, `New()` — currently the unconditional string
+  `"missing embed provider: set --embed-provider, NEO4J_EMBED_PROVIDER, or pick a stored
+  embed credential"`) MUST obey the same off-mode rule as REQ-F-015. When `accept-env-vars`
+  is **off**, the message MUST NOT advertise `NEO4J_EMBED_PROVIDER` as if setting it would
+  help (the gate is ignoring it); it must reference `--embed-provider` / `.env` / a stored
+  embed credential and MAY point at `accept-env-vars` (e.g. "set `--embed-provider`, or
+  enable `accept-env-vars` to read `NEO4J_EMBED_PROVIDER`"). When `accept-env-vars` is
+  **on** the message MAY continue to name `NEO4J_EMBED_PROVIDER`. This closes the gap where
+  REQ-F-015 was applied to the connection/password sites but missed the embed *provider*
+  message (the embed *API-key* message was already correctly gated to on-mode). Note `New()`
+  takes a resolved `Config` without the gate flag, so the gate state must be threaded in
+  (e.g. carry an `AcceptEnvVars` bool on the embed `Config`, or raise the empty-provider
+  error from `Resolve`, which already has `cfg`). The off-path (provider resolved) must be
+  untouched.
+
+- **REQ-F-018** (QA Finding 4 — partial-params DBMS error names gated env vars off-mode):
+  The DBMS partial-override error in `dbconn.ResolveConn` (currently the unconditional dual
+  form `"partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME,
+  or --password/NEO4J_PASSWORD is provided, all three (--uri, --username, --password) are
+  required"`) MUST be consistent with REQ-F-015. When `accept-env-vars` is **off**, the
+  message MUST NOT name the gated `NEO4J_URI`/`NEO4J_USERNAME`/`NEO4J_PASSWORD` env vars
+  (only one or two `--flags` could have been supplied to reach this branch in off-mode, since
+  env vars contribute nothing to the count when gated); it should name only the `--flags`.
+  When `accept-env-vars` is **on**, the message MAY retain the dual `--flag/NEO4J_*` form (and
+  in on-mode the env-completeness check in `ValidateEnvCredentialSet` already names the
+  missing `NEO4J_*` vars for env-supplied subsets, per REQ-F-010/REQ-F-014). This is a
+  wording-only change; the completeness decision (three required params, database optional —
+  REQ-F-014) is unchanged.
+
+- **REQ-F-019** (QA Finding 3 — OAuth mint swallows non-2xx and returns an empty token):
+  `mintTokenHTTP` (`neo4j-cli/aura/internal/api/token.go`) currently special-cases only HTTP
+  401 (auth error) and 404 (panic); its `case http.StatusBadRequest:` and
+  `case http.StatusForbidden:` arms have empty bodies, so a 400/403 (or any other unlisted
+  non-2xx, e.g. 422/500) falls through, the body is parsed into a `Grant`, and an **empty
+  `AccessToken` is returned with no error**. Downstream this produces an
+  `Authorization: Bearer ` (empty) request and the alarming generic
+  `"unexpected status code 422 ... please report an issue"`. The mint MUST instead return a
+  clear, actionable error for every non-2xx and MUST NOT return an empty access token as
+  success. Required behaviour:
+  - **401** → existing auth error ("the provided credentials are invalid, expired, or
+    revoked").
+  - **403** → a *distinct* error indicating the credentials are valid but not authorized for
+    this request — NOT the 401 wording, so a 403 user is not told their credentials are
+    invalid. The message MUST NOT mention a mismatched Aura environment: a wrong-environment
+    credential is a niche cause that mainly affects internal users and would clutter the
+    user-facing message, so keep the 403 wording to a clean "forbidden / credentials valid but
+    not authorized for this request" (lacking the required permission). Suggested shape:
+    `"forbidden (HTTP 403): the credentials are valid but not authorized for this request
+    (insufficient permission)."`
+  - **Any other non-2xx** (incl. 400/422/5xx) and any 2xx that yields an **empty
+    `access_token`** → a clear error naming the status (or "empty token") rather than the
+    generic "please report" panic.
+  - This fix applies to **all OAuth mint paths** (the single `mintTokenHTTP` chokepoint), so
+    it benefits env-var-synthesized credentials AND stored keyring/insecure credentials
+    uniformly. This is a pre-existing defect being fixed here because the env-var/CI flow
+    (REQ-F-005/006) makes a clean OAuth error materially more important; it is a behavioural
+    improvement to Aura auth error messaging across the board, not specific to
+    `accept-env-vars`.
+
+- **REQ-F-020** (QA Finding 2 — empty token persisted to the on-disk token cache): In
+  env-var mode, `getToken` calls `writeTokenCache(..., grant.AccessToken, ...)` after a mint
+  regardless of whether a token was actually obtained, so a failed/empty mint writes a junk
+  `{"token":"","expiry":...}` file into `os.TempDir()` on every invocation. `readTokenCache`
+  already rejects empty tokens (so there is no cache *poisoning*), but the cache MUST NOT
+  persist an empty token at all. `writeTokenCache` (or its caller) MUST skip the write when
+  the token is empty. With REQ-F-019 in place a failed mint returns an error before the cache
+  write is reached, so this is belt-and-braces; keep the guard so the cache layer is correct
+  independent of caller behaviour.
+
 ### Non-Functional Requirements
 
 - **REQ-NF-001**: Changing `accept-env-vars` has no side effects on credential storage.
@@ -427,6 +504,43 @@ known boolean keys via their bool accessor (so `accept-env-vars` shows `true`/`f
 `"1"`/`"0"`); if a global normalisation is risky, document the quirk in the README/known
 behaviour and leave resolution untouched.
 
+### Second-round QA fixes (REQ-F-017..020)
+
+- **Embed off-mode message (REQ-F-017)**: `New()` in `neo4j-cli/query/embed/embed.go` raises
+  the empty-provider error without the gate flag in hand. Thread the gate in — either add an
+  `AcceptEnvVars bool` to the embed `Config` (set in `Resolve` from `cfg.Global.AcceptEnvVars()`)
+  and branch the message on it, or move the empty-provider check into `Resolve` (which already
+  has `cfg`). Mirror the wording pattern already used by `promptPassword` / `dbconn/helpers.go`
+  (REQ-F-015): off → `--embed-provider` / `.env` / stored cred (+ optional "enable
+  accept-env-vars to read NEO4J_EMBED_PROVIDER"); on → may name `NEO4J_EMBED_PROVIDER`. Add an
+  embed test for both gate states.
+
+- **Partial-params message (REQ-F-018)**: in `dbconn.ResolveConn`, the `default:` partial-
+  override branch builds one static dual-form string. Make it gate-aware via
+  `cfg.Global.AcceptEnvVars()`: off → name only `--uri`/`--username`/`--password`; on → keep the
+  `--flag/NEO4J_*` dual form. Wording-only; the `requiredCount` logic is unchanged. Reconcile
+  with the existing `ValidateEnvCredentialSet` env message so on-mode env subsets still surface
+  the missing `NEO4J_*` vars (that path already fires before this branch for env-supplied sets).
+
+- **Mint error handling (REQ-F-019)**: rework the status switch in `mintTokenHTTP`
+  (`token.go`). Replace the fall-through `case 400/403` arms with explicit handling: 401 →
+  existing auth error; 403 → a new "forbidden / not authorized for this request" error that
+  does NOT mention a wrong Aura environment (niche internal-only cause); default non-2xx → a
+  clear error naming the status (reuse the existing response-error helpers where possible
+  rather than the generic
+  `please report` panic). After a successful HTTP exchange, also treat an **empty
+  `grant.AccessToken`** as an error. Because this is the single mint chokepoint, both the
+  env-var and stored-credential paths in `getToken` inherit the fix. Add tests via the
+  `mintToken` seam covering 401, 403, another non-2xx (e.g. 422/500), and a 200-with-empty-token
+  response. Confirm the redaction rules (no secret-word `:`/`=` prefixes) still hold for any new
+  debug/error text per AGENTS.md.
+
+- **Empty-token cache guard (REQ-F-020)**: in `writeTokenCache` (or the `getToken` envMode
+  caller), skip the write when `token == ""`. Add a `token_cache_test.go` case asserting no file
+  is created for an empty token. With REQ-F-019 returning early on a failed mint, the caller
+  branch may not even reach the write — keep the guard regardless so the cache layer is correct
+  in isolation.
+
 ### Breaking change handling
 
 `DBMS` and embed env var reads are currently unconditional. Gating them is a breaking
@@ -521,6 +635,28 @@ Mitigations:
 - [ ] README updated for the three-param override (database optional) across flags and env
   vars, the off-mode message behaviour, and the hint `--rw`.
 
+### Second-round QA additions (REQ-F-017..020)
+
+- [ ] With `accept-env-vars` off and no resolvable embed provider, the "missing embed provider"
+  error does NOT advertise `NEO4J_EMBED_PROVIDER` as a fix; it references `--embed-provider` /
+  `.env` / a stored embed credential (and may mention enabling `accept-env-vars`). With
+  `accept-env-vars` on it may name `NEO4J_EMBED_PROVIDER` (REQ-F-017).
+- [ ] With `accept-env-vars` off, a partial flag-only DBMS override (one or two of
+  `--uri`/`--username`/`--password`) is rejected with a message naming only the `--flags`, not
+  `NEO4J_URI`/`NEO4J_USERNAME`/`NEO4J_PASSWORD`; with `accept-env-vars` on the message may use the
+  `--flag/NEO4J_*` dual form (REQ-F-018).
+- [ ] An Aura OAuth mint returning 401 yields the invalid-credentials auth error; a 403 yields a
+  distinct "forbidden / not authorized" error (NOT the 401 wording, and NOT mentioning a wrong
+  Aura environment); any other non-2xx (e.g. 422/500) and a 2xx with an empty `access_token`
+  yield a clear error naming the status (not the generic "please report") (REQ-F-019).
+- [ ] The mint fix applies on both the env-var-synthesized and stored-credential paths (single
+  `mintTokenHTTP` chokepoint); a forbidden/empty mint never produces an
+  `Authorization: Bearer ` (empty) downstream request (REQ-F-019).
+- [ ] No on-disk token-cache file is written when the minted token is empty;
+  `token_cache_test.go` covers the empty-token case (REQ-F-020).
+- [ ] `make test`, `make fmt-check`, `make lint` pass; `go generate ./neo4j-cli/internal/skill/...`
+  produces no bundle drift after the message changes.
+
 ## Out of Scope
 
 - `credential-storage: env` as a storage mode (explicitly abandoned in favour of this
@@ -555,3 +691,17 @@ Resolved during post-implementation QA (2026-06-26):
 - The discovery hint includes `--rw` so it works non-interactively (QA Finding 3, REQ-F-016).
 - The `config get`/`list` display quirk and the sentinel-only hint behaviour are addressed
   (normalise-or-document; document-as-intended respectively) (QA Findings 4/5, REQ-NF-008/009).
+
+Resolved during second-round QA (2026-06-26, live local Enterprise + live Aura):
+- The embed "missing embed provider" message was the one off-mode site REQ-F-015 missed; it is
+  made gate-aware like the connection/password messages (REQ-F-017).
+- The DBMS partial-params error no longer names gated `NEO4J_*` vars when the gate is off
+  (REQ-F-018).
+- `mintTokenHTTP` was silently swallowing 403/400 (and other unlisted non-2xx), returning an
+  empty token that produced a downstream 422 "please report"; it now returns clear per-status
+  errors — 401 (invalid credentials) vs 403 (a distinct "forbidden / not authorized" message
+  that deliberately does NOT mention a wrong Aura environment, since that is a niche
+  internal-only cause) vs other non-2xx — and never returns an empty token as success. The fix
+  lives at the single mint chokepoint so stored AND env-var credentials benefit (REQ-F-019).
+  Decision: fix all mint paths (not env-var-only) and distinguish 401 vs 403 vs other.
+- The token cache no longer persists an empty token (REQ-F-020).
