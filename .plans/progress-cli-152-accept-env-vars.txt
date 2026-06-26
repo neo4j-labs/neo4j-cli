@@ -90,3 +90,8 @@ Decisions: Centralised on/off wording in one dbconn helper so all three sites st
 Added `--rw` to the discovery-hint config-set suggestion in app.go maybeEmitEnvVarHint so the suggested command succeeds in non-interactive/agent/CI contexts (where the hint surfaces). Added envVarHintSuggestion const + assertion in env_var_hint_test.go.
 Files: ~app.go, ~env_var_hint_test.go
 Decisions: README already used --rw; no skill-bundle drift (hint is runtime stderr, not generated).
+
+## TASK-019 — 2026-06-26T13:30:00Z
+Normalised config get/list display (REQ-NF-008): GlobalConfig.Get now coerces known boolean keys (telemetry, skill-auto-refresh, history-enabled, tee-enabled, accept-env-vars) via viper.GetBool when set, so accept-env-vars renders unquoted true/false (never "1"/"0"/"true"); nil preserved for unset keys so unset still shows null.
+Files: ~clicfg.go, ~accept_env_vars_test.go
+Decisions: Normalised (preferred over documenting). Resolution unchanged (AcceptEnvVars() reads GetBool directly). booleanGlobalKeys map kept in sync with Set validators by hand — reviewer-noted low/optional dedup left out of scope.

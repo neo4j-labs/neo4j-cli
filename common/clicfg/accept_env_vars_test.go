@@ -140,6 +140,37 @@ func TestGatedGetenv(t *testing.T) {
 	})
 }
 
+func TestAcceptEnvVarsDisplaysAsBool(t *testing.T) {
+	t.Run("unset renders as nil (null)", func(t *testing.T) {
+		fs, err := testfs.GetTestFs(`{}`, "{}")
+		require.NoError(t, err)
+		cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+		assert.Nil(t, cfg.Global.Get("accept-env-vars"))
+	})
+
+	t.Run("config-set string renders as bool", func(t *testing.T) {
+		fs, err := testfs.GetTestFs(`{}`, "{}")
+		require.NoError(t, err)
+		cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+		require.NoError(t, cfg.Global.Set("accept-env-vars", "true"))
+		assert.Equal(t, true, cfg.Global.Get("accept-env-vars"))
+		assert.Equal(t, true, cfg.Global.GetPrintable("accept-env-vars").Value)
+	})
+
+	t.Run("env bootstrap renders as bool, never the raw literal", func(t *testing.T) {
+		for _, tc := range []struct {
+			env  string
+			want bool
+		}{{"1", true}, {"0", false}} {
+			t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", tc.env)
+			fs, err := testfs.GetTestFs(`{}`, "{}")
+			require.NoError(t, err)
+			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			assert.Equal(t, tc.want, cfg.Global.Get("accept-env-vars"))
+		}
+	})
+}
+
 func TestAcceptEnvVarsAppearsInPrintable(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{}`, "{}")
 	require.NoError(t, err)

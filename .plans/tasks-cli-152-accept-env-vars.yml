@@ -515,6 +515,8 @@ tasks:
       - "AcceptEnvVars() resolution is unchanged (true for true/1, false for false/0/unset)"
       - "Output casing/format gates still pass; make test, make fmt-check, make lint pass"
     source: qa
+    status: completed
+    completed_at: 2026-06-26T13:30:00Z
 
   - id: task-020
     title: 'Document sentinel-only discovery-hint detection as intended behaviour'

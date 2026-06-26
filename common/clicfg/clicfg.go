@@ -412,7 +412,25 @@ func (config *GlobalConfig) IsValidConfigKey(key string) bool {
 	return slices.Contains(config.ValidConfigKeys, key)
 }
 
+// booleanGlobalKeys are the global config keys whose stored value is logically
+// boolean. config set persists every value as a string and the env bootstrap
+// (e.g. NEO4J_CLI_ACCEPT_ENV_VARS=1) surfaces the raw "1"/"0"/"true" literal, so
+// Get coerces these via GetBool to render unquoted true/false consistently
+// across config get and config list.
+var booleanGlobalKeys = map[string]bool{
+	"telemetry":          true,
+	"skill-auto-refresh": true,
+	"history-enabled":    true,
+	"tee-enabled":        true,
+	"accept-env-vars":    true,
+}
+
 func (config *GlobalConfig) Get(key string) interface{} {
+	// Preserve a nil (null) result for keys with no value set so unset
+	// boolean keys still render as null rather than a defaulted false.
+	if booleanGlobalKeys[key] && config.viper.Get(key) != nil {
+		return config.viper.GetBool(key)
+	}
 	return config.viper.Get(key)
 }
 
