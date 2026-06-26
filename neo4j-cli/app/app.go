@@ -142,7 +142,7 @@ func maybeEmitEnvVarHint(cfg *clicfg.Config, stderr io.Writer) {
 	if !credentials.HasAnyCredentialEnvVar(os.Getenv) {
 		return
 	}
-	_, _ = fmt.Fprintln(stderr, "hint: credential env vars detected but accept-env-vars is not set — run 'neo4j-cli config set accept-env-vars true' or set NEO4J_CLI_ACCEPT_ENV_VARS=1")
+	_, _ = fmt.Fprintln(stderr, "hint: credential env vars detected but accept-env-vars is not set — run 'neo4j-cli config set accept-env-vars true --rw' or set NEO4J_CLI_ACCEPT_ENV_VARS=1")
 }
 
 // initCredentialStorageDefault runs on every invocation before any RunE

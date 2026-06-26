@@ -19,6 +19,11 @@ import (
 
 const envVarHintText = "hint: credential env vars detected but accept-env-vars is not set"
 
+// envVarHintSuggestion is the actionable remedy embedded in the hint. The --rw
+// flag is required because the hint most often surfaces in non-interactive/agent
+// contexts where `config set` rejects a write without it (REQ-F-016).
+const envVarHintSuggestion = "run 'neo4j-cli config set accept-env-vars true --rw' or set NEO4J_CLI_ACCEPT_ENV_VARS=1"
+
 // TestMaybeEmitEnvVarHint covers the discovery-hint matrix: it fires only when
 // accept-env-vars has never been explicitly set AND a credential env var is
 // present.
@@ -84,6 +89,7 @@ func TestMaybeEmitEnvVarHint(t *testing.T) {
 
 			if tc.wantHint {
 				assert.Contains(t, stderr.String(), envVarHintText)
+				assert.Contains(t, stderr.String(), envVarHintSuggestion)
 			} else {
 				assert.Empty(t, stderr.String())
 			}

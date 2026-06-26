@@ -482,7 +482,7 @@ tasks:
       Long/Example — the hint is runtime stderr text, so confirm whether
       go generate drift applies; if a generated reference embeds the hint, run
       go generate and commit the regenerated bundle.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "The hint reads: ...run 'neo4j-cli config set accept-env-vars true --rw' or set NEO4J_CLI_ACCEPT_ENV_VARS=1"
@@ -490,6 +490,7 @@ tasks:
       - "env_var_hint_test.go asserts the new string including --rw"
       - "make test, make fmt-check, make lint pass; go generate produces no bundle drift"
     source: qa
+    completed_at: 2026-06-26T12:00:00Z
 
   - id: task-019
     title: 'Normalise or document accept-env-vars config get/list display'

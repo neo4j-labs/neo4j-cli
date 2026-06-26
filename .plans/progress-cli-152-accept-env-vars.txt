@@ -85,3 +85,8 @@ Decisions: env-mode partials still surface via ValidateEnvCredentialSet (fires b
 Reworded off-mode password-required errors (REQ-F-015): added shared dbconn.PasswordRequiredMessage(acceptEnv) — off-mode points at --password/.env/accept-env-vars (does not advertise NEO4J_PASSWORD as an effective remedy), on-mode still names the env var. Threaded cfg.Global.AcceptEnvVars() through query promptPassword, dbconn.PromptPassword, and admin's inline message. Discovery hint (REQ-F-007) untouched.
 Files: ~dbconn/helpers.go, ~dbconn/conn.go, ~dbconn/conn_test.go, ~admin/admin.go, ~admin/admin_conn_test.go, ~query/run.go, ~query/schema.go, ~query/run_test.go
 Decisions: Centralised on/off wording in one dbconn helper so all three sites stay consistent; PromptPassword gained an acceptEnv bool param (callers all have cfg in scope). dbms credential add's "--env NEO4J_PASSWORD" message left as-is (refers to the ungated .env file, not a gated OS env var).
+
+## TASK-018 — 2026-06-26T12:00:00Z
+Added `--rw` to the discovery-hint config-set suggestion in app.go maybeEmitEnvVarHint so the suggested command succeeds in non-interactive/agent/CI contexts (where the hint surfaces). Added envVarHintSuggestion const + assertion in env_var_hint_test.go.
+Files: ~app.go, ~env_var_hint_test.go
+Decisions: README already used --rw; no skill-bundle drift (hint is runtime stderr, not generated).
