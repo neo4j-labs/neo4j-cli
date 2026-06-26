@@ -412,7 +412,6 @@ tasks:
       Update README: the "must supply all four" statement for the connection
       override (and the embed/env sections as needed) must change to "all three of
       URI/username/password, database optional" across both flags and env vars.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "accept-env-vars=true + stored default cred + NEO4J_URI/USERNAME/PASSWORD (no NEO4J_DATABASE) overrides the stored cred and resolves without an 'all four' error"
@@ -452,7 +451,6 @@ tasks:
         - neo4j-cli/internal/dbconn/helpers.go (~line 38)
       Must not regress the one-time discovery hint (REQ-F-007). Update/extend the
       tests asserting these message strings.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "With accept-env-vars off and a missing connection value, the error does NOT suggest setting a gated env var as an effective remedy"
@@ -507,7 +505,6 @@ tasks:
       display quirk (README/known behaviour) and leave it. Resolution via
       Viper.GetBool already works and must not regress. Check the casing/output
       gates (snake_case keys) are unaffected.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "config get accept-env-vars and config list render the value consistently with sibling boolean keys, OR the quirk is explicitly documented"
@@ -529,10 +526,11 @@ tasks:
       behaviour in the README "Environment variables" section (and/or alongside
       the hint description) so it is not mistaken for a bug. Do NOT change the
       sentinel-based detection design.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "README documents that the hint is triggered by sentinel vars (NEO4J_URI / NEO4J_AURA_CLIENT_ID / NEO4J_EMBED_PROVIDER) and not by non-sentinel vars alone"
       - "No code change to HasAnyCredentialEnvVar / the sentinel design"
       - "make fmt-check passes; go generate produces no bundle drift if README feeds any generated surface"
     source: qa
+    completed_at: 2026-06-26T14:30:00Z

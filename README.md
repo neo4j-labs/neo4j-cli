@@ -111,7 +111,7 @@ The DBMS gate lives at the shared connection-resolution layer, so it covers `neo
 
 This is a **breaking change**: the DBMS and embed env vars were previously read unconditionally. Additionally, the `NEO4J_DATABASE` override applied alongside `--credential` (the CLI-212 behaviour) now also requires `accept-env-vars`; the explicit `--database` flag is never gated. Enabling or disabling `accept-env-vars` never modifies stored credentials — it only changes the runtime resolution path. The `.env` file walk-up (controlled by `--env`) is independent of this gate and unaffected.
 
-If a credential env var is present while `accept-env-vars` has never been set, the CLI prints a one-time stderr hint pointing you here.
+If a credential env var is present while `accept-env-vars` has never been set, the CLI prints a one-time stderr hint pointing you here. The hint is triggered only by the *sentinel* env var of each type — `NEO4J_URI` (DBMS), `NEO4J_AURA_CLIENT_ID` (Aura), or `NEO4J_EMBED_PROVIDER` (Embed). Setting only a non-sentinel var on its own (for example `NEO4J_PASSWORD` without `NEO4J_URI`) does not trigger the hint; this is intended, not a bug, since a lone secondary var is ambiguous without its sentinel.
 
 ## Aura
 

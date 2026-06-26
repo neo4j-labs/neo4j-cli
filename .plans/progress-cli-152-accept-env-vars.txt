@@ -95,3 +95,7 @@ Decisions: README already used --rw; no skill-bundle drift (hint is runtime stde
 Normalised config get/list display (REQ-NF-008): GlobalConfig.Get now coerces known boolean keys (telemetry, skill-auto-refresh, history-enabled, tee-enabled, accept-env-vars) via viper.GetBool when set, so accept-env-vars renders unquoted true/false (never "1"/"0"/"true"); nil preserved for unset keys so unset still shows null.
 Files: ~clicfg.go, ~accept_env_vars_test.go
 Decisions: Normalised (preferred over documenting). Resolution unchanged (AcceptEnvVars() reads GetBool directly). booleanGlobalKeys map kept in sync with Set validators by hand — reviewer-noted low/optional dedup left out of scope.
+
+## TASK-020 — 2026-06-26T14:30:00Z
+Documented in README Environment variables section that the one-time discovery hint is triggered only by the sentinel vars (NEO4J_URI / NEO4J_AURA_CLIENT_ID / NEO4J_EMBED_PROVIDER), and that a lone non-sentinel var (e.g. NEO4J_PASSWORD) does not trigger it by design (REQ-NF-009).
+Files: ~README.md
