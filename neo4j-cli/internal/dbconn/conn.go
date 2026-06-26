@@ -284,7 +284,7 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *DesktopMa
 				"or open Desktop and use 'Reset password' on this resource.",
 			name, id)
 	}
-	pw, perr := PromptPassword(cmd)
+	pw, perr := PromptPassword(cmd, cfg.Global.AcceptEnvVars())
 	if perr != nil {
 		return nil, perr
 	}

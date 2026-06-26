@@ -68,7 +68,7 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 	}
 
 	if c.Password == "" {
-		pw, err := promptPassword(cmd)
+		pw, err := promptPassword(cmd, cfg)
 		if err != nil {
 			return err
 		}
@@ -196,11 +196,12 @@ func resolveCypher(cmd *cobra.Command, args []string) (string, error) {
 
 // promptPassword reads a password from the controlling terminal with no echo,
 // or returns a clear usage error when stdin is not a TTY (so scripted use
-// must supply the password via flag/env/.env).
-func promptPassword(cmd *cobra.Command) (string, error) {
+// must supply the password via flag/env/.env). The off-mode error omits the
+// gated NEO4J_PASSWORD env var (see PasswordRequiredMessage).
+func promptPassword(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 	if !dbconn.StdinIsTTY() {
 		return "", clierr.NewUsageError(
-			"password is required: set --password, NEO4J_PASSWORD, or add it to a .env file")
+			"%s", dbconn.PasswordRequiredMessage(cfg.Global.AcceptEnvVars()))
 	}
 	_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Password: ")
 	pw, err := dbconn.PasswordReader()

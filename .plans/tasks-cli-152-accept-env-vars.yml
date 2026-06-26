@@ -462,7 +462,9 @@ tasks:
       - "The one-time discovery hint (REQ-F-007) still behaves per spec"
       - "Tests asserting the affected message strings are updated; make test, make fmt-check, make lint pass"
 
+    status: completed
     source: qa
+    completed_at: 2026-06-26T11:05:00Z
 
   - id: task-018
     title: 'Add --rw to the discovery hint config-set suggestion'

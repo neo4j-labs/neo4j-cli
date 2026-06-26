@@ -41,10 +41,12 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 				return err
 			}
 			if conn.Password == "" {
+				acceptEnv := cfg.Global.AcceptEnvVars()
 				if !dbconn.StdinIsTTY() {
-					return clierr.NewUsageError("--password is required or run interactively")
+					return clierr.NewUsageError(
+						"%s, or run interactively", dbconn.PasswordRequiredMessage(acceptEnv))
 				}
-				pw, perr := dbconn.PromptPassword(cmd)
+				pw, perr := dbconn.PromptPassword(cmd, acceptEnv)
 				if perr != nil {
 					return perr
 				}

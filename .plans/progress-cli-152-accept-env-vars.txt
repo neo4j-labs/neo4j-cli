@@ -80,3 +80,8 @@ Files: +0 new, ~4 mod, -0 del
 Fixed default-path override completeness (REQ-F-014): dbconn.ResolveConn now decides completeness on the three required params (uri/username/password) only; database is always optional (applied when present, never counted), uniformly for flags AND env vars. Partial flag override message dropped the database clause ("all three" now). requiredCount==0+stored-cred keeps a supplied database override (database==""guard); admin skipDatabase path unchanged; applyDBOverride (CLI-212) untouched. README updated to "three required, database optional".
 Files: ~conn.go, ~conn_test.go, ~query/connect_test.go, ~README.md
 Decisions: env-mode partials still surface via ValidateEnvCredentialSet (fires before the switch) naming NEO4J_* vars; the switch's default branch only fires for flag subsets.
+
+## TASK-017 — 2026-06-26T11:05:00Z
+Reworded off-mode password-required errors (REQ-F-015): added shared dbconn.PasswordRequiredMessage(acceptEnv) — off-mode points at --password/.env/accept-env-vars (does not advertise NEO4J_PASSWORD as an effective remedy), on-mode still names the env var. Threaded cfg.Global.AcceptEnvVars() through query promptPassword, dbconn.PromptPassword, and admin's inline message. Discovery hint (REQ-F-007) untouched.
+Files: ~dbconn/helpers.go, ~dbconn/conn.go, ~dbconn/conn_test.go, ~admin/admin.go, ~admin/admin_conn_test.go, ~query/run.go, ~query/schema.go, ~query/run_test.go
+Decisions: Centralised on/off wording in one dbconn helper so all three sites stay consistent; PromptPassword gained an acceptEnv bool param (callers all have cfg in scope). dbms credential add's "--env NEO4J_PASSWORD" message left as-is (refers to the ungated .env file, not a gated OS env var).

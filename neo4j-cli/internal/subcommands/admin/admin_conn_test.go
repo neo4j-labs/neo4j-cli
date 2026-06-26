@@ -96,9 +96,12 @@ func TestAdminConn_PasswordPrompt_NonTTY_ReturnsUsageError(t *testing.T) {
 	// Check via errors.As for the typed error, falling back to message check.
 	var ce *clierr.CLIError
 	if errors.As(err, &ce) {
-		assert.Contains(t, ce.Message, "--password is required")
+		assert.Contains(t, ce.Message, "password is required")
+		assert.Contains(t, ce.Message, "run interactively")
+		assert.Contains(t, ce.Message, "accept-env-vars")
+		assert.NotContains(t, ce.Message, "set --password, NEO4J_PASSWORD")
 	} else {
-		assert.Contains(t, err.Error(), "--password is required")
+		assert.Contains(t, err.Error(), "password is required")
 	}
 }
 

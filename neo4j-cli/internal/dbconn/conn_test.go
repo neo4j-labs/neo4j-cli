@@ -1024,9 +1024,24 @@ func TestPromptPassword_NonTTY_ReturnsUsageError(t *testing.T) {
 	var buf bytes.Buffer
 	cmd.SetErr(&buf)
 
-	_, err := PromptPassword(cmd)
+	_, err := PromptPassword(cmd, false)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--password is required")
+	assert.Contains(t, err.Error(), "password is required")
+	assert.Contains(t, err.Error(), "accept-env-vars")
+	assert.NotContains(t, err.Error(), "set --password, NEO4J_PASSWORD")
+}
+
+// TestPasswordRequiredMessage_OnVsOff verifies the gated env var is advertised
+// only when accept-env-vars is on.
+func TestPasswordRequiredMessage_OnVsOff(t *testing.T) {
+	off := PasswordRequiredMessage(false)
+	assert.NotContains(t, off, "set --password, NEO4J_PASSWORD")
+	assert.Contains(t, off, "--password")
+	assert.Contains(t, off, ".env")
+	assert.Contains(t, off, "accept-env-vars")
+
+	on := PasswordRequiredMessage(true)
+	assert.Contains(t, on, "NEO4J_PASSWORD")
 }
 
 // TestPromptPassword_TTY_ReadsFromPasswordReader verifies that PromptPassword
@@ -1045,7 +1060,7 @@ func TestPromptPassword_TTY_ReadsFromPasswordReader(t *testing.T) {
 	var buf bytes.Buffer
 	cmd.SetErr(&buf)
 
-	pw, err := PromptPassword(cmd)
+	pw, err := PromptPassword(cmd, false)
 	require.NoError(t, err)
 	assert.Equal(t, "prompted-pw", pw)
 	assert.Contains(t, buf.String(), "Password: ")
@@ -1067,7 +1082,7 @@ func TestPromptPassword_TTY_ReaderError_Propagates(t *testing.T) {
 	var buf bytes.Buffer
 	cmd.SetErr(&buf)
 
-	_, err := PromptPassword(cmd)
+	_, err := PromptPassword(cmd, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "read interrupted")
 }

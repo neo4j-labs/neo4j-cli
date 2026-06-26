@@ -114,7 +114,7 @@ func runSchema(cmd *cobra.Command, cfg *clicfg.Config) error {
 	}
 
 	if c.Password == "" {
-		pw, err := promptPassword(cmd)
+		pw, err := promptPassword(cmd, cfg)
 		if err != nil {
 			return err
 		}
