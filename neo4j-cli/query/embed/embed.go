@@ -48,6 +48,12 @@ type Config struct {
 	UserAgent      string
 	VertexProject  string
 	VertexLocation string
+
+	// AcceptEnvVars mirrors cfg.Global.AcceptEnvVars() at Resolve time so New
+	// can word its missing-provider usage error without re-reading config: in
+	// env-var mode it may name NEO4J_EMBED_PROVIDER, otherwise it must not
+	// advertise a gated variable the CLI is currently ignoring (REQ-F-017).
+	AcceptEnvVars bool
 }
 
 // Provider name constants shared by the cobra flag-validator (see credential
@@ -249,6 +255,8 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	}
 	out.UserAgent = "neo4j-cli/v" + version
 
+	out.AcceptEnvVars = cfg != nil && cfg.Global.AcceptEnvVars()
+
 	return out, nil
 }
 
@@ -381,8 +389,13 @@ func parseDimensions(s string) (int, bool) {
 func New(cfg Config) (Provider, error) {
 	switch cfg.Provider {
 	case "":
+		if cfg.AcceptEnvVars {
+			return nil, clierr.NewUsageError(
+				"missing embed provider: set --embed-provider, NEO4J_EMBED_PROVIDER, a .env file, or pick a stored embed credential")
+		}
 		return nil, clierr.NewUsageError(
-			"missing embed provider: set --embed-provider, NEO4J_EMBED_PROVIDER, or pick a stored embed credential")
+			"missing embed provider: set --embed-provider, a .env file, or pick a stored embed credential " +
+				"(or enable accept-env-vars to read NEO4J_EMBED_PROVIDER)")
 	case ProviderOpenAI:
 		return newOpenAIProvider(cfg), nil
 	case ProviderOllama:

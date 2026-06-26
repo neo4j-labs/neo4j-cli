@@ -99,3 +99,8 @@ Decisions: Normalised (preferred over documenting). Resolution unchanged (Accept
 ## TASK-020 — 2026-06-26T14:30:00Z
 Documented in README Environment variables section that the one-time discovery hint is triggered only by the sentinel vars (NEO4J_URI / NEO4J_AURA_CLIENT_ID / NEO4J_EMBED_PROVIDER), and that a lone non-sentinel var (e.g. NEO4J_PASSWORD) does not trigger it by design (REQ-NF-009).
 Files: ~README.md
+
+## TASK-021 — 2026-06-26T16:10:00Z
+Made embed New()'s "missing embed provider" usage error gate-aware (REQ-F-017): off-mode points at --embed-provider / .env / stored embed credential and only mentions NEO4J_EMBED_PROVIDER behind "enable accept-env-vars"; on-mode keeps naming the var. Threaded the gate via a new Config.AcceptEnvVars bool set in Resolve from cfg.Global.AcceptEnvVars().
+Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
+Decisions: Chose the Config-field option (set in Resolve) over raising the empty-provider check in Resolve so New(Config) stays self-contained and the existing providerFactory seam is unaffected. Runtime error text, not a Long/Example, so no skill-bundle drift.

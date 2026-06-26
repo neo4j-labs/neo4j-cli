@@ -556,7 +556,8 @@ tasks:
       .env / stored embed credential, and MAY say "enable accept-env-vars to read
       NEO4J_EMBED_PROVIDER"; on-mode MAY keep naming NEO4J_EMBED_PROVIDER. Do not
       change the resolved (provider present) path.
-    status: pending
+    status: completed
+    completed_at: 2026-06-26T16:10:00Z
     dependencies: []
     acceptance_criteria:
       - "Gate off + no resolvable provider: error references --embed-provider / .env / stored cred and does NOT advertise NEO4J_EMBED_PROVIDER as a fix (may mention enabling accept-env-vars)"

@@ -434,6 +434,36 @@ func TestNew_EmptyProviderUsageError(t *testing.T) {
 	assert.Contains(t, err.Error(), "--embed-provider")
 }
 
+// TestNew_EmptyProviderMessageIsGateAware verifies the missing-provider usage
+// error is gate-aware (REQ-F-017): with accept-env-vars off it must NOT
+// advertise NEO4J_EMBED_PROVIDER as an effective fix (only as something to
+// enable), and with it on it MAY name the variable directly.
+func TestNew_EmptyProviderMessageIsGateAware(t *testing.T) {
+	t.Run("off mode does not advertise the gated env var as a fix", func(t *testing.T) {
+		_, err := New(Config{AcceptEnvVars: false})
+		require.Error(t, err)
+		msg := err.Error()
+		assert.Contains(t, msg, "missing embed provider")
+		assert.Contains(t, msg, "--embed-provider")
+		assert.Contains(t, msg, ".env")
+		assert.Contains(t, msg, "stored embed credential")
+		assert.Contains(t, msg, "enable accept-env-vars")
+		// The var name may appear, but only behind "enable accept-env-vars".
+		assert.NotContains(t, msg, "set --embed-provider, NEO4J_EMBED_PROVIDER",
+			"off-mode message must not advertise NEO4J_EMBED_PROVIDER as a direct fix")
+	})
+
+	t.Run("on mode may name the env var directly", func(t *testing.T) {
+		_, err := New(Config{AcceptEnvVars: true})
+		require.Error(t, err)
+		msg := err.Error()
+		assert.Contains(t, msg, "missing embed provider")
+		assert.Contains(t, msg, "--embed-provider")
+		assert.Contains(t, msg, "NEO4J_EMBED_PROVIDER")
+		assert.NotContains(t, msg, "enable accept-env-vars")
+	})
+}
+
 func TestNew_InvalidProvider(t *testing.T) {
 	_, err := New(Config{Provider: "bogus"})
 	require.Error(t, err)
