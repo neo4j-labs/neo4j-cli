@@ -718,7 +718,8 @@ tasks:
       feed the generated skill bundle, so run 'go generate
       ./neo4j-cli/internal/skill/...' and commit the regenerated bundle; keep new
       Long prose flush-left where the skill renderer requires it (AGENTS.md).
-    status: pending
+    status: completed
+    completed_at: 2026-06-26T18:55:00Z
     dependencies: []
     acceptance_criteria:
       - "'query --help' and the admin leaves no longer show [env: NEO4J_URI/USERNAME/PASSWORD/DATABASE] or [env: NEO4J_EMBED_*] on individual flags"

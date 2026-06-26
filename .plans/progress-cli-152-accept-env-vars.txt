@@ -126,3 +126,7 @@ Added 1 review task (task-025) from the CI security-review finding (re-enforce 0
 Re-enforced 0600 on the Aura token cache by switching writeTokenCache to an atomic write-then-rename (CreateTemp + explicit Chmod(0600) + Rename), which guarantees the mode on every write regardless of prior file state and closes the partial-write window.
 Files: ~neo4j-cli/aura/internal/api/token_cache.go, ~neo4j-cli/aura/internal/api/token_cache_test.go
 Decisions: explicit tmp.Chmod(0o600) (not relying on CreateTemp's default mode) defends against permissive umask; stayed on raw os.* rather than fileutils/afero (whose OpenFile-based helper is umask-dependent and requires afero).
+
+## TASK-026 — 2026-06-26T18:55:00Z
+Removed the gated [env: NEO4J_*] / (env: NEO4J_*) clauses from the query and admin connection/embed flag usage strings (left --debug's NEO4J_DEBUG clause intact) and added a single gate-aware "Environment variables" paragraph to the query and admin top-level Long descriptions; regenerated the skill bundle.
+Files: ~4 (query.go, admin/admin.go, bundle/references/query.md, bundle/references/admin.md)

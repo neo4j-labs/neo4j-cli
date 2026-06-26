@@ -34,7 +34,12 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"Subcommands: `database` (list, get, create, drop, start, stop), " +
 			"`user` (list, get, create, drop, rename, set-password, suspend, activate), " +
 			"`role` (list, get, create, drop, grant, revoke), " +
-			"`privilege` (list, grant, deny, revoke).",
+			"`privilege` (list, grant, deny, revoke). " +
+			"Environment variables: the connection vars NEO4J_URI, NEO4J_USERNAME and " +
+			"NEO4J_PASSWORD are read ONLY when accept-env-vars is enabled - run " +
+			"`neo4j-cli config set accept-env-vars true --rw` or set " +
+			"NEO4J_CLI_ACCEPT_ENV_VARS=1. Explicit flags and `.env` files are never " +
+			"gated. See the README \"Environment variables\" section for details.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			conn, err := dbconn.ResolveConn(cmd, cfg, true)
 			if err != nil {
@@ -57,9 +62,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().String("uri", "", "Neo4j server URI (env: NEO4J_URI)")
-	cmd.PersistentFlags().StringP("username", "u", "", "Neo4j username (env: NEO4J_USERNAME)")
-	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password (env: NEO4J_PASSWORD)")
+	cmd.PersistentFlags().String("uri", "", "Neo4j server URI")
+	cmd.PersistentFlags().StringP("username", "u", "", "Neo4j username")
+	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password")
 	cmd.PersistentFlags().String("env", "", "Path to a .env file with NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD (walks up from cwd when unset)")
 	cmd.PersistentFlags().StringP("credential", "c", "", "Name of a stored dbms credential, 'desktop' for a running Neo4j Desktop 2 DBMS, or 'desktop-connection:<uuid>' for a saved connection")
 	cmd.PersistentFlags().Bool("debug", false, "Enable Bolt driver debug logging to stderr (env: NEO4J_DEBUG=1)")
