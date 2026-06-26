@@ -623,7 +623,8 @@ tasks:
       another non-2xx (422 or 500), and a 200-with-empty-token response. Verify any
       new debug/error text obeys the AGENTS.md redaction rule (no <secretword>:/=
       prefix immediately before a word).
-    status: pending
+    status: completed
+    completed_at: 2026-06-26T16:45:00Z
     dependencies: []
     acceptance_criteria:
       - "401 -> invalid-credentials auth error; 403 -> distinct 'forbidden / not authorized' error (NOT the 401 wording, and NOT mentioning a wrong Aura environment)"

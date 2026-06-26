@@ -109,3 +109,8 @@ Decisions: Chose the Config-field option (set in Resolve) over raising the empty
 Made the DBMS partial-params error in dbconn.ResolveConn gate-aware: off-mode names only --uri/--username/--password, on-mode keeps the --flag/NEO4J_* dual form (REQ-F-018). Wording-only; completeness logic unchanged.
 Files: ~neo4j-cli/internal/dbconn/conn.go, ~neo4j-cli/internal/dbconn/conn_test.go, ~neo4j-cli/query/connect_test.go
 Decisions: In on-mode the default: partial branch is rarely reached because ValidateEnvCredentialSet (against resolved values) catches any subset of the three required first and names the missing NEO4J_* vars; updated query+admin off-mode partial tests to assert flag-only form.
+
+## TASK-023 — 2026-06-26T16:45:00Z
+Reworked mintTokenHTTP's status switch (single mint chokepoint) so every non-2xx returns a clear error: 401 -> existing invalid/expired/revoked auth error, 403 -> distinct forbidden/not-authorized auth error (no env mention), any other non-2xx -> upstream error naming the status; a 2xx with empty access_token is now an error too (no empty Bearer). Both env-var and stored-credential mints inherit it.
+Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_test.go
+Decisions: Used a default branch with a 200-299 range guard to catch all unlisted non-2xx in one place; 403 maps to NewAuthError (exit 4), other non-2xx + empty-token to NewUpstreamError (exit 8). Removed the prior empty-arm 400/403 cases and the misleading 404 panic that hardcoded a 400 status.

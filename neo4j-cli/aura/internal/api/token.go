@@ -119,10 +119,12 @@ func mintTokenHTTP(credential *credentials.AuraCredential, cfg *clicfg.Config) (
 	switch statusCode := res.StatusCode; statusCode {
 	case http.StatusUnauthorized:
 		return Grant{}, clierr.NewAuthError("the provided credentials are invalid, expired, or revoked")
-	case http.StatusBadRequest:
 	case http.StatusForbidden:
-	case http.StatusNotFound:
-		panic(clierr.NewFatalError("can't retrieve authentication token. Response status code [%d]", http.StatusBadRequest))
+		return Grant{}, clierr.NewAuthError("forbidden (HTTP 403): the credentials are valid but not authorized for this request (insufficient permission)")
+	default:
+		if statusCode < 200 || statusCode >= 300 {
+			return Grant{}, clierr.NewUpstreamError("can't retrieve authentication token: the authentication endpoint returned HTTP %d %s", statusCode, http.StatusText(statusCode))
+		}
 	}
 
 	resBody, err := io.ReadAll(res.Body)
@@ -133,6 +135,9 @@ func mintTokenHTTP(credential *credentials.AuraCredential, cfg *clicfg.Config) (
 	var grant Grant
 	if err := json.Unmarshal(resBody, &grant); err != nil {
 		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
+	}
+	if grant.AccessToken == "" {
+		return Grant{}, clierr.NewUpstreamError("can't retrieve authentication token: the authentication endpoint returned an empty token")
 	}
 	return grant, nil
 }
