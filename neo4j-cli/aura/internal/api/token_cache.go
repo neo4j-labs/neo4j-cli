@@ -76,6 +76,12 @@ func readTokenCache(path, fullHash string) (token string, ok bool) {
 // Errors are returned for best-effort handling by the caller; a cache write
 // failure must not fail the command.
 func writeTokenCache(path, fullHash, token string, expiresInSeconds int64) error {
+	// Never persist an empty token: readTokenCache already treats one as a miss,
+	// so writing it would only leave junk on disk. Keep the cache layer correct
+	// independent of whether the caller already screened out failed mints.
+	if token == "" {
+		return nil
+	}
 	entry := tokenCacheEntry{
 		Token:  token,
 		Expiry: time.Now().Add(time.Duration(expiresInSeconds) * time.Second),

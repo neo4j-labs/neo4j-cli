@@ -647,10 +647,11 @@ tasks:
       write when token == "". With task-023 (REQ-F-019) in place a failed mint
       returns an error before the write is reached, so this is belt-and-braces; keep
       the guard so the cache layer is correct independent of caller behaviour.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "No on-disk token-cache file is created when the minted token is empty"
       - "token_cache_test.go adds a case asserting no file is written for an empty token"
       - "Non-empty tokens still cache as before (0600, identity-bound, hit/miss semantics unchanged); make test, make fmt-check, make lint pass"
     source: qa
+    status: completed
+    completed_at: 2026-06-26T16:55:00Z

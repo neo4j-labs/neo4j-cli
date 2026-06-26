@@ -114,3 +114,7 @@ Decisions: In on-mode the default: partial branch is rarely reached because Vali
 Reworked mintTokenHTTP's status switch (single mint chokepoint) so every non-2xx returns a clear error: 401 -> existing invalid/expired/revoked auth error, 403 -> distinct forbidden/not-authorized auth error (no env mention), any other non-2xx -> upstream error naming the status; a 2xx with empty access_token is now an error too (no empty Bearer). Both env-var and stored-credential mints inherit it.
 Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_test.go
 Decisions: Used a default branch with a 200-299 range guard to catch all unlisted non-2xx in one place; 403 maps to NewAuthError (exit 4), other non-2xx + empty-token to NewUpstreamError (exit 8). Removed the prior empty-arm 400/403 cases and the misleading 404 panic that hardcoded a 400 status.
+
+## TASK-024 — 2026-06-26T16:55:00Z
+Guarded writeTokenCache to skip persisting an empty token (returns nil before any file write), keeping the Aura disk token cache correct independent of caller behaviour. Added a test driving an env-mode mint that returns an empty token to assert no cache file is written.
+Files: ~neo4j-cli/aura/internal/api/token_cache.go, ~neo4j-cli/aura/internal/api/token_cache_test.go

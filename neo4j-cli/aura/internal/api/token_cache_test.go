@@ -229,6 +229,26 @@ func TestTokenCacheHash_NoSeparatorCollision(t *testing.T) {
 	assert.NotEqual(t, api.TokenCacheHashForTest("id", "secret", url), api.TokenCacheHashForTest("id", "other", url))
 }
 
+// TestTokenCache_EnvMode_EmptyTokenNotWritten asserts the cache layer never
+// persists an empty token. The mint seam returns an empty token with no error
+// (simulating a misbehaving caller) so the write guard is exercised in
+// isolation from the mint-layer error handling.
+func TestTokenCache_EnvMode_EmptyTokenNotWritten(t *testing.T) {
+	dir := t.TempDir()
+	api.SetTokenCacheDirForTest(t, dir)
+
+	api.SetMintTokenForTest(t, func() (api.Grant, error) {
+		return api.Grant{AccessToken: "", ExpiresIn: 3600}, nil
+	})
+
+	srv := instancesOnlyServer(t)
+	doRequest(t, envCfg(t, srv, "id", "secret"))
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "an empty minted token must not be written to the disk cache")
+}
+
 // guards against any drift in the buffer constant's interaction with expiry.
 func TestTokenCache_FreshTokenIsReused(t *testing.T) {
 	dir := t.TempDir()
