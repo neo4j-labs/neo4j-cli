@@ -104,3 +104,8 @@ Files: ~README.md
 Made embed New()'s "missing embed provider" usage error gate-aware (REQ-F-017): off-mode points at --embed-provider / .env / stored embed credential and only mentions NEO4J_EMBED_PROVIDER behind "enable accept-env-vars"; on-mode keeps naming the var. Threaded the gate via a new Config.AcceptEnvVars bool set in Resolve from cfg.Global.AcceptEnvVars().
 Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
 Decisions: Chose the Config-field option (set in Resolve) over raising the empty-provider check in Resolve so New(Config) stays self-contained and the existing providerFactory seam is unaffected. Runtime error text, not a Long/Example, so no skill-bundle drift.
+
+## TASK-022 — 2026-06-26T15:45:00Z
+Made the DBMS partial-params error in dbconn.ResolveConn gate-aware: off-mode names only --uri/--username/--password, on-mode keeps the --flag/NEO4J_* dual form (REQ-F-018). Wording-only; completeness logic unchanged.
+Files: ~neo4j-cli/internal/dbconn/conn.go, ~neo4j-cli/internal/dbconn/conn_test.go, ~neo4j-cli/query/connect_test.go
+Decisions: In on-mode the default: partial branch is rarely reached because ValidateEnvCredentialSet (against resolved values) catches any subset of the three required first and names the missing NEO4J_* vars; updated query+admin off-mode partial tests to assert flag-only form.

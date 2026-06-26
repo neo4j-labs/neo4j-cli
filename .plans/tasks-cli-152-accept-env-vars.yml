@@ -583,7 +583,7 @@ tasks:
       REQ-F-014) is unchanged. Ensure on-mode env-supplied subsets still surface the
       missing NEO4J_* vars via the existing ValidateEnvCredentialSet path (which
       fires before this branch for env sets).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Gate off + partial flag override (1-2 of --uri/--username/--password): error names only the --flags, not NEO4J_*"
@@ -591,6 +591,7 @@ tasks:
       - "requiredCount/completeness behaviour unchanged (three required, database optional)"
       - "dbconn conn_test.go covers both gate states; make test, make fmt-check, make lint pass"
     source: qa
+    completed_at: 2026-06-26T15:45:00Z
 
   - id: task-023
     title: 'Fix OAuth mint to return clear per-status errors and never an empty token'

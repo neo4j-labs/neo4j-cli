@@ -225,10 +225,17 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 	default:
 		// Partial override of a stored credential — reject. In env-var mode the
 		// completeness check above already named the missing NEO4J_* vars, so this
-		// only fires for explicit --flag subsets.
+		// only fires for explicit --flag subsets. When the gate is off, gated env
+		// vars contribute nothing, so name only the --flags rather than the
+		// misleading --flag/NEO4J_* dual form (REQ-F-018).
+		if cfg.Global.AcceptEnvVars() {
+			return nil, fmt.Errorf(
+				"partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
+					"or --password/NEO4J_PASSWORD is provided, all three (--uri, --username, --password) are required")
+		}
 		return nil, fmt.Errorf(
-			"partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
-				"or --password/NEO4J_PASSWORD is provided, all three (--uri, --username, --password) are required")
+			"partial connection params: when any of --uri, --username, or --password is provided, " +
+				"all three (--uri, --username, --password) are required")
 	}
 
 	if uri == "" {

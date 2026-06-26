@@ -361,12 +361,15 @@ func TestResolveConn_StoredCredential_PartialOverrideErrors(t *testing.T) {
 
 	_, err := resolveConn(cmd, cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--uri/NEO4J_URI")
-	assert.Contains(t, err.Error(), "--username/NEO4J_USERNAME")
-	assert.Contains(t, err.Error(), "--password/NEO4J_PASSWORD")
+	assert.Contains(t, err.Error(), "partial connection params")
+	assert.Contains(t, err.Error(), "--uri")
+	assert.Contains(t, err.Error(), "--username")
+	assert.Contains(t, err.Error(), "--password")
 	// database is optional (REQ-F-014): a complete override is the three required
 	// params, so the partial-override error must not mention the database param.
-	assert.NotContains(t, err.Error(), "--database/NEO4J_DATABASE")
+	assert.NotContains(t, err.Error(), "--database")
+	// Off-mode must not advertise the gated env vars (REQ-F-018).
+	assert.NotContains(t, err.Error(), "NEO4J_")
 }
 
 func TestResolveConn_NoStoredCredential_FallsBackToDefaults(t *testing.T) {

@@ -242,11 +242,14 @@ func TestResolveConn_Admin_PartialOverrideErrors(t *testing.T) {
 
 	_, err := ResolveConn(cmd, cfg, true)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--uri/NEO4J_URI")
-	assert.Contains(t, err.Error(), "--username/NEO4J_USERNAME")
-	assert.Contains(t, err.Error(), "--password/NEO4J_PASSWORD")
+	assert.Contains(t, err.Error(), "partial connection params")
+	assert.Contains(t, err.Error(), "--uri")
+	assert.Contains(t, err.Error(), "--username")
+	assert.Contains(t, err.Error(), "--password")
 	// Admin partial override message must NOT mention --database.
 	assert.NotContains(t, err.Error(), "--database")
+	// Off-mode must not advertise the gated env vars (REQ-F-018).
+	assert.NotContains(t, err.Error(), "NEO4J_")
 }
 
 // TestResolveConn_Admin_AllThreeFlagsBypassStoredCredential verifies that
@@ -807,8 +810,35 @@ func TestResolveConn_Query_PartialFlagOverrideRejected(t *testing.T) {
 			assert.Contains(t, err.Error(), "partial connection params")
 			assert.Contains(t, err.Error(), "--uri")
 			assert.NotContains(t, err.Error(), "all four", "the override is three required params, database optional")
+			assert.NotContains(t, err.Error(), "NEO4J_",
+				"off-mode partial error must not advertise gated env vars (REQ-F-018)")
 		})
 	}
+}
+
+// TestResolveConn_Query_PartialOverrideOnMode_NamesEnvVars verifies REQ-F-018:
+// with accept-env-vars on, a partial override (any subset of the three required)
+// is caught by the ValidateEnvCredentialSet completeness check, which names the
+// missing NEO4J_* vars (the gate-aware partial-params branch is reserved for the
+// off path). A flag-supplied piece counts as present in the resolved set.
+func TestResolveConn_Query_PartialOverrideOnMode_NamesEnvVars(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--uri=neo4j://flag:7687"}))
+
+	_, err := ResolveConn(cmd, cfg, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), EnvUsername,
+		"on-mode partial override names the missing NEO4J_* vars (REQ-F-010/F-018)")
+	assert.Contains(t, err.Error(), EnvPassword)
 }
 
 // TestResolveConn_Query_PartialEnvOverrideRejectedNamingVars verifies REQ-F-014:
