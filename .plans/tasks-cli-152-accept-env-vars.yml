@@ -1,7 +1,7 @@
 feature: cli-152-accept-env-vars
 prd: ./prd-cli-152-accept-env-vars.md
 created_at: 2026-06-25T10:50:25Z
-updated_at: 2026-06-26T18:30:00Z
+updated_at: 2026-06-26T19:15:00Z
 
 tasks:
   - id: task-001
@@ -762,4 +762,50 @@ tasks:
       - "Off-mode partial flag override still names only the --flags (REQ-F-018 unchanged); three-param/database-optional completeness (REQ-F-014) unchanged"
       - "The unreachable dual-form partial branch is removed and its comment corrected; no dead code remains"
       - "New dbconn conn tests cover the flag-only, env-only, and mixed on-mode subsets; make test, make fmt-check, make lint all pass"
+    source: qa
+
+  - id: task-028
+    title: 'Make the embed missing-API-key message gate-aware (centralize in Resolve + gate provider backstops)'
+    description: |
+      (Fourth-round QA finding, REQ-F-023; corrects REQ-F-017's inaccurate claim.)
+      The per-provider missing-API-key errors in each embedding provider's Embed()
+      are unconditional and advertise the gated key env vars off-mode:
+      openai.go (~62-67: "missing API key for openai: set OPENAI_API_KEY,
+      NEO4J_EMBED_API_KEY, ..." + WithSuggestion "provide a key via an env var"),
+      gemini.go (~79-83: GEMINI_API_KEY, GOOGLE_API_KEY, NEO4J_EMBED_API_KEY),
+      huggingface.go (~62-66: HF_TOKEN, NEO4J_EMBED_API_KEY). When accept-env-vars
+      is OFF and a provider is supplied via the never-gated --embed-provider flag
+      (or .env / stored cred) while keys exist only in OS env (gated away),
+      resolution leaves APIKey == "" and these messages fire, advertising gated
+      env vars - exactly the off-mode defect REQ-F-015/017 aimed to remove.
+      REQ-F-017 only gated the empty-key check in Resolve() (embed.go ~241-248,
+      on-mode only); the provider backstops were missed. There is no
+      --embed-api-key flag (key comes only from env var, .env, or stored cred).
+      Fix in two parts (the embed Config already carries AcceptEnvVars):
+      (a) In Resolve(), drop the `if cfg.Global.AcceptEnvVars()` guard around the
+      empty-key check so it fires for a needs-key provider with no resolved key in
+      BOTH gate states, branching wording on the gate - off: reference a .env file /
+      a stored embed credential (+ optional "enable accept-env-vars to read <key env
+      vars>"), MUST NOT present the OS env vars as a direct fix; on: may name the env
+      vars. providerNeedsKey already exists.
+      (b) Branch the three provider Embed() messages AND their WithSuggestion text on
+      p.cfg.AcceptEnvVars so the backstop obeys the same rule when reached directly
+      (e.g. the standalone `query :embed` leaf). A small shared helper for the off/on
+      message bodies is fine if it reads cleanly across the providers + Resolve site,
+      but do not over-abstract - distinct provider key-var lists may stay per-provider.
+      The .env suggestion must appear in BOTH modes (dotenv is never gated). The
+      key/Authorization value must never appear in any message. The on-path (key
+      resolved) and precedence (flag > env > .env > stored) are untouched. Run
+      `go generate ./neo4j-cli/internal/skill/...` if any Long/help changed (the
+      runtime error strings are not in the bundle, but verify no drift).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "OFF + 'query --embed-provider openai' with OPENAI_API_KEY/NEO4J_EMBED_API_KEY only in OS env (gated): error references a .env file / stored embed credential (and may mention enabling accept-env-vars), and does NOT advertise the OS env vars as a direct fix"
+      - "Same off-mode behaviour for gemini (GEMINI_API_KEY/GOOGLE_API_KEY) and huggingface (HF_TOKEN)"
+      - "ON + needs-key provider with no resolved key: message may name the provider's key env vars"
+      - "OFF: a key supplied via a .env file resolves successfully with no missing-key error (dotenv never gated)"
+      - "The empty-key check is centralized in Resolve() for both gate states AND the three provider Embed() backstop messages are gate-aware; the WithSuggestion text is gated too"
+      - "No API-key message or suggestion advertises a gated env var as a direct fix when accept-env-vars is off; key/Authorization value never appears in any message"
+      - "make test, make fmt-check, make lint pass; go generate ./neo4j-cli/internal/skill/... produces no bundle drift"
     source: qa

@@ -201,7 +201,10 @@ stored credentials.
   enable `accept-env-vars` to read `NEO4J_EMBED_PROVIDER`"). When `accept-env-vars` is
   **on** the message MAY continue to name `NEO4J_EMBED_PROVIDER`. This closes the gap where
   REQ-F-015 was applied to the connection/password sites but missed the embed *provider*
-  message (the embed *API-key* message was already correctly gated to on-mode). Note `New()`
+  message (the embed *API-key* message was already correctly gated to on-mode — **CORRECTION,
+  see REQ-F-023: this was inaccurate; only the empty-key check in `Resolve()` was gated, while
+  the per-provider `Embed()` backstop messages still advertised the gated key env vars off-mode**).
+  Note `New()`
   takes a resolved `Config` without the gate flag, so the gate state must be threaded in
   (e.g. carry an `AcceptEnvVars` bool on the embed `Config`, or raise the empty-provider
   error from `Resolve`, which already has `cfg`). The off-path (provider resolved) must be
@@ -318,6 +321,49 @@ stored credentials.
     remains; correct the misleading comment.
   - The off-mode behaviour (names only `--flags`) and the three-required-params /
     database-optional completeness decision (REQ-F-014) are unchanged.
+
+> The requirement below (REQ-F-023) was added after a fourth round of QA (2026-06-26, run
+> against the built binary) found that the embed **API-key** off-mode message still advertised
+> gated env vars — contradicting REQ-F-017's claim that that message "was already correctly
+> gated to on-mode". REQ-F-017 only gated the empty-key check in `Resolve()`; the per-provider
+> backstop messages were missed.
+
+- **REQ-F-023** (QA Finding — embed API-key off-mode message advertises gated env vars; corrects
+  REQ-F-017's inaccurate claim): The per-provider missing-API-key errors raised in each
+  embedding provider's `Embed()` are **unconditional** — `openai.go` (`"missing API key for
+  openai: set OPENAI_API_KEY, NEO4J_EMBED_API_KEY, or store one with ... credential embed
+  add"`), `gemini.go` (`GEMINI_API_KEY, GOOGLE_API_KEY, NEO4J_EMBED_API_KEY`), `huggingface.go`
+  (`HF_TOKEN, NEO4J_EMBED_API_KEY`), each with a `WithSuggestion("provide a key via an env var,
+  ...")`. When `accept-env-vars` is **off** and a provider is supplied via the (never-gated)
+  `--embed-provider` flag (or `.env` / a stored credential) while the only API keys present are
+  in OS env vars (gated away), resolution leaves `APIKey == ""` and these messages fire,
+  advertising the gated `OPENAI_API_KEY`/`NEO4J_EMBED_API_KEY`/etc. and telling the user to
+  "provide a key via an env var" — exactly the off-mode defect REQ-F-015/017 set out to
+  eliminate. (There is no `--embed-api-key` flag; a key can come only from an env var, a `.env`
+  file, or a stored embed credential.) Required behaviour (decision: centralize **and** gate the
+  provider messages):
+  - **(a) Centralize a gate-aware empty-key check in `Resolve()`** that fires in BOTH gate
+    states (not just on-mode) for a needs-key provider that resolved no key, producing a single
+    gate-aware message. This also removes the asymmetry between the on-mode-only `Resolve()`
+    check (`embed.go` ~241) and the provider backstops (audit observation). **Off** → reference
+    a `.env` file and a stored embed credential, and MAY point at enabling `accept-env-vars` to
+    read the key env vars; it MUST NOT present the OS env vars
+    (`OPENAI_API_KEY`/`NEO4J_EMBED_API_KEY`/`HF_TOKEN`/`GEMINI_API_KEY`/`GOOGLE_API_KEY`) as a
+    direct fix. **On** → MAY name the env vars (current wording).
+  - **(b) Make the three provider `Embed()` backstop messages gate-aware** (openai/gemini/
+    huggingface) via the `cfg.AcceptEnvVars` mirror field already on the embed `Config`, so even
+    when reached directly (e.g. the standalone `query :embed` leaf, or any path bypassing the
+    `Resolve()` check) they obey the same off-mode rule. Both the primary message AND the
+    `WithSuggestion` text must be gated.
+  - **Off-mode wording shape** (mirrors REQ-F-015/017): off → `"missing API key for <provider>:
+    set NEO4J_EMBED_API_KEY in a .env file, or store one with \`neo4j-cli credential embed add\`
+    (or enable accept-env-vars to read <the provider's key env vars>)"`. The provider-specific
+    OS-env-var names appear only in the on-mode wording and inside the "enable accept-env-vars to
+    read ..." clause.
+  - The `.env` path stays valid off-mode (dotenv is never gated), so it MUST remain a suggested
+    fix in BOTH modes.
+  - The on-path (key resolved) and the resolution precedence (flag > env > `.env` > stored) are
+    untouched. The Authorization header / key value must never appear in any message (unchanged).
 
 ### Non-Functional Requirements
 
@@ -632,6 +678,29 @@ behaviour and leave resolution untouched.
   on-mode `NEO4J_URI`-only (no flags) → `NEO4J_*` message; on-mode `--uri` flag +
   `NEO4J_USERNAME` env, missing password → names missing `NEO4J_PASSWORD`.
 
+### Fourth-round QA fix (REQ-F-023)
+
+- **Embed API-key off-mode message (REQ-F-023)**: the missing-key message currently lives in
+  two places — the on-mode-gated empty-key check in `Resolve()` (`neo4j-cli/query/embed/embed.go`
+  ~241-248) and the unconditional per-provider checks in `openai.go` (~62-67), `gemini.go`
+  (~79-83), `huggingface.go` (~62-66), each guarding `p.cfg.APIKey == ""` in `Embed()`. The
+  embed `Config` already carries `AcceptEnvVars` (added for REQ-F-017). Fix in two parts:
+  - **(a)** In `Resolve()`, drop the `if cfg.Global.AcceptEnvVars()` guard around the empty-key
+    check so it fires for a needs-key provider with no resolved key in BOTH gate states, and
+    branch its wording on the gate: off → `.env`/stored-cred + optional "enable accept-env-vars
+    to read <key env vars>"; on → may name the env vars. (`providerNeedsKey` already exists.)
+  - **(b)** Branch the three provider `Embed()` messages (and their `WithSuggestion` text) on
+    `p.cfg.AcceptEnvVars` so the backstop obeys the same rule when reached directly. Keep a
+    small shared helper for the off/on message bodies if it reads cleanly across the three
+    providers + the `Resolve()` site (DRY the wording), but do not over-abstract — distinct
+    provider key-var lists (HF_TOKEN; GEMINI/GOOGLE; OPENAI) may stay per-provider.
+  - The `.env` suggestion must appear in both modes (dotenv is never gated). The
+    key/Authorization value must never appear in any message. The on-path is untouched.
+  - Tests: for openai/gemini/huggingface, OFF + provider-via-`--embed-provider` + key only in
+    OS env (gated) → message references `.env`/stored cred (+ accept-env-vars) and does NOT
+    advertise the OS key var as a direct fix; ON + no key → message may name the env vars; a
+    `.env`-supplied key off-mode resolves with no error.
+
 ### Breaking change handling
 
 `DBMS` and embed env var reads are currently unconditional. Gating them is a breaking
@@ -767,6 +836,24 @@ Mitigations:
   its comment corrected; no dead code remains (REQ-F-022).
 - [ ] `make test`, `make fmt-check`, `make lint` pass; `go generate
   ./neo4j-cli/internal/skill/...` produces no bundle drift after the help/message changes.
+
+### Fourth-round QA addition (REQ-F-023)
+
+- [ ] With `accept-env-vars` **off**, `query --embed-provider openai` (provider via flag) with
+  `OPENAI_API_KEY`/`NEO4J_EMBED_API_KEY` present only in OS env vars (gated) fails with a
+  message that does NOT advertise those OS env vars as a direct fix — it references a `.env`
+  file / a stored embed credential and MAY mention enabling `accept-env-vars` (REQ-F-023).
+- [ ] The same off-mode behaviour holds for `gemini` (`GEMINI_API_KEY`/`GOOGLE_API_KEY`) and
+  `huggingface` (`HF_TOKEN`) providers (REQ-F-023).
+- [ ] With `accept-env-vars` **on** and a needs-key provider with no resolved key, the message
+  MAY name the provider's key env vars (REQ-F-023).
+- [ ] Off-mode, a key supplied via a `.env` file resolves successfully (no missing-key error),
+  confirming dotenv is never gated (REQ-F-023).
+- [ ] The empty-key check is centralized in `Resolve()` for both gate states AND the three
+  provider `Embed()` backstop messages are gate-aware; no API-key message advertises a gated
+  env var off-mode (REQ-F-023).
+- [ ] `make test`, `make fmt-check`, `make lint` pass; `go generate
+  ./neo4j-cli/internal/skill/...` produces no bundle drift (REQ-F-023).
 
 ## Out of Scope
 
