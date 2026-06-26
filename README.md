@@ -104,10 +104,10 @@ When enabled, the gate applies uniformly to all three credential types with the 
 | Type  | Env vars |
 | ----- | -------- |
 | Aura  | `NEO4J_AURA_CLIENT_ID`, `NEO4J_AURA_CLIENT_SECRET` (both required; synthesized into an ephemeral in-memory credential, never persisted) |
-| DBMS  | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE` |
+| DBMS  | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` (all three required to override a stored credential), `NEO4J_DATABASE` (optional) |
 | Embed | `NEO4J_EMBED_PROVIDER`, `NEO4J_EMBED_MODEL`, `NEO4J_EMBED_BASE_URL`, `NEO4J_EMBED_DIMENSIONS`, `NEO4J_EMBED_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
 
-The DBMS gate lives at the shared connection-resolution layer, so it covers `neo4j-cli query` **and the entire `admin` command tree** (`admin database`/`user`/`role`/`privilege`) identically — there is no per-command env handling. A partial set for any type (e.g. `NEO4J_URI` without `NEO4J_USERNAME`/`NEO4J_PASSWORD`, or one Aura var without the other) is rejected with an error naming the missing variables rather than silently falling back to a stored credential.
+The DBMS gate lives at the shared connection-resolution layer, so it covers `neo4j-cli query` **and the entire `admin` command tree** (`admin database`/`user`/`role`/`privilege`) identically — there is no per-command env handling. For DBMS, a complete override is the **three required** values URI/username/password (via env vars or `--uri`/`--username`/`--password` flags); the database (`NEO4J_DATABASE`/`--database`) is always optional and, when omitted, the server resolves the connecting user's home database. A partial set for any type (e.g. `NEO4J_URI` without `NEO4J_USERNAME`/`NEO4J_PASSWORD`, or one Aura var without the other) is rejected with an error naming the missing values rather than silently falling back to a stored credential.
 
 This is a **breaking change**: the DBMS and embed env vars were previously read unconditionally. Additionally, the `NEO4J_DATABASE` override applied alongside `--credential` (the CLI-212 behaviour) now also requires `accept-env-vars`; the explicit `--database` flag is never gated. Enabling or disabling `accept-env-vars` never modifies stored credentials — it only changes the runtime resolution path. The `.env` file walk-up (controlled by `--env`) is independent of this gate and unaffected.
 
@@ -364,7 +364,7 @@ echo 'MATCH (n) RETURN count(n)' | neo4j-cli query
 
 **Preferred:** add a `dbms` credential (see [Credentials](#credentials)) and `query` connects with no further config. `aura instance create` auto-stores one for new instances.
 
-Flags, env vars, and `.env` files are optional overrides — useful for one-offs or CI without persisting a credential. When a stored credential exists, an override must supply **all four** of URI/username/password/database (any partial set is rejected). Without a stored credential, resolution is flag → env var → `.env` file (auto-discovered walking up from cwd) → built-in default.
+Flags, env vars, and `.env` files are optional overrides — useful for one-offs or CI without persisting a credential. When a stored credential exists, an override must supply **all three** of URI/username/password (via `--uri`/`--username`/`--password` or the matching env vars); the database (`--database`/`NEO4J_DATABASE`) is always optional and is applied when present but never required (omitted, the server resolves the connecting user's home database). Any partial set of the three required values is rejected. Without a stored credential, resolution is flag → env var → `.env` file (auto-discovered walking up from cwd) → built-in default.
 
 > **Env var reads require opt-in.** The `NEO4J_*` connection env vars below are only read when `accept-env-vars` is enabled — see [Environment variables](#environment-variables). Explicit flags and `.env` files are unaffected by this gate.
 

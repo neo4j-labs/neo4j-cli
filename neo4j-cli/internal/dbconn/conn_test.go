@@ -702,6 +702,185 @@ func TestResolveConn_EnvGate_OffNoCompletenessError(t *testing.T) {
 	assert.Equal(t, DefaultURI, conn.URI, "partial env set must be ignored when accept-env-vars is off")
 }
 
+// TestResolveConn_Query_ThreeEnvVarsBypassStoredCredential verifies REQ-F-014:
+// with accept-env-vars on, a stored default credential, and only the three
+// required env vars (no NEO4J_DATABASE), the env vars override the stored
+// credential without an "all four required" partial error.
+func TestResolveConn_Query_ThreeEnvVarsBypassStoredCredential(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "neo4j://env-host:7687")
+	t.Setenv(EnvUsername, "env-user")
+	t.Setenv(EnvPassword, "env-pass")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://env-host:7687", conn.URI)
+	assert.Equal(t, "env-user", conn.Username)
+	assert.Equal(t, "env-pass", conn.Password)
+	assert.Equal(t, "", conn.Database, "database is optional; left empty so the server resolves the home database")
+}
+
+// TestResolveConn_Query_ThreeFlagsBypassStoredCredential verifies REQ-F-014 for
+// flags: --uri/--username/--password (no --database) override a stored default
+// credential without an "all four required" error.
+func TestResolveConn_Query_ThreeFlagsBypassStoredCredential(t *testing.T) {
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{
+		"--uri=neo4j://flag:7687",
+		"--username=flagUser",
+		"--password=flagPass",
+	}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://flag:7687", conn.URI)
+	assert.Equal(t, "flagUser", conn.Username)
+	assert.Equal(t, "flagPass", conn.Password)
+	assert.Equal(t, "", conn.Database, "database optional; not pulled from the bypassed stored credential")
+}
+
+// TestResolveConn_Query_DatabaseAppliedButOptional verifies REQ-F-014: when
+// --database is supplied alongside the three required flags it is applied, but
+// it was never required to complete the override.
+func TestResolveConn_Query_DatabaseAppliedButOptional(t *testing.T) {
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{
+		"--uri=neo4j://flag:7687",
+		"--username=flagUser",
+		"--password=flagPass",
+		"--database=flag-db",
+	}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://flag:7687", conn.URI)
+	assert.Equal(t, "flag-db", conn.Database, "supplied database must be applied")
+}
+
+// TestResolveConn_Query_PartialFlagOverrideRejected verifies REQ-F-014: with a
+// stored default credential, supplying one or two of uri/username/password via
+// flags (no env) is still a rejected partial override naming the --flags.
+func TestResolveConn_Query_PartialFlagOverrideRejected(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"only uri", []string{"--uri=neo4j://flag:7687"}},
+		{"uri+username", []string{"--uri=neo4j://flag:7687", "--username=flagUser"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(EnvURI, "")
+			t.Setenv(EnvUsername, "")
+			t.Setenv(EnvPassword, "")
+			t.Setenv(EnvDatabase, "")
+			t.Chdir(t.TempDir())
+
+			credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+			cfg, _ := newCfgWithCreds(t, credsJSON)
+			cmd := newQueryCmd(cfg)
+			require.NoError(t, cmd.ParseFlags(tc.args))
+
+			_, err := ResolveConn(cmd, cfg, false)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "partial connection params")
+			assert.Contains(t, err.Error(), "--uri")
+			assert.NotContains(t, err.Error(), "all four", "the override is three required params, database optional")
+		})
+	}
+}
+
+// TestResolveConn_Query_PartialEnvOverrideRejectedNamingVars verifies REQ-F-014:
+// with a stored default credential and a partial env set (two of three), the
+// env-mode error names the missing NEO4J_* vars rather than the --flag form.
+func TestResolveConn_Query_PartialEnvOverrideRejectedNamingVars(t *testing.T) {
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "neo4j://env-host:7687")
+	t.Setenv(EnvUsername, "env-user")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+
+	_, err := ResolveConn(cmd, cfg, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), EnvPassword)
+	assert.NotContains(t, err.Error(), "--uri", "env-mode partial error names NEO4J_* vars, not --flags")
+}
+
+// TestResolveConn_Query_ThreeFlagsNoStoredCredNoRegression verifies REQ-F-014:
+// with no stored credential, a three-flag override still resolves cleanly (no
+// regression from the relaxed completeness rule).
+func TestResolveConn_Query_ThreeFlagsNoStoredCredNoRegression(t *testing.T) {
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	cfg, _ := newCfgWithCreds(t, "{}")
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{
+		"--uri=neo4j://flag:7687",
+		"--username=flagUser",
+		"--password=flagPass",
+	}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://flag:7687", conn.URI)
+	assert.Equal(t, "flagUser", conn.Username)
+	assert.Equal(t, "flagPass", conn.Password)
+}
+
+// TestResolveConn_Query_DatabaseOnlyOverrideLayersOntoStoredCredential verifies
+// REQ-F-014: with a stored default credential and only --database supplied (none
+// of the three required params), the database is no longer a partial override —
+// it layers onto the stored credential's uri/username/password.
+func TestResolveConn_Query_DatabaseOnlyOverrideLayersOntoStoredCredential(t *testing.T) {
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--database=flag-db"}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "neo4j://stored:7687", conn.URI)
+	assert.Equal(t, "storedUser", conn.Username)
+	assert.Equal(t, "storedPass", conn.Password)
+	assert.Equal(t, "flag-db", conn.Database, "supplied database overrides the stored credential's database")
+}
+
 // TestLoadEnvFile_NoEnvReturnsEmpty verifies that when no .env is present the
 // returned map is empty (not nil).
 func TestLoadEnvFile_NoEnvReturnsEmpty(t *testing.T) {

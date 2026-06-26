@@ -75,3 +75,8 @@ Added 1 review task (task-015) from CI security-review finding.
 ## TASK-015 — 2026-06-25T15:55:43Z
 Length-prefixed each tokenCacheHash component (clientID/clientSecret/authURL) so the "|" separator can't be forged from within a component, eliminating the cache-identity collision that caused wrong cache hits / 401s. Both the filename short-hash and in-file full-hash benefit (shared construction). Added a focused collision test plus a TokenCacheHashForTest seam.
 Files: +0 new, ~4 mod, -0 del
+
+## TASK-016 — 2026-06-26T10:35:00Z
+Fixed default-path override completeness (REQ-F-014): dbconn.ResolveConn now decides completeness on the three required params (uri/username/password) only; database is always optional (applied when present, never counted), uniformly for flags AND env vars. Partial flag override message dropped the database clause ("all three" now). requiredCount==0+stored-cred keeps a supplied database override (database==""guard); admin skipDatabase path unchanged; applyDBOverride (CLI-212) untouched. README updated to "three required, database optional".
+Files: ~conn.go, ~conn_test.go, ~query/connect_test.go, ~README.md
+Decisions: env-mode partials still surface via ValidateEnvCredentialSet (fires before the switch) naming NEO4J_* vars; the switch's default branch only fires for flag subsets.

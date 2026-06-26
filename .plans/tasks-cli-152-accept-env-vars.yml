@@ -424,7 +424,9 @@ tasks:
       - "New tests cover three-env + stored cred, three-flag + stored cred, two-of-three partial (env and flag), and database-applied-but-optional"
       - "README updated to 'three required, database optional' for both flags and env vars"
       - "make test, make fmt-check, make lint pass; go generate produces no bundle drift"
+    status: completed
     source: qa
+    completed_at: 2026-06-26T10:35:00Z
 
   - id: task-017
     title: 'Reword off-mode error messages so they do not advertise gated env vars'

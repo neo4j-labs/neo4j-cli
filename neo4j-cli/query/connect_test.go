@@ -364,7 +364,9 @@ func TestResolveConn_StoredCredential_PartialOverrideErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "--uri/NEO4J_URI")
 	assert.Contains(t, err.Error(), "--username/NEO4J_USERNAME")
 	assert.Contains(t, err.Error(), "--password/NEO4J_PASSWORD")
-	assert.Contains(t, err.Error(), "--database/NEO4J_DATABASE")
+	// database is optional (REQ-F-014): a complete override is the three required
+	// params, so the partial-override error must not mention the database param.
+	assert.NotContains(t, err.Error(), "--database/NEO4J_DATABASE")
 }
 
 func TestResolveConn_NoStoredCredential_FallsBackToDefaults(t *testing.T) {

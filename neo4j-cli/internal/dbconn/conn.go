@@ -186,60 +186,49 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		}
 	}
 
-	explicitCount := 0
+	// Completeness is decided on the three required params only
+	// (uri/username/password). database is always optional: it is applied when
+	// present but never required and never counted toward completeness, in both
+	// query and admin (skipDatabase) modes (REQ-F-014).
+	requiredCount := 0
 	if uri != "" {
-		explicitCount++
+		requiredCount++
 	}
 	if username != "" {
-		explicitCount++
+		requiredCount++
 	}
 	if password != "" {
-		explicitCount++
-	}
-	if !skipDatabase && database != "" {
-		explicitCount++
+		requiredCount++
 	}
 
 	storedCred, _ := cfg.Credentials.Dbms.GetDefault()
 	hasStoredCred := storedCred != nil
 
-	// Determine how many explicit params are expected to constitute a complete
-	// set. When skipDatabase is true we track 3 params (uri, user, pass);
-	// otherwise 4.
-	fullCount := 4
-	if skipDatabase {
-		fullCount = 3
-	}
-
 	switch {
-	case !hasStoredCred && explicitCount == 0:
-		// No stored credential, no explicit params — fall through to built-in defaults.
-
 	case !hasStoredCred:
-		// No stored credential with some explicit params — apply what was given.
+		// No stored credential — apply whatever required params were given (or
+		// none, falling through to built-in defaults).
 
-	case explicitCount == 0:
-		// Stored credential available, no explicit params — use the credential.
+	case requiredCount == 0:
+		// Stored credential available, no explicit required params — use the
+		// credential. An explicit database override is layered on below.
 		uri = storedCred.URI
 		username = storedCred.Username
 		password = storedCred.Password
-		if !skipDatabase {
+		if !skipDatabase && database == "" {
 			database = storedCred.DatabaseName
 		}
 
-	case explicitCount == fullCount:
-		// All explicitly provided — bypass stored credential entirely.
+	case requiredCount == 3:
+		// All three required params provided — bypass stored credential entirely.
 
 	default:
-		// Partial override of a stored credential — reject.
-		if skipDatabase {
-			return nil, fmt.Errorf(
-				"partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
-					"or --password/NEO4J_PASSWORD is provided, all three are required")
-		}
+		// Partial override of a stored credential — reject. In env-var mode the
+		// completeness check above already named the missing NEO4J_* vars, so this
+		// only fires for explicit --flag subsets.
 		return nil, fmt.Errorf(
 			"partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
-				"--password/NEO4J_PASSWORD, or --database/NEO4J_DATABASE is provided, all four are required")
+				"or --password/NEO4J_PASSWORD is provided, all three (--uri, --username, --password) are required")
 	}
 
 	if uri == "" {
