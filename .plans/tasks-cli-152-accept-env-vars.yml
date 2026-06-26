@@ -655,3 +655,40 @@ tasks:
     source: qa
     status: completed
     completed_at: 2026-06-26T16:55:00Z
+
+  - id: task-025
+    title: 'Re-enforce 0600 on the Aura token cache file on every write'
+    description: |
+      (CI security-review finding [Low, defense-in-depth], REQ-NF-002 hardening.)
+      writeTokenCache in neo4j-cli/aura/internal/api/token_cache.go currently does
+      `os.WriteFile(path, data, 0o600)`. Go's os.WriteFile applies the perm
+      argument ONLY when creating a new file; if the cache file already exists from
+      a previous CLI run, its permissions are preserved unchanged. So a cache file
+      whose permissions were later widened (accidental chmod, a umask
+      misconfiguration on a shared CI runner, etc.) would keep those wider perms
+      after the next token write, leaving the derived JWT readable by other local
+      users. The path is not guessable by another user (the 16-char filename is a
+      SHA-256 prefix derived from the client secret) and the first write correctly
+      creates the file at 0600, so practical exploitability is low — but the cache
+      layer should guarantee 0600 on every write regardless of prior file state.
+      Fix: make the write re-enforce 0600 on an existing file. Preferred is an
+      atomic write-then-rename (write to a temp file in the same dir created at
+      0600, then os.Rename over the target) which also eliminates the partial-write
+      window; an explicit os.Chmod(path, 0o600) after os.WriteFile is an acceptable
+      minimal alternative. NOTE the token cache deliberately uses the raw os.*
+      filesystem (os.ReadFile/os.WriteFile against os.TempDir via the cacheDirFn
+      seam), NOT the afero FS — so prefer a raw-os solution over pulling in
+      fileutils.WriteFileErr/afero unless that reads more cleanly. The companion
+      separator-injection finding the same review raised is ALREADY addressed
+      (task-015 length-prefixes the hash components) and needs no further work.
+      Add a token_cache_test.go case: pre-create the cache file with 0644, perform a
+      write, and assert the resulting mode is 0600.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Writing the token cache over a pre-existing file whose mode was widened (e.g. 0644) results in mode 0600"
+      - "The first/creating write still produces a 0600 file; hit/miss/identity-binding semantics unchanged"
+      - "token_cache_test.go covers the pre-existing-widened-file case asserting final mode 0600"
+      - "The fix keeps the cache on the raw os filesystem (no unnecessary afero dependency); make test, make fmt-check, make lint pass"
+      - "CI security-review check on the PR returns a pass verdict (zero inline findings)"
+    source: review

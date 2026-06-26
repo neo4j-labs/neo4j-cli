@@ -118,3 +118,6 @@ Decisions: Used a default branch with a 200-299 range guard to catch all unliste
 ## TASK-024 — 2026-06-26T16:55:00Z
 Guarded writeTokenCache to skip persisting an empty token (returns nil before any file write), keeping the Aura disk token cache correct independent of caller behaviour. Added a test driving an env-mode mint that returns an empty token to assert no cache file is written.
 Files: ~neo4j-cli/aura/internal/api/token_cache.go, ~neo4j-cli/aura/internal/api/token_cache_test.go
+
+## REVIEW — 2026-06-26T17:10:00Z
+Added 1 review task (task-025) from the CI security-review finding (re-enforce 0600 on the Aura token cache file on every write).
