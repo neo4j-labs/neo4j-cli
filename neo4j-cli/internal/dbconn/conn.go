@@ -195,21 +195,35 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		requiredCount++
 	}
 
-	// In env-var mode, reject an incomplete DBMS set that includes any
-	// env/dotenv-sourced piece by naming the missing NEO4J_* vars (REQ-F-010).
-	// This fires regardless of a stored credential ("must not silently fall
-	// back"). A complete set (all three from any source) and a purely-flag
-	// subset both skip this — the latter falls through to the partial switch,
-	// which names the --flags (REQ-F-022).
-	if cfg.Global.AcceptEnvVars() && requiredCount != 3 && envSourced {
+	// Reject an incomplete DBMS set that includes any env/dotenv-sourced piece
+	// by naming the missing NEO4J_* vars (REQ-F-010/F-024). This fires whenever
+	// envSourced (so off-mode dotenv-only partials are named with NEO4J_* too,
+	// matching on-mode for the same .env — REQ-F-024) and is ungated: OS env is
+	// already folded into the env half via GatedGetenv, so off-mode only sees
+	// dotenv pieces here. A complete set (all three from any source) and a
+	// purely-flag subset both skip this — the latter falls through to the
+	// partial switch, which names the --flags (REQ-F-022).
+	//
+	// "Provided" is attributed to the pre-flag env half only (envURI/…), so a
+	// value supplied by a --flag is never reported as a set NEO4J_* var; the
+	// "missing" view uses the post-flag resolved values so only genuinely-empty
+	// required pieces are named (REQ-F-025).
+	if requiredCount != 3 && envSourced {
+		envHalf := map[string]string{
+			credentials.EnvURI:      envURI,
+			credentials.EnvUsername: envUsername,
+			credentials.EnvPassword: envPassword,
+		}
 		resolved := map[string]string{
 			credentials.EnvURI:      uri,
 			credentials.EnvUsername: username,
 			credentials.EnvPassword: password,
 		}
-		if err := credentials.ValidateEnvCredentialSet(credentials.DBMSEnvSpec, func(name string) string {
-			return resolved[name]
-		}); err != nil {
+		if err := credentials.ValidateEnvCredentialSetSourced(
+			credentials.DBMSEnvSpec,
+			func(name string) string { return envHalf[name] },
+			func(name string) string { return resolved[name] },
+		); err != nil {
 			return nil, err
 		}
 	}

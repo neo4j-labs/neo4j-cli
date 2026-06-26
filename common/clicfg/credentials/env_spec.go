@@ -83,21 +83,34 @@ func HasAnyCredentialEnvVar(getenv func(string) string) bool {
 // is set, all of them must be. Returns a clierr usage error naming the
 // missing vars, or nil when every group is either fully set or fully empty.
 func ValidateEnvCredentialSet(spec EnvCredentialSpec, getenv func(string) string) error {
+	return ValidateEnvCredentialSetSourced(spec, getenv, getenv)
+}
+
+// ValidateEnvCredentialSetSourced is like ValidateEnvCredentialSet but takes a
+// separate view of which vars were supplied by an env/dotenv source (present)
+// and which required vars are still genuinely absent after all sources are
+// applied (absent). This lets a caller attribute "provided" only to truly
+// env-sourced pieces (so a flag-supplied value is not reported as a set env
+// var) while still naming the genuinely-missing required pieces. The error
+// message names a group's vars when that group has both a present member and
+// an absent member. ValidateEnvCredentialSet passes the same getenv for both.
+func ValidateEnvCredentialSetSourced(spec EnvCredentialSpec, present, absent func(string) string) error {
 	for _, group := range spec.RequiredGroups {
-		var present, missing []string
+		var setVars, missing []string
 		for _, name := range group {
-			if getenv(name) != "" {
-				present = append(present, name)
-			} else {
+			if present(name) != "" {
+				setVars = append(setVars, name)
+			}
+			if absent(name) == "" {
 				missing = append(missing, name)
 			}
 		}
-		if len(present) > 0 && len(missing) > 0 {
+		if len(setVars) > 0 && len(missing) > 0 {
 			return clierr.NewUsageError(
 				"incomplete credential environment: %s must be set when %s %s provided (missing: %s)",
 				strings.Join(group, ", "),
-				strings.Join(present, ", "),
-				plural(len(present)),
+				strings.Join(setVars, ", "),
+				plural(len(setVars)),
 				strings.Join(missing, ", "),
 			)
 		}

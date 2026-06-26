@@ -111,12 +111,13 @@ func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
-		[]byte("NEO4J_USERNAME=onlydotenv\nNEO4J_PASSWORD=onlydotenvpw\n"), 0644))
+		[]byte("NEO4J_URI=neo4j://onlydotenv:7687\nNEO4J_USERNAME=onlydotenv\nNEO4J_PASSWORD=onlydotenvpw\n"), 0644))
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 
 	c, err := resolveConn(cmd, cfg)
 	require.NoError(t, err)
+	assert.Equal(t, "neo4j://onlydotenv:7687", c.URI)
 	assert.Equal(t, "onlydotenv", c.Username)
 	assert.Equal(t, "onlydotenvpw", c.Password)
 }

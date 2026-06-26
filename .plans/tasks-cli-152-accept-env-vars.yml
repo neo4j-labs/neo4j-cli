@@ -867,7 +867,8 @@ tasks:
       wording for purely-flag subsets (REQ-F-018/022), or the credential/desktop
       paths. The runtime error strings are not in the skill bundle, but run
       `go generate ./neo4j-cli/internal/skill/...` to confirm no drift.
-    status: pending
+    status: completed
+    completed_at: 2026-06-26T22:15:00Z
     dependencies: []
     acceptance_criteria:
       - "OFF: a .env with only NEO4J_URI (no flags) is rejected with the NEO4J_*-named completeness UsageError (exit 2), identical to on-mode — not the --flags partial connection params error (exit 1) (REQ-F-024)"

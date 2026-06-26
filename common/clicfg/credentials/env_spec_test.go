@@ -131,3 +131,40 @@ func TestValidateEnvCredentialSet_DBMS(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateEnvCredentialSetSourced verifies that the separate present/absent
+// views drive attribution: a piece in the "present" (env-sourced) view is named
+// as provided, a piece empty in the "absent" (resolved) view is named missing,
+// and a piece supplied only via the absent view (e.g. a flag) is neither named
+// provided nor counted missing.
+func TestValidateEnvCredentialSetSourced(t *testing.T) {
+	t.Run("flag-supplied uri not named provided, only missing piece named", func(t *testing.T) {
+		present := fakeGetenv(map[string]string{credentials.EnvUsername: "env-user"})
+		absent := fakeGetenv(map[string]string{
+			credentials.EnvURI:      "neo4j://flag",
+			credentials.EnvUsername: "env-user",
+		})
+		err := credentials.ValidateEnvCredentialSetSourced(credentials.DBMSEnvSpec, present, absent)
+		require.Error(t, err)
+		// The "when ... provided" clause names only the env-sourced username, not
+		// the flag-supplied uri; the missing clause names only the absent password.
+		assert.Contains(t, err.Error(), "when "+credentials.EnvUsername+" is provided")
+		assert.Contains(t, err.Error(), "missing: "+credentials.EnvPassword+")")
+	})
+
+	t.Run("complete resolved set passes even if env half is partial", func(t *testing.T) {
+		present := fakeGetenv(map[string]string{credentials.EnvURI: "neo4j://env"})
+		absent := fakeGetenv(map[string]string{
+			credentials.EnvURI:      "neo4j://env",
+			credentials.EnvUsername: "u",
+			credentials.EnvPassword: "p",
+		})
+		require.NoError(t, credentials.ValidateEnvCredentialSetSourced(credentials.DBMSEnvSpec, present, absent))
+	})
+
+	t.Run("empty env half never errors", func(t *testing.T) {
+		present := fakeGetenv(map[string]string{})
+		absent := fakeGetenv(map[string]string{credentials.EnvURI: "neo4j://flag"})
+		require.NoError(t, credentials.ValidateEnvCredentialSetSourced(credentials.DBMSEnvSpec, present, absent))
+	})
+}

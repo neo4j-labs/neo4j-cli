@@ -5,6 +5,7 @@ package dbconn
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/test/utils/testfs"
 )
 
@@ -885,6 +887,12 @@ func TestResolveConn_Query_PartialMixedOnMode_NamesMissingEnvVar(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), EnvPassword,
 		"mixed subset with an env-sourced value names the missing NEO4J_* var (REQ-F-022)")
+	// The --uri value came from a flag, so it must not be named in the
+	// "provided" clause as a set env var (REQ-F-025). The group preamble still
+	// lists all three required vars; only the attribution clause is asserted.
+	assert.Contains(t, err.Error(), "when "+EnvUsername+" is provided")
+	assert.NotContains(t, err.Error(), "when "+EnvURI,
+		"the flag-supplied --uri is not reported as a provided env var (REQ-F-025)")
 }
 
 // TestResolveConn_Query_PartialEnvOverrideRejectedNamingVars verifies REQ-F-014:
@@ -906,6 +914,99 @@ func TestResolveConn_Query_PartialEnvOverrideRejectedNamingVars(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), EnvPassword)
 	assert.NotContains(t, err.Error(), "--uri", "env-mode partial error names NEO4J_* vars, not --flags")
+}
+
+// TestResolveConn_Query_PartialDotenvOffMode_NamesEnvVars verifies REQ-F-024:
+// with accept-env-vars OFF and a .env containing only NEO4J_URI (no flags),
+// resolution is rejected with the NEO4J_*-named completeness UsageError (exit 2),
+// identical to on-mode — not the --flags partial-connection-params error
+// (exit 1). dotenv is never gated, so its partial set must be named by its
+// source even off-mode.
+func TestResolveConn_Query_PartialDotenvOffMode_NamesEnvVars(t *testing.T) {
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+	t.Setenv(envAcceptEnvVars, "")
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+
+	cfg, fs := newCfgWithCreds(t, "{}")
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
+		[]byte("NEO4J_URI=neo4j://dotenv-host:7687\n"), 0644))
+
+	cmd := newQueryCmd(cfg)
+
+	_, err := ResolveConn(cmd, cfg, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), EnvUsername)
+	assert.Contains(t, err.Error(), EnvPassword)
+	assert.NotContains(t, err.Error(), "partial connection params",
+		"off-mode dotenv partial is named by its NEO4J_* source, not the --flags message (REQ-F-024)")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "off-mode dotenv partial is a clierr.UsageError")
+	assert.Equal(t, 2, ce.Code, "dotenv completeness failure is a usage error (exit 2), identical to on-mode (REQ-F-024)")
+}
+
+// TestResolveConn_Query_PartialDotenvOnMode_NamesEnvVars verifies REQ-F-024:
+// the same .env-only NEO4J_URI partial produces the identical NEO4J_*-named
+// UsageError (exit 2) with accept-env-vars ON.
+func TestResolveConn_Query_PartialDotenvOnMode_NamesEnvVars(t *testing.T) {
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+
+	cfg, fs := newCfgWithCreds(t, "{}")
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
+		[]byte("NEO4J_URI=neo4j://dotenv-host:7687\n"), 0644))
+
+	cmd := newQueryCmd(cfg)
+
+	_, err := ResolveConn(cmd, cfg, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), EnvUsername)
+	assert.Contains(t, err.Error(), EnvPassword)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+}
+
+// TestResolveConn_Query_PartialFlagOnly_NotUsageError verifies REQ-F-024: a
+// purely-flag partial subset (no env/dotenv piece) stays the --flags
+// partial-connection-params message (a plain error, exit 1, NOT a usage error)
+// in BOTH gate states — REQ-F-018/022 unchanged.
+func TestResolveConn_Query_PartialFlagOnly_NotUsageError(t *testing.T) {
+	for _, gate := range []string{"", "1"} {
+		t.Run("gate="+gate, func(t *testing.T) {
+			t.Setenv(envAcceptEnvVars, gate)
+			t.Setenv(EnvURI, "")
+			t.Setenv(EnvUsername, "")
+			t.Setenv(EnvPassword, "")
+			t.Setenv(EnvDatabase, "")
+			t.Chdir(t.TempDir())
+
+			credsJSON := storedDefaultCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
+			cfg, _ := newCfgWithCreds(t, credsJSON)
+			cmd := newQueryCmd(cfg)
+			require.NoError(t, cmd.ParseFlags([]string{"--uri=neo4j://flag:7687"}))
+
+			_, err := ResolveConn(cmd, cfg, false)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "partial connection params")
+			assert.NotContains(t, err.Error(), "NEO4J_",
+				"purely-flag partial names only the --flags (REQ-F-018/022)")
+
+			var ce *clierr.CLIError
+			assert.False(t, errors.As(err, &ce),
+				"purely-flag partial is a plain error (exit 1), not a usage error (REQ-F-024)")
+		})
+	}
 }
 
 // TestResolveConn_Query_ThreeFlagsNoStoredCredNoRegression verifies REQ-F-014:
