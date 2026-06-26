@@ -4,11 +4,14 @@
 package aura
 
 import (
+	"os"
+
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphanalytics"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/debug"
 	"github.com/neo4j/cli/common/flags"
@@ -45,6 +48,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			}
 		}
 		cfg.Aura.SetDebug(debug.Resolve(cmd))
+		if err := applyEnvCredential(cfg); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -58,6 +64,33 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(graphql.NewCmd(cfg))
 
 	return cmd
+}
+
+// applyEnvCredential synthesizes an ephemeral Aura credential from
+// NEO4J_AURA_CLIENT_ID/NEO4J_AURA_CLIENT_SECRET when accept-env-vars is enabled.
+// The credential lives only in memory (cfg.Aura.SetActiveCredential) and is never
+// persisted to disk or keyring. A partial pair is a usage error naming the missing
+// variable. An explicit --credential flag runs afterwards (its hook is registered
+// on the subcommand) and takes precedence.
+func applyEnvCredential(cfg *clicfg.Config) error {
+	if !cfg.Global.AcceptEnvVars() {
+		return nil
+	}
+	if err := credentials.ValidateEnvCredentialSet(credentials.AuraEnvSpec, os.Getenv); err != nil {
+		return err
+	}
+	clientID := os.Getenv(credentials.EnvAuraClientID)
+	clientSecret := os.Getenv(credentials.EnvAuraClientSecret)
+	if clientID == "" || clientSecret == "" {
+		return nil
+	}
+	cfg.Aura.SetActiveCredential(&credentials.AuraCredential{
+		Name:         "env",
+		ClientId:     clientID,
+		ClientSecret: clientSecret,
+		Ephemeral:    true,
+	})
+	return nil
 }
 
 func NewStandaloneCmd(cfg *clicfg.Config) *cobra.Command {

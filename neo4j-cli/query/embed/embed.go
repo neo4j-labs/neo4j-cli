@@ -15,6 +15,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/subosito/gotenv"
@@ -47,6 +48,12 @@ type Config struct {
 	UserAgent      string
 	VertexProject  string
 	VertexLocation string
+
+	// AcceptEnvVars mirrors cfg.Global.AcceptEnvVars() at Resolve time so New
+	// can word its missing-provider usage error without re-reading config: in
+	// env-var mode it may name NEO4J_EMBED_PROVIDER, otherwise it must not
+	// advertise a gated variable the CLI is currently ignoring (REQ-F-017).
+	AcceptEnvVars bool
 }
 
 // Provider name constants shared by the cobra flag-validator (see credential
@@ -57,20 +64,6 @@ const (
 	ProviderHuggingFace = "huggingface"
 	ProviderGemini      = "gemini"
 	ProviderVertex      = "vertex"
-)
-
-// Environment variable names. Keep these grouped here so a single grep across
-// the package finds every external variable read.
-const (
-	envEmbedProvider   = "NEO4J_EMBED_PROVIDER"
-	envEmbedModel      = "NEO4J_EMBED_MODEL"
-	envEmbedBaseURL    = "NEO4J_EMBED_BASE_URL"
-	envEmbedDimensions = "NEO4J_EMBED_DIMENSIONS"
-	envEmbedAPIKey     = "NEO4J_EMBED_API_KEY"
-	envOpenAIKey       = "OPENAI_API_KEY"
-	envHFToken         = "HF_TOKEN"
-	envGeminiKey       = "GEMINI_API_KEY"
-	envGoogleKey       = "GOOGLE_API_KEY"
 )
 
 // providerFactory is the test seam for producer-side substitution. Production
@@ -189,26 +182,27 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 			*dst = v
 		}
 	}
-	apply(envEmbedProvider, &out.Provider)
-	apply(envEmbedModel, &out.Model)
-	apply(envEmbedBaseURL, &out.BaseURL)
-	if v, ok := dotenvVals[envEmbedDimensions]; ok && v != "" {
+	apply(credentials.EnvEmbedProvider, &out.Provider)
+	apply(credentials.EnvEmbedModel, &out.Model)
+	apply(credentials.EnvEmbedBaseURL, &out.BaseURL)
+	if v, ok := dotenvVals[credentials.EnvEmbedDimensions]; ok && v != "" {
 		if n, ok := parseDimensions(v); ok {
 			out.Dimensions = n
 		}
 	}
 
-	// 3. OS environment.
-	if v := os.Getenv(envEmbedProvider); v != "" {
+	// 3. OS environment (gated behind accept-env-vars; the .env walk-up above
+	// is intentionally NOT gated).
+	if v := cfg.GatedGetenv(credentials.EnvEmbedProvider); v != "" {
 		out.Provider = v
 	}
-	if v := os.Getenv(envEmbedModel); v != "" {
+	if v := cfg.GatedGetenv(credentials.EnvEmbedModel); v != "" {
 		out.Model = v
 	}
-	if v := os.Getenv(envEmbedBaseURL); v != "" {
+	if v := cfg.GatedGetenv(credentials.EnvEmbedBaseURL); v != "" {
 		out.BaseURL = v
 	}
-	if v := os.Getenv(envEmbedDimensions); v != "" {
+	if v := cfg.GatedGetenv(credentials.EnvEmbedDimensions); v != "" {
 		if n, ok := parseDimensions(v); ok {
 			out.Dimensions = n
 		}
@@ -235,7 +229,21 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	// API key — provider-specific env beats generic embed env beats stored
 	// credential. .env entries override the stored cred but not OS env, so
 	// we read .env first then OS env.
-	out.APIKey = resolveAPIKey(out.Provider, out.APIKey, dotenvVals)
+	out.APIKey = resolveAPIKey(cfg, out.Provider, out.APIKey, dotenvVals)
+
+	out.AcceptEnvVars = cfg != nil && cfg.Global.AcceptEnvVars()
+
+	// A provider that needs an API key but resolved none from any source (flag /
+	// env / .env / stored) is a usage error (REQ-F-010 / REQ-F-023 embed group).
+	// Validate the RESOLVED Config — not raw os.Getenv — so a key supplied via
+	// .env or a stored credential counts as present, matching the DBMS check in
+	// dbconn.ResolveConn and the documented precedence. The check fires in BOTH
+	// gate states; the message wording is gate-aware so the off-mode form never
+	// advertises a gated OS env var as a direct fix.
+	if out.Provider != "" && providerNeedsKey(out.Provider) && out.APIKey == "" {
+		return Config{}, clierr.NewUsageError(
+			"%s", missingAPIKeyMessage(out.Provider, out.AcceptEnvVars))
+	}
 
 	// User agent matches the rest of the query package (`neo4j-cli/v<version>`).
 	version := "dev"
@@ -247,40 +255,101 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	return out, nil
 }
 
+// providerKeyEnvVars lists the OS environment variables each provider reads for
+// its API key, highest-precedence first. Named only in the on-mode message and
+// inside the off-mode "enable accept-env-vars to read ..." clause — never as a
+// direct off-mode fix (REQ-F-023).
+func providerKeyEnvVars(provider string) []string {
+	switch strings.ToLower(provider) {
+	case ProviderOpenAI:
+		return []string{credentials.EnvOpenAIKey, credentials.EnvEmbedAPIKey}
+	case ProviderHuggingFace:
+		return []string{credentials.EnvHFToken, credentials.EnvEmbedAPIKey}
+	case ProviderGemini:
+		return []string{credentials.EnvGeminiKey, credentials.EnvGoogleKey, credentials.EnvEmbedAPIKey}
+	default:
+		return []string{credentials.EnvEmbedAPIKey}
+	}
+}
+
+// missingAPIKeyMessage builds the gate-aware missing-API-key error body shared
+// by Resolve and the per-provider Embed backstops (REQ-F-023). Off-mode points
+// at a .env file and a stored credential (dotenv is never gated) and only
+// mentions the OS env vars behind an "enable accept-env-vars" clause; on-mode
+// names the env vars directly. The key value never appears in either form.
+func missingAPIKeyMessage(provider string, acceptEnvVars bool) string {
+	vars := strings.Join(providerKeyEnvVars(provider), ", ")
+	if acceptEnvVars {
+		return fmt.Sprintf(
+			"missing API key for %s: set %s, add it to a .env file, "+
+				"or store one with `neo4j-cli credential embed add`",
+			provider, vars)
+	}
+	return fmt.Sprintf(
+		"missing API key for %s: add it to a .env file, "+
+			"or store one with `neo4j-cli credential embed add` "+
+			"(or enable accept-env-vars to read %s)",
+		provider, vars)
+}
+
+// missingAPIKeySuggestion is the gate-aware WithSuggestion text for the
+// per-provider Embed backstops (REQ-F-023).
+func missingAPIKeySuggestion(acceptEnvVars bool) string {
+	if acceptEnvVars {
+		return "provide a key via an env var or a .env file, " +
+			"or see `neo4j-cli credential embed add --help` to store one"
+	}
+	return "provide a key via a .env file, " +
+		"or see `neo4j-cli credential embed add --help` to store one " +
+		"(or enable accept-env-vars to read the provider's key env vars)"
+}
+
+// providerNeedsKey reports whether a provider requires an API key. Ollama
+// needs none and Vertex authenticates via Application Default Credentials, so
+// both are exempt — matching the resolveAPIKey logic below.
+func providerNeedsKey(provider string) bool {
+	switch strings.ToLower(provider) {
+	case ProviderOllama, ProviderVertex:
+		return false
+	default:
+		return true
+	}
+}
+
 // resolveAPIKey applies provider-specific API key resolution. OpenAI,
 // HuggingFace, and Gemini honour a provider-specific env, then the generic
 // embed env; Ollama and Vertex are left untouched (Ollama needs no API key,
 // Vertex authenticates via ADC). For Gemini, GEMINI_API_KEY beats
 // GOOGLE_API_KEY beats NEO4J_EMBED_API_KEY beats stored within each stage.
 // Returns the highest-precedence non-empty value, falling back to storedKey.
-func resolveAPIKey(provider, storedKey string, dotenv map[string]string) string {
+func resolveAPIKey(cfg *clicfg.Config, provider, storedKey string, dotenv map[string]string) string {
 	out := storedKey
 
 	// Stage values in lowest → highest precedence (.env < OS env). Apply
 	// per-provider keys before the generic one in each stage so a per-
 	// provider variable always wins inside its precedence tier.
-	stages := []map[string]string{dotenv, osEnvSnapshot()}
+	stages := []map[string]string{dotenv, osEnvSnapshot(cfg)}
 	for _, stage := range stages {
 		// Generic key applies to any provider that needs an API key.
-		if v := stage[envEmbedAPIKey]; v != "" {
+		if v := stage[credentials.EnvEmbedAPIKey]; v != "" {
 			out = v
 		}
 		switch provider {
 		case ProviderOpenAI:
-			if v := stage[envOpenAIKey]; v != "" {
+			if v := stage[credentials.EnvOpenAIKey]; v != "" {
 				out = v
 			}
 		case ProviderHuggingFace:
-			if v := stage[envHFToken]; v != "" {
+			if v := stage[credentials.EnvHFToken]; v != "" {
 				out = v
 			}
 		case ProviderGemini:
 			// GOOGLE_API_KEY first, then GEMINI_API_KEY so the
 			// gemini-specific var wins inside this stage.
-			if v := stage[envGoogleKey]; v != "" {
+			if v := stage[credentials.EnvGoogleKey]; v != "" {
 				out = v
 			}
-			if v := stage[envGeminiKey]; v != "" {
+			if v := stage[credentials.EnvGeminiKey]; v != "" {
 				out = v
 			}
 		}
@@ -290,14 +359,15 @@ func resolveAPIKey(provider, storedKey string, dotenv map[string]string) string 
 
 // osEnvSnapshot returns the subset of os.Getenv values relevant to API-key
 // resolution. Built on demand so a test that calls t.Setenv before Resolve
-// sees the change.
-func osEnvSnapshot() map[string]string {
+// sees the change. Reads are gated behind accept-env-vars; when the gate is
+// off every value is empty so the stored credential / .env path wins.
+func osEnvSnapshot(cfg *clicfg.Config) map[string]string {
 	return map[string]string{
-		envEmbedAPIKey: os.Getenv(envEmbedAPIKey),
-		envOpenAIKey:   os.Getenv(envOpenAIKey),
-		envHFToken:     os.Getenv(envHFToken),
-		envGeminiKey:   os.Getenv(envGeminiKey),
-		envGoogleKey:   os.Getenv(envGoogleKey),
+		credentials.EnvEmbedAPIKey: cfg.GatedGetenv(credentials.EnvEmbedAPIKey),
+		credentials.EnvOpenAIKey:   cfg.GatedGetenv(credentials.EnvOpenAIKey),
+		credentials.EnvHFToken:     cfg.GatedGetenv(credentials.EnvHFToken),
+		credentials.EnvGeminiKey:   cfg.GatedGetenv(credentials.EnvGeminiKey),
+		credentials.EnvGoogleKey:   cfg.GatedGetenv(credentials.EnvGoogleKey),
 	}
 }
 
@@ -363,8 +433,13 @@ func parseDimensions(s string) (int, bool) {
 func New(cfg Config) (Provider, error) {
 	switch cfg.Provider {
 	case "":
+		if cfg.AcceptEnvVars {
+			return nil, clierr.NewUsageError(
+				"missing embed provider: set --embed-provider, NEO4J_EMBED_PROVIDER, a .env file, or pick a stored embed credential")
+		}
 		return nil, clierr.NewUsageError(
-			"missing embed provider: set --embed-provider, NEO4J_EMBED_PROVIDER, or pick a stored embed credential")
+			"missing embed provider: set --embed-provider, a .env file, or pick a stored embed credential " +
+				"(or enable accept-env-vars to read NEO4J_EMBED_PROVIDER)")
 	case ProviderOpenAI:
 		return newOpenAIProvider(cfg), nil
 	case ProviderOllama:

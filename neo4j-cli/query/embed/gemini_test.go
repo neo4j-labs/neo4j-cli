@@ -146,9 +146,10 @@ func TestGemini_Embed_MissingKeyReturnsAuthError(t *testing.T) {
 	defer srv.Close()
 
 	p := newGeminiProvider(Config{
-		Provider: ProviderGemini,
-		Model:    "gemini-embedding-001",
-		BaseURL:  srv.URL,
+		Provider:      ProviderGemini,
+		Model:         "gemini-embedding-001",
+		BaseURL:       srv.URL,
+		AcceptEnvVars: true,
 	})
 	got, err := p.Embed(context.Background(), "hello")
 	require.Error(t, err)
@@ -163,6 +164,22 @@ func TestGemini_Embed_MissingKeyReturnsAuthError(t *testing.T) {
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 4, ce.Code)
 	assert.Contains(t, ce.Suggestion, "neo4j-cli credential embed add", "auth error signposts the credential-store command")
+}
+
+// TestGemini_Embed_MissingKeyMessageGateAware verifies the gemini provider
+// backstop obeys REQ-F-023: off-mode references a .env file / stored credential
+// and does NOT advertise the OS key env vars as a direct fix.
+func TestGemini_Embed_MissingKeyMessageGateAware(t *testing.T) {
+	p := newGeminiProvider(Config{Provider: ProviderGemini, AcceptEnvVars: false})
+	_, err := p.Embed(context.Background(), "hello")
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "missing API key for gemini")
+	assert.Contains(t, msg, ".env")
+	assert.Contains(t, msg, "enable accept-env-vars")
+	assert.NotContains(t, msg, "set GEMINI_API_KEY",
+		"off-mode message must not advertise GEMINI_API_KEY as a direct fix")
+	assert.NotContains(t, msg, "set GOOGLE_API_KEY")
 }
 
 func TestGemini_Embed_Non2xxWrapsStatusNoKeyLeak(t *testing.T) {

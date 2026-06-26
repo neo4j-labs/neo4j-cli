@@ -16,8 +16,27 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/test/utils/testfs"
+)
+
+// envAcceptEnvVars is the env var bound to the accept-env-vars config key.
+// Tests that exercise the env-var path set it to "1".
+const envAcceptEnvVars = "NEO4J_CLI_ACCEPT_ENV_VARS"
+
+// Embed env-var name aliases for the tests. The literals are single-sourced in
+// the credentials package; these short local names keep the table tests terse.
+const (
+	envEmbedProvider   = credentials.EnvEmbedProvider
+	envEmbedModel      = credentials.EnvEmbedModel
+	envEmbedBaseURL    = credentials.EnvEmbedBaseURL
+	envEmbedDimensions = credentials.EnvEmbedDimensions
+	envEmbedAPIKey     = credentials.EnvEmbedAPIKey
+	envOpenAIKey       = credentials.EnvOpenAIKey
+	envHFToken         = credentials.EnvHFToken
+	envGeminiKey       = credentials.EnvGeminiKey
+	envGoogleKey       = credentials.EnvGoogleKey
 )
 
 // newTestCmd builds a cobra.Command carrying the same persistent flag set the
@@ -52,6 +71,7 @@ func newTestCfg(t *testing.T, credsJSON string) *clicfg.Config {
 // known-empty baseline regardless of the developer machine's shell.
 func clearEmbedEnv(t *testing.T) {
 	t.Helper()
+	t.Setenv(envAcceptEnvVars, "")
 	t.Setenv(envEmbedProvider, "")
 	t.Setenv(envEmbedModel, "")
 	t.Setenv(envEmbedBaseURL, "")
@@ -96,6 +116,7 @@ func TestResolve_StoredCredOnly(t *testing.T) {
 
 func TestResolve_FlagsBeatEnvBeatsDotenvBeatsStored(t *testing.T) {
 	clearEmbedEnv(t)
+	t.Setenv(envAcceptEnvVars, "1")
 
 	creds := `{"embed":{"default-credential":"d","credentials":[` +
 		`{"name":"d","provider":"openai","model":"stored-model",` +
@@ -355,10 +376,14 @@ func TestResolveAPIKey_OpenAIPrecedence(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			clearEmbedEnv(t)
+			// OS env reads in resolveAPIKey are gated; enable so the table's
+			// osEnv entries are honoured.
+			t.Setenv(envAcceptEnvVars, "1")
+			cfg := newTestCfg(t, "{}")
 			for k, v := range tc.osEnv {
 				t.Setenv(k, v)
 			}
-			got := resolveAPIKey(tc.provider, tc.stored, tc.dotenv)
+			got := resolveAPIKey(cfg, tc.provider, tc.stored, tc.dotenv)
 			assert.Equal(t, tc.want, got)
 		})
 	}
@@ -409,6 +434,36 @@ func TestNew_EmptyProviderUsageError(t *testing.T) {
 	assert.Contains(t, err.Error(), "--embed-provider")
 }
 
+// TestNew_EmptyProviderMessageIsGateAware verifies the missing-provider usage
+// error is gate-aware (REQ-F-017): with accept-env-vars off it must NOT
+// advertise NEO4J_EMBED_PROVIDER as an effective fix (only as something to
+// enable), and with it on it MAY name the variable directly.
+func TestNew_EmptyProviderMessageIsGateAware(t *testing.T) {
+	t.Run("off mode does not advertise the gated env var as a fix", func(t *testing.T) {
+		_, err := New(Config{AcceptEnvVars: false})
+		require.Error(t, err)
+		msg := err.Error()
+		assert.Contains(t, msg, "missing embed provider")
+		assert.Contains(t, msg, "--embed-provider")
+		assert.Contains(t, msg, ".env")
+		assert.Contains(t, msg, "stored embed credential")
+		assert.Contains(t, msg, "enable accept-env-vars")
+		// The var name may appear, but only behind "enable accept-env-vars".
+		assert.NotContains(t, msg, "set --embed-provider, NEO4J_EMBED_PROVIDER",
+			"off-mode message must not advertise NEO4J_EMBED_PROVIDER as a direct fix")
+	})
+
+	t.Run("on mode may name the env var directly", func(t *testing.T) {
+		_, err := New(Config{AcceptEnvVars: true})
+		require.Error(t, err)
+		msg := err.Error()
+		assert.Contains(t, msg, "missing embed provider")
+		assert.Contains(t, msg, "--embed-provider")
+		assert.Contains(t, msg, "NEO4J_EMBED_PROVIDER")
+		assert.NotContains(t, msg, "enable accept-env-vars")
+	})
+}
+
 func TestNew_InvalidProvider(t *testing.T) {
 	_, err := New(Config{Provider: "bogus"})
 	require.Error(t, err)
@@ -435,6 +490,203 @@ func TestResolve_StoredCred_CopiesVertexFields(t *testing.T) {
 	assert.Equal(t, "vertex", got.Provider)
 	assert.Equal(t, "my-project", got.VertexProject)
 	assert.Equal(t, "us-central1", got.VertexLocation)
+}
+
+// TestResolve_EnvGate_OffIgnoresEnvVars verifies that with accept-env-vars off
+// the embed env vars are ignored and the stored credential is used.
+func TestResolve_EnvGate_OffIgnoresEnvVars(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+
+	t.Setenv(envEmbedProvider, "huggingface")
+	t.Setenv(envEmbedModel, "env-model")
+	t.Setenv(envEmbedAPIKey, "env-key")
+
+	creds := `{"embed":{"default-credential":"d","credentials":[` +
+		`{"name":"d","provider":"openai","model":"stored-model",` +
+		`"base-url":"https://stored.example/v1","dimensions":256,"api-key":"stored-key"}` +
+		`]}}`
+	cfg := newTestCfg(t, creds)
+	cmd := newTestCmd(t)
+
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "openai", got.Provider, "env provider must be ignored when gate off")
+	assert.Equal(t, "stored-model", got.Model)
+	assert.Equal(t, "stored-key", got.APIKey, "env key must be ignored when gate off")
+}
+
+// TestResolve_EnvGate_OnUsesEnvKey verifies that with accept-env-vars on the
+// NEO4J_EMBED_API_KEY overrides the stored credential's key.
+func TestResolve_EnvGate_OnUsesEnvKey(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(envEmbedAPIKey, "env-key")
+
+	creds := `{"embed":{"default-credential":"d","credentials":[` +
+		`{"name":"d","provider":"openai","model":"stored-model",` +
+		`"base-url":"https://stored.example/v1","dimensions":256,"api-key":"stored-key"}` +
+		`]}}`
+	cfg := newTestCfg(t, creds)
+	cmd := newTestCmd(t)
+
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "env-key", got.APIKey, "env key must override stored when gate on")
+	assert.Equal(t, "openai", got.Provider)
+}
+
+// TestResolve_EnvGate_OnMissingKeyErrors verifies that with accept-env-vars on
+// and NEO4J_EMBED_PROVIDER=openai but no key var, a usage error is returned.
+func TestResolve_EnvGate_OnMissingKeyErrors(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(envEmbedProvider, "openai")
+
+	cfg := newTestCfg(t, "{}")
+	cmd := newTestCmd(t)
+
+	_, err := Resolve(cmd, cfg)
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "missing API key for openai")
+	assert.Contains(t, msg, "OPENAI_API_KEY", "on-mode message may name the env vars")
+}
+
+// TestResolve_EnvGate_OffProviderViaFlagMissingKey is the REQ-F-023 off-mode
+// case: provider supplied via the never-gated --embed-provider flag while the
+// only keys live in (gated) OS env. The centralized check fires and the message
+// must reference a .env file / stored credential, not advertise the OS env var.
+func TestResolve_EnvGate_OffProviderViaFlagMissingKey(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(envEmbedAPIKey, "ignored-os-key")
+	t.Setenv(envOpenAIKey, "ignored-os-key")
+
+	cfg := newTestCfg(t, "{}")
+	cmd := newTestCmd(t, "--embed-provider=openai")
+
+	_, err := Resolve(cmd, cfg)
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "missing API key for openai")
+	assert.Contains(t, msg, ".env")
+	assert.Contains(t, msg, "credential embed add")
+	assert.Contains(t, msg, "enable accept-env-vars")
+	assert.NotContains(t, msg, "set OPENAI_API_KEY",
+		"off-mode message must not advertise the OS env var as a direct fix")
+}
+
+// TestResolve_EnvGate_OffProviderViaFlagKeyFromDotenv confirms dotenv is never
+// gated: provider via flag, gate off, key from .env resolves cleanly.
+func TestResolve_EnvGate_OffProviderViaFlagKeyFromDotenv(t *testing.T) {
+	clearEmbedEnv(t)
+
+	cfg := newTestCfg(t, "{}")
+	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_API_KEY=dotenv-key\n")
+
+	cmd := newTestCmd(t, "--embed-provider=openai")
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "openai", got.Provider)
+	assert.Equal(t, "dotenv-key", got.APIKey, "key from .env must satisfy the check even off-mode")
+}
+
+// TestResolve_EnvGate_OnProviderFromEnvKeyFromDotenv is the bug case from the
+// review: provider arrives via NEO4J_EMBED_PROVIDER while the key arrives via
+// the .env walk-up. The resolved Config has a key, so it must resolve cleanly.
+func TestResolve_EnvGate_OnProviderFromEnvKeyFromDotenv(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(envEmbedProvider, "openai")
+
+	cfg := newTestCfg(t, "{}")
+	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_API_KEY=dotenv-key\n")
+
+	cmd := newTestCmd(t)
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "openai", got.Provider)
+	assert.Equal(t, "dotenv-key", got.APIKey, "key from .env must satisfy the env-mode check")
+}
+
+// TestResolve_EnvGate_OnProviderFromEnvKeyFromStored covers the other resolved
+// source: provider via env, key from the stored embed credential.
+func TestResolve_EnvGate_OnProviderFromEnvKeyFromStored(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(envEmbedProvider, "openai")
+
+	creds := `{"embed":{"default-credential":"d","credentials":[` +
+		`{"name":"d","provider":"openai","model":"stored-model",` +
+		`"base-url":"https://stored.example/v1","dimensions":256,"api-key":"stored-key"}` +
+		`]}}`
+	cfg := newTestCfg(t, creds)
+	cmd := newTestCmd(t)
+
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "openai", got.Provider)
+	assert.Equal(t, "stored-key", got.APIKey, "key from stored cred must satisfy the env-mode check")
+}
+
+// TestResolve_EnvGate_OnNoKeyProvidersExempt verifies Ollama and Vertex never
+// require a key even in env-var mode with no key from any source.
+func TestResolve_EnvGate_OnNoKeyProvidersExempt(t *testing.T) {
+	for _, provider := range []string{"ollama", "vertex"} {
+		t.Run(provider, func(t *testing.T) {
+			clearEmbedEnv(t)
+			t.Chdir(t.TempDir())
+			t.Setenv(envAcceptEnvVars, "1")
+			t.Setenv(envEmbedProvider, provider)
+
+			cfg := newTestCfg(t, "{}")
+			cmd := newTestCmd(t)
+
+			got, err := Resolve(cmd, cfg)
+			require.NoError(t, err)
+			assert.Equal(t, provider, got.Provider)
+			assert.Empty(t, got.APIKey)
+		})
+	}
+}
+
+// TestResolve_EnvGate_OffDotenvUnaffected verifies the .env walk-up still
+// overlays values even when accept-env-vars is off.
+func TestResolve_EnvGate_OffDotenvUnaffected(t *testing.T) {
+	clearEmbedEnv(t)
+
+	creds := `{"embed":{"default-credential":"d","credentials":[` +
+		`{"name":"d","provider":"openai","model":"stored-model",` +
+		`"base-url":"https://stored.example/v1","dimensions":100,"api-key":"stored-key"}` +
+		`]}}`
+	cfg := newTestCfg(t, creds)
+	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_MODEL=dotenv-model\nNEO4J_EMBED_API_KEY=dotenv-key\n")
+
+	cmd := newTestCmd(t)
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "dotenv-model", got.Model, ".env must overlay regardless of gate")
+	assert.Equal(t, "dotenv-key", got.APIKey, ".env key must overlay regardless of gate")
+}
+
+// TestResolve_EnvGate_FlagBeatsEnv verifies an explicit flag still wins over an
+// env var when the gate is on.
+func TestResolve_EnvGate_FlagBeatsEnv(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+	t.Setenv(envAcceptEnvVars, "1")
+	t.Setenv(envEmbedModel, "env-model")
+
+	cfg := newTestCfg(t, "{}")
+	cmd := newTestCmd(t, "--embed-model=flag-model")
+
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "flag-model", got.Model, "explicit flag must beat env var")
 }
 
 func TestProviderFactorySeam(t *testing.T) {

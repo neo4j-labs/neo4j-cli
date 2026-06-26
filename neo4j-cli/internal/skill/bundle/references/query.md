@@ -7,7 +7,7 @@
 
 Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol
 
-Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Multiple statements may be passed in a single string: they are split on a `;` at the end of a line (a mid-line `;` is kept verbatim; the terminating `;` is stripped). By default each statement runs in its own transaction, in order, failing fast on the first error; pass `--atomic` to run them all in one transaction that rolls back if any statement fails, or `--continue-on-error` (non-atomic only) to report each failure and keep going, exiting non-zero at the end. Multiple result sets render as a JSON array with `--format json` or as stacked blocks with `--format table`/`toon`. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
+Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Multiple statements may be passed in a single string: they are split on a `;` at the end of a line (a mid-line `;` is kept verbatim; the terminating `;` is stripped). By default each statement runs in its own transaction, in order, failing fast on the first error; pass `--atomic` to run them all in one transaction that rolls back if any statement fails, or `--continue-on-error` (non-atomic only) to report each failure and keep going, exiting non-zero at the end. Multiple result sets render as a JSON array with `--format json` or as stacked blocks with `--format table`/`toon`. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked. Environment variables: the connection vars NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE and the embedding vars NEO4J_EMBED_PROVIDER, NEO4J_EMBED_MODEL, NEO4J_EMBED_BASE_URL, NEO4J_EMBED_DIMENSIONS, NEO4J_EMBED_API_KEY (and provider keys OPENAI_API_KEY, HF_TOKEN, GEMINI_API_KEY, GOOGLE_API_KEY) are read ONLY when accept-env-vars is enabled - run `neo4j-cli config set accept-env-vars true --rw` or set NEO4J_CLI_ACCEPT_ENV_VARS=1. Explicit flags and `.env` files are never gated. See the README "Environment variables" section for details.
 
 Usage: `neo4j-cli query [cypher]`
 
@@ -17,22 +17,22 @@ Flags:
 |------|------|---------|-------------|
 | `--atomic` | bool | false | Run all statements in a single transaction; roll back on any failure (default: each statement in its own transaction, fail-fast) |
 | `--continue-on-error` | bool | false | Keep running after a statement fails: report each failure and execute the rest, then exit non-zero (non-atomic only; mutually exclusive with --atomic) |
-| `-c, --credential` | string | - | Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list'). Combine with --database/NEO4J_DATABASE to target a specific database |
-| `-d, --database` | string | - | Target database name; defaults to the connecting user's home database when unset - typically "neo4j", but can vary by deployment (e.g. the instance DBID on Aura Free). Also applies with --credential, overriding the credential-supplied database [env: NEO4J_DATABASE] |
+| `-c, --credential` | string | - | Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list'). Combine with --database to target a specific database |
+| `-d, --database` | string | - | Target database name; defaults to the connecting user's home database when unset - typically "neo4j", but can vary by deployment (e.g. the instance DBID on Aura Free). Also applies with --credential, overriding the credential-supplied database |
 | `--debug` | bool | false | Route Neo4j driver activity (connection, auth, routing, retries) to stderr at DEBUG level; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
-| `--embed-base-url` | string | - | Embedding provider base URL [env: NEO4J_EMBED_BASE_URL] |
+| `--embed-base-url` | string | - | Embedding provider base URL |
 | `--embed-credential` | string | - | Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list') |
-| `--embed-dimensions` | int | 0 | Embedding output dimensions (provider-dependent; ignored by Ollama) [env: NEO4J_EMBED_DIMENSIONS] |
-| `--embed-model` | string | - | Embedding model name [env: NEO4J_EMBED_MODEL] |
-| `--embed-provider` | string | - | Embedding provider: openai \| ollama \| huggingface \| gemini \| vertex [env: NEO4J_EMBED_PROVIDER] |
+| `--embed-dimensions` | int | 0 | Embedding output dimensions (provider-dependent; ignored by Ollama) |
+| `--embed-model` | string | - | Embedding model name |
+| `--embed-provider` | string | - | Embedding provider: openai \| ollama \| huggingface \| gemini \| vertex |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
 | `--format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
 | `--max-rows` | int | 100 | Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON |
 | `--param` | stringArray | [] | Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string. Use `key:embed=<text>` to embed text via the configured provider and bind the resulting vector to $key (see `query :embed`). |
-| `-p, --password` | string | - | Neo4j password [env: NEO4J_PASSWORD]; prompted on TTY if unset |
+| `-p, --password` | string | - | Neo4j password; prompted on TTY if unset |
 | `--truncate-arrays-over` | int | 100 | Recursively truncate any array longer than N inside row values (0 = off); rendered as ["<truncated: K items>"] |
-| `--uri` | string | - | Neo4j Bolt URI [env: NEO4J_URI]. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default "neo4j://localhost:7687") |
-| `-u, --username` | string | - | Neo4j username [env: NEO4J_USERNAME] (default "neo4j") |
+| `--uri` | string | - | Neo4j Bolt URI. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default "neo4j://localhost:7687") |
+| `-u, --username` | string | - | Neo4j username (default "neo4j") |
 
 Examples:
 

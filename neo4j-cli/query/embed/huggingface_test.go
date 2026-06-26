@@ -140,9 +140,10 @@ func TestHuggingFace_Embed_MissingKeyReturnsAuthError(t *testing.T) {
 	defer srv.Close()
 
 	p := newHuggingFaceProvider(Config{
-		Provider: ProviderHuggingFace,
-		Model:    "m",
-		BaseURL:  srv.URL,
+		Provider:      ProviderHuggingFace,
+		Model:         "m",
+		BaseURL:       srv.URL,
+		AcceptEnvVars: true,
 		// No APIKey.
 	})
 	got, err := p.Embed(context.Background(), "hello")
@@ -155,6 +156,21 @@ func TestHuggingFace_Embed_MissingKeyReturnsAuthError(t *testing.T) {
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 4, ce.Code)
 	assert.Contains(t, ce.Suggestion, "neo4j-cli credential embed add", "auth error signposts the credential-store command")
+}
+
+// TestHuggingFace_Embed_MissingKeyMessageGateAware verifies the huggingface
+// provider backstop obeys REQ-F-023: off-mode references a .env file / stored
+// credential and does NOT advertise HF_TOKEN as a direct fix.
+func TestHuggingFace_Embed_MissingKeyMessageGateAware(t *testing.T) {
+	p := newHuggingFaceProvider(Config{Provider: ProviderHuggingFace, AcceptEnvVars: false})
+	_, err := p.Embed(context.Background(), "hello")
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "missing API key for huggingface")
+	assert.Contains(t, msg, ".env")
+	assert.Contains(t, msg, "enable accept-env-vars")
+	assert.NotContains(t, msg, "set HF_TOKEN",
+		"off-mode message must not advertise HF_TOKEN as a direct fix")
 }
 
 func TestHuggingFace_Embed_Non2xxWrapsStatusNoAuthLeak(t *testing.T) {

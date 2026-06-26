@@ -60,6 +60,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	tmp := t.TempDir()
 	t.Chdir(tmp)
 
+	t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 	t.Setenv(dbconn.EnvURI, "neo4j://from-env:7687")
 	t.Setenv(dbconn.EnvUsername, "fromenv")
 	t.Setenv(dbconn.EnvPassword, "envpw")
@@ -110,12 +111,13 @@ func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
-		[]byte("NEO4J_USERNAME=onlydotenv\nNEO4J_PASSWORD=onlydotenvpw\n"), 0644))
+		[]byte("NEO4J_URI=neo4j://onlydotenv:7687\nNEO4J_USERNAME=onlydotenv\nNEO4J_PASSWORD=onlydotenvpw\n"), 0644))
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 
 	c, err := resolveConn(cmd, cfg)
 	require.NoError(t, err)
+	assert.Equal(t, "neo4j://onlydotenv:7687", c.URI)
 	assert.Equal(t, "onlydotenv", c.Username)
 	assert.Equal(t, "onlydotenvpw", c.Password)
 }
@@ -360,10 +362,15 @@ func TestResolveConn_StoredCredential_PartialOverrideErrors(t *testing.T) {
 
 	_, err := resolveConn(cmd, cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--uri/NEO4J_URI")
-	assert.Contains(t, err.Error(), "--username/NEO4J_USERNAME")
-	assert.Contains(t, err.Error(), "--password/NEO4J_PASSWORD")
-	assert.Contains(t, err.Error(), "--database/NEO4J_DATABASE")
+	assert.Contains(t, err.Error(), "partial connection params")
+	assert.Contains(t, err.Error(), "--uri")
+	assert.Contains(t, err.Error(), "--username")
+	assert.Contains(t, err.Error(), "--password")
+	// database is optional (REQ-F-014): a complete override is the three required
+	// params, so the partial-override error must not mention the database param.
+	assert.NotContains(t, err.Error(), "--database")
+	// Off-mode must not advertise the gated env vars (REQ-F-018).
+	assert.NotContains(t, err.Error(), "NEO4J_")
 }
 
 func TestResolveConn_NoStoredCredential_FallsBackToDefaults(t *testing.T) {
@@ -551,6 +558,7 @@ func TestResolveConn_CredentialFlag_DatabaseOverridePrecedence(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 			t.Setenv(dbconn.EnvURI, "")
 			t.Setenv(dbconn.EnvUsername, "")
 			t.Setenv(dbconn.EnvPassword, "")

@@ -159,6 +159,12 @@ type AuraCredential struct {
 	ClientSecret string `json:"client-secret"`
 	AccessToken  string `json:"access-token"`
 	TokenExpiry  int64  `json:"token-expiry"`
+
+	// Ephemeral marks a credential synthesized in-memory from env vars
+	// (accept-env-vars mode). It is never stored, so it is excluded from
+	// serialization; getToken keys the on-disk JWT cache on this flag instead
+	// of inferring env-ness from a store-miss.
+	Ephemeral bool `json:"-"`
 }
 
 // deleteFromKeyring removes all keyring entries for this Aura credential.

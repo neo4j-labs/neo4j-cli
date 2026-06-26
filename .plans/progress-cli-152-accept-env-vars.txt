@@ -1,0 +1,147 @@
+## TASK-001 — 2026-06-25T00:00:00Z
+Added `accept-env-vars` global config key: ValidConfigKeys entry, Viper.BindEnv("NEO4J_CLI_ACCEPT_ENV_VARS"), AcceptEnvVars()/AcceptEnvVarsIsSet() accessors mirroring CredentialStorage, true/false validation in Set().
+Files: +1 new (accept_env_vars_test.go), ~3 mod (clicfg.go, config/list_test.go, aura standalone_config_test.go)
+Decisions: Updated two golden config-list tests (key sorts alphabetically first in JSON output); no skill-bundle drift (bundle doesn't enumerate config keys).
+
+## TASK-002 — 2026-06-25T11:06:39Z
+Added common/clicfg/credentials/env_spec.go: EnvCredentialSpec type, Aura/DBMS/Embed specs, HasAnyCredentialEnvVar, ValidateEnvCredentialSet (RequiredGroups completeness -> clierr usage error), ValidateEmbedEnvSet (provider-specific API-key check; ollama+vertex exempt). Env var name constants single-sourced here. getenv is a func param for testability. Helpers are unwired (consumed by tasks 003-009).
+Files: +2 new (env_spec.go, env_spec_test.go)
+Decisions: Vertex exempted from API-key check alongside Ollama (it authenticates via ADC, not the key vars); provider/env-var string constants intentionally duplicated from query/embed since common/ cannot import that package.
+
+## TASK-003 — 2026-06-25T11:14:05Z
+Gated the DBMS connection env reads in dbconn.ResolveConn behind cfg.Global.AcceptEnvVars() via a gatedGetenv helper: the os.Getenv halves of the uri/username/password/database Overlays and os.Getenv(EnvDatabase) in applyDBOverride (CLI-212 path, REQ-F-013). Dotenv walk-up and explicit flags remain ungated; explicitCount switch unchanged. Covers query+admin+desktop via the single chokepoint.
+Files: ~6 mod (conn.go, conn_test.go, admin_conn_test.go, connect_test.go, desktop_test.go, run_test.go)
+Decisions: applyDBOverride gained a *clicfg.Config param (all 3 call sites updated). Existing env-dependent tests across query/admin opt into the gate with t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS","1"); cross-package test files use the raw literal since the dbconn-test const is unreachable from them.
+
+## TASK-004 — 2026-06-25T11:21:11Z
+Enforced DBMS env-set completeness in dbconn.ResolveConn when accept-env-vars is on: a partial DBMS set fails naming the missing NEO4J_* vars (REQ-F-010), covering query and admin via the shared resolution chokepoint.
+Files: ~3 mod (conn.go, conn_test.go, admin_conn_test.go)
+Decisions: Validate against resolved uri/username/password (post flag+dotenv overlay) rather than raw os.Getenv so a piece supplied by a flag/dotenv counts as present; updated the admin password-from-env test to supply a complete env set per the new contract.
+
+## TASK-005 — 2026-06-25T12:03:49Z
+Verified the admin tree inherits the gated DBMS env behaviour with NO production code change (admin resolves solely via dbconn.ResolveConn(cmd,cfg,true); grep confirms no direct os.Getenv/NEO4J_* reads in any admin leaf, REQ-NF-006). Added four admin-level parity tests driving the full tree via NewCmd().Execute() with `user list`: env honoured only when gate on, ignored when off (stored default cred used), NEO4J_DATABASE never consulted (both gate states), partial DBMS env set surfaces the same missing-var error as query.
+Files: ~2 mod (admin_conn_test.go, helpers_test.go)
+Decisions: Extended fakeQueryRunner to capture lastConn (the existing adminRunnerFn seam) so end-to-end tests can assert the resolved Conn. The CLI-212/explicitCount note is informational, not a defect for admin — when the gate is off env vars contribute nothing to explicitCount so a stored credential is used cleanly. The skipDatabase partial-params branch in ResolveConn is unreachable via env vars when the gate is on (the env-spec completeness check intercepts first), so admin env-parity rejection always surfaces via the env-spec error.
+
+## TASK-006 — 2026-06-25T12:09:54Z
+Gated all embed OS env reads (NEO4J_EMBED_* + provider API keys) behind cfg.Global.AcceptEnvVars() via a local gatedGetenv helper mirroring dbconn; the .env walk-up stays ungated. In env-var mode Resolve now calls credentials.ValidateEmbedEnvSet so a provider needing a key with none set is a usage error.
+Files: ~2 (embed.go, embed_test.go)
+
+## TASK-007 — 2026-06-25T12:20:12Z
+Aura root PersistentPreRunE now synthesizes an ephemeral in-memory AuraCredential ("env") from NEO4J_AURA_CLIENT_ID/SECRET when accept-env-vars is on (validated via ValidateEnvCredentialSet); explicit --credential still wins since its subcommand hook runs after the root hook under EnableTraverseRunHooks.
+Files: +1 new (aura/env_credential_test.go), ~3 mod (aura.go, api/token.go, api/api_test.go, testfs.go)
+Decisions: getToken must skip cfg.Credentials.Aura.UpdateAccessToken when the active credential isn't in the store — otherwise its Get(name) lookup panics for the env-synthesized "env" credential (review-caught). Token stays in-process only; the persistent JWT cache is task-008. Added testfs.GetTestCredentials to assert credentials.json byte-stability.
+
+## TASK-008 — 2026-06-25T12:28:39Z
+Added an identity-bound on-disk Aura JWT token cache (os.TempDir/neo4j-cli-aura-token-<short>.json, 0600) consulted only for env-var-synthesized credentials; getToken refactored to extract a mintToken seam and gate disk caching on (!inStore && AcceptEnvVars). Cache stores token+expiry+full sha256(id|secret|authURL) hash — never the raw secret — with a 60s expiry buffer.
+Files: +neo4j-cli/aura/internal/api/token_cache.go, +token_cache_test.go; ~token.go, ~export_test.go
+Decisions: env-mode = credential not in store AND accept-env-vars true (stored keyring/insecure creds keep store-level token persistence and never touch the disk cache). cacheDirFn/mintToken/cache-path test seams in export_test.go.
+
+## TASK-009 — 2026-06-25T12:33:16Z
+Added maybeEmitEnvVarHint in app.go root PersistentPreRunE: emits the one-time stderr discovery hint (REQ-F-007 exact text) when AcceptEnvVarsIsSet() is false AND credentials.HasAnyCredentialEnvVar(os.Getenv) is true; once-per-process is structural (root hook runs once per invocation, mirroring initCredentialStorageDefault). Writer seam (io.Writer) for testability.
+Files: +1 new (env_var_hint_test.go), ~1 mod (app.go)
+
+## TASK-010 — 2026-06-25T12:38:06Z
+Documented the accept-env-vars feature: a Minor changie entry describing the new config key, NEO4J_CLI_ACCEPT_ENV_VARS bootstrap, and the DBMS/embed + CLI-212 breaking changes; a new README "Environment variables" section with the per-type env-var table, precedence, admin coverage, and partial-set/hint notes, plus cross-link notes in the DBMS and embed precedence paragraphs.
+Files: +1 new (.changes/unreleased/neo4j-cli-Minor-20260625-133535.yaml), ~1 mod (README.md)
+Decisions: README does not feed the skill bundle/additions, so no go-generate regeneration needed; changie auto-named the file.
+
+## TASK-011 — 2026-06-25T12:41:53Z
+Convergence: ran go generate ./neo4j-cli/internal/skill/... (and full ./...) — zero bundle drift; the config key change never reached the bundle. All gates pass (make test, fmt-check, lint=0 issues, license-check, generate-check on clean tree). Credential byte-stability already covered by TestMakeRequest_EnvCredentialNotPersisted (task-007); no new test needed.
+Files: ~1 mod (tasks/progress YAML only)
+Decisions: keyring untouched by construction (UpdateAccessToken guarded by !inStore) so no extra keyring assertion added.
+
+## REVIEW — 2026-06-25T12:56:14Z
+Added 3 review tasks (task-012..task-014).
+
+## TASK-012 — 2026-06-25T13:02:16Z
+Replaced the embed env-mode key check with one that validates the RESOLVED Config (out.Provider set + providerNeedsKey + out.APIKey=="") instead of re-reading os.Getenv, so a key from .env or a stored credential now satisfies it (fixes the bug + matches the dbconn.ResolveConn shape). Moved the provider-needs-a-key policy into embed (new providerNeedsKey, Ollama/Vertex exempt) and removed credentials.ValidateEmbedEnvSet + the embedProviderOllama/Vertex constants.
+Files: ~4 mod (embed.go, embed_test.go, env_spec.go, env_spec_test.go)
+Decisions: providerNeedsKey lowercases (preserving old ValidateEmbedEnvSet leniency); error text changed to "missing embed API key".
+
+## TASK-013 — 2026-06-25T13:11:08Z
+Consolidated the duplicated gatedGetenv helper into one shared (*clicfg.Config).GatedGetenv and single-sourced the credential env-var name constants in common/clicfg/credentials/env_spec.go; dbconn, embed, and credential/dbms/add.go now reference credentials.Env* and call cfg.GatedGetenv.
+Files: +0 new, ~5 mod (clicfg.go, dbconn/conn.go, embed/embed.go, credential/dbms/add.go, accept_env_vars_test.go + embed_test.go alias block), -0 del
+Decisions: The shared helper landed on *clicfg.Config (not credentials) because clicfg imports credentials in production — a credentials-hosted helper depending on *clicfg.Config would cycle. The method is nil-safe on receiver and c.Global (preserves+hardens embed's cfg==nil guard). dbconn's exported EnvURI/etc. and embed_test's lowercase env consts are kept as aliases of credentials.Env* (literal lives only in credentials) to avoid churning ~130 test references.
+
+## TASK-014 — 2026-06-25T13:16:55Z
+Made the env-mode check direct: added an Ephemeral bool `json:"-"` marker to credentials.AuraCredential, set true at the single synthesis site (aura.go applyEnvCredential), and getToken now computes envMode := credential.Ephemeral && AcceptEnvVars() instead of inferring it from a !inStore store-miss.
+Files: +0 new, ~4 mod (token.go, aura.go, credentials/aura.go, token_cache_test.go), -0 del
+Decisions: Chose an explicit ephemeral marker over a sentinel-name ("env") check — the name route would false-positive on a real stored credential literally named "env", whereas the marker is unambiguous and only ever set at synthesis. json:"-" keeps it out of credentials.json (no byte drift). The persistence branch now inlines the same Get(name) lookup (pure read, no side effects) to decide UpdateAccessToken, preserving the prior no-panic/no-persist behavior exactly. The token_cache_test.go envCfg helper gained Ephemeral:true to stay a faithful mirror of production synthesis (not a behavior-masking change; reviewer confirmed). All existing token-cache tests pass unchanged.
+
+## REVIEW — 2026-06-25T15:52:38Z
+Added 1 review task (task-015) from CI security-review finding.
+
+## TASK-015 — 2026-06-25T15:55:43Z
+Length-prefixed each tokenCacheHash component (clientID/clientSecret/authURL) so the "|" separator can't be forged from within a component, eliminating the cache-identity collision that caused wrong cache hits / 401s. Both the filename short-hash and in-file full-hash benefit (shared construction). Added a focused collision test plus a TokenCacheHashForTest seam.
+Files: +0 new, ~4 mod, -0 del
+
+## TASK-016 — 2026-06-26T10:35:00Z
+Fixed default-path override completeness (REQ-F-014): dbconn.ResolveConn now decides completeness on the three required params (uri/username/password) only; database is always optional (applied when present, never counted), uniformly for flags AND env vars. Partial flag override message dropped the database clause ("all three" now). requiredCount==0+stored-cred keeps a supplied database override (database==""guard); admin skipDatabase path unchanged; applyDBOverride (CLI-212) untouched. README updated to "three required, database optional".
+Files: ~conn.go, ~conn_test.go, ~query/connect_test.go, ~README.md
+Decisions: env-mode partials still surface via ValidateEnvCredentialSet (fires before the switch) naming NEO4J_* vars; the switch's default branch only fires for flag subsets.
+
+## TASK-017 — 2026-06-26T11:05:00Z
+Reworded off-mode password-required errors (REQ-F-015): added shared dbconn.PasswordRequiredMessage(acceptEnv) — off-mode points at --password/.env/accept-env-vars (does not advertise NEO4J_PASSWORD as an effective remedy), on-mode still names the env var. Threaded cfg.Global.AcceptEnvVars() through query promptPassword, dbconn.PromptPassword, and admin's inline message. Discovery hint (REQ-F-007) untouched.
+Files: ~dbconn/helpers.go, ~dbconn/conn.go, ~dbconn/conn_test.go, ~admin/admin.go, ~admin/admin_conn_test.go, ~query/run.go, ~query/schema.go, ~query/run_test.go
+Decisions: Centralised on/off wording in one dbconn helper so all three sites stay consistent; PromptPassword gained an acceptEnv bool param (callers all have cfg in scope). dbms credential add's "--env NEO4J_PASSWORD" message left as-is (refers to the ungated .env file, not a gated OS env var).
+
+## TASK-018 — 2026-06-26T12:00:00Z
+Added `--rw` to the discovery-hint config-set suggestion in app.go maybeEmitEnvVarHint so the suggested command succeeds in non-interactive/agent/CI contexts (where the hint surfaces). Added envVarHintSuggestion const + assertion in env_var_hint_test.go.
+Files: ~app.go, ~env_var_hint_test.go
+Decisions: README already used --rw; no skill-bundle drift (hint is runtime stderr, not generated).
+
+## TASK-019 — 2026-06-26T13:30:00Z
+Normalised config get/list display (REQ-NF-008): GlobalConfig.Get now coerces known boolean keys (telemetry, skill-auto-refresh, history-enabled, tee-enabled, accept-env-vars) via viper.GetBool when set, so accept-env-vars renders unquoted true/false (never "1"/"0"/"true"); nil preserved for unset keys so unset still shows null.
+Files: ~clicfg.go, ~accept_env_vars_test.go
+Decisions: Normalised (preferred over documenting). Resolution unchanged (AcceptEnvVars() reads GetBool directly). booleanGlobalKeys map kept in sync with Set validators by hand — reviewer-noted low/optional dedup left out of scope.
+
+## TASK-020 — 2026-06-26T14:30:00Z
+Documented in README Environment variables section that the one-time discovery hint is triggered only by the sentinel vars (NEO4J_URI / NEO4J_AURA_CLIENT_ID / NEO4J_EMBED_PROVIDER), and that a lone non-sentinel var (e.g. NEO4J_PASSWORD) does not trigger it by design (REQ-NF-009).
+Files: ~README.md
+
+## TASK-021 — 2026-06-26T16:10:00Z
+Made embed New()'s "missing embed provider" usage error gate-aware (REQ-F-017): off-mode points at --embed-provider / .env / stored embed credential and only mentions NEO4J_EMBED_PROVIDER behind "enable accept-env-vars"; on-mode keeps naming the var. Threaded the gate via a new Config.AcceptEnvVars bool set in Resolve from cfg.Global.AcceptEnvVars().
+Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
+Decisions: Chose the Config-field option (set in Resolve) over raising the empty-provider check in Resolve so New(Config) stays self-contained and the existing providerFactory seam is unaffected. Runtime error text, not a Long/Example, so no skill-bundle drift.
+
+## TASK-022 — 2026-06-26T15:45:00Z
+Made the DBMS partial-params error in dbconn.ResolveConn gate-aware: off-mode names only --uri/--username/--password, on-mode keeps the --flag/NEO4J_* dual form (REQ-F-018). Wording-only; completeness logic unchanged.
+Files: ~neo4j-cli/internal/dbconn/conn.go, ~neo4j-cli/internal/dbconn/conn_test.go, ~neo4j-cli/query/connect_test.go
+Decisions: In on-mode the default: partial branch is rarely reached because ValidateEnvCredentialSet (against resolved values) catches any subset of the three required first and names the missing NEO4J_* vars; updated query+admin off-mode partial tests to assert flag-only form.
+
+## TASK-023 — 2026-06-26T16:45:00Z
+Reworked mintTokenHTTP's status switch (single mint chokepoint) so every non-2xx returns a clear error: 401 -> existing invalid/expired/revoked auth error, 403 -> distinct forbidden/not-authorized auth error (no env mention), any other non-2xx -> upstream error naming the status; a 2xx with empty access_token is now an error too (no empty Bearer). Both env-var and stored-credential mints inherit it.
+Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_test.go
+Decisions: Used a default branch with a 200-299 range guard to catch all unlisted non-2xx in one place; 403 maps to NewAuthError (exit 4), other non-2xx + empty-token to NewUpstreamError (exit 8). Removed the prior empty-arm 400/403 cases and the misleading 404 panic that hardcoded a 400 status.
+
+## TASK-024 — 2026-06-26T16:55:00Z
+Guarded writeTokenCache to skip persisting an empty token (returns nil before any file write), keeping the Aura disk token cache correct independent of caller behaviour. Added a test driving an env-mode mint that returns an empty token to assert no cache file is written.
+Files: ~neo4j-cli/aura/internal/api/token_cache.go, ~neo4j-cli/aura/internal/api/token_cache_test.go
+
+## REVIEW — 2026-06-26T17:10:00Z
+Added 1 review task (task-025) from the CI security-review finding (re-enforce 0600 on the Aura token cache file on every write).
+
+## TASK-025 — 2026-06-26T17:30:00Z
+Re-enforced 0600 on the Aura token cache by switching writeTokenCache to an atomic write-then-rename (CreateTemp + explicit Chmod(0600) + Rename), which guarantees the mode on every write regardless of prior file state and closes the partial-write window.
+Files: ~neo4j-cli/aura/internal/api/token_cache.go, ~neo4j-cli/aura/internal/api/token_cache_test.go
+Decisions: explicit tmp.Chmod(0o600) (not relying on CreateTemp's default mode) defends against permissive umask; stayed on raw os.* rather than fileutils/afero (whose OpenFile-based helper is umask-dependent and requires afero).
+
+## TASK-026 — 2026-06-26T18:55:00Z
+Removed the gated [env: NEO4J_*] / (env: NEO4J_*) clauses from the query and admin connection/embed flag usage strings (left --debug's NEO4J_DEBUG clause intact) and added a single gate-aware "Environment variables" paragraph to the query and admin top-level Long descriptions; regenerated the skill bundle.
+Files: ~4 (query.go, admin/admin.go, bundle/references/query.md, bundle/references/admin.md)
+
+## TASK-027 — 2026-06-26T19:45:00Z
+Made the on-mode partial DBMS override message name the source actually used (REQ-F-022): the env-completeness check now fires only when accept-env-vars is on AND the resolved set is incomplete (requiredCount != 3) AND at least one of uri/username/password came from an env/dotenv source — so a purely-flag partial subset falls through to the partial switch (names --flags) while any env-sourced partial still names NEO4J_*. Deleted the unreachable on-mode dual-form partial branch and corrected its comment.
+Files: ~2 mod (neo4j-cli/internal/dbconn/conn.go, neo4j-cli/internal/dbconn/conn_test.go)
+Decisions: Tracked completeness on the resolved requiredCount (not the env-sourced half alone) so the legitimate mixed-complete case (env password + flag uri/username) is not falsely rejected — the prior "env-sourced-half-only" framing broke TestRunQuery_PasswordFromEnvSkipsPrompt; guarding on requiredCount != 3 + an envSourced bool gives the right source-aware message in all cases while preserving REQ-F-010 (no silent fallback) regardless of a stored credential.
+
+## TASK-028 — 2026-06-26T21:35:00Z
+Made the embed missing-API-key error gate-aware (REQ-F-023): dropped the on-mode-only guard in Resolve() so the empty-key check fires in both gate states with gate-aware wording, and routed the three provider Embed() backstop messages + their WithSuggestion text through two shared helpers (missingAPIKeyMessage / missingAPIKeySuggestion) plus a per-provider providerKeyEnvVars table. Off-mode references a .env file / stored embed credential and only names the OS key env vars behind an "enable accept-env-vars to read ..." clause; on-mode names them directly. The .env suggestion appears in both modes.
+Files: ~4 mod (embed.go, openai.go, gemini.go, huggingface.go), ~4 mod tests
+Decisions: helpers live in the embed package (which owns the provider taxonomy); message starts "missing API key for <provider>:" so no <secretword>: prefix trips the redaction regex (verified via reviewer).
+
+## TASK-029 — 2026-06-26T22:15:00Z
+Fixed partial-override source attribution in dbconn.ResolveConn: ungated the env/dotenv completeness check (REQ-F-024) so it fires whenever envSourced && requiredCount != 3 in both gate states (off-mode only sees dotenv pieces since OS env is gated to "" via GatedGetenv), and made attribution source-accurate (REQ-F-025) by deriving "provided" from the pre-flag env half and "missing" from the post-flag resolved values via a new ValidateEnvCredentialSetSourced helper.
+Files: ~3 mod (neo4j-cli/internal/dbconn/conn.go, common/clicfg/credentials/env_spec.go, neo4j-cli/query/connect_test.go), ~2 mod tests (dbconn/conn_test.go, credentials/env_spec_test.go)
+Decisions: ValidateEnvCredentialSet now delegates to ValidateEnvCredentialSetSourced with present==absent==getenv (identical behaviour for the Aura caller); updated query/connect_test.go TestResolveConn_DotenvWinsWhenNoEnvOrFlag to use a complete dotenv set (it previously asserted a 2-of-3 dotenv set resolved cleanly, which REQ-F-024 deliberately changes — adding NEO4J_URI preserves the test's actual intent rather than masking the new behaviour).

@@ -68,6 +68,7 @@ func TestResolveConn_DesktopActive_DatabaseOverride(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 			t.Setenv(dbconn.EnvURI, "")
 			t.Setenv(dbconn.EnvUsername, "")
 			t.Setenv(dbconn.EnvPassword, "")
@@ -286,6 +287,7 @@ func TestResolveConn_DesktopConnection_DatabaseOverride(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 			t.Setenv(dbconn.EnvURI, "")
 			t.Setenv(dbconn.EnvUsername, "")
 			t.Setenv(dbconn.EnvPassword, "")

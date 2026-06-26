@@ -106,7 +106,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		fs:              fs,
 		viper:           Viper,
 		configPath:      fullConfigPath,
-		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage", "history-enabled", "history-limit", "tee-enabled", "tee-limit"},
+		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage", "history-enabled", "history-limit", "tee-enabled", "tee-limit", "accept-env-vars"},
 	}
 
 	// Wire the storage mode only when credential-storage is explicitly set in
@@ -218,8 +218,9 @@ func (d PrintableConfigData) MarshalJSON() ([]byte, error) {
 }
 
 func bindEnvironmentVariables(Viper *viper.Viper) {
-	Viper.BindEnv("aura.base-url", "AURA_BASE_URL") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
-	Viper.BindEnv("aura.auth-url", "AURA_AUTH_URL") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
+	Viper.BindEnv("aura.base-url", "AURA_BASE_URL")               //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
+	Viper.BindEnv("aura.auth-url", "AURA_AUTH_URL")               //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
+	Viper.BindEnv("accept-env-vars", "NEO4J_CLI_ACCEPT_ENV_VARS") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
 
 	// Bind one env var per registered feature flag. Names are derived
 	// purely from the flag name via FlagNameToEnv (e.g. "flag.aura-beta"
@@ -411,7 +412,25 @@ func (config *GlobalConfig) IsValidConfigKey(key string) bool {
 	return slices.Contains(config.ValidConfigKeys, key)
 }
 
+// booleanGlobalKeys are the global config keys whose stored value is logically
+// boolean. config set persists every value as a string and the env bootstrap
+// (e.g. NEO4J_CLI_ACCEPT_ENV_VARS=1) surfaces the raw "1"/"0"/"true" literal, so
+// Get coerces these via GetBool to render unquoted true/false consistently
+// across config get and config list.
+var booleanGlobalKeys = map[string]bool{
+	"telemetry":          true,
+	"skill-auto-refresh": true,
+	"history-enabled":    true,
+	"tee-enabled":        true,
+	"accept-env-vars":    true,
+}
+
 func (config *GlobalConfig) Get(key string) interface{} {
+	// Preserve a nil (null) result for keys with no value set so unset
+	// boolean keys still render as null rather than a defaulted false.
+	if booleanGlobalKeys[key] && config.viper.Get(key) != nil {
+		return config.viper.GetBool(key)
+	}
 	return config.viper.Get(key)
 }
 
@@ -467,6 +486,12 @@ func (config *GlobalConfig) Set(key string, value string) error {
 	if key == "tee-enabled" {
 		if value != "true" && value != "false" {
 			return clierr.NewUsageError("invalid value for 'tee-enabled': %s (valid values: true, false)", value)
+		}
+	}
+
+	if key == "accept-env-vars" {
+		if value != "true" && value != "false" {
+			return clierr.NewUsageError("invalid value for 'accept-env-vars': %s (valid values: true, false)", value)
 		}
 	}
 
@@ -536,6 +561,33 @@ func (config *GlobalConfig) CredentialStorage() string {
 // should write the appropriate default.
 func (config *GlobalConfig) CredentialStorageIsSet() bool {
 	return config.viper.IsSet("credential-storage")
+}
+
+// AcceptEnvVars reports whether reading credentials from well-known environment
+// variables is enabled. Defaults to false; activatable via config or the
+// NEO4J_CLI_ACCEPT_ENV_VARS env var.
+func (config *GlobalConfig) AcceptEnvVars() bool {
+	return config.viper.GetBool("accept-env-vars")
+}
+
+// AcceptEnvVarsIsSet reports whether "accept-env-vars" has been explicitly
+// written to config.json, set in-memory in this process, or supplied via
+// NEO4J_CLI_ACCEPT_ENV_VARS.
+func (config *GlobalConfig) AcceptEnvVarsIsSet() bool {
+	return config.viper.IsSet("accept-env-vars")
+}
+
+// GatedGetenv returns os.Getenv(name) only when accept-env-vars is enabled;
+// otherwise it returns "" so credential env vars are ignored. It is the single
+// gate shared by the DBMS connection and embed resolvers; the dotenv (--env
+// walk-up) mechanism is intentionally NOT routed through it. The receiver and
+// its Global are nil-checked so callers can pass a partially constructed Config
+// (the embed :embed leaf relies on this).
+func (c *Config) GatedGetenv(name string) string {
+	if c == nil || c.Global == nil || !c.Global.AcceptEnvVars() {
+		return ""
+	}
+	return os.Getenv(name)
 }
 
 func (config *GlobalConfig) BindFormat(flag *pflag.Flag) {

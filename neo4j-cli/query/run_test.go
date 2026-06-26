@@ -915,6 +915,7 @@ func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
 	r.install(t)
 
 	h := newRunHarness(t, "json")
+	t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 	t.Setenv(dbconn.EnvPassword, "from-env")
 	t.Setenv(dbconn.EnvURI, "")
 	t.Setenv(dbconn.EnvUsername, "")
@@ -1300,11 +1301,32 @@ func TestPromptPassword_NonTTYReturnsUsageError(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetOut(&bytes.Buffer{})
 
-	_, err := promptPassword(cmd)
+	_, err := promptPassword(cmd, cfg)
 	require.Error(t, err)
+	// accept-env-vars is off (default): the gated env var must NOT be advertised
+	// as an effective remedy; point at --flags / .env / the gate instead.
 	assert.Contains(t, err.Error(), "--password")
-	assert.Contains(t, err.Error(), "NEO4J_PASSWORD")
 	assert.Contains(t, err.Error(), ".env")
+	assert.Contains(t, err.Error(), "accept-env-vars")
+	assert.NotContains(t, err.Error(), "set --password, NEO4J_PASSWORD")
+}
+
+func TestPromptPassword_NonTTY_AcceptEnvVarsOn_NamesEnvVar(t *testing.T) {
+	origTTY := dbconn.StdinIsTTY
+	t.Cleanup(func() { dbconn.StdinIsTTY = origTTY })
+	dbconn.StdinIsTTY = func() bool { return false }
+
+	t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
+
+	fs := afero.NewMemMapFs()
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cmd := NewCmd(cfg)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetOut(&bytes.Buffer{})
+
+	_, err := promptPassword(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "NEO4J_PASSWORD")
 }
 
 // stubEmbedProvider is a deterministic Provider used by the runQuery embed

@@ -90,9 +90,10 @@ func TestOpenAI_Embed_MissingKeyReturnsAuthError(t *testing.T) {
 	defer srv.Close()
 
 	p := newOpenAIProvider(Config{
-		Provider: ProviderOpenAI,
-		Model:    "text-embedding-3-small",
-		BaseURL:  srv.URL,
+		Provider:      ProviderOpenAI,
+		Model:         "text-embedding-3-small",
+		BaseURL:       srv.URL,
+		AcceptEnvVars: true,
 		// No APIKey.
 	})
 	got, err := p.Embed(context.Background(), "hello")
@@ -105,6 +106,38 @@ func TestOpenAI_Embed_MissingKeyReturnsAuthError(t *testing.T) {
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 4, ce.Code)
 	assert.Contains(t, ce.Suggestion, "neo4j-cli credential embed add", "auth error signposts the credential-store command")
+}
+
+// TestOpenAI_Embed_MissingKeyMessageGateAware verifies the provider backstop
+// obeys REQ-F-023: off-mode references a .env file / stored credential and does
+// NOT advertise the OS key env vars as a direct fix; on-mode may name them.
+func TestOpenAI_Embed_MissingKeyMessageGateAware(t *testing.T) {
+	t.Run("off mode does not advertise the gated env var as a fix", func(t *testing.T) {
+		p := newOpenAIProvider(Config{Provider: ProviderOpenAI, AcceptEnvVars: false})
+		_, err := p.Embed(context.Background(), "hello")
+		require.Error(t, err)
+		msg := err.Error()
+		assert.Contains(t, msg, "missing API key for openai")
+		assert.Contains(t, msg, ".env")
+		assert.Contains(t, msg, "credential embed add")
+		assert.Contains(t, msg, "enable accept-env-vars")
+		assert.NotContains(t, msg, "set OPENAI_API_KEY",
+			"off-mode message must not advertise OPENAI_API_KEY as a direct fix")
+
+		var ce *clierr.CLIError
+		require.True(t, errors.As(err, &ce))
+		assert.NotContains(t, ce.Suggestion, "via an env var",
+			"off-mode suggestion must not advertise an env var as a direct fix")
+	})
+
+	t.Run("on mode may name the env vars directly", func(t *testing.T) {
+		p := newOpenAIProvider(Config{Provider: ProviderOpenAI, AcceptEnvVars: true})
+		_, err := p.Embed(context.Background(), "hello")
+		require.Error(t, err)
+		msg := err.Error()
+		assert.Contains(t, msg, "OPENAI_API_KEY")
+		assert.Contains(t, msg, "NEO4J_EMBED_API_KEY")
+	})
 }
 
 func TestOpenAI_Embed_Non2xxWrapsStatusNoAuthLeak(t *testing.T) {

@@ -38,7 +38,15 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"Multiple result sets render as a JSON array with `--format json` " +
 			"or as stacked blocks with `--format table`/`toon`. " +
 			"Write operations require `--rw`; without `--rw`, an EXPLAIN preflight " +
-			"runs first and statements classified as writes are blocked.",
+			"runs first and statements classified as writes are blocked. " +
+			"Environment variables: the connection vars NEO4J_URI, NEO4J_USERNAME, " +
+			"NEO4J_PASSWORD, NEO4J_DATABASE and the embedding vars NEO4J_EMBED_PROVIDER, " +
+			"NEO4J_EMBED_MODEL, NEO4J_EMBED_BASE_URL, NEO4J_EMBED_DIMENSIONS, " +
+			"NEO4J_EMBED_API_KEY (and provider keys OPENAI_API_KEY, HF_TOKEN, " +
+			"GEMINI_API_KEY, GOOGLE_API_KEY) are read ONLY when accept-env-vars is " +
+			"enabled - run `neo4j-cli config set accept-env-vars true --rw` or set " +
+			"NEO4J_CLI_ACCEPT_ENV_VARS=1. Explicit flags and `.env` files are never " +
+			"gated. See the README \"Environment variables\" section for details.",
 		Example: `# Introspect the schema before writing Cypher (always do this first)
 neo4j-cli query :schema --format toon
 
@@ -83,23 +91,23 @@ neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bo
 		},
 	}
 
-	cmd.PersistentFlags().String("uri", "", "Neo4j Bolt URI [env: NEO4J_URI]. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default \"neo4j://localhost:7687\")")
-	cmd.PersistentFlags().StringP("username", "u", "", "Neo4j username [env: NEO4J_USERNAME] (default \"neo4j\")")
-	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password [env: NEO4J_PASSWORD]; prompted on TTY if unset")
-	cmd.PersistentFlags().StringP("database", "d", "", "Target database name; defaults to the connecting user's home database when unset - typically \"neo4j\", but can vary by deployment (e.g. the instance DBID on Aura Free). Also applies with --credential, overriding the credential-supplied database [env: NEO4J_DATABASE]")
+	cmd.PersistentFlags().String("uri", "", "Neo4j Bolt URI. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default \"neo4j://localhost:7687\")")
+	cmd.PersistentFlags().StringP("username", "u", "", "Neo4j username (default \"neo4j\")")
+	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password; prompted on TTY if unset")
+	cmd.PersistentFlags().StringP("database", "d", "", "Target database name; defaults to the connecting user's home database when unset - typically \"neo4j\", but can vary by deployment (e.g. the instance DBID on Aura Free). Also applies with --credential, overriding the credential-supplied database")
 	cmd.PersistentFlags().String("env", "", "Path to a .env file (auto-discovered by walking up from cwd if unset)")
 	cmd.PersistentFlags().StringArray("param", nil, "Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string. Use `key:embed=<text>` to embed text via the configured provider and bind the resulting vector to $key (see `query :embed`).")
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
-	cmd.PersistentFlags().StringP("credential", "c", "", "Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list'). Combine with --database/NEO4J_DATABASE to target a specific database")
+	cmd.PersistentFlags().StringP("credential", "c", "", "Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list'). Combine with --database to target a specific database")
 	cmd.PersistentFlags().Bool("atomic", false, "Run all statements in a single transaction; roll back on any failure (default: each statement in its own transaction, fail-fast)")
 	cmd.PersistentFlags().Bool("continue-on-error", false, "Keep running after a statement fails: report each failure and execute the rest, then exit non-zero (non-atomic only; mutually exclusive with --atomic)")
 
 	cmd.PersistentFlags().String("embed-credential", "", "Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list')")
-	cmd.PersistentFlags().String("embed-provider", "", "Embedding provider: openai | ollama | huggingface | gemini | vertex [env: NEO4J_EMBED_PROVIDER]")
-	cmd.PersistentFlags().String("embed-model", "", "Embedding model name [env: NEO4J_EMBED_MODEL]")
-	cmd.PersistentFlags().String("embed-base-url", "", "Embedding provider base URL [env: NEO4J_EMBED_BASE_URL]")
-	cmd.PersistentFlags().Int("embed-dimensions", 0, "Embedding output dimensions (provider-dependent; ignored by Ollama) [env: NEO4J_EMBED_DIMENSIONS]")
+	cmd.PersistentFlags().String("embed-provider", "", "Embedding provider: openai | ollama | huggingface | gemini | vertex")
+	cmd.PersistentFlags().String("embed-model", "", "Embedding model name")
+	cmd.PersistentFlags().String("embed-base-url", "", "Embedding provider base URL")
+	cmd.PersistentFlags().Int("embed-dimensions", 0, "Embedding output dimensions (provider-dependent; ignored by Ollama)")
 
 	cmd.PersistentFlags().Bool("debug", false, "Route Neo4j driver activity (connection, auth, routing, retries) to stderr at DEBUG level; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)]")
 

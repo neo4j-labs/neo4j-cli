@@ -140,6 +140,36 @@ func TestMakeRequest_CredentialResolution(t *testing.T) {
 	}
 }
 
+// TestMakeRequest_EnvCredentialNotPersisted drives a full request with an
+// active credential that is NOT in the store (mirroring accept-env-vars
+// synthesis). It must succeed (no panic from the UpdateAccessToken store
+// lookup) and leave credentials.json untouched.
+func TestMakeRequest_EnvCredentialNotPersisted(t *testing.T) {
+	srv, capturedClientID := setupServer(t)
+
+	const emptyCreds = `{"aura":{"credentials":[],"default-credential":""}}`
+	cfg := buildTestConfig(t, srv.URL, emptyCreds)
+	cfg.Aura.SetActiveCredential(&credentials.AuraCredential{
+		Name:         "env",
+		ClientId:     "env-client",
+		ClientSecret: "env-secret",
+	})
+
+	before, err := testfs.GetTestCredentials(cfg.Aura.Fs())
+	require.NoError(t, err)
+
+	_, _, err = api.MakeRequest(cfg, "instances", &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion1,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "env-client", *capturedClientID)
+
+	after, err := testfs.GetTestCredentials(cfg.Aura.Fs())
+	require.NoError(t, err)
+	assert.Equal(t, before, after, "env-synthesized token must not be persisted to credentials.json")
+}
+
 // TestMakeRequest_Timeout asserts the http.Client timeout fires when the
 // server stalls past the configured cap. Uses the test seam to dial the cap
 // down to milliseconds so the assertion runs in <1s; production keeps the 60s
@@ -333,4 +363,86 @@ func TestGetToken_401_AuthError(t *testing.T) {
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 4, ce.Code)
 	assert.Contains(t, ce.Error(), "invalid, expired, or revoked")
+}
+
+// mintStatusConfig wires a config whose auth endpoint returns the given status
+// and body, with a stored default credential so MakeRequest enters getToken.
+func mintStatusConfig(t *testing.T, status int, body string) *clicfg.Config {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		if body != "" {
+			w.Write([]byte(body)) //nolint:errcheck
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	return buildTestConfig(t, srv.URL, `{
+		"aura": {
+			"credentials": [{"name":"c","client-id":"id","client-secret":"s","access-token":"","token-expiry":0}],
+			"default-credential": "c"
+		}
+	}`)
+}
+
+// TestGetToken_403_ForbiddenError locks REQ-F-019: a 403 from the token
+// endpoint surfaces as a distinct "forbidden / not authorized" auth error — not
+// the 401 wording — and never an empty-token success.
+func TestGetToken_403_ForbiddenError(t *testing.T) {
+	cfg := mintStatusConfig(t, http.StatusForbidden, "")
+
+	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion1,
+	})
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 4, ce.Code)
+	assert.Contains(t, ce.Error(), "forbidden")
+	assert.Contains(t, ce.Error(), "not authorized")
+	assert.NotContains(t, ce.Error(), "invalid, expired, or revoked")
+	assert.NotContains(t, ce.Error(), "environment")
+}
+
+// TestGetToken_OtherNon2xx_NamesStatus locks REQ-F-019: an unlisted non-2xx
+// (e.g. 422, 500) returns a clear error naming the status rather than the
+// generic "please report" panic or an empty-token success.
+func TestGetToken_OtherNon2xx_NamesStatus(t *testing.T) {
+	for _, status := range []int{http.StatusUnprocessableEntity, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			cfg := mintStatusConfig(t, status, "")
+
+			_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+				Method:  http.MethodGet,
+				Version: api.AuraApiVersion1,
+			})
+			require.Error(t, err)
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(err, &ce))
+			assert.Contains(t, ce.Error(), fmt.Sprintf("%d", status))
+			assert.NotContains(t, ce.Error(), "please report")
+		})
+	}
+}
+
+// TestGetToken_EmptyTokenIsError locks REQ-F-019: a 200 with an empty
+// access_token must not be returned as success (no "Authorization: Bearer ").
+func TestGetToken_EmptyTokenIsError(t *testing.T) {
+	cfg := mintStatusConfig(t, http.StatusOK, `{"access_token":"","expires_in":3600,"token_type":"bearer"}`)
+
+	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion1,
+	})
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Contains(t, ce.Error(), "empty token")
+	assert.NotContains(t, ce.Error(), "please report")
 }

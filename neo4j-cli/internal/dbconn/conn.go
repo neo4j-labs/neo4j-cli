@@ -30,11 +30,15 @@ const (
 	DefaultURI      = "neo4j://localhost:7687"
 	DefaultUsername = "neo4j"
 	DefaultDatabase = "neo4j"
+)
 
-	EnvURI      = "NEO4J_URI"
-	EnvUsername = "NEO4J_USERNAME"
-	EnvPassword = "NEO4J_PASSWORD"
-	EnvDatabase = "NEO4J_DATABASE"
+// Connection env-var names are single-sourced in the credentials package; these
+// are re-exported here for the dbconn tests that drive resolution via t.Setenv.
+const (
+	EnvURI      = credentials.EnvURI
+	EnvUsername = credentials.EnvUsername
+	EnvPassword = credentials.EnvPassword
+	EnvDatabase = credentials.EnvDatabase
 )
 
 // Conn holds the resolved Neo4j connection details. It does not carry an open
@@ -94,7 +98,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 			if err != nil {
 				return nil, err
 			}
-			applyDBOverride(cmd, c, skipDatabase)
+			applyDBOverride(cmd, cfg, c, skipDatabase)
 			return c, nil
 		}
 
@@ -113,7 +117,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 			if err != nil {
 				return nil, err
 			}
-			applyDBOverride(cmd, c, skipDatabase)
+			applyDBOverride(cmd, cfg, c, skipDatabase)
 			return c, nil
 		}
 
@@ -128,7 +132,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		}
 
 		c := buildConnFromPersistedCred(cred, cfg, cmd)
-		applyDBOverride(cmd, c, skipDatabase)
+		applyDBOverride(cmd, cfg, c, skipDatabase)
 		return c, nil
 	}
 
@@ -142,12 +146,23 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		return nil, err
 	}
 
-	uri := Overlay(dotenvVals[EnvURI], os.Getenv(EnvURI))
-	username := Overlay(dotenvVals[EnvUsername], os.Getenv(EnvUsername))
-	password := Overlay(dotenvVals[EnvPassword], os.Getenv(EnvPassword))
+	// The env half (dotenv walk-up + gated OS env). Tracked separately from the
+	// post-flag resolved values so the partial-override error can name the
+	// source the user actually used: an incomplete set that includes any
+	// env/dotenv-sourced piece is named with NEO4J_* vars; a purely-flag subset
+	// is named with --flags (REQ-F-022). dotenv uses the same NEO4J_* keys, so
+	// dotenv-supplied pieces count as env-sourced.
+	envURI := Overlay(dotenvVals[credentials.EnvURI], cfg.GatedGetenv(credentials.EnvURI))
+	envUsername := Overlay(dotenvVals[credentials.EnvUsername], cfg.GatedGetenv(credentials.EnvUsername))
+	envPassword := Overlay(dotenvVals[credentials.EnvPassword], cfg.GatedGetenv(credentials.EnvPassword))
+	envSourced := envURI != "" || envUsername != "" || envPassword != ""
+
+	uri := envURI
+	username := envUsername
+	password := envPassword
 	database := ""
 	if !skipDatabase {
-		database = Overlay(dotenvVals[EnvDatabase], os.Getenv(EnvDatabase))
+		database = Overlay(dotenvVals[credentials.EnvDatabase], cfg.GatedGetenv(credentials.EnvDatabase))
 	}
 
 	if f := cmd.Flag("uri"); f != nil && f.Changed {
@@ -165,60 +180,84 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		}
 	}
 
-	explicitCount := 0
+	// Completeness is decided on the three required params only
+	// (uri/username/password). database is always optional: it is applied when
+	// present but never required and never counted toward completeness, in both
+	// query and admin (skipDatabase) modes (REQ-F-014).
+	requiredCount := 0
 	if uri != "" {
-		explicitCount++
+		requiredCount++
 	}
 	if username != "" {
-		explicitCount++
+		requiredCount++
 	}
 	if password != "" {
-		explicitCount++
+		requiredCount++
 	}
-	if !skipDatabase && database != "" {
-		explicitCount++
+
+	// Reject an incomplete DBMS set that includes any env/dotenv-sourced piece
+	// by naming the missing NEO4J_* vars (REQ-F-010/F-024). This fires whenever
+	// envSourced (so off-mode dotenv-only partials are named with NEO4J_* too,
+	// matching on-mode for the same .env — REQ-F-024) and is ungated: OS env is
+	// already folded into the env half via GatedGetenv, so off-mode only sees
+	// dotenv pieces here. A complete set (all three from any source) and a
+	// purely-flag subset both skip this — the latter falls through to the
+	// partial switch, which names the --flags (REQ-F-022).
+	//
+	// "Provided" is attributed to the pre-flag env half only (envURI/…), so a
+	// value supplied by a --flag is never reported as a set NEO4J_* var; the
+	// "missing" view uses the post-flag resolved values so only genuinely-empty
+	// required pieces are named (REQ-F-025).
+	if requiredCount != 3 && envSourced {
+		envHalf := map[string]string{
+			credentials.EnvURI:      envURI,
+			credentials.EnvUsername: envUsername,
+			credentials.EnvPassword: envPassword,
+		}
+		resolved := map[string]string{
+			credentials.EnvURI:      uri,
+			credentials.EnvUsername: username,
+			credentials.EnvPassword: password,
+		}
+		if err := credentials.ValidateEnvCredentialSetSourced(
+			credentials.DBMSEnvSpec,
+			func(name string) string { return envHalf[name] },
+			func(name string) string { return resolved[name] },
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	storedCred, _ := cfg.Credentials.Dbms.GetDefault()
 	hasStoredCred := storedCred != nil
 
-	// Determine how many explicit params are expected to constitute a complete
-	// set. When skipDatabase is true we track 3 params (uri, user, pass);
-	// otherwise 4.
-	fullCount := 4
-	if skipDatabase {
-		fullCount = 3
-	}
-
 	switch {
-	case !hasStoredCred && explicitCount == 0:
-		// No stored credential, no explicit params — fall through to built-in defaults.
-
 	case !hasStoredCred:
-		// No stored credential with some explicit params — apply what was given.
+		// No stored credential — apply whatever required params were given (or
+		// none, falling through to built-in defaults).
 
-	case explicitCount == 0:
-		// Stored credential available, no explicit params — use the credential.
+	case requiredCount == 0:
+		// Stored credential available, no explicit required params — use the
+		// credential. An explicit database override is layered on below.
 		uri = storedCred.URI
 		username = storedCred.Username
 		password = storedCred.Password
-		if !skipDatabase {
+		if !skipDatabase && database == "" {
 			database = storedCred.DatabaseName
 		}
 
-	case explicitCount == fullCount:
-		// All explicitly provided — bypass stored credential entirely.
+	case requiredCount == 3:
+		// All three required params provided — bypass stored credential entirely.
 
 	default:
-		// Partial override of a stored credential — reject.
-		if skipDatabase {
-			return nil, fmt.Errorf(
-				"partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
-					"or --password/NEO4J_PASSWORD is provided, all three are required")
-		}
+		// Partial override of a stored credential — reject. Any subset that
+		// included a NEO4J_*/dotenv-sourced value was already named by the
+		// env-completeness check above, so this branch only fires for a
+		// purely-flag subset and names only the --flags, in both gate states
+		// (REQ-F-018/REQ-F-022).
 		return nil, fmt.Errorf(
-			"partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
-				"--password/NEO4J_PASSWORD, or --database/NEO4J_DATABASE is provided, all four are required")
+			"partial connection params: when any of --uri, --username, or --password is provided, " +
+				"all three (--uri, --username, --password) are required")
 	}
 
 	if uri == "" {
@@ -274,7 +313,7 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *DesktopMa
 				"or open Desktop and use 'Reset password' on this resource.",
 			name, id)
 	}
-	pw, perr := PromptPassword(cmd)
+	pw, perr := PromptPassword(cmd, cfg.Global.AcceptEnvVars())
 	if perr != nil {
 		return nil, perr
 	}
@@ -284,14 +323,16 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *DesktopMa
 
 // applyDBOverride layers a --database flag or NEO4J_DATABASE env override onto
 // c when skipDatabase is false. Used in the credential path so a persisted or
-// Desktop credential's database can be overridden at the call site.
-func applyDBOverride(cmd *cobra.Command, c *Conn, skipDatabase bool) {
+// Desktop credential's database can be overridden at the call site. The
+// NEO4J_DATABASE override is gated behind accept-env-vars (REQ-F-013); the
+// explicit --database flag always wins.
+func applyDBOverride(cmd *cobra.Command, cfg *clicfg.Config, c *Conn, skipDatabase bool) {
 	if skipDatabase {
 		return
 	}
 	if f := cmd.Flag("database"); f != nil && f.Changed {
 		c.Database = f.Value.String()
-	} else if v := os.Getenv(EnvDatabase); v != "" {
+	} else if v := cfg.GatedGetenv(credentials.EnvDatabase); v != "" {
 		c.Database = v
 	}
 }

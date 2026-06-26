@@ -30,12 +30,25 @@ var PasswordReader = func() (string, error) {
 	return string(pw), nil
 }
 
+// PasswordRequiredMessage returns the usage-error message shown when a password
+// is needed but none was supplied and stdin is not a TTY. When acceptEnv is
+// false the NEO4J_PASSWORD env var is NOT advertised as an effective remedy (the
+// gate is ignoring it); instead the message points at --password / .env and at
+// enabling accept-env-vars. When acceptEnv is true the env var may be named.
+func PasswordRequiredMessage(acceptEnv bool) string {
+	if acceptEnv {
+		return "password is required: set --password, NEO4J_PASSWORD, or add it to a .env file"
+	}
+	return "password is required: set --password or add it to a .env file " +
+		"(or enable accept-env-vars to read NEO4J_PASSWORD)"
+}
+
 // PromptPassword reads a password from the controlling terminal with no echo.
-// Returns a usage error when stdin is not a TTY.
-func PromptPassword(cmd *cobra.Command) (string, error) {
+// Returns a usage error when stdin is not a TTY. acceptEnv tailors the off-mode
+// error so it does not advertise the gated NEO4J_PASSWORD env var.
+func PromptPassword(cmd *cobra.Command, acceptEnv bool) (string, error) {
 	if !StdinIsTTY() {
-		return "", clierr.NewUsageError(
-			"--password is required or run interactively")
+		return "", clierr.NewUsageError("%s", PasswordRequiredMessage(acceptEnv))
 	}
 	_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Password: ")
 	pw, err := PasswordReader()

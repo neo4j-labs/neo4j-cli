@@ -54,7 +54,7 @@
 
 Manage Neo4j databases, users, roles, and privileges
 
-Manage Neo4j databases via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke), `privilege` (list, grant, deny, revoke).
+Manage Neo4j databases via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke), `privilege` (list, grant, deny, revoke). Environment variables: the connection vars NEO4J_URI, NEO4J_USERNAME and NEO4J_PASSWORD are read ONLY when accept-env-vars is enabled - run `neo4j-cli config set accept-env-vars true --rw` or set NEO4J_CLI_ACCEPT_ENV_VARS=1. Explicit flags and `.env` files are never gated. See the README "Environment variables" section for details.
 
 Usage: `neo4j-cli admin`
 
@@ -65,9 +65,9 @@ Flags:
 | `-c, --credential` | string | - | Name of a stored dbms credential, 'desktop' for a running Neo4j Desktop 2 DBMS, or 'desktop-connection:<uuid>' for a saved connection |
 | `--debug` | bool | false | Enable Bolt driver debug logging to stderr (env: NEO4J_DEBUG=1) |
 | `--env` | string | - | Path to a .env file with NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD (walks up from cwd when unset) |
-| `-p, --password` | string | - | Neo4j password (env: NEO4J_PASSWORD) |
-| `--uri` | string | - | Neo4j server URI (env: NEO4J_URI) |
-| `-u, --username` | string | - | Neo4j username (env: NEO4J_USERNAME) |
+| `-p, --password` | string | - | Neo4j password |
+| `--uri` | string | - | Neo4j server URI |
+| `-u, --username` | string | - | Neo4j username |
 
 ## neo4j-cli admin database
 
