@@ -110,7 +110,7 @@ func (h *loadHarness) run(command string) error {
 }
 
 func registerLoadRunningInstanceMock(h *loadHarness) {
-	h.handle("GET /v1/instances/db1d1234", http.StatusOK, `{"data": {"id": "db1d1234", "status": "running"}}`)
+	h.handle("GET "+deployInstancesPath+"/db1d1234", http.StatusOK, `{"data": {"id": "db1d1234", "status": "running"}}`)
 }
 
 // withStubbedLoadDeps swaps the dataset/docker seams the load leaf touches with
@@ -241,7 +241,7 @@ func TestLoadCreatesThenStages(t *testing.T) {
 		res.WriteHeader(http.StatusAccepted)
 		_, _ = res.Write([]byte(deployCreateResponse))
 	})
-	h.mux.HandleFunc("GET /v1/instances/db1d1234", func(res http.ResponseWriter, _ *http.Request) {
+	h.mux.HandleFunc("GET "+deployInstancesPath+"/db1d1234", func(res http.ResponseWriter, _ *http.Request) {
 		order = append(order, "poll")
 		res.WriteHeader(http.StatusOK)
 		_, _ = res.Write([]byte(`{"data": {"id": "db1d1234", "status": "running"}}`))

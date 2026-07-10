@@ -148,7 +148,7 @@ tasks:
       paths/version (via PollWithVersion). Ensure the `legacy_status`->`status`
       normalization (V-2) is applied before status is read for readiness so
       `--wait` behaves identically. `PollSnapshot`/`PollCMK` remain on v1.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -158,7 +158,7 @@ tasks:
       - "Readiness detection reads normalised `status` (from v2beta1 `legacy_status`)."
       - "--wait on instance create/session create still completes and reports readiness correctly."
       - "PollSnapshot and PollCMK are unchanged (still v1)."
-    completed_at: null
+    completed_at: 2026-07-10T18:05:00Z
 
   - id: task-009
     title: 'Verify non-migrated commands unchanged (pause/resume/update/overwrite, snapshot, CMK, graphql)'

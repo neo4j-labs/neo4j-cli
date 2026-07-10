@@ -226,7 +226,7 @@ The command waits for the instance to be ready and for the data load to finish b
 			}
 
 			fmt.Fprintln(errOut, "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-			if _, err := api.PollInstance(cfg, instanceID, api.InstanceStatusCreating); err != nil {
+			if _, err := api.PollInstance(cfg, resolvedOrgID, resolvedProjectID, instanceID, api.InstanceStatusCreating); err != nil {
 				return err
 			}
 

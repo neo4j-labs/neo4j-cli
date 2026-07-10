@@ -109,7 +109,7 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 						return nil
 					}
 
-					pollResponse, err := api.PollGraphAnalyticsSessionReady(cfg, sessionID, api.GraphAnalyticsSessionWaitingStatus)
+					pollResponse, err := api.PollGraphAnalyticsSessionReady(cfg, orgID, projectID, sessionID, api.GraphAnalyticsSessionWaitingStatus)
 					if err != nil {
 						return err
 					}

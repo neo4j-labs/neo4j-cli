@@ -207,15 +207,15 @@ func TestCreateSessionWithWait(t *testing.T) {
   }
 }`)
 
-	getMock := helper.NewRequestHandlerMock("GET /v1/graph-analytics/sessions/559c94c7-15de43fg", http.StatusOK, `{
+	getMock := helper.NewRequestHandlerMock("GET /v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions/559c94c7-15de43fg", http.StatusOK, `{
 			"data": {
 				"id": "559c94c7-15de43fg",
-				"status": "Creating"
+				"legacy_status": "Creating"
 			}
 		}`).AddResponse(http.StatusOK, `{
 			"data": {
 				"id": "559c94c7-15de43fg",
-				"status": "Ready"
+				"legacy_status": "Ready"
 			}
 		}`)
 

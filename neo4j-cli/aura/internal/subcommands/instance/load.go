@@ -198,7 +198,7 @@ If the data load fails after the instance was created, the instance is left in p
 			}
 
 			fmt.Fprintln(errOut, "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-			if _, err := api.PollInstance(cfg, instanceID, api.InstanceStatusCreating); err != nil {
+			if _, err := api.PollInstance(cfg, resolvedOrgID, resolvedProjectID, instanceID, api.InstanceStatusCreating); err != nil {
 				return err
 			}
 

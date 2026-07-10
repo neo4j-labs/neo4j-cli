@@ -32,3 +32,8 @@ Decisions: 404 suggestion now comes natively from suggestionForResource("session
 Migrated `aura project get` to derive the single project from api.ListProjects (v2beta1 /organizations/{org}/projects) and stop calling v1 /tenants/{id}; the matched Project is marshaled into a GetProjectResponse and printed, preserving id/name output and the existing not-found error.
 Files: ~2 mod (get.go, get_test.go)
 Decisions: kept the ListProjects+filter path (per task mandate) rather than the single-fetch api.GetProject; also a behaviour fix — output now always prints the found project instead of gating on a v1 200. Added TestGetProjectMakesNoV1Call asserting the v1 handler is called 0 times; removed the now-dead TestGetProjectV1Error.
+
+## TASK-008 — 2026-07-10T18:05:00Z
+Migrated PollInstance and PollGraphAnalyticsSessionReady to poll the v2beta1 org/project-scoped paths via PollWithVersion(AuraApiVersion2); both now take orgID/projectID. Added PollResponse.normalize() (legacy_status->status, native status wins) applied before readiness is evaluated in PollWithVersion. PollSnapshot/PollCMK/PollGraphQLDataApi unchanged. Updated all 6 callers (create/deploy/load/overwrite/resume, session/create) to pass org/project; resume+overwrite now capture the previously-discarded orgID.
+Files: ~8 mod (poll.go, create.go, deploy.go, load.go, overwrite.go, resume.go, session/create.go + tests poll_debug_test.go, create_test.go, deploy_test.go, load_test.go, overwrite_test.go, session/create_test.go)
+Decisions: resume/overwrite readiness poll now hits the v2beta1 scoped GET (a status read, identical to `get`); their mutation POSTs stay v1 per task-009. Split overwrite's shared preflight+poll mock into a v1 preflight mock and a v2beta1 poll mock.

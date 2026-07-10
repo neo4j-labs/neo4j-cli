@@ -122,7 +122,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					instanceId, _ := instance["id"].(string)
 
-					pollResponse, err := api.PollInstance(cfg, instanceId, api.InstanceStatusCreating)
+					pollResponse, err := api.PollInstance(cfg, resolvedOrgID, resolvedProjectID, instanceId, api.InstanceStatusCreating)
 					if err != nil {
 						return err
 					}

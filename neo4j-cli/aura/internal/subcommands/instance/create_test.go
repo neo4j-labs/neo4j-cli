@@ -504,15 +504,15 @@ func TestCreateFreeInstanceWithWait(t *testing.T) {
 			}
 		}`)
 
-	getMock := helper.NewRequestHandlerMock("GET /v1/instances/db1d1234", http.StatusOK, `{
+	getMock := helper.NewRequestHandlerMock("GET "+createInstancesPath+"/db1d1234", http.StatusOK, `{
 			"data": {
 				"id": "db1d1234",
-				"status": "creating"
+				"legacy_status": "creating"
 			}
 		}`).AddResponse(http.StatusOK, `{
 			"data": {
 				"id": "db1d1234",
-				"status": "ready"
+				"legacy_status": "ready"
 			}
 		}`)
 
@@ -571,7 +571,7 @@ func TestCreateFreeInstanceWithWait_StdoutIsValidJSON(t *testing.T) {
 			}
 		}`)
 
-	helper.NewRequestHandlerMock("GET /v1/instances/db1d1234", http.StatusOK, `{
+	helper.NewRequestHandlerMock("GET "+createInstancesPath+"/db1d1234", http.StatusOK, `{
 			"data": {
 				"id": "db1d1234",
 				"status": "creating"
@@ -1008,7 +1008,7 @@ func TestCreateCredentialStoredBeforeWait(t *testing.T) {
 
 	helper.NewRequestHandlerMock("POST "+createInstancesPath, http.StatusAccepted, createAPIResponse)
 
-	helper.NewRequestHandlerMock("GET /v1/instances/db1d1234", http.StatusOK, `{
+	helper.NewRequestHandlerMock("GET "+createInstancesPath+"/db1d1234", http.StatusOK, `{
 		"data": {
 			"id": "db1d1234",
 			"status": "creating"
