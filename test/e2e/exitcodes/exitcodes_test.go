@@ -12,7 +12,7 @@
 //	2 usage (--bad-flag, cobra FlagErrorFunc)
 //	3 not_found        (HTTP 404)
 //	4 auth_error       (HTTP 401)
-//	5 conflict         (HTTP 409)
+//	5 conflict         (HTTP 409, and HTTP 402 quota-exceeded)
 //	6 validation_error (HTTP 400)
 //	7 rate_limited     (HTTP 429 with Retry-After: 30 → exit 7 AND message
 //	                    body contains "30")
@@ -20,6 +20,10 @@
 //
 // Plus two zero-exit paths: happy GET → 0; bare `neo4j-cli` with no
 // subcommand prints help → 0.
+//
+// The `aura instance` commands target the v2beta1 org/project-scoped instance
+// paths; scenarios pass --organization-id/--project-id and the fixture serves
+// both the project-validation call and the scoped instances path.
 //
 // Gated by build tag `e2e_exitcodes` so it stays out of the default
 // `go test ./...` matrix, mirroring `test/e2e/release_fixture/`'s
@@ -162,16 +166,37 @@ func seedCreds(t *testing.T, dir string) {
 	}
 }
 
-// fixtureServer returns an httptest.Server that responds to /v1/instances
-// (and any /v1/instances/<id>[/...] subpath) with the supplied status, body
-// and optional Retry-After header. /oauth/token is stubbed defensively in
-// case any path bypasses the cached access token.
+// e2eOrgID / e2eProjectID scope the v2beta1 instance paths the migrated
+// `aura instance` commands now target. They are passed to the CLI via
+// --organization-id / --project-id so org/project resolution succeeds without
+// seeding a default workspace into config.
+const (
+	e2eOrgID     = "e2e-org"
+	e2eProjectID = "e2e-proj"
+)
+
+// fixtureServer returns an httptest.Server that responds to the v2beta1
+// org/project-scoped instances path
+// (/v2beta1/organizations/{org}/projects/{proj}/instances[/<id>...]) with the
+// supplied status, body and optional Retry-After header. The list-projects
+// validation call (/v2beta1/organizations/{org}/projects) always returns 200
+// with e2eProjectID present so ResolveAndValidateOrgProject passes regardless
+// of the scenario's instances-path status. /oauth/token is stubbed defensively
+// in case any path bypasses the cached access token.
 func fixtureServer(t *testing.T, status int, retryAfter, body string) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"access_token":"stub-token","expires_in":3600,"token_type":"bearer"}`))
+	})
+	// Project-validation call must always succeed and list the resolved
+	// project so resolution proceeds to the instances request under test.
+	projectsPath := fmt.Sprintf("/v2beta1/organizations/%s/projects", e2eOrgID)
+	mux.HandleFunc(projectsPath, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintf(w, `{"data":[{"id":%q,"name":"e2e"}]}`, e2eProjectID)
 	})
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		if retryAfter != "" {
@@ -181,9 +206,11 @@ func fixtureServer(t *testing.T, status int, retryAfter, body string) *httptest.
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
 	}
-	mux.HandleFunc("/v1/instances", handler)
-	// Trailing slash registers the subtree handler for /v1/instances/<id>[/...].
-	mux.HandleFunc("/v1/instances/", handler)
+	instancesPath := fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/instances", e2eOrgID, e2eProjectID)
+	mux.HandleFunc(instancesPath, handler)
+	// Trailing slash registers the subtree handler for the scoped
+	// .../instances/<id>[/...] paths (e.g. `instance get <id>`).
+	mux.HandleFunc(instancesPath+"/", handler)
 	srv := httptest.NewServer(mux)
 	// Force loopback bind so urlcheck.ValidateRemoteURL accepts http://.
 	if !strings.HasPrefix(srv.URL, "http://127.0.0.1:") && !strings.HasPrefix(srv.URL, "http://localhost:") {
@@ -272,9 +299,14 @@ func errBody(msg string) string {
 	return fmt.Sprintf(`{"errors":[{"message":%q}]}`, msg)
 }
 
-// happyInstancesBody is a minimal valid /v1/instances response so the happy
+// happyInstancesBody is a minimal valid instances-list response so the happy
 // scenario exits 0 cleanly.
 const happyInstancesBody = `{"data":[]}`
+
+// scopeFlags are the org/project resolution flags appended to every
+// server-hitting `aura instance` scenario so ResolveAndValidateOrgProject
+// resolves without a seeded default workspace.
+var scopeFlags = []string{"--organization-id", e2eOrgID, "--project-id", e2eProjectID}
 
 func TestExitCodes(t *testing.T) {
 	bin := buildBinary(t)
@@ -282,7 +314,7 @@ func TestExitCodes(t *testing.T) {
 	scenarios := []scenario{
 		{
 			name:       "happy_path_200",
-			args:       []string{"aura", "instance", "list", "--format", "json"},
+			args:       append([]string{"aura", "instance", "list", "--format", "json"}, scopeFlags...),
 			status:     http.StatusOK,
 			body:       happyInstancesBody,
 			wantExit:   0,
@@ -302,35 +334,35 @@ func TestExitCodes(t *testing.T) {
 		},
 		{
 			name:     "not_found_404_exit_3",
-			args:     []string{"aura", "instance", "list"},
+			args:     append([]string{"aura", "instance", "list"}, scopeFlags...),
 			status:   http.StatusNotFound,
 			body:     errBody("instance not found"),
 			wantExit: 3,
 		},
 		{
 			name:     "auth_401_exit_4",
-			args:     []string{"aura", "instance", "list"},
+			args:     append([]string{"aura", "instance", "list"}, scopeFlags...),
 			status:   http.StatusUnauthorized,
 			body:     errBody("invalid token"),
 			wantExit: 4,
 		},
 		{
 			name:     "conflict_409_exit_5",
-			args:     []string{"aura", "instance", "list"},
+			args:     append([]string{"aura", "instance", "list"}, scopeFlags...),
 			status:   http.StatusConflict,
 			body:     errBody("duplicate instance"),
 			wantExit: 5,
 		},
 		{
 			name:     "validation_400_exit_6",
-			args:     []string{"aura", "instance", "list"},
+			args:     append([]string{"aura", "instance", "list"}, scopeFlags...),
 			status:   http.StatusBadRequest,
 			body:     errBody("bad request"),
 			wantExit: 6,
 		},
 		{
 			name:               "rate_limited_429_exit_7",
-			args:               []string{"aura", "instance", "list"},
+			args:               append([]string{"aura", "instance", "list"}, scopeFlags...),
 			status:             http.StatusTooManyRequests,
 			retryAfter:         "30",
 			body:               errBody("rate limit"),
@@ -339,10 +371,21 @@ func TestExitCodes(t *testing.T) {
 		},
 		{
 			name:     "upstream_503_exit_8",
-			args:     []string{"aura", "instance", "list"},
+			args:     append([]string{"aura", "instance", "list"}, scopeFlags...),
 			status:   http.StatusServiceUnavailable,
 			body:     errBody("service unavailable"),
 			wantExit: 8,
+		},
+		// 402 with a v2beta1 quota-exceeded reason maps to conflict (exit 5)
+		// and surfaces the quota suggestion; asserts the errors[].reason enum
+		// still fires end-to-end against the scoped instances path.
+		{
+			name:               "payment_required_402_quota_exit_5",
+			args:               append([]string{"aura", "instance", "list"}, scopeFlags...),
+			status:             http.StatusPaymentRequired,
+			body:               `{"errors":[{"message":"quota reached","reason":"quota-exceeded"}]}`,
+			wantExit:           5,
+			wantStderrContains: "quota",
 		},
 		{
 			name:       "no_subcommand_help_exit_0",
@@ -369,7 +412,7 @@ func TestExitCodes(t *testing.T) {
 		// clean JSON envelope (no cobra usage preamble).
 		{
 			name:                 "not_found_404_get_json",
-			args:                 []string{"aura", "instance", "get", "does-not-exist", "--format=json"},
+			args:                 append([]string{"aura", "instance", "get", "does-not-exist", "--format=json"}, scopeFlags...),
 			status:               http.StatusNotFound,
 			body:                 errBody("instance not found"),
 			wantExit:             3,

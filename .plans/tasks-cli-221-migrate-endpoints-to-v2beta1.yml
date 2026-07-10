@@ -188,7 +188,7 @@ tasks:
       redaction/telemetry/tee behaviour is unchanged (V-3: confirm error-envelope
       `errors[].reason` / quota handling against v2beta1 shapes). Run the
       build-tagged e2e suites where output names changed.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -201,7 +201,7 @@ tasks:
       - "e2e decoders/golden files updated; `go test -tags=e2e_desktop ./test/e2e/desktop/...` passes where relevant."
       - "Redaction/tee/telemetry tests pass with no secret leaks under the new paths."
       - "402/404 error handling verified against v2beta1 body shapes (reason/quota-exceeded still fires)."
-    completed_at: null
+    completed_at: 2026-07-10T13:29:46Z
 
   - id: task-011
     title: 'Regenerate skill bundle, add changelog, and pass final gates'
