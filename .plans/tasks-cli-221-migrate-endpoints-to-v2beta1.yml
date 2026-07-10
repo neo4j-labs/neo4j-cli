@@ -294,7 +294,7 @@ tasks:
       / utils.defaultOrgAndProject, or a shared "resolve+fetch one project"
       function) so org parsing lives in one place and the not-found error is a
       structured clierr matching every other v2beta1 command.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -302,7 +302,7 @@ tasks:
       - "The project-in-org lookup reuses the canonical utils path and returns a structured clierr.NewNotFoundError with resource + suggestion (no bare fmt.Errorf)."
       - "project get output for a found project is unchanged; not-found now matches the other v2beta1 commands' error contract."
       - "project get tests updated for the structured error; all gates pass."
-    completed_at: null
+    completed_at: 2026-07-10T22:15:00Z
 
   - id: task-015
     title: 'Avoid double response-body parse in instance get'

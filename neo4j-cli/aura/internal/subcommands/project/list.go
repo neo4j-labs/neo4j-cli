@@ -6,11 +6,11 @@ package project
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,7 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 		RunE: func(cmd *cobra.Command, args []string) error {
 			orgID := organizationId
 			if orgID == "" {
-				orgID = resolveOrgFromWorkspace(cfg)
+				orgID = utils.OrgFromWorkspace(cfg)
 			}
 			if orgID == "" {
 				return fmt.Errorf("required flag \"organization-id\" not set and aura.default-workspace is not configured")
@@ -58,18 +58,4 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 	cmd.Flags().StringVar(&organizationId, "organization-id", "", "Organization ID (defaults to org portion of aura.default-workspace)")
 
 	return cmd
-}
-
-// resolveOrgFromWorkspace returns the organization portion of aura.default-workspace,
-// or an empty string when not set or the workspace has no '/'.
-func resolveOrgFromWorkspace(cfg *clicfg.Config) string {
-	ctx := cfg.Aura.DefaultWorkspace()
-	if ctx == "" {
-		return ""
-	}
-	idx := strings.LastIndex(ctx, "/")
-	if idx < 0 {
-		return ""
-	}
-	return ctx[:idx]
 }

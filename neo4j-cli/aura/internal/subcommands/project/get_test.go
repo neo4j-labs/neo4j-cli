@@ -47,7 +47,7 @@ func TestGetProject(t *testing.T) {
 			name:       "project not in org returns error",
 			listStatus: http.StatusOK,
 			listBody:   listProjectsBody("other-proj"),
-			wantErr:    fmt.Sprintf("project %s not found in organization %s", testProjectID, testOrgID),
+			wantErr:    fmt.Sprintf("could not find project %s in organization %s", testProjectID, testOrgID),
 		},
 		{
 			name:       "list projects API error returns error",

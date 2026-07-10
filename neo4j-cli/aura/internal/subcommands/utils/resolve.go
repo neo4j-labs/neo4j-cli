@@ -72,23 +72,41 @@ func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string
 	return orgID, projectID, nil
 }
 
-// validateProjectInOrg calls the v2beta1 list-projects endpoint and confirms
-// that projectID appears in the response.
-func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
+// FetchProjectInOrg derives a single project from the v2beta1 list-projects
+// endpoint (GET /organizations/{orgID}/projects) by filtering for projectID.
+// It is the canonical "resolve one project" path shared by project get and the
+// org/project scope validation: an absent project yields a structured
+// clierr.NewNotFoundError with resource + suggestion.
+func FetchProjectInOrg(cfg *clicfg.Config, orgID, projectID string) (*api.Project, error) {
 	projects, err := api.ListProjects(cfg, orgID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, p := range projects.Data {
-		if p.Id == projectID {
-			return nil
+	for i := range projects.Data {
+		if projects.Data[i].Id == projectID {
+			return &projects.Data[i], nil
 		}
 	}
 
-	return clierr.NewNotFoundError("could not find project %s in organization %s", projectID, orgID).
+	return nil, clierr.NewNotFoundError("could not find project %s in organization %s", projectID, orgID).
 		WithResource("project", projectID).
 		WithSuggestion("Run 'neo4j-cli aura project list --organization-id <id>' to see available projects.")
+}
+
+// validateProjectInOrg confirms that projectID appears in the org's project
+// list, reusing the canonical FetchProjectInOrg lookup.
+func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
+	_, err := FetchProjectInOrg(cfg, orgID, projectID)
+	return err
+}
+
+// OrgFromWorkspace returns the organization portion of aura.default-workspace,
+// or an empty string when the workspace is not set or has no '/'. It is the
+// canonical org-parsing helper shared by project commands.
+func OrgFromWorkspace(cfg *clicfg.Config) string {
+	orgID, _ := defaultOrgAndProject(cfg)
+	return orgID
 }
 
 // FetchScopedInstance performs a GET on the v2beta1 org/project-scoped instance
