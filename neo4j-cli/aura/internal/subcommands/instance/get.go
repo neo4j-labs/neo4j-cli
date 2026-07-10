@@ -44,7 +44,7 @@ neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-0
 			if resBody != nil {
 				responseData := api.ParseBody(resBody)
 				normalized := utils.NormalizeV2Beta1Response(responseData)
-				fields, err := getFields(resBody)
+				fields, err := getFields(responseData)
 				if err != nil {
 					return err
 				}
@@ -56,9 +56,7 @@ neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-0
 	}
 }
 
-func getFields(resBody []byte) ([]string, error) {
-	responseBody := api.ParseBody(resBody)
-
+func getFields(responseBody api.ResponseData) ([]string, error) {
 	fields := []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"}
 	instance, err := responseBody.GetSingleOrError()
 	if err != nil {

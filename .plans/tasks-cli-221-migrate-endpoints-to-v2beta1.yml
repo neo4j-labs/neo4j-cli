@@ -313,11 +313,11 @@ tasks:
       metrics_integration_url — two parses of the same bytes for one render.
       Pass the already-parsed responseData (or the single map) into getFields
       instead of re-parsing.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
       - "instance/get.go parses the response body exactly once; getFields receives the already-parsed data."
       - "get output (including metrics_integration_url handling) is unchanged."
       - "make test, make fmt-check, make lint, make license-check all pass."
-    completed_at: null
+    completed_at: 2026-07-10T14:34:36Z

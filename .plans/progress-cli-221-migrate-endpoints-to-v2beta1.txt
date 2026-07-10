@@ -69,3 +69,7 @@ Decisions: preferTo=false path now deterministically prefers the legacy `from` v
 project get now reuses canonical utils resolution: added utils.FetchProjectInOrg (single "resolve one project" path returning a structured clierr.NewNotFoundError with resource+suggestion) and utils.OrgFromWorkspace (delegates to defaultOrgAndProject). validateProjectInOrg now delegates to FetchProjectInOrg; get.go drops its manual scan + bare fmt.Errorf; list.go's duplicate resolveOrgFromWorkspace deleted in favour of OrgFromWorkspace.
 Files: ~4 mod (utils/resolve.go, project/get.go, project/list.go, project/get_test.go)
 Decisions: get.go's missing-org branch still uses a bare fmt.Errorf (out of scope per reviewer — task targets org-parsing dedup + the not-found path).
+
+## TASK-015 — 2026-07-10T14:34:36Z
+instance/get.go now parses the response body once: getFields takes the already-parsed api.ResponseData instead of re-calling api.ParseBody on the same bytes. Output (incl. metrics_integration_url) unchanged.
+Files: ~1 mod (get.go)
