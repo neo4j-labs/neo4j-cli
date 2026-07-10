@@ -4,34 +4,19 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
 const testDeleteInstanceID = "2f49c2b3"
-
-// instanceGetBody returns a minimal GET /instances/{id} response body with the
-// given tenant_id. Used to satisfy pre-flight ownership checks in mutating
-// command tests.
-func instanceGetBody(id, tenantID string) string {
-	return fmt.Sprintf(`{
-		"data": {
-			"id": %q,
-			"name": "Production",
-			"status": "running",
-			"tenant_id": %q,
-			"cloud_provider": "gcp",
-			"connection_url": "YOUR_CONNECTION_URL",
-			"region": "europe-west1",
-			"type": "enterprise-db",
-			"memory": "8GB"
-		}
-	}`, id, tenantID)
-}
 
 func TestDeleteInstance(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
@@ -41,9 +26,7 @@ func TestDeleteInstance(t *testing.T) {
 
 	instanceId := testDeleteInstanceID
 
-	// Single mock for /v1/instances/{id}: first call is GET (pre-flight), second is DELETE.
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-	mockHandler.AddResponse(http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusAccepted, `{
 		"data": {
 		  "id": "2f49c2b3",
 		  "name": "Production",
@@ -59,7 +42,7 @@ func TestDeleteInstance(t *testing.T) {
 
 	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
 
-	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 
 	helper.AssertOutJson(`{
@@ -86,8 +69,7 @@ func TestDeleteInstanceWithDefaultWorkspace(t *testing.T) {
 
 	instanceId := testDeleteInstanceID
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-	mockHandler.AddResponse(http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusAccepted, `{
 		"data": {
 		  "id": "2f49c2b3",
 		  "name": "Production",
@@ -103,7 +85,7 @@ func TestDeleteInstanceWithDefaultWorkspace(t *testing.T) {
 
 	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --rw --yes --force", instanceId))
 
-	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledTimes(1)
 	helper.AsssertOk()
 }
 
@@ -140,6 +122,8 @@ func TestDeleteInstanceProjectNotInOrg(t *testing.T) {
 	helper.AssertErr("Error: could not find project unknown-project in organization " + testListOrgID)
 }
 
+// TestDeleteInstanceNotInProject covers an instance outside the scoped project.
+// The v2beta1 scoped delete path natively 404s; no tenant_id preflight is done.
 func TestDeleteInstanceNotInProject(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
@@ -148,13 +132,26 @@ func TestDeleteInstanceNotInProject(t *testing.T) {
 
 	instanceId := testDeleteInstanceID
 
-	// Instance belongs to a different project.
-	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, "other-project-id"))
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusNotFound, fmt.Sprintf(`{
+		"errors": [
+			{
+			"message": "DB not found: %s",
+			"reason": "db-not-found"
+			}
+		]
+	}`, instanceId))
 
-	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
+	err := helper.ExecuteCommandE(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
 
-	helper.AssertErr(fmt.Sprintf("Error: could not find instance %s in project %s", instanceId, testListProjectID))
-	helper.AssertUsageNotShown()
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	require.Equal(t, 3, ce.Code)
+	require.Equal(t, "instance", ce.ResourceType)
+	require.Equal(t, instanceId, ce.ResourceID)
+
+	helper.AssertErr(fmt.Sprintf("Error: [\n\tDB not found: %s\n]", instanceId))
 }
 
 func TestDeleteInstanceWithTrailingNewline(t *testing.T) {
@@ -165,9 +162,7 @@ func TestDeleteInstanceWithTrailingNewline(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 
-	// Single mock: GET (pre-flight ownership check) then DELETE.
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-	mockHandler.AddResponse(http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusAccepted, `{
 		"data": {
 		  "id": "2f49c2b3",
 		  "name": "Production",
@@ -183,7 +178,7 @@ func TestDeleteInstanceWithTrailingNewline(t *testing.T) {
 
 	helper.ExecuteCommand(fmt.Sprintf("instance delete %s\"\n\" --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
 
-	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 }
 
@@ -232,13 +227,11 @@ func TestDeleteInstanceError(t *testing.T) {
 
 			instanceId := testDeleteInstanceID
 
-			// First call GET (pre-flight OK), second call DELETE (error).
-			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-			mockHandler.AddResponse(testCase.statusCode, testCase.returnBody)
+			mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), testCase.statusCode, testCase.returnBody)
 
 			helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
 
-			mockHandler.AssertCalledTimes(2)
+			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodDelete)
 
 			helper.AssertOut("")
@@ -259,8 +252,7 @@ func TestDeleteInstanceConfirmGate(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			t.Cleanup(helper.Close)
 			registerProjectsMock(&helper)
-			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-			mock.AddResponse(http.StatusAccepted, `{"data": {"id": "`+instanceId+`", "status": "deleting"}}`)
+			mock := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusAccepted, `{"data": {"id": "`+instanceId+`", "status": "deleting"}}`)
 			helper.SetStdin(stdin)
 			err := helper.ExecuteCommandE(args)
 			return confirmtest.GateRunResult{Err: err, Stderr: helper.PrintErr(), Invoked: mock.CalledWithMethod(http.MethodDelete)}

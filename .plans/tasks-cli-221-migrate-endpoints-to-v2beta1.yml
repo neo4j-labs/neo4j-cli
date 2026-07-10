@@ -91,7 +91,7 @@ tasks:
       GET where redundant). Not-found for an instance outside the project must
       surface via the v2beta1 path's native 404 with the existing message/exit
       code.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -100,7 +100,7 @@ tasks:
       - "The tenant_id-based ownership preflight for instances is removed; scoping is native to the path."
       - "A not-found instance yields the existing error message, resource type, suggestion, and exit code."
       - "get output preserves `status` and exposes `project_id`; tests updated and pass."
-    completed_at: null
+    completed_at: 2026-07-10T15:05:00Z
 
   - id: task-006
     title: 'Migrate graph-analytics session create/list/get/delete to v2beta1'

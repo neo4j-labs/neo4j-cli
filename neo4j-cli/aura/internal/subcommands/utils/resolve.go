@@ -91,6 +91,31 @@ func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
 		WithSuggestion("Run 'neo4j-cli aura project list --organization-id <id>' to see available projects.")
 }
 
+// FetchScopedInstance performs a GET on the v2beta1 org/project-scoped instance
+// path (/organizations/{orgID}/projects/{projectID}/instances/{instanceID}) and
+// returns the raw response body so the caller can reuse it for output (avoiding
+// a second round-trip in read-only commands such as "instance get").
+//
+// Scoping is native to the path, so no tenant_id comparison is performed: an
+// instance outside the project surfaces via the v2beta1 path's own 404, which
+// carries the correct resource type, id, and suggestion.
+func FetchScopedInstance(cfg *clicfg.Config, orgID, projectID, instanceID string) ([]byte, error) {
+	path := fmt.Sprintf("/organizations/%s/projects/%s/instances/%s", orgID, projectID, instanceID)
+	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion2,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d fetching instance", statusCode)
+	}
+
+	return resBody, nil
+}
+
 // FetchAndVerifyInstanceInProject performs a GET /instances/{instanceID} and
 // checks that the instance's tenant_id matches projectID. It returns the raw
 // response body so the caller can reuse it for output (avoiding a second

@@ -32,23 +32,23 @@ neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-0
 			instanceId := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
-			resBody, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID)
+			resBody, err := utils.FetchScopedInstance(cfg, orgID, projectID, instanceId)
 			if err != nil {
 				return err
 			}
 
 			if resBody != nil {
 				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				normalized := utils.NormalizeV2Beta1Response(responseData)
 				fields, err := getFields(resBody)
 				if err != nil {
 					return err
 				}
-				output.PrintBodyMap(cmd, cfg, renamed, fields)
+				output.PrintBodyMap(cmd, cfg, normalized, fields)
 			}
 
 			return nil

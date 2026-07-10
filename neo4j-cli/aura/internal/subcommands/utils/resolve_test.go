@@ -302,6 +302,17 @@ func buildResourceServer(t *testing.T, resourcePath, tenantID string) *httptest.
 	return srv
 }
 
+func TestFetchScopedInstance(t *testing.T) {
+	const instanceID = "inst-xyz"
+	scopedPath := "/v2beta1/organizations/" + testOrgID + "/projects/" + testProjectID + "/instances/" + instanceID
+	srv := buildResourceServer(t, scopedPath, testProjectID)
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	body, err := utils.FetchScopedInstance(cfg, testOrgID, testProjectID, instanceID)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `"id": "x"`)
+}
+
 func TestFetchAndVerifyInstanceInProject_OwnershipMismatch(t *testing.T) {
 	const instanceID = "inst-xyz"
 	srv := buildResourceServer(t, "/v1/instances/"+instanceID, "other-project")
