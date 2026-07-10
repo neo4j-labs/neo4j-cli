@@ -111,7 +111,7 @@ tasks:
       resolving org/project via `ResolveAndValidateOrgProject`. Update
       `utils.FetchAndVerifySessionInProject` to drop the redundant `tenant_id`
       ownership preflight. Apply task-001 normalization to session output.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -120,7 +120,7 @@ tasks:
       - "org/project resolved via ResolveAndValidateOrgProject; no new flags/config."
       - "The tenant_id-based session ownership preflight is removed."
       - "session output preserves `status` and exposes `project_id`; tests updated and pass."
-    completed_at: null
+    completed_at: 2026-07-10T16:05:00Z
 
   - id: task-007
     title: 'Migrate project get to derive from v2beta1 project list (REQ-F-008a)'

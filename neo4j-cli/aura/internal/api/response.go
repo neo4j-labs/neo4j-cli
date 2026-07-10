@@ -277,6 +277,8 @@ func suggestionForResource(resourceType string) string {
 		return "Run 'neo4j-cli aura organization list' to see available organizations."
 	case "customer-managed-key":
 		return "Run 'neo4j-cli aura customer-managed-key list' to see customer-managed keys."
+	case "session":
+		return "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project."
 	case "tenant":
 		return "Run 'neo4j-cli aura project list' to see available projects (tenants are now called projects)."
 	default:

@@ -152,37 +152,27 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 	return resBody, nil
 }
 
-// FetchAndVerifySessionInProject performs a GET /graph-analytics/sessions/{sessionID}
-// and checks that the session's tenant_id matches projectID. It returns the raw
-// response body so the caller can reuse it for output (avoiding a second
-// round-trip in read-only commands such as "graph-analytics session get").
+// FetchScopedSession performs a GET on the v2beta1 org/project-scoped
+// graph-analytics session path
+// (/organizations/{orgID}/projects/{projectID}/graph-analytics/sessions/{sessionID})
+// and returns the raw response body so the caller can reuse it for output
+// (avoiding a second round-trip in read-only commands such as
+// "graph-analytics session get").
 //
-// If the session exists but belongs to a different project the function
-// returns (nil, "could not find session {sessionID} in project {projectID}").
-func FetchAndVerifySessionInProject(cfg *clicfg.Config, sessionID, projectID string) ([]byte, error) {
-	path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionID)
+// Scoping is native to the path, so no tenant_id comparison is performed: a
+// session outside the project surfaces via the v2beta1 path's own 404.
+func FetchScopedSession(cfg *clicfg.Config, orgID, projectID, sessionID string) ([]byte, error) {
+	path := fmt.Sprintf("/organizations/%s/projects/%s/graph-analytics/sessions/%s", orgID, projectID, sessionID)
 	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-		Method: http.MethodGet,
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion2,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d from preflight ownership check", statusCode)
-	}
-
-	responseData := api.ParseBody(resBody)
-	session, err := responseData.GetSingleOrError()
-	if err != nil {
-		return nil, err
-	}
-
-	tenantID, _ := session["tenant_id"].(string)
-	if tenantID != projectID {
-		return nil, clierr.NewNotFoundError("could not find session %s in project %s", sessionID, projectID).
-			WithResource("graph-analytics-session", sessionID).
-			WithSuggestion("Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.")
+		return nil, fmt.Errorf("unexpected status %d fetching session", statusCode)
 	}
 
 	return resBody, nil

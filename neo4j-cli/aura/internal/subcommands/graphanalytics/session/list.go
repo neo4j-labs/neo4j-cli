@@ -4,6 +4,7 @@
 package session
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -32,21 +33,20 @@ neo4j-cli aura graph-analytics session list --organization-id 00000000-0000-0000
 Use --organization-id and --project-id to specify which project's sessions to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
-			path := "/graph-analytics/sessions"
+			path := fmt.Sprintf("/organizations/%s/projects/%s/graph-analytics/sessions", orgID, projectID)
 
-			queryParams := map[string]string{
-				"tenantId": projectID,
-			}
+			var queryParams map[string]string
 			if instanceId != "" {
-				queryParams["instanceId"] = instanceId
+				queryParams = map[string]string{"instanceId": instanceId}
 			}
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:      http.MethodGet,
+				Version:     api.AuraApiVersion2,
 				QueryParams: queryParams,
 			})
 			if err != nil {
@@ -55,8 +55,8 @@ Use --organization-id and --project-id to specify which project's sessions to li
 
 			if statusCode == http.StatusOK {
 				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "status", "project_id", "cloud_provider", "ttl"})
+				normalized := utils.NormalizeV2Beta1Response(responseData)
+				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "status", "project_id", "cloud_provider", "ttl"})
 			}
 			return nil
 		},

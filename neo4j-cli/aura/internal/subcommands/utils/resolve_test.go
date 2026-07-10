@@ -330,21 +330,15 @@ func TestFetchAndVerifyInstanceInProject_OwnershipMismatch(t *testing.T) {
 	assert.Equal(t, "Run 'neo4j-cli aura instance list --project-id <id>' to see instances in this project.", ce.Suggestion)
 }
 
-func TestFetchAndVerifySessionInProject_OwnershipMismatch(t *testing.T) {
+func TestFetchScopedSession(t *testing.T) {
 	const sessionID = "sess-xyz"
-	srv := buildResourceServer(t, "/v1/graph-analytics/sessions/"+sessionID, "other-project")
+	scopedPath := "/v2beta1/organizations/" + testOrgID + "/projects/" + testProjectID + "/graph-analytics/sessions/" + sessionID
+	srv := buildResourceServer(t, scopedPath, testProjectID)
 	cfg := buildTestConfig(t, srv.URL, "")
 
-	_, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, testProjectID)
-	require.Error(t, err)
-	assert.Equal(t, fmt.Sprintf("could not find session %s in project %s", sessionID, testProjectID), err.Error())
-
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 3, ce.Code)
-	assert.Equal(t, "graph-analytics-session", ce.ResourceType)
-	assert.Equal(t, sessionID, ce.ResourceID)
-	assert.Equal(t, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.", ce.Suggestion)
+	body, err := utils.FetchScopedSession(cfg, testOrgID, testProjectID, sessionID)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `"id": "x"`)
 }
 
 func TestFetchAndVerifyCMKInProject_OwnershipMismatch(t *testing.T) {

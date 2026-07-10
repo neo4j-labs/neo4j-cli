@@ -25,8 +25,8 @@ func registerProjectsMock(helper *testutils.AuraTestHelper) {
 	)
 }
 
-// sessionGetBody returns a minimal GET /graph-analytics/sessions/{id} response
-// body with the given tenant_id. Used to satisfy pre-flight ownership checks.
+// sessionGetBody returns a minimal session GET response body with the given
+// tenant_id, which exercises the tenant_id->project_id output normalization.
 func sessionGetBody(id, tenantID string) string {
 	return `{
 		"data": {
