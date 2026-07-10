@@ -201,8 +201,9 @@ func pollForToken(ctx context.Context, cfg *loginConfig, dcResp *deviceCodeRespo
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "login",
-		Short: "Authenticate with Aura using the device authorization flow",
+		Use:         "login",
+		Annotations: map[string]string{"write": "true"},
+		Short:       "Authenticate with Aura using the device authorization flow",
 		Long: "Authenticate with Aura using the OAuth 2.0 Device Authorization Grant (RFC 8628).\n" +
 			"On success, the credential is stored under the name \"login\" and always set as the\n" +
 			"default, overwriting any previously configured default.\n\n" +
