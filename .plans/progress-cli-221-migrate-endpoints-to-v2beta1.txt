@@ -47,3 +47,7 @@ Decisions: guarded the mapping AND the empty-Version defaulting in MakeRequest, 
 Fixed the e2e_exitcodes suite for the v2beta1 migration: instance list/get now resolve org/project and hit /v2beta1/organizations/{org}/projects/{proj}/instances, so the suite passes --organization-id/--project-id, registers the scoped instances path in the mock mux, and adds an always-200 list-projects validation handler; added a 402 quota-exceeded scenario (exit 5) exercising errors[].reason end-to-end. Verified casing gates, redaction/tee, and 402/404 body-shape handling already satisfied by tasks 003-008 (no other test/golden/decoder changes needed).
 Files: ~1 mod (test/e2e/exitcodes/exitcodes_test.go)
 Decisions: passed scope via flags rather than seeding a default workspace into config; list-projects handler always returns 200 with the project present so resolution proceeds to the instances request under test regardless of the scenario status.
+
+## TASK-011 — 2026-07-10T13:33:01Z
+Finalized the feature: ran `go generate ./...` (no bundle drift — no Long/Example text changed on migrated commands, so TestGenerator_RoundTrip already passes) and added a user-facing changie Minor entry describing the v2beta1 org/project-scoped endpoint migration (instance list/create/get/delete, graph-analytics session ops, project get) plus the tenant_id->project_id and legacy_status->status output changes. All final gates pass (test, fmt-check, lint 0 issues, license-check).
+Files: +1 new (.changes/unreleased changie Minor)

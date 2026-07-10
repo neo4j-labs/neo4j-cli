@@ -211,7 +211,7 @@ tasks:
       user-facing changelog entry via changie (Minor) describing the v2beta1
       endpoint migration and the `tenant_id`->`project_id` output rename. Ensure
       all final gates pass.
-    status: pending
+    status: completed
     dependencies:
       - task-009
       - task-010
@@ -220,4 +220,4 @@ tasks:
       - "changie Minor entry added describing the migration and output rename."
       - "make test, make fmt-check, make lint, make license-check all pass."
       - "Debug traces show the new v2beta1 paths and remain redacted."
-    completed_at: null
+    completed_at: 2026-07-10T13:33:01Z
