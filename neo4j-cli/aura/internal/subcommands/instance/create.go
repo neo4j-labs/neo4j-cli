@@ -91,20 +91,20 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, resolvedProjectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			resolvedOrgID, resolvedProjectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
 			// Auto-generate a default name when --name is omitted.
-			name, err = resolveInstanceName(cfg, name, resolvedProjectID)
+			name, err = resolveInstanceName(cfg, name, resolvedOrgID, resolvedProjectID)
 			if err != nil {
 				return err
 			}
 
 			body := buildCreateInstanceBody(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin, resolvedProjectID)
 
-			instance, err := createAndStoreInstance(cfg, body, credentialOptions{
+			instance, err := createAndStoreInstance(cfg, body, resolvedOrgID, resolvedProjectID, credentialOptions{
 				instanceType:        string(_type),
 				credentialName:      credentialName,
 				noCredentialStorage: noCredentialStorage,

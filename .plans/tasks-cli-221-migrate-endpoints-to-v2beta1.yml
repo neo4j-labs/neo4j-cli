@@ -69,7 +69,7 @@ tasks:
       is unwrapped from the `{data:...}` envelope and that `RegisterSecretValue`
       and DBMS credential storage read the correct field names (V-1). Preserve the
       existing tenant_id->project_id rename in `renderInstanceResult`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-003
@@ -79,7 +79,7 @@ tasks:
       - "Printed credentials (username/password/connection_url) populate correctly; password is registered via RegisterSecretValue before printing."
       - "DBMS credential storage still succeeds using the v2beta1 field names."
       - "Create tests updated and pass; no secret leaks in redaction/tee tests."
-    completed_at: null
+    completed_at: 2026-07-10T14:05:00Z
 
   - id: task-005
     title: 'Migrate instance get + delete; remove tenant_id ownership preflight'

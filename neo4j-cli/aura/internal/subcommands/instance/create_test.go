@@ -18,6 +18,9 @@ import (
 const (
 	testCreateOrgID     = "test-org-id"
 	testCreateProjectID = "YOUR_TENANT_ID"
+	// createInstancesPath is the v2beta1 org/project-scoped instances path the
+	// create leaf POSTs to and pre-lists for auto-naming.
+	createInstancesPath = "/v2beta1/organizations/" + testCreateOrgID + "/projects/" + testCreateProjectID + "/instances"
 )
 
 // registerCreateProjectsMock registers a v2beta1 projects mock for the standard create test org/project.
@@ -33,7 +36,7 @@ func TestCreateFreeInstanceRequiresRw(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, `{
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
@@ -59,7 +62,7 @@ func TestCreateFreeInstance(t *testing.T) {
 
 	registerCreateProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, `{
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
@@ -104,7 +107,7 @@ func TestCreateProfessionalInstance(t *testing.T) {
 
 	registerCreateProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, `{
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
@@ -148,7 +151,7 @@ func TestCreateProfessionalInstanceVectorOptimizedGraphAnalyticsPlugin(t *testin
 
 	registerCreateProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, `{
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
@@ -190,7 +193,7 @@ func TestCreateProfessionalInstanceNoMemory(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --rw")
 
@@ -204,7 +207,7 @@ func TestCreateInstanceMissingOrg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --project-id " + testCreateProjectID + " --rw")
 
@@ -217,7 +220,7 @@ func TestCreateInstanceMissingProject(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --rw")
 
@@ -230,7 +233,7 @@ func TestCreateProfessionalInstanceInvalidCloudProvider(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider invalid --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -244,7 +247,7 @@ func TestCreateProfessionalInstanceInvalidMemory(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 3GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -258,7 +261,7 @@ func TestCreateProfessionalInstanceInvalidInstanceType(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type invalid-db --memory 1GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -272,7 +275,7 @@ func TestCreateProfessionalInstanceInvalidVersion(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --version 6 --rw")
 
@@ -286,7 +289,7 @@ func TestCreateFreeInstanceWithMemory(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --memory 1GB --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -300,7 +303,7 @@ func TestCreateFreeInstanceWithRegion(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -314,7 +317,7 @@ func TestCreateFreeInstanceWithCloudProvider(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -328,7 +331,7 @@ func TestCreateFreeInstanceWithGraphAnalyticsPlugin(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --graph-analytics-plugin --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -382,7 +385,7 @@ func TestCreateInstanceError(t *testing.T) {
 
 			registerCreateProjectsMock(&helper)
 
-			mockHandler := helper.NewRequestHandlerMock("/v1/instances", testCase.statusCode, testCase.returnBody)
+			mockHandler := helper.NewRequestHandlerMock(createInstancesPath, testCase.statusCode, testCase.returnBody)
 
 			helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --rw")
 
@@ -401,7 +404,7 @@ func TestInstanceWithCmkId(t *testing.T) {
 
 	registerCreateProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, `{
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
@@ -445,7 +448,7 @@ func TestCreateFreeInstanceWithDefaultWorkspace(t *testing.T) {
 
 	registerCreateProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, `{
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
@@ -487,7 +490,7 @@ func TestCreateFreeInstanceWithWait(t *testing.T) {
 
 	registerCreateProjectsMock(&helper)
 
-	createMock := helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, `{
+	createMock := helper.NewRequestHandlerMock("POST "+createInstancesPath, http.StatusAccepted, `{
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
@@ -554,7 +557,7 @@ func TestCreateFreeInstanceWithWait_StdoutIsValidJSON(t *testing.T) {
 
 	registerCreateProjectsMock(&helper)
 
-	helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, `{
+	helper.NewRequestHandlerMock("POST "+createInstancesPath, http.StatusAccepted, `{
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
@@ -627,7 +630,7 @@ func TestCreateCredentialFlagValidation(t *testing.T) {
 				registerCreateProjectsMock(&helper)
 			}
 
-			mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+			mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, `{
 				"data": {
 					"id": "db1d1234",
 					"connection_url": "YOUR_CONNECTION_URL",
@@ -699,7 +702,7 @@ func TestCreateDefaultCredentialStorage(t *testing.T) {
 	defer helper.Close()
 
 	registerCreateProjectsMock(&helper)
-	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -768,7 +771,7 @@ func TestCreateDatabaseNameStorage(t *testing.T) {
 
 			registerCreateProjectsMock(&helper)
 
-			helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, fmt.Sprintf(`{
+			helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, fmt.Sprintf(`{
 				"data": {
 					"id": "db1d1234",
 					"connection_url": "YOUR_CONNECTION_URL",
@@ -809,7 +812,7 @@ func TestCreateCollisionResolution(t *testing.T) {
 	helper.SetCredentialsValue("dbms.default-credential", "db1d1234-default")
 
 	registerCreateProjectsMock(&helper)
-	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
@@ -841,7 +844,7 @@ func TestCreateCustomCredentialName(t *testing.T) {
 	defer helper.Close()
 
 	registerCreateProjectsMock(&helper)
-	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myinstance --rw")
 
@@ -883,7 +886,7 @@ func TestCreateCustomCredentialNameCollision(t *testing.T) {
 	helper.SetCredentialsValue("dbms.default-credential", "myinstance")
 
 	registerCreateProjectsMock(&helper)
-	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myinstance --rw")
 
@@ -913,7 +916,7 @@ func TestCreateNoCredentialStorage(t *testing.T) {
 	defer helper.Close()
 
 	registerCreateProjectsMock(&helper)
-	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw")
 
@@ -943,7 +946,7 @@ func TestCreateNoCredentialPrint(t *testing.T) {
 	defer helper.Close()
 
 	registerCreateProjectsMock(&helper)
-	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-print --rw")
 
@@ -973,7 +976,7 @@ func TestCreateNoCredentialStorageAndNoPrint(t *testing.T) {
 	defer helper.Close()
 
 	registerCreateProjectsMock(&helper)
-	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --no-credential-print --rw")
 
@@ -1003,7 +1006,7 @@ func TestCreateCredentialStoredBeforeWait(t *testing.T) {
 
 	registerCreateProjectsMock(&helper)
 
-	helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, createAPIResponse)
+	helper.NewRequestHandlerMock("POST "+createInstancesPath, http.StatusAccepted, createAPIResponse)
 
 	helper.NewRequestHandlerMock("GET /v1/instances/db1d1234", http.StatusOK, `{
 		"data": {
@@ -1072,8 +1075,8 @@ func TestCreateDefaultNameGeneration(t *testing.T) {
 
 			registerCreateProjectsMock(&helper)
 
-			listMock := helper.NewRequestHandlerMock("GET /v1/instances", http.StatusOK, tc.listResponseBody)
-			postMock := helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, `{
+			listMock := helper.NewRequestHandlerMock("GET "+createInstancesPath, http.StatusOK, tc.listResponseBody)
+			postMock := helper.NewRequestHandlerMock("POST "+createInstancesPath, http.StatusAccepted, `{
 				"data": {
 					"id": "db1d1234",
 					"connection_url": "YOUR_CONNECTION_URL",
@@ -1104,7 +1107,7 @@ func TestCreateDefaultNameListAPIError(t *testing.T) {
 
 	registerCreateProjectsMock(&helper)
 
-	listMock := helper.NewRequestHandlerMock("GET /v1/instances", http.StatusInternalServerError, `{
+	listMock := helper.NewRequestHandlerMock("GET "+createInstancesPath, http.StatusInternalServerError, `{
 		"errors": [
 			{
 				"message": "internal server error",
@@ -1112,7 +1115,7 @@ func TestCreateDefaultNameListAPIError(t *testing.T) {
 			}
 		]
 	}`)
-	postMock := helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, `{"data": {}}`)
+	postMock := helper.NewRequestHandlerMock("POST "+createInstancesPath, http.StatusAccepted, `{"data": {}}`)
 
 	helper.ExecuteCommand("instance create --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw")
 

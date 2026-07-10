@@ -12,3 +12,8 @@ Decisions: kept flat-path resolution untouched to preserve existing snapshots/da
 Migrated `aura instance list` to the v2beta1 org/project-scoped path GET /organizations/{orgID}/projects/{projectID}/instances (Version AuraApiVersion2), dropping the v1 tenantId query param and switching output mapping from RenameResponseField to utils.NormalizeV2Beta1Response (legacy_status->status, tenant_id->project_id). Added `status` to the table field list.
 Files: ~2 mod (list.go, list_test.go)
 Decisions: test now seeds legacy_status in mock rows and asserts it surfaces as status in JSON, covering the normalization path directly per review.
+
+## TASK-004 — 2026-07-10T14:05:00Z
+Migrated `aura instance create` to POST the v2beta1 org/project-scoped path (/organizations/{orgID}/projects/{projectID}/instances, Version AuraApiVersion2), including the auto-naming pre-list GET on the same scoped path (dropped the v1 tenantId query param). Added a scopedInstancesPath helper; threaded orgID into the shared resolveInstanceName/createAndStoreInstance helpers, which also migrated deploy + load's create path. renderInstanceResult tenant_id->project_id rename preserved; {data:...} unwrap and cred storage unchanged. Poll GETs stay v1 (task-008).
+Files: ~6 mod (create_core.go, create.go, deploy.go, load.go, create_test.go, deploy_test.go, load_test.go)
+Decisions: request POST body still sends tenant_id (scope now in path) — PRD V-1/REQ-F-002 only cover the path+response, so live-schema confirmation of a body project_id rename is deferred to task-011.

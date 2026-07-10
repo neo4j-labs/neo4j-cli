@@ -17,6 +17,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// scopedInstancesPath builds the v2beta1 org/project-scoped instances path.
+func scopedInstancesPath(orgID, projectID string) string {
+	return fmt.Sprintf("/organizations/%s/projects/%s/instances", orgID, projectID)
+}
+
 // instanceFlags carries the create-mirror flag values shared by the create and
 // deploy leaves' PreRunE validation. The validator reads these to decide which
 // flags to require and which combinations to reject.
@@ -73,16 +78,17 @@ func validateInstanceFlags(cmd *cobra.Command, cfg *clicfg.Config, f instanceFla
 }
 
 // resolveInstanceName returns the explicit name when non-empty, otherwise it
-// lists the project's instances and derives an unused default name (e.g.
-// Instance01). Shared by the create and deploy leaves' auto-naming.
-func resolveInstanceName(cfg *clicfg.Config, name, projectID string) (string, error) {
+// lists the project's instances (via the v2beta1 org/project-scoped path) and
+// derives an unused default name (e.g. Instance01). Shared by the create and
+// deploy leaves' auto-naming.
+func resolveInstanceName(cfg *clicfg.Config, name, orgID, projectID string) (string, error) {
 	if name != "" {
 		return name, nil
 	}
 
-	listBody, _, listErr := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
-		Method:      http.MethodGet,
-		QueryParams: map[string]string{"tenantId": projectID},
+	listBody, _, listErr := api.MakeRequest(cfg, scopedInstancesPath(orgID, projectID), &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion2,
 	})
 	if listErr != nil {
 		return "", listErr
@@ -200,10 +206,11 @@ type credentialOptions struct {
 // A status other than 202 Accepted or 200 OK yields a nil map and nil error
 // (mirroring the historic create behaviour, where only those paths produce
 // output).
-func createAndStoreInstance(cfg *clicfg.Config, body map[string]any, credOpts credentialOptions) (map[string]any, error) {
-	resBody, statusCode, err := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
+func createAndStoreInstance(cfg *clicfg.Config, body map[string]any, orgID, projectID string, credOpts credentialOptions) (map[string]any, error) {
+	resBody, statusCode, err := api.MakeRequest(cfg, scopedInstancesPath(orgID, projectID), &api.RequestConfig{
 		PostBody: body,
 		Method:   http.MethodPost,
+		Version:  api.AuraApiVersion2,
 	})
 	if err != nil {
 		return nil, err

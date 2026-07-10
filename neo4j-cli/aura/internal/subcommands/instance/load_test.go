@@ -147,7 +147,7 @@ func TestLoadGDSHardErrorsBeforeAnyWork(t *testing.T) {
 	h := newLoadHarness(t)
 
 	var createCalled bool
-	h.mux.HandleFunc("POST /v1/instances", func(res http.ResponseWriter, _ *http.Request) {
+	h.mux.HandleFunc("POST "+deployInstancesPath, func(res http.ResponseWriter, _ *http.Request) {
 		createCalled = true
 		res.WriteHeader(http.StatusAccepted)
 	})
@@ -171,7 +171,7 @@ func TestLoadDockerAbsentErrorsBeforeInstanceCreation(t *testing.T) {
 	h := newLoadHarness(t)
 
 	var createCalled bool
-	h.mux.HandleFunc("POST /v1/instances", func(res http.ResponseWriter, _ *http.Request) {
+	h.mux.HandleFunc("POST "+deployInstancesPath, func(res http.ResponseWriter, _ *http.Request) {
 		createCalled = true
 		res.WriteHeader(http.StatusAccepted)
 	})
@@ -191,7 +191,7 @@ func TestLoadResolveErrorBeforeInstanceCreation(t *testing.T) {
 	h := newLoadHarness(t)
 
 	var createCalled bool
-	h.mux.HandleFunc("POST /v1/instances", func(res http.ResponseWriter, _ *http.Request) {
+	h.mux.HandleFunc("POST "+deployInstancesPath, func(res http.ResponseWriter, _ *http.Request) {
 		createCalled = true
 		res.WriteHeader(http.StatusAccepted)
 	})
@@ -209,7 +209,7 @@ func TestLoadResolveErrorBeforeInstanceCreation(t *testing.T) {
 
 func TestLoadSuccessCreatesStagesAndPushes(t *testing.T) {
 	h := newLoadHarness(t)
-	h.handle("POST /v1/instances", http.StatusAccepted, deployCreateResponse)
+	h.handle("POST "+deployInstancesPath, http.StatusAccepted, deployCreateResponse)
 	registerLoadRunningInstanceMock(h)
 
 	var gotLoad datasetStageLoad
@@ -236,7 +236,7 @@ func TestLoadCreatesThenStages(t *testing.T) {
 	h := newLoadHarness(t)
 
 	var order []string
-	h.mux.HandleFunc("POST /v1/instances", func(res http.ResponseWriter, _ *http.Request) {
+	h.mux.HandleFunc("POST "+deployInstancesPath, func(res http.ResponseWriter, _ *http.Request) {
 		order = append(order, "create")
 		res.WriteHeader(http.StatusAccepted)
 		_, _ = res.Write([]byte(deployCreateResponse))
@@ -258,7 +258,7 @@ func TestLoadCreatesThenStages(t *testing.T) {
 
 func TestLoadStageFailureLeavesInstance(t *testing.T) {
 	h := newLoadHarness(t)
-	h.handle("POST /v1/instances", http.StatusAccepted, deployCreateResponse)
+	h.handle("POST "+deployInstancesPath, http.StatusAccepted, deployCreateResponse)
 	registerLoadRunningInstanceMock(h)
 
 	withStubbedLoadDeps(t, moviesLoadSpec(), nil, nil, func(context.Context, *clicfg.Config, datasetStageLoad, deployTarget, io.Writer) error {
