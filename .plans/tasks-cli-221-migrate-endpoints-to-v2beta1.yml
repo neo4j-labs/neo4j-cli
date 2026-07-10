@@ -241,7 +241,7 @@ tasks:
       api/poll.go and both FetchScoped* helpers. Collapse create_core.go's local
       scopedInstancesPath into the shared builders rather than leaving a
       package-private near-duplicate.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -249,7 +249,7 @@ tasks:
       - "All ~9 previous inline fmt.Sprintf path sites (instance list/delete, session create/list/delete, poll.go, FetchScoped* helpers) route through the shared builders."
       - "create_core.go's local scopedInstancesPath is removed and its callers use the shared builder."
       - "make test, make fmt-check, make lint, make license-check all pass."
-    completed_at: null
+    completed_at: 2026-07-10T20:15:00Z
 
   - id: task-013
     title: 'Unify tenant_id->project_id rename across normalize and rename helpers'

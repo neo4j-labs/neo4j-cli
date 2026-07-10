@@ -100,7 +100,7 @@ func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
 // instance outside the project surfaces via the v2beta1 path's own 404, which
 // carries the correct resource type, id, and suggestion.
 func FetchScopedInstance(cfg *clicfg.Config, orgID, projectID, instanceID string) ([]byte, error) {
-	path := fmt.Sprintf("/organizations/%s/projects/%s/instances/%s", orgID, projectID, instanceID)
+	path := api.ScopedInstancePath(orgID, projectID, instanceID)
 	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion2,
@@ -162,7 +162,7 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 // Scoping is native to the path, so no tenant_id comparison is performed: a
 // session outside the project surfaces via the v2beta1 path's own 404.
 func FetchScopedSession(cfg *clicfg.Config, orgID, projectID, sessionID string) ([]byte, error) {
-	path := fmt.Sprintf("/organizations/%s/projects/%s/graph-analytics/sessions/%s", orgID, projectID, sessionID)
+	path := api.ScopedSessionPath(orgID, projectID, sessionID)
 	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion2,

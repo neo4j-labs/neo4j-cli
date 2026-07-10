@@ -4,7 +4,6 @@
 package instance
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -36,7 +35,7 @@ neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000
 				return err
 			}
 
-			path := fmt.Sprintf("/organizations/%s/projects/%s/instances", orgID, projectID)
+			path := api.ScopedInstancesPath(orgID, projectID)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:  http.MethodGet,

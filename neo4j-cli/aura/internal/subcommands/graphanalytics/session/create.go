@@ -84,7 +84,7 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 			if region != "" {
 				body["region"] = region
 			}
-			path := fmt.Sprintf("/organizations/%s/projects/%s/graph-analytics/sessions", orgID, projectID)
+			path := api.ScopedSessionsPath(orgID, projectID)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				PostBody: body,
 				Method:   http.MethodPost,

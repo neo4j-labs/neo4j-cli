@@ -4,7 +4,6 @@
 package instance
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -51,7 +50,7 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
-			path := fmt.Sprintf("/organizations/%s/projects/%s/instances/%s", orgID, projectID, instanceID)
+			path := api.ScopedInstancePath(orgID, projectID, instanceID)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:  http.MethodDelete,
 				Version: api.AuraApiVersion2,

@@ -4,7 +4,6 @@
 package session
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -38,7 +37,7 @@ Use --organization-id and --project-id to specify which project's sessions to li
 				return err
 			}
 
-			path := fmt.Sprintf("/organizations/%s/projects/%s/graph-analytics/sessions", orgID, projectID)
+			path := api.ScopedSessionsPath(orgID, projectID)
 
 			var queryParams map[string]string
 			if instanceId != "" {

@@ -4,7 +4,6 @@
 package session
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -47,7 +46,7 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 				return err
 			}
 
-			path := fmt.Sprintf("/organizations/%s/projects/%s/graph-analytics/sessions/%s", orgID, projectID, sessionID)
+			path := api.ScopedSessionPath(orgID, projectID, sessionID)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:  http.MethodDelete,
 				Version: api.AuraApiVersion2,

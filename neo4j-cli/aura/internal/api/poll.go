@@ -33,7 +33,7 @@ func (r *PollResponse) normalize() {
 }
 
 func PollInstance(cfg *clicfg.Config, orgID, projectID, instanceId string, waitingStatus string) (*PollResponse, error) {
-	path := fmt.Sprintf("/organizations/%s/projects/%s/instances/%s", orgID, projectID, instanceId)
+	path := ScopedInstancePath(orgID, projectID, instanceId)
 	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
 		return status != waitingStatus
 	})
@@ -61,7 +61,7 @@ func PollGraphQLDataApi(cfg *clicfg.Config, instanceId string, graphQLDataApiId 
 }
 
 func PollGraphAnalyticsSessionReady(cfg *clicfg.Config, orgID, projectID, sessionId string, waitingStatus []string) (*PollResponse, error) {
-	path := fmt.Sprintf("/organizations/%s/projects/%s/graph-analytics/sessions/%s", orgID, projectID, sessionId)
+	path := ScopedSessionPath(orgID, projectID, sessionId)
 	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
 		return !slices.Contains(waitingStatus, status)
 	})

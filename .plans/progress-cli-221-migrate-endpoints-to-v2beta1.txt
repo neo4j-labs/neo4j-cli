@@ -54,3 +54,8 @@ Files: +1 new (.changes/unreleased changie Minor)
 
 ## REVIEW — 2026-07-10T14:04:58Z
 Added 4 review tasks (task-012..task-015).
+
+## TASK-012 — 2026-07-10T20:15:00Z
+Centralized v2beta1 scoped-path construction into api/scoped_path.go (ScopedInstancesPath/ScopedInstancePath/ScopedSessionsPath/ScopedSessionPath, item forms compose collection forms). Routed all inline fmt.Sprintf sites through them: instance list/delete/create_core, session create/list/delete, api/poll.go (both pollers), utils/resolve.go FetchScoped* helpers; removed create_core's local scopedInstancesPath; dropped now-unused fmt imports.
+Files: +1 new (scoped_path.go), ~8 mod
+Decisions: builders live in api (not utils) because api/poll.go must use them and api cannot import utils (cycle). Review caught 3 unmigrated session files on first pass; fixed before completion.

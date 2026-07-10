@@ -17,11 +17,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// scopedInstancesPath builds the v2beta1 org/project-scoped instances path.
-func scopedInstancesPath(orgID, projectID string) string {
-	return fmt.Sprintf("/organizations/%s/projects/%s/instances", orgID, projectID)
-}
-
 // instanceFlags carries the create-mirror flag values shared by the create and
 // deploy leaves' PreRunE validation. The validator reads these to decide which
 // flags to require and which combinations to reject.
@@ -86,7 +81,7 @@ func resolveInstanceName(cfg *clicfg.Config, name, orgID, projectID string) (str
 		return name, nil
 	}
 
-	listBody, _, listErr := api.MakeRequest(cfg, scopedInstancesPath(orgID, projectID), &api.RequestConfig{
+	listBody, _, listErr := api.MakeRequest(cfg, api.ScopedInstancesPath(orgID, projectID), &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion2,
 	})
@@ -207,7 +202,7 @@ type credentialOptions struct {
 // (mirroring the historic create behaviour, where only those paths produce
 // output).
 func createAndStoreInstance(cfg *clicfg.Config, body map[string]any, orgID, projectID string, credOpts credentialOptions) (map[string]any, error) {
-	resBody, statusCode, err := api.MakeRequest(cfg, scopedInstancesPath(orgID, projectID), &api.RequestConfig{
+	resBody, statusCode, err := api.MakeRequest(cfg, api.ScopedInstancesPath(orgID, projectID), &api.RequestConfig{
 		PostBody: body,
 		Method:   http.MethodPost,
 		Version:  api.AuraApiVersion2,
