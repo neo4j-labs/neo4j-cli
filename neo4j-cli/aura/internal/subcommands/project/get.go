@@ -4,8 +4,8 @@
 package project
 
 import (
+	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -47,28 +47,23 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 			if err != nil {
 				return err
 			}
-			found := false
-			for _, p := range projects.Data {
-				if p.Id == projectID {
-					found = true
+			var found *api.Project
+			for i := range projects.Data {
+				if projects.Data[i].Id == projectID {
+					found = &projects.Data[i]
 					break
 				}
 			}
-			if !found {
+			if found == nil {
 				return fmt.Errorf("project %s not found in organization %s", projectID, orgID)
 			}
 
-			resBody, statusCode, err := api.MakeRequest(cfg, fmt.Sprintf("/tenants/%s", projectID), &api.RequestConfig{
-				Method:  http.MethodGet,
-				Version: api.AuraApiVersion1,
-			})
+			resBody, err := json.Marshal(api.GetProjectResponse{Data: *found})
 			if err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
-			}
+			output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
 
 			return nil
 		},

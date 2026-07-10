@@ -130,7 +130,7 @@ tasks:
       (v2beta1) by reusing `api.ListProjects` and filtering for the requested
       projectID. Return the existing not-found error (message/resource/exit code)
       when the project is absent.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -138,7 +138,7 @@ tasks:
       - "A present project is returned with the same output fields as before."
       - "An absent project yields the existing not-found message, suggestion, and exit code."
       - "project get tests updated for the derived-from-list behaviour and pass."
-    completed_at: null
+    completed_at: 2026-07-10T17:05:00Z
 
   - id: task-008
     title: 'Migrate instance/session polling helpers to v2beta1'
