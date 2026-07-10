@@ -20,43 +20,15 @@ import "github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 // A native field always wins over the legacy source: if a map already contains
 // `status`, its value is kept and any `legacy_status` is dropped; likewise a
 // native `project_id` is kept over `tenant_id`.
+//
+// This is RenameResponseField's superset for migrated commands: it applies the
+// same tenant_id->project_id rename plus legacy_status->status, and — because a
+// v2beta1 response may carry both the legacy and native field — routes through
+// renameMapKey with the native-preferring tie-break (preferTo=true) rather than
+// RenameResponseField's unconditional move.
 func NormalizeV2Beta1Response(data api.ResponseData) api.ResponseData {
-	switch d := data.(type) {
-	case api.SingleValueResponseData:
-		return api.NewSingleValueResponseData(normalizeMap(d.Data))
-	default:
-		rows := data.AsArray()
-		normalized := make([]map[string]any, len(rows))
-		for i, row := range rows {
-			normalized[i] = normalizeMap(row)
-		}
-		return api.NewListResponseData(normalized)
-	}
-}
-
-// normalizeMap returns a copy of m with legacy_status renamed to status and
-// tenant_id renamed to project_id. A pre-existing native destination key
-// (status / project_id) is preserved and the corresponding legacy key dropped.
-func normalizeMap(m map[string]any) map[string]any {
-	out := preferField(m, "legacy_status", "status")
-	out = preferField(out, "tenant_id", "project_id")
-	return out
-}
-
-// preferField copies m, ensuring `to` holds the native value if present,
-// otherwise the value of `from`, and always drops `from` from the result.
-func preferField(m map[string]any, from, to string) map[string]any {
-	out := make(map[string]any, len(m))
-	for k, v := range m {
-		if k == from {
-			continue
-		}
-		out[k] = v
-	}
-	if native, ok := m[to]; ok {
-		out[to] = native
-	} else if legacy, ok := m[from]; ok {
-		out[to] = legacy
-	}
-	return out
+	return mapResponse(data, func(m map[string]any) map[string]any {
+		out := renameMapKey(m, "legacy_status", "status", true)
+		return renameMapKey(out, "tenant_id", "project_id", true)
+	})
 }

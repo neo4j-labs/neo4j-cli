@@ -267,7 +267,7 @@ tasks:
       in terms of `renameMapKey` (or vice-versa) so there is ONE copy-and-rename
       primitive, and make the relationship between the two public helpers explicit
       so a reader can tell why create uses one and delete the other.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -275,7 +275,7 @@ tasks:
       - "NormalizeV2Beta1Response is built on top of the shared rename primitive."
       - "Both public helpers' relationship/intent is clear (via naming and/or a brief doc comment where non-obvious)."
       - "Existing behaviour and tests for both migrated and non-migrated commands are unchanged; all gates pass."
-    completed_at: null
+    completed_at: 2026-07-10T21:15:00Z
 
   - id: task-014
     title: 'Reuse canonical utils resolution in project get'

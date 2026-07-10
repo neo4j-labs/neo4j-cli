@@ -59,3 +59,8 @@ Added 4 review tasks (task-012..task-015).
 Centralized v2beta1 scoped-path construction into api/scoped_path.go (ScopedInstancesPath/ScopedInstancePath/ScopedSessionsPath/ScopedSessionPath, item forms compose collection forms). Routed all inline fmt.Sprintf sites through them: instance list/delete/create_core, session create/list/delete, api/poll.go (both pollers), utils/resolve.go FetchScoped* helpers; removed create_core's local scopedInstancesPath; dropped now-unused fmt imports.
 Files: +1 new (scoped_path.go), ~8 mod
 Decisions: builders live in api (not utils) because api/poll.go must use them and api cannot import utils (cycle). Review caught 3 unmigrated session files on first pass; fixed before completion.
+
+## TASK-013 — 2026-07-10T21:15:00Z
+Unified the copy-and-rename logic: renameMapKey(m, from, to, preferTo) is now the single copy-and-rename primitive and mapResponse the shared envelope-preserving walker. RenameResponseField routes through it with preferTo=false (unconditional move, for non-migrated v1-only responses); NormalizeV2Beta1Response with preferTo=true (native `to` wins, for v2beta1 responses carrying both). preferField/normalizeMap deleted. Doc comments make the two public helpers' relationship explicit.
+Files: ~2 mod (rename.go, normalize.go)
+Decisions: preferTo=false path now deterministically prefers the legacy `from` value (was iteration-order-dependent when both keys present); harmless since all RenameResponseField callers rename tenant_id->project_id on v1 responses that carry only tenant_id.
