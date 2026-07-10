@@ -13,14 +13,14 @@ tasks:
       existing `utils.RenameResponseField`. This is the shared output-contract
       layer the migrated commands will call so field mapping is not duplicated
       per command.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A reusable helper normalises `legacy_status` to `status` on v2beta1 response bodies (single and list)."
       - "The helper renames/guarantees `project_id` (from v2beta1 native `project_id` or legacy `tenant_id`)."
       - "Helper lives in a shared location (e.g. utils) and is unit-tested with table-driven tests using testfs, not afero.NewOsFs()."
       - "No behavioural change yet for callers not wired to it."
-    completed_at: null
+    completed_at: 2026-07-10T11:45:00Z
 
   - id: task-002
     title: 'Fix parseResourceFromRequest for nested v2beta1 paths (REQ-F-013a)'

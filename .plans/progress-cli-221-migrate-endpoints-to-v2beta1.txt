@@ -1,0 +1,4 @@
+## TASK-001 — 2026-07-10T11:45:00Z
+Added centralized utils.NormalizeV2Beta1Response helper renaming legacy_status->status and tenant_id->project_id (single+list), with native fields winning over legacy sources and no input mutation. Not yet wired to any caller.
+Files: +2 new (normalize.go, normalize_test.go)
+Decisions: native destination field (status/project_id) wins over legacy source; this is a deliberate tie-break divergence from RenameResponseField, which callers will adopt in task-003/005/006.
