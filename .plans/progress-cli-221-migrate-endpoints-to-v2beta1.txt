@@ -7,3 +7,8 @@ Decisions: native destination field (status/project_id) wins over legacy source;
 parseResourceFromRequest now detects the nested v2beta1 shape (/<ver>/organizations/{org}/projects/{proj}/<plural>/<id>) via a segments>=6 + organizations/projects guard, skips the scoping prefix, and returns the trailing plural/id pair; flat v1 paths keep first-pair behaviour. Action suffixes (pause/resume/overwrite/metrics/invoke) are stripped so they aren't mistaken for ids.
 Files: ~2 mod (response.go, response_test.go)
 Decisions: kept flat-path resolution untouched to preserve existing snapshots/data-apis first-pair tests; scoped trailing-pair logic gated strictly to the org/project prefix. invoke added to the action allow-list per review (agent invoke path is nested v2beta1).
+
+## TASK-003 — 2026-07-10T13:05:00Z
+Migrated `aura instance list` to the v2beta1 org/project-scoped path GET /organizations/{orgID}/projects/{projectID}/instances (Version AuraApiVersion2), dropping the v1 tenantId query param and switching output mapping from RenameResponseField to utils.NormalizeV2Beta1Response (legacy_status->status, tenant_id->project_id). Added `status` to the table field list.
+Files: ~2 mod (list.go, list_test.go)
+Decisions: test now seeds legacy_status in mock rows and asserts it surfaces as status in JSON, covering the normalization path directly per review.

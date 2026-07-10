@@ -49,7 +49,7 @@ tasks:
       `utils.ResolveAndValidateOrgProject`. Apply the task-001 normalization so
       output preserves `status` and exposes `project_id`. Pagination behaviour is
       unchanged (render the single response; do not follow page tokens).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -57,7 +57,7 @@ tasks:
       - "org/project resolved through ResolveAndValidateOrgProject; no new flags/config added."
       - "Output preserves `status` and renames `tenant_id`->`project_id`; other columns remain populated."
       - "Existing list tests updated for the new path and field names and pass."
-    completed_at: null
+    completed_at: 2026-07-10T13:05:00Z
 
   - id: task-004
     title: 'Migrate instance create (incl. auto-naming, credential display) to v2beta1'
