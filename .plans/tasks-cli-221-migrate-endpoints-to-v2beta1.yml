@@ -31,14 +31,14 @@ tasks:
       `/v2beta1/organizations/{org}/projects/{proj}/instances/{id}` it must return
       resourceType=`instance` and resourceID=`{id}`, so 404 envelopes and
       `suggestionForResource` hints are correct. Flat v1 paths must keep working.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Nested v2beta1 instance/session paths yield the correct trailing resource type and id."
       - "Flat v1 paths (e.g. /v1/instances/{id}) still resolve correctly."
       - "Sub-resource paths ending in an action (e.g. .../pause) do not mis-report the action as an id."
       - "Table-driven tests cover v1 flat, v2beta1 nested, and action-suffixed paths."
-    completed_at: null
+    completed_at: 2026-07-10T12:15:00Z
 
   - id: task-003
     title: 'Migrate instance list to v2beta1 org/project-scoped endpoint'

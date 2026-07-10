@@ -2,3 +2,8 @@
 Added centralized utils.NormalizeV2Beta1Response helper renaming legacy_status->status and tenant_id->project_id (single+list), with native fields winning over legacy sources and no input mutation. Not yet wired to any caller.
 Files: +2 new (normalize.go, normalize_test.go)
 Decisions: native destination field (status/project_id) wins over legacy source; this is a deliberate tie-break divergence from RenameResponseField, which callers will adopt in task-003/005/006.
+
+## TASK-002 — 2026-07-10T12:15:00Z
+parseResourceFromRequest now detects the nested v2beta1 shape (/<ver>/organizations/{org}/projects/{proj}/<plural>/<id>) via a segments>=6 + organizations/projects guard, skips the scoping prefix, and returns the trailing plural/id pair; flat v1 paths keep first-pair behaviour. Action suffixes (pause/resume/overwrite/metrics/invoke) are stripped so they aren't mistaken for ids.
+Files: ~2 mod (response.go, response_test.go)
+Decisions: kept flat-path resolution untouched to preserve existing snapshots/data-apis first-pair tests; scoped trailing-pair logic gated strictly to the org/project prefix. invoke added to the action allow-list per review (agent invoke path is nested v2beta1).
