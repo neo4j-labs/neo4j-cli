@@ -64,3 +64,8 @@ func TokenCacheHashForTest(clientID, clientSecret, authURL string) string {
 	full, _ := tokenCacheHash(clientID, clientSecret, authURL)
 	return full
 }
+
+// VersionPathForTest exposes the version->wire-path mapping for assertions.
+func VersionPathForTest(v AuraApiVersion) string {
+	return getVersionPath(v)
+}

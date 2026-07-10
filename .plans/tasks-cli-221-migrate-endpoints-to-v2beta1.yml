@@ -168,7 +168,7 @@ tasks:
       and all `graphql` commands remain on their existing versions (v1 / v1beta5)
       and still function. Ensure any shared helper changes from earlier tasks did
       not alter their paths, versions, or output.
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-006
@@ -177,7 +177,7 @@ tasks:
       - "snapshot and customer-managed-key commands still call v1; graphql still calls v1beta5."
       - "Output and ownership behaviour for these commands is unchanged."
       - "Their existing tests pass without modification (beyond unrelated shared-helper signatures)."
-    completed_at: null
+    completed_at: 2026-07-10T19:05:00Z
 
   - id: task-010
     title: 'Update tests, golden files, casing gates, and e2e decoders'
