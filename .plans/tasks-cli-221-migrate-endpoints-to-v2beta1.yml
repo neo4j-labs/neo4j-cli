@@ -221,3 +221,103 @@ tasks:
       - "make test, make fmt-check, make lint, make license-check all pass."
       - "Debug traces show the new v2beta1 paths and remain redacted."
     completed_at: 2026-07-10T13:33:01Z
+
+  - id: task-012
+    title: 'Centralize v2beta1 scoped-path construction'
+    description: |
+      [Review finding #1 — Priority 2, missed centralization.] The v2beta1
+      scoped-path format string is now hand-built (fmt.Sprintf'd inline) across
+      9+ sites in 3 packages: instance/delete.go, instance/list.go, api/poll.go
+      (instances); utils/resolve.go FetchScopedInstance and FetchScopedSession;
+      session/create.go, session/delete.go, session/list.go, api/poll.go
+      (sessions); plus instance/create_core.go which has a local
+      `scopedInstancesPath` helper used only by create/deploy and not shared with
+      delete/list/get. This is textbook Shotgun Surgery: the day the API path
+      prefix changes (v2beta1 -> v2, or the scoping shape shifts) you must edit
+      9+ literals across 3 packages. Introduce one canonical path-builder set
+      (e.g. in utils or api: ScopedInstancePath(org, proj, id),
+      ScopedInstancesPath(org, proj), ScopedSessionPath(...),
+      ScopedSessionsPath(...)) and route EVERY call site through it, including
+      api/poll.go and both FetchScoped* helpers. Collapse create_core.go's local
+      scopedInstancesPath into the shared builders rather than leaving a
+      package-private near-duplicate.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "A single canonical set of v2beta1 scoped-path builders exists (instances + sessions, list + item forms)."
+      - "All ~9 previous inline fmt.Sprintf path sites (instance list/delete, session create/list/delete, poll.go, FetchScoped* helpers) route through the shared builders."
+      - "create_core.go's local scopedInstancesPath is removed and its callers use the shared builder."
+      - "make test, make fmt-check, make lint, make license-check all pass."
+    completed_at: null
+
+  - id: task-013
+    title: 'Unify tenant_id->project_id rename across normalize and rename helpers'
+    description: |
+      [Review finding #2 — Priority 4, duplicated code / divergent change.] The
+      migrated read commands use utils.NormalizeV2Beta1Response (renames
+      legacy_status->status AND tenant_id->project_id), while 8 sibling commands
+      (instance pause/resume/update/overwrite, create_core.go, customermanagedkey
+      list/create/get) still call utils.RenameResponseField for the SAME
+      tenant_id->project_id mapping. So two helpers now do the same rename, with
+      NormalizeV2Beta1Response a superset, and `preferField` (normalize.go) and
+      `renameMapKey` (rename.go) are near-identical copy-map-and-rename loops.
+      Do NOT force every command onto NormalizeV2Beta1Response (non-migrated ones
+      legitimately shouldn't map legacy_status yet). Instead express `preferField`
+      in terms of `renameMapKey` (or vice-versa) so there is ONE copy-and-rename
+      primitive, and make the relationship between the two public helpers explicit
+      so a reader can tell why create uses one and delete the other.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "There is a single copy-and-rename primitive; preferField/renameMapKey no longer duplicate the loop."
+      - "NormalizeV2Beta1Response is built on top of the shared rename primitive."
+      - "Both public helpers' relationship/intent is clear (via naming and/or a brief doc comment where non-obvious)."
+      - "Existing behaviour and tests for both migrated and non-migrated commands are unchanged; all gates pass."
+    completed_at: null
+
+  - id: task-014
+    title: 'Reuse canonical utils resolution in project get'
+    description: |
+      [Review finding #3 — Priority 4, reimplemented canonical logic.]
+      project/get.go reimplements two things utils already owns:
+      (1) org-from-workspace parsing — project/list.go resolveOrgFromWorkspace
+      duplicates the org half of utils.defaultOrgAndProject (same LastIndex("/")
+      split, different function); and (2) the project-in-org lookup — get.go does
+      a manual linear scan of projects.Data for projectID, which is exactly what
+      utils.validateProjectInOrg already does, EXCEPT validateProjectInOrg returns
+      a proper clierr.NewNotFoundError with resource + suggestion while get.go
+      returns a bare fmt.Errorf with no envelope/suggestion. The migration thus
+      produced an inconsistent error contract for the same "project not found in
+      org" condition. Reuse the canonical utils helpers (utils.validateProjectInOrg
+      / utils.defaultOrgAndProject, or a shared "resolve+fetch one project"
+      function) so org parsing lives in one place and the not-found error is a
+      structured clierr matching every other v2beta1 command.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "project get no longer reimplements org-workspace parsing; it reuses the canonical utils resolution."
+      - "The project-in-org lookup reuses the canonical utils path and returns a structured clierr.NewNotFoundError with resource + suggestion (no bare fmt.Errorf)."
+      - "project get output for a found project is unchanged; not-found now matches the other v2beta1 commands' error contract."
+      - "project get tests updated for the structured error; all gates pass."
+    completed_at: null
+
+  - id: task-015
+    title: 'Avoid double response-body parse in instance get'
+    description: |
+      [Review finding #4 — Priority 7, minor efficiency.] instance/get.go calls
+      api.ParseBody(resBody) for normalization, then getFields(resBody) re-parses
+      the same bytes via a second api.ParseBody call just to inspect
+      metrics_integration_url — two parses of the same bytes for one render.
+      Pass the already-parsed responseData (or the single map) into getFields
+      instead of re-parsing.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "instance/get.go parses the response body exactly once; getFields receives the already-parsed data."
+      - "get output (including metrics_integration_url handling) is unchanged."
+      - "make test, make fmt-check, make lint, make license-check all pass."
+    completed_at: null

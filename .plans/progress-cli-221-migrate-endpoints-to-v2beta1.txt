@@ -51,3 +51,6 @@ Decisions: passed scope via flags rather than seeding a default workspace into c
 ## TASK-011 — 2026-07-10T13:33:01Z
 Finalized the feature: ran `go generate ./...` (no bundle drift — no Long/Example text changed on migrated commands, so TestGenerator_RoundTrip already passes) and added a user-facing changie Minor entry describing the v2beta1 org/project-scoped endpoint migration (instance list/create/get/delete, graph-analytics session ops, project get) plus the tenant_id->project_id and legacy_status->status output changes. All final gates pass (test, fmt-check, lint 0 issues, license-check).
 Files: +1 new (.changes/unreleased changie Minor)
+
+## REVIEW — 2026-07-10T14:04:58Z
+Added 4 review tasks (task-012..task-015).
