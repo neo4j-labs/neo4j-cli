@@ -6,6 +6,7 @@ package utils
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
@@ -13,6 +14,21 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/spf13/cobra"
 )
+
+// ValidateResourceID rejects an ID that would break out of, or malform, the
+// scoped resource path it is interpolated into. Aura resource IDs are opaque
+// UUID/short-hex tokens, so an empty value, a "."/".." path segment, or an
+// embedded slash/backslash is always invalid. Catching it here turns a
+// silently-retargeted request into a clear validation error: url.JoinPath (used
+// by api.MakeRequest to assemble the URL) resolves "." and ".." path segments
+// against the base, so e.g. an instanceID of "../.." would otherwise point the
+// request at a parent resource rather than failing cleanly.
+func ValidateResourceID(resourceType, id string) error {
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`) {
+		return clierr.NewValidationError("invalid %s id %q", resourceType, id)
+	}
+	return nil
+}
 
 // ResolveAndValidateOrgProject resolves the organization and project IDs for
 // Aura commands using the following precedence:
@@ -118,6 +134,9 @@ func OrgFromWorkspace(cfg *clicfg.Config) string {
 // instance outside the project surfaces via the v2beta1 path's own 404, which
 // carries the correct resource type, id, and suggestion.
 func FetchScopedInstance(cfg *clicfg.Config, orgID, projectID, instanceID string) ([]byte, error) {
+	if err := ValidateResourceID("instance", instanceID); err != nil {
+		return nil, err
+	}
 	path := api.ScopedInstancePath(orgID, projectID, instanceID)
 	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 		Method:  http.MethodGet,
@@ -180,6 +199,9 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 // Scoping is native to the path, so no tenant_id comparison is performed: a
 // session outside the project surfaces via the v2beta1 path's own 404.
 func FetchScopedSession(cfg *clicfg.Config, orgID, projectID, sessionID string) ([]byte, error) {
+	if err := ValidateResourceID("session", sessionID); err != nil {
+		return nil, err
+	}
 	path := api.ScopedSessionPath(orgID, projectID, sessionID)
 	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 		Method:  http.MethodGet,

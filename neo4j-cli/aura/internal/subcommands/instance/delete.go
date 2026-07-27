@@ -46,6 +46,10 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
+			if err := utils.ValidateResourceID("instance", instanceID); err != nil {
+				return err
+			}
+
 			if err := confirm.Require(cmd, instanceID); err != nil {
 				return err
 			}

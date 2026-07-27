@@ -42,6 +42,10 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 				return err
 			}
 
+			if err := utils.ValidateResourceID("session", sessionID); err != nil {
+				return err
+			}
+
 			if err := confirm.Require(cmd, sessionID); err != nil {
 				return err
 			}
