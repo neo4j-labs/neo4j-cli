@@ -212,6 +212,10 @@ var nonIDActionSuffixes = map[string]struct{}{
 	"overwrite": {},
 	"metrics":   {},
 	"invoke":    {},
+	// `.../virtual-graphs/allowed-configs` lists the selectable memory
+	// configurations for the collection, so the trailing segment is a
+	// sub-collection rather than a virtual graph id.
+	"allowed-configs": {},
 }
 
 // parseResourceFromRequest extracts a (resourceType, resourceID) pair from
@@ -279,6 +283,8 @@ func suggestionForResource(resourceType string) string {
 		return "Run 'neo4j-cli aura customer-managed-key list' to see customer-managed keys."
 	case "session":
 		return "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project."
+	case "virtual-graph":
+		return "Run 'neo4j-cli aura virtual-graph list --project-id <id>' to see virtual graphs in this project."
 	case "tenant":
 		return "Run 'neo4j-cli aura project list' to see available projects (tenants are now called projects)."
 	default:
@@ -421,6 +427,17 @@ const (
 const (
 	GraphQLDataApiAuthProviderTypeJwks   = "jwks"
 	GraphQLDataApiAuthProviderTypeApiKey = "api-key"
+)
+
+// Virtual graph lifecycle states, in the lowercase form the v2beta1 API
+// returns. Casing is not guaranteed, so comparisons against these constants are
+// case-insensitive (see PollVirtualGraph).
+const (
+	VirtualGraphStatusCreating string = "creating"
+	VirtualGraphStatusRunning  string = "running"
+	VirtualGraphStatusUpdating string = "updating"
+	VirtualGraphStatusError    string = "error"
+	VirtualGraphStatusDeleted  string = "deleted"
 )
 
 const (
