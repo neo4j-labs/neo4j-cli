@@ -121,6 +121,22 @@ func TestListVirtualGraphsPagination(t *testing.T) {
 	helper.AssertErrContainsStrings([]string{"More results available. Re-run with --page-token cursor-two"})
 }
 
+// TestListVirtualGraphsPaginationRelativeLink covers links.next arriving as a
+// relative URL rather than the absolute one the API examples show. Both forms
+// occur in practice, and the cursor must be extracted either way.
+func TestListVirtualGraphsPaginationRelativeLink(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	helper.NewRequestHandlerMock(virtualGraphsPath(), http.StatusOK, listBody(`"?page_limit=1&page_token=cursor-two"`))
+
+	helper.ExecuteCommand(fmt.Sprintf("virtual-graph list --page-limit 1 --organization-id %s --project-id %s", testOrgID, testProjectID))
+
+	helper.AssertErrContainsStrings([]string{"More results available. Re-run with --page-token cursor-two"})
+}
+
 // TestListVirtualGraphsOmitsUnsetPaginationParams guards against sending
 // page_limit=0, which would ask the API for an empty page.
 func TestListVirtualGraphsOmitsUnsetPaginationParams(t *testing.T) {
