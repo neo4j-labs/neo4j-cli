@@ -51,7 +51,7 @@ neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organ
 			instanceId := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
@@ -89,7 +89,7 @@ neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organ
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				pollResponse, err := api.PollInstance(cfg, instanceId, api.InstanceStatusOverwriting)
+				pollResponse, err := api.PollInstance(cfg, orgID, projectID, instanceId, api.InstanceStatusOverwriting)
 				if err != nil {
 					return err
 				}

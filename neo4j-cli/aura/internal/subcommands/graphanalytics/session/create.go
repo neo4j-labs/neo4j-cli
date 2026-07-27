@@ -58,7 +58,7 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
@@ -84,9 +84,11 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 			if region != "" {
 				body["region"] = region
 			}
-			resBody, statusCode, err := api.MakeRequest(cfg, "/graph-analytics/sessions", &api.RequestConfig{
+			path := api.ScopedSessionsPath(orgID, projectID)
+			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				PostBody: body,
 				Method:   http.MethodPost,
+				Version:  api.AuraApiVersion2,
 			})
 			if err != nil {
 				return err
@@ -95,20 +97,19 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 			// NOTE: Return 202 if new session gets created and 200 if existing session was found
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "memory", "status", "created_at"})
+				normalized := utils.NormalizeV2Beta1Response(responseData)
+				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "project_id", "memory", "status", "created_at"})
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
-					respData := api.ParseBody(resBody)
-					status := respData.AsArray()[0]["status"]
-					sessionID := respData.AsArray()[0]["id"].(string)
+					status := normalized.AsArray()[0]["status"]
+					sessionID := normalized.AsArray()[0]["id"].(string)
 					if status == "Ready" {
 						return nil
 					}
 
-					pollResponse, err := api.PollGraphAnalyticsSessionReady(cfg, sessionID, api.GraphAnalyticsSessionWaitingStatus)
+					pollResponse, err := api.PollGraphAnalyticsSessionReady(cfg, orgID, projectID, sessionID, api.GraphAnalyticsSessionWaitingStatus)
 					if err != nil {
 						return err
 					}

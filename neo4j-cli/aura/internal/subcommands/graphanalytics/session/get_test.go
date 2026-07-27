@@ -14,13 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func scopedSessionPath(sessionID string) string {
+	return fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/graph-analytics/sessions/%s", testOrgID, testProjectID, sessionID)
+}
+
 func TestGetSession(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
+	mockHandler := helper.NewRequestHandlerMock(scopedSessionPath(testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session get %s --organization-id %s --project-id %s", testSessionID, testOrgID, testProjectID))
 
@@ -53,7 +57,7 @@ func TestGetSessionWithDefaultWorkspace(t *testing.T) {
 	helper.SetDefaultProjectInConfig(testOrgID, testProjectID)
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
+	mockHandler := helper.NewRequestHandlerMock(scopedSessionPath(testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session get %s", testSessionID))
 
@@ -96,20 +100,6 @@ func TestGetSessionProjectNotInOrg(t *testing.T) {
 	helper.AssertErr("Error: could not find project unknown-project in organization " + testOrgID)
 }
 
-func TestGetSessionNotInProject(t *testing.T) {
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	registerProjectsMock(&helper)
-
-	// Session belongs to a different project.
-	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, "other-project-id"))
-
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session get %s --organization-id %s --project-id %s", testSessionID, testOrgID, testProjectID))
-
-	helper.AssertErr(fmt.Sprintf("Error: could not find session %s in project %s", testSessionID, testProjectID))
-}
-
 func TestGetSessionWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
@@ -118,7 +108,7 @@ func TestGetSessionWithTrailingNewline(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", sessionId), http.StatusOK, sessionGetBody(sessionId, testProjectID))
+	mockHandler := helper.NewRequestHandlerMock(scopedSessionPath(sessionId), http.StatusOK, sessionGetBody(sessionId, testProjectID))
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session get %s\"\n\" --organization-id %s --project-id %s", sessionId, testOrgID, testProjectID))
 
@@ -126,19 +116,17 @@ func TestGetSessionWithTrailingNewline(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 }
 
-// TestGetSessionNotFound_HasSuggestion locks the WithNotFoundContext
-// rewrite at the session-GET call site: when the API returns 404 for a
-// session path, the API layer's parseResourceFromRequest mis-segments
-// the nested path; the caller rewrites ResourceType to
-// "graph-analytics-session" and attaches the session-list Suggestion
-// (REQ-F-013).
-func TestGetSessionNotFound_HasSuggestion(t *testing.T) {
+// TestGetSessionNotFound verifies that a 404 on the v2beta1 scoped session
+// path surfaces as a not-found error tagged with resource type "session" by
+// the API layer's parseResourceFromRequest (which resolves the trailing
+// plural/id pair of the nested path).
+func TestGetSessionNotFound(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
 	registerProjectsMock(&helper)
 
-	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusNotFound, `{
+	helper.NewRequestHandlerMock(scopedSessionPath(testSessionID), http.StatusNotFound, `{
 		"errors": [
 			{"message": "session not found", "reason": "not-found"}
 		]
@@ -149,7 +137,7 @@ func TestGetSessionNotFound_HasSuggestion(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
 	require.Equal(t, 3, ce.Code)
-	require.Equal(t, "graph-analytics-session", ce.ResourceType)
+	require.Equal(t, "session", ce.ResourceType)
 	require.Equal(t, testSessionID, ce.ResourceID)
 	require.Equal(t, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.", ce.Suggestion)
 }
@@ -162,7 +150,7 @@ func TestGetSessionError(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", sessionId), http.StatusNotFound, `
+	mockHandler := helper.NewRequestHandlerMock(scopedSessionPath(sessionId), http.StatusNotFound, `
 {
   "data": null,
   "errors": [

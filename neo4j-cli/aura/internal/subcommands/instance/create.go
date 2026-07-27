@@ -91,20 +91,20 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, resolvedProjectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			resolvedOrgID, resolvedProjectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
 			// Auto-generate a default name when --name is omitted.
-			name, err = resolveInstanceName(cfg, name, resolvedProjectID)
+			name, err = resolveInstanceName(cfg, name, resolvedOrgID, resolvedProjectID)
 			if err != nil {
 				return err
 			}
 
 			body := buildCreateInstanceBody(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin, resolvedProjectID)
 
-			instance, err := createAndStoreInstance(cfg, body, credentialOptions{
+			instance, err := createAndStoreInstance(cfg, body, resolvedOrgID, resolvedProjectID, credentialOptions{
 				instanceType:        string(_type),
 				credentialName:      credentialName,
 				noCredentialStorage: noCredentialStorage,
@@ -122,7 +122,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					instanceId, _ := instance["id"].(string)
 
-					pollResponse, err := api.PollInstance(cfg, instanceId, api.InstanceStatusCreating)
+					pollResponse, err := api.PollInstance(cfg, resolvedOrgID, resolvedProjectID, instanceId, api.InstanceStatusCreating)
 					if err != nil {
 						return err
 					}

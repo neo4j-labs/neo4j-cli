@@ -26,6 +26,9 @@ import (
 const (
 	deployOrgID     = "test-org-id"
 	deployProjectID = "YOUR_TENANT_ID"
+	// deployInstancesPath is the v2beta1 org/project-scoped instances path the
+	// deploy leaf POSTs the create to.
+	deployInstancesPath = "/v2beta1/organizations/" + deployOrgID + "/projects/" + deployProjectID + "/instances"
 )
 
 // deployHarness drives NewDeployCmd directly (the leaf is not yet registered in
@@ -131,7 +134,7 @@ const deployCreateResponse = `{
 }`
 
 func registerRunningInstanceMock(h *deployHarness) {
-	h.handle("GET /v1/instances/db1d1234", http.StatusOK, `{"data": {"id": "db1d1234", "status": "running"}}`)
+	h.handle("GET "+deployInstancesPath+"/db1d1234", http.StatusOK, `{"data": {"id": "db1d1234", "status": "running"}}`)
 }
 
 // withStubbedDispatch swaps both dispatch seams with recorders for the duration
@@ -220,7 +223,7 @@ func TestDeployInvalidVersionRejected(t *testing.T) {
 
 func TestDeployDockerSuccess(t *testing.T) {
 	h := newDeployHarness(t)
-	h.handle("POST /v1/instances", http.StatusAccepted, deployCreateResponse)
+	h.handle("POST "+deployInstancesPath, http.StatusAccepted, deployCreateResponse)
 	registerRunningInstanceMock(h)
 
 	var gotTarget deployTarget
@@ -249,12 +252,12 @@ func TestDeployCreatesAndPollsBeforePush(t *testing.T) {
 	h := newDeployHarness(t)
 
 	var order []string
-	h.mux.HandleFunc("POST /v1/instances", func(res http.ResponseWriter, _ *http.Request) {
+	h.mux.HandleFunc("POST "+deployInstancesPath, func(res http.ResponseWriter, _ *http.Request) {
 		order = append(order, "create")
 		res.WriteHeader(http.StatusAccepted)
 		_, _ = res.Write([]byte(deployCreateResponse))
 	})
-	h.mux.HandleFunc("GET /v1/instances/db1d1234", func(res http.ResponseWriter, _ *http.Request) {
+	h.mux.HandleFunc("GET "+deployInstancesPath+"/db1d1234", func(res http.ResponseWriter, _ *http.Request) {
 		order = append(order, "poll")
 		res.WriteHeader(http.StatusOK)
 		_, _ = res.Write([]byte(`{"data": {"id": "db1d1234", "status": "running"}}`))
@@ -272,7 +275,7 @@ func TestDeployCreatesAndPollsBeforePush(t *testing.T) {
 
 func TestDeployPushFailureLeavesInstance(t *testing.T) {
 	h := newDeployHarness(t)
-	h.handle("POST /v1/instances", http.StatusAccepted, deployCreateResponse)
+	h.handle("POST "+deployInstancesPath, http.StatusAccepted, deployCreateResponse)
 	registerRunningInstanceMock(h)
 
 	pushErr := errors.New("neo4j-admin upload: boom")
@@ -297,7 +300,7 @@ func TestDeployPushFailureLeavesInstance(t *testing.T) {
 // (not the docker seam) with the resolved target + port.
 func TestDeployDesktopDispatch(t *testing.T) {
 	h := newDeployHarness(t)
-	h.handle("POST /v1/instances", http.StatusAccepted, deployCreateResponse)
+	h.handle("POST "+deployInstancesPath, http.StatusAccepted, deployCreateResponse)
 	registerRunningInstanceMock(h)
 
 	prevDocker := deployViaDockerFn
@@ -333,7 +336,7 @@ func TestDeployDesktopDispatch(t *testing.T) {
 // the user has not opted out of printing it.
 func TestDeployTargetPasswordNotLeaked(t *testing.T) {
 	h := newDeployHarness(t)
-	h.handle("POST /v1/instances", http.StatusAccepted, deployCreateResponse)
+	h.handle("POST "+deployInstancesPath, http.StatusAccepted, deployCreateResponse)
 	registerRunningInstanceMock(h)
 
 	withStubbedDispatch(t, func(_ context.Context, _ *clicfg.Config, _, _ string, _ deployTarget) error {
@@ -351,7 +354,7 @@ func TestDeployDockerCommunityFastFails(t *testing.T) {
 	h := newDeployHarness(t)
 
 	var createCalled bool
-	h.mux.HandleFunc("POST /v1/instances", func(res http.ResponseWriter, _ *http.Request) {
+	h.mux.HandleFunc("POST "+deployInstancesPath, func(res http.ResponseWriter, _ *http.Request) {
 		createCalled = true
 		res.WriteHeader(http.StatusAccepted)
 		_, _ = res.Write([]byte(deployCreateResponse))

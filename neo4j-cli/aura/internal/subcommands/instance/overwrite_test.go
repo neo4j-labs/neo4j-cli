@@ -174,17 +174,19 @@ func TestOverwriteWithWait(t *testing.T) {
 		}
 	  }`)
 
-	// First call: pre-flight ownership check. Second and third: poll until ready.
-	getMock := helper.NewRequestHandlerMock("GET /v1/instances/2f49c2b3", http.StatusOK, instanceGetBody(instanceId, testListProjectID)).
-		AddResponse(http.StatusOK, `{
+	// Pre-flight ownership check stays on the v1 flat instance path.
+	preflightMock := helper.NewRequestHandlerMock("GET /v1/instances/2f49c2b3", http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+
+	// Readiness polling targets the v2beta1 org/project-scoped instance path.
+	pollMock := helper.NewRequestHandlerMock(fmt.Sprintf("GET /v2beta1/organizations/%s/projects/%s/instances/2f49c2b3", testListOrgID, testListProjectID), http.StatusOK, `{
 		"data": {
 			"id": "2f49c2b3",
-			"status": "overwriting"
+			"legacy_status": "overwriting"
 		}
 	}`).AddResponse(http.StatusOK, `{
 		"data": {
 			"id": "2f49c2b3",
-			"status": "ready"
+			"legacy_status": "ready"
 		}
 	}`)
 
@@ -195,7 +197,8 @@ func TestOverwriteWithWait(t *testing.T) {
 		"source_instance_id": "191b0da2"
 	  }`)
 
-	getMock.AssertCalledTimes(3)
+	preflightMock.AssertCalledTimes(1)
+	pollMock.AssertCalledTimes(2)
 
 	helper.AssertOutJson(`{
 	  "data": {

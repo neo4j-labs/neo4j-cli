@@ -17,6 +17,12 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
+// scopedInstancePath builds the v2beta1 org/project-scoped instance path used
+// by the migrated get/delete commands.
+func scopedInstancePath(instanceID string) string {
+	return "/v2beta1/organizations/" + testListOrgID + "/projects/" + testListProjectID + "/instances/" + instanceID
+}
+
 func TestGetInstance(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
@@ -25,7 +31,7 @@ func TestGetInstance(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusOK, `{
 			"data": {
 				"id": "2f49c2b3",
 				"name": "Production",
@@ -71,7 +77,7 @@ func TestGetInstanceWithTrailingNewline(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusOK, `{
 			"data": {
 				"id": "2f49c2b3",
 				"name": "Production",
@@ -117,7 +123,7 @@ func TestGetEnterpriseInstanceWithTableOutput(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusOK, `{
 			"data": {
 				"id": "2f49c2b3",
 				"name": "Production",
@@ -158,7 +164,7 @@ func TestGetProfessionalInstanceWithTableOutput(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusOK, `{
 			"data": {
 				"id": "2f49c2b3",
 				"name": "Production",
@@ -200,7 +206,7 @@ func TestGetInstanceWithDefaultWorkspace(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusOK, `{
 			"data": {
 				"id": "2f49c2b3",
 				"name": "Production",
@@ -259,6 +265,9 @@ func TestGetInstanceProjectNotInOrg(t *testing.T) {
 	helper.AssertErr("Error: could not find project unknown-project in organization " + testListOrgID)
 }
 
+// TestGetInstanceNotInProject covers an instance that does not belong to the
+// scoped project. With the v2beta1 scoped path there is no tenant_id preflight;
+// the API returns a native 404 that carries the correct resource envelope.
 func TestGetInstanceNotInProject(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
@@ -266,27 +275,28 @@ func TestGetInstanceNotInProject(t *testing.T) {
 	registerProjectsMock(&helper)
 
 	instanceId := "2f49c2b3"
-	otherProject := "other-project-id"
 
-	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
-			"data": {
-				"id": "2f49c2b3",
-				"name": "Production",
-				"status": "running",
-				"tenant_id": "other-project-id",
-				"cloud_provider": "gcp",
-				"connection_url": "YOUR_CONNECTION_URL",
-				"region": "europe-west1",
-				"type": "enterprise-db",
-				"memory": "8GB",
-				"storage": "16GB"
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusNotFound, fmt.Sprintf(`{
+		"errors": [
+			{
+			"message": "DB not found: %s",
+			"reason": "db-not-found"
 			}
-		}`)
+		]
+	}`, instanceId))
 
-	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
+	err := helper.ExecuteCommandE(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
 
-	_ = otherProject
-	helper.AssertErr(fmt.Sprintf("Error: could not find instance %s in project %s", instanceId, testListProjectID))
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	require.Equal(t, 3, ce.Code)
+	require.Equal(t, "instance", ce.ResourceType)
+	require.Equal(t, instanceId, ce.ResourceID)
+
+	helper.AssertErr(fmt.Sprintf("Error: [\n\tDB not found: %s\n]", instanceId))
 }
 
 func TestGetInstanceNotFoundError(t *testing.T) {
@@ -297,7 +307,7 @@ func TestGetInstanceNotFoundError(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusNotFound, fmt.Sprintf(`{
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), http.StatusNotFound, fmt.Sprintf(`{
 		"errors": [
 			{
 			"message": "DB not found: %s",
@@ -346,7 +356,7 @@ func TestUnauthorizedAccessTokenRefresh(t *testing.T) {
 
 			instanceId := "2f49c2b3"
 
-			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), statusCode, `{
+			mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(instanceId), statusCode, `{
 				"errors": [
 					{
 						"message": "string",

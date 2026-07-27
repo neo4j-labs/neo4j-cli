@@ -31,24 +31,19 @@ neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 
 			sessionID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
-			resBody, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, projectID)
+			resBody, err := utils.FetchScopedSession(cfg, orgID, projectID, sessionID)
 			if err != nil {
-				// On 404 the API layer's parseResourceFromRequest mis-segments
-				// the nested /graph-analytics/sessions/<id> path (extracts
-				// "graph-analytic"). Rewrite the context so the user gets
-				// session-specific Suggestion text. The ownership-mismatch
-				// path is already tagged correctly inside the helper.
-				return utils.WithNotFoundContext(err, "graph-analytics-session", sessionID, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.")
+				return err
 			}
 
 			if resBody != nil {
 				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{
+				normalized := utils.NormalizeV2Beta1Response(responseData)
+				output.PrintBodyMap(cmd, cfg, normalized, []string{
 					"id",
 					"name",
 					"memory",

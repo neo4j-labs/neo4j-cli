@@ -174,7 +174,7 @@ The command waits for the instance to be ready and for the data load to finish b
 			ctx := cmd.Context()
 			errOut := cmd.ErrOrStderr()
 
-			_, resolvedProjectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			resolvedOrgID, resolvedProjectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
@@ -193,7 +193,7 @@ The command waits for the instance to be ready and for the data load to finish b
 				}
 			}
 
-			name, err = resolveInstanceName(cfg, name, resolvedProjectID)
+			name, err = resolveInstanceName(cfg, name, resolvedOrgID, resolvedProjectID)
 			if err != nil {
 				return err
 			}
@@ -202,7 +202,7 @@ The command waits for the instance to be ready and for the data load to finish b
 
 			fmt.Fprintln(errOut, "Creating instance...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
-			instance, err := createAndStoreInstance(cfg, body, credentialOptions{
+			instance, err := createAndStoreInstance(cfg, body, resolvedOrgID, resolvedProjectID, credentialOptions{
 				instanceType:        string(_type),
 				credentialName:      credentialName,
 				noCredentialStorage: noCredentialStorage,
@@ -226,7 +226,7 @@ The command waits for the instance to be ready and for the data load to finish b
 			}
 
 			fmt.Fprintln(errOut, "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-			if _, err := api.PollInstance(cfg, instanceID, api.InstanceStatusCreating); err != nil {
+			if _, err := api.PollInstance(cfg, resolvedOrgID, resolvedProjectID, instanceID, api.InstanceStatusCreating); err != nil {
 				return err
 			}
 

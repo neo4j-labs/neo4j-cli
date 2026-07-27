@@ -16,14 +16,25 @@ import (
 
 type PollResponse struct {
 	Data struct {
-		Id     string
-		Status string
+		Id string
+		// v2beta1 emits the operational state as legacy_status; see normalize().
+		Status       string
+		LegacyStatus string `json:"legacy_status"`
 	}
 }
 
-func PollInstance(cfg *clicfg.Config, instanceId string, waitingStatus string) (*PollResponse, error) {
-	path := fmt.Sprintf("/instances/%s", instanceId)
-	return Poll(cfg, path, func(status string) bool {
+// normalize applies the v2beta1 legacy_status->status mapping so readiness is
+// evaluated against a stable field regardless of API version. A native status
+// always wins over legacy_status.
+func (r *PollResponse) normalize() {
+	if r.Data.Status == "" {
+		r.Data.Status = r.Data.LegacyStatus
+	}
+}
+
+func PollInstance(cfg *clicfg.Config, orgID, projectID, instanceId string, waitingStatus string) (*PollResponse, error) {
+	path := ScopedInstancePath(orgID, projectID, instanceId)
+	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
 		return status != waitingStatus
 	})
 }
@@ -49,9 +60,9 @@ func PollGraphQLDataApi(cfg *clicfg.Config, instanceId string, graphQLDataApiId 
 	})
 }
 
-func PollGraphAnalyticsSessionReady(cfg *clicfg.Config, sessionId string, waitingStatus []string) (*PollResponse, error) {
-	path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionId)
-	return Poll(cfg, path, func(status string) bool {
+func PollGraphAnalyticsSessionReady(cfg *clicfg.Config, orgID, projectID, sessionId string, waitingStatus []string) (*PollResponse, error) {
+	path := ScopedSessionPath(orgID, projectID, sessionId)
+	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
 		return !slices.Contains(waitingStatus, status)
 	})
 }
@@ -78,6 +89,7 @@ func PollWithVersion(cfg *clicfg.Config, url string, version AuraApiVersion, con
 			if err := json.Unmarshal(resBody, &response); err != nil {
 				return nil, clierr.NewUpstreamError("cannot retrieve response polling: %w", err)
 			}
+			response.normalize()
 
 			if debug {
 				debugInfo("poll attempt %d/%d path %s status %d observed %q interval %ds", i+1, pollingConfig.MaxRetries, url, statusCode, response.Data.Status, pollingConfig.Interval)

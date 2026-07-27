@@ -40,14 +40,14 @@ func TestGetProject(t *testing.T) {
 			listStatus: http.StatusOK,
 			listBody:   listProjectsBody(testProjectID),
 			wantOutJSON: `{
-				"data": {"id": "proj-222", "name": "My Project"}
+				"data": {"id": "proj-222", "name": "Project proj-222"}
 			}`,
 		},
 		{
 			name:       "project not in org returns error",
 			listStatus: http.StatusOK,
 			listBody:   listProjectsBody("other-proj"),
-			wantErr:    fmt.Sprintf("project %s not found in organization %s", testProjectID, testOrgID),
+			wantErr:    fmt.Sprintf("could not find project %s in organization %s", testProjectID, testOrgID),
 		},
 		{
 			name:       "list projects API error returns error",
@@ -65,12 +65,6 @@ func TestGetProject(t *testing.T) {
 				tc.listStatus,
 				tc.listBody,
 			)
-			// v1 handler present for the success case; ignored by error cases that return early.
-			helper.NewRequestHandlerMock(
-				fmt.Sprintf("/v1/tenants/%s", testProjectID),
-				http.StatusOK,
-				`{"data": {"id": "proj-222", "name": "My Project"}}`,
-			)
 
 			helper.ExecuteCommand(fmt.Sprintf("project get %s --organization-id=%s", testProjectID, testOrgID))
 
@@ -84,7 +78,7 @@ func TestGetProject(t *testing.T) {
 	}
 }
 
-func TestGetProjectV1Error(t *testing.T) {
+func TestGetProjectMakesNoV1Call(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -93,15 +87,16 @@ func TestGetProjectV1Error(t *testing.T) {
 		http.StatusOK,
 		listProjectsBody(testProjectID),
 	)
-	helper.NewRequestHandlerMock(
+	v1Handler := helper.NewRequestHandlerMock(
 		fmt.Sprintf("/v1/tenants/%s", testProjectID),
-		http.StatusNotFound,
-		`{"errors": [{"message": "project not found"}]}`,
+		http.StatusOK,
+		`{"data": {"id": "proj-222", "name": "My Project"}}`,
 	)
 
 	helper.ExecuteCommand(fmt.Sprintf("project get %s --organization-id=%s", testProjectID, testOrgID))
 
-	helper.AssertErrContainsStrings([]string{"project not found"})
+	helper.AsssertOk()
+	v1Handler.AssertCalledTimes(0)
 }
 
 func TestGetProjectFromWorkspaceConfig(t *testing.T) {
@@ -115,16 +110,10 @@ func TestGetProjectFromWorkspaceConfig(t *testing.T) {
 		http.StatusOK,
 		listProjectsBody(testProjectID),
 	)
-	getHandler := helper.NewRequestHandlerMock(
-		fmt.Sprintf("/v1/tenants/%s", testProjectID),
-		http.StatusOK,
-		`{"data": {"id": "proj-222", "name": "My Project"}}`,
-	)
 
 	helper.ExecuteCommand(fmt.Sprintf("project get %s", testProjectID))
 
 	listHandler.AssertCalledTimes(1)
-	getHandler.AssertCalledTimes(1)
 	helper.AsssertOk()
 }
 
@@ -137,16 +126,10 @@ func TestGetProjectWithTrailingNewline(t *testing.T) {
 		http.StatusOK,
 		listProjectsBody(testProjectID),
 	)
-	getHandler := helper.NewRequestHandlerMock(
-		fmt.Sprintf("/v1/tenants/%s", testProjectID),
-		http.StatusOK,
-		`{"data": {"id": "proj-222", "name": "My Project"}}`,
-	)
 
 	helper.ExecuteCommand(fmt.Sprintf("project get %s\"\n\" --organization-id=%s", testProjectID, testOrgID))
 
 	listHandler.AssertCalledTimes(1)
-	getHandler.AssertCalledTimes(1)
 	helper.AsssertOk()
 }
 

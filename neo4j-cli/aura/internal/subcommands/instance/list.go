@@ -30,19 +30,16 @@ neo4j-cli aura instance list
 neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
-			path := "/instances"
+			path := api.ScopedInstancesPath(orgID, projectID)
 
-			queryParams := map[string]string{
-				"tenantId": projectID,
-			}
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:      http.MethodGet,
-				QueryParams: queryParams,
+				Method:  http.MethodGet,
+				Version: api.AuraApiVersion2,
 			})
 			if err != nil {
 				return err
@@ -50,8 +47,8 @@ neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000
 
 			if statusCode == http.StatusOK {
 				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "cloud_provider"})
+				normalized := utils.NormalizeV2Beta1Response(responseData)
+				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "status", "project_id", "cloud_provider"})
 			}
 			return nil
 		},

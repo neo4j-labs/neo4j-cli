@@ -4,13 +4,14 @@
 package project
 
 import (
+	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,7 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 
 			orgID := organizationId
 			if orgID == "" {
-				orgID = resolveOrgFromWorkspace(cfg)
+				orgID = utils.OrgFromWorkspace(cfg)
 			}
 			if orgID == "" {
 				return fmt.Errorf("required flag \"organization-id\" not set and aura.default-workspace is not configured")
@@ -43,32 +44,17 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 
 			cmd.SilenceUsage = true
 
-			projects, err := api.ListProjects(cfg, orgID)
-			if err != nil {
-				return err
-			}
-			found := false
-			for _, p := range projects.Data {
-				if p.Id == projectID {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("project %s not found in organization %s", projectID, orgID)
-			}
-
-			resBody, statusCode, err := api.MakeRequest(cfg, fmt.Sprintf("/tenants/%s", projectID), &api.RequestConfig{
-				Method:  http.MethodGet,
-				Version: api.AuraApiVersion1,
-			})
+			found, err := utils.FetchProjectInOrg(cfg, orgID, projectID)
 			if err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
+			resBody, err := json.Marshal(api.GetProjectResponse{Data: *found})
+			if err != nil {
+				return err
 			}
+
+			output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
 
 			return nil
 		},

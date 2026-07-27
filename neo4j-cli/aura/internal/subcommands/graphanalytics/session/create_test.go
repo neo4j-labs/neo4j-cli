@@ -17,7 +17,7 @@ func TestCreateAttachedSession(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusAccepted, `{
   "data": {
     "id": "559c94c7-15de43fg",
     "name": "people-and-fruits-with-db",
@@ -67,7 +67,7 @@ func TestCreateStandAloneSession(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusAccepted, `{
   "data": {
     "id": "s-15de43fg",
     "name": "people-and-fruits-with-db",
@@ -117,7 +117,7 @@ func TestCreateSessionWithDefaultWorkspace(t *testing.T) {
 	helper.SetDefaultProjectInConfig(testOrgID, testProjectID)
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusAccepted, `{
   "data": {
     "id": "s-15de43fg",
     "name": "ws-session",
@@ -145,7 +145,7 @@ func TestCreateSessionMissingOrg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
 
 	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --rw")
 
@@ -157,7 +157,7 @@ func TestCreateSessionMissingProject(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --organization-id %s --rw", testOrgID))
 
@@ -175,7 +175,7 @@ func TestCreateSessionProjectNotInOrg(t *testing.T) {
 		`{"data": []}`,
 	)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --organization-id %s --project-id unknown-project --rw", testOrgID))
 
@@ -189,7 +189,7 @@ func TestCreateSessionWithWait(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	createMock := helper.NewRequestHandlerMock("POST /v1/graph-analytics/sessions", http.StatusAccepted, `{
+	createMock := helper.NewRequestHandlerMock("POST /v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusAccepted, `{
   "data": {
     "id": "559c94c7-15de43fg",
     "name": "people-and-fruits-with-db",
@@ -207,15 +207,15 @@ func TestCreateSessionWithWait(t *testing.T) {
   }
 }`)
 
-	getMock := helper.NewRequestHandlerMock("GET /v1/graph-analytics/sessions/559c94c7-15de43fg", http.StatusOK, `{
+	getMock := helper.NewRequestHandlerMock("GET /v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions/559c94c7-15de43fg", http.StatusOK, `{
 			"data": {
 				"id": "559c94c7-15de43fg",
-				"status": "Creating"
+				"legacy_status": "Creating"
 			}
 		}`).AddResponse(http.StatusOK, `{
 			"data": {
 				"id": "559c94c7-15de43fg",
-				"status": "Ready"
+				"legacy_status": "Ready"
 			}
 		}`)
 

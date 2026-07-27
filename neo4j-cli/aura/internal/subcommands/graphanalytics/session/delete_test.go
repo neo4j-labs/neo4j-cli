@@ -21,13 +21,11 @@ func TestDeleteSession(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	// Single mock for /v1/graph-analytics/sessions/{id}: first call is GET (pre-flight), second is DELETE.
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
-	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
+	mockHandler := helper.NewRequestHandlerMock(scopedSessionPath(testSessionID), http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", testSessionID, testOrgID, testProjectID))
 
-	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 
 	helper.AssertOutJson(`{
@@ -44,12 +42,11 @@ func TestDeleteSessionWithDefaultWorkspace(t *testing.T) {
 	helper.SetDefaultProjectInConfig(testOrgID, testProjectID)
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
-	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
+	mockHandler := helper.NewRequestHandlerMock(scopedSessionPath(testSessionID), http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --rw --yes --force", testSessionID))
 
-	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledTimes(1)
 	helper.AsssertOk()
 }
 
@@ -86,21 +83,6 @@ func TestDeleteSessionProjectNotInOrg(t *testing.T) {
 	helper.AssertErr("Error: could not find project unknown-project in organization " + testOrgID)
 }
 
-func TestDeleteSessionNotInProject(t *testing.T) {
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	registerProjectsMock(&helper)
-
-	// Session belongs to a different project.
-	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, "other-project-id"))
-
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
-
-	helper.AssertErr(fmt.Sprintf("Error: could not find session %s in project %s", testSessionID, testProjectID))
-	helper.AssertUsageNotShown()
-}
-
 func TestDeleteSessionWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
@@ -109,8 +91,7 @@ func TestDeleteSessionWithTrailingNewline(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", sessionId), http.StatusOK, sessionGetBody(sessionId, testProjectID))
-	mockHandler.AddResponse(http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(scopedSessionPath(sessionId), http.StatusAccepted, `{
 		"data": {
 		  "id": "42-24"
 		}
@@ -118,25 +99,20 @@ func TestDeleteSessionWithTrailingNewline(t *testing.T) {
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s\"\n\" --organization-id %s --project-id %s --rw --yes --force", sessionId, testOrgID, testProjectID))
 
-	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 }
 
-// TestDeleteSessionNotFound_HasSuggestion locks the WithNotFoundContext
-// rewrite at the session-DELETE call site: when the API returns 404 for
-// the DELETE call (after the preflight succeeds), the API layer's
-// parseResourceFromRequest mis-segments the nested path; the caller
-// rewrites ResourceType to "graph-analytics-session" and attaches the
-// session-list Suggestion (REQ-F-013).
-func TestDeleteSessionNotFound_HasSuggestion(t *testing.T) {
+// TestDeleteSessionNotFound verifies that a 404 on the v2beta1 scoped session
+// path surfaces as a not-found error tagged with resource type "session" by
+// the API layer's parseResourceFromRequest.
+func TestDeleteSessionNotFound(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
 	registerProjectsMock(&helper)
 
-	// Pre-flight GET succeeds (session in project), then DELETE returns 404.
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
-	mockHandler.AddResponse(http.StatusNotFound, `{
+	helper.NewRequestHandlerMock(scopedSessionPath(testSessionID), http.StatusNotFound, `{
 		"errors": [
 			{"message": "session not found", "reason": "not-found"}
 		]
@@ -147,7 +123,7 @@ func TestDeleteSessionNotFound_HasSuggestion(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
 	require.Equal(t, 3, ce.Code)
-	require.Equal(t, "graph-analytics-session", ce.ResourceType)
+	require.Equal(t, "session", ce.ResourceType)
 	require.Equal(t, testSessionID, ce.ResourceID)
 	require.Equal(t, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.", ce.Suggestion)
 }
@@ -160,9 +136,7 @@ func TestDeleteSessionError(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	// Pre-flight GET succeeds (session in project), then DELETE returns an error.
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", sessionId), http.StatusOK, sessionGetBody(sessionId, testProjectID))
-	mockHandler.AddResponse(http.StatusNotFound, `
+	mockHandler := helper.NewRequestHandlerMock(scopedSessionPath(sessionId), http.StatusNotFound, `
 {
   "data": null,
   "errors": [
@@ -177,7 +151,7 @@ func TestDeleteSessionError(t *testing.T) {
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", sessionId, testOrgID, testProjectID))
 
-	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 
 	helper.AssertOut("")
@@ -197,8 +171,7 @@ func TestDeleteSessionConfirmGate(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			t.Cleanup(helper.Close)
 			registerProjectsMock(&helper)
-			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
-			mock.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
+			mock := helper.NewRequestHandlerMock(scopedSessionPath(testSessionID), http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
 			helper.SetStdin(stdin)
 			err := helper.ExecuteCommandE(args)
 			return confirmtest.GateRunResult{Err: err, Stderr: helper.PrintErr(), Invoked: mock.CalledWithMethod(http.MethodDelete)}

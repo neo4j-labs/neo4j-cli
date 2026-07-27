@@ -32,23 +32,23 @@ neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-0
 			instanceId := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
-			resBody, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID)
+			resBody, err := utils.FetchScopedInstance(cfg, orgID, projectID, instanceId)
 			if err != nil {
 				return err
 			}
 
 			if resBody != nil {
 				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				fields, err := getFields(resBody)
+				normalized := utils.NormalizeV2Beta1Response(responseData)
+				fields, err := getFields(responseData)
 				if err != nil {
 					return err
 				}
-				output.PrintBodyMap(cmd, cfg, renamed, fields)
+				output.PrintBodyMap(cmd, cfg, normalized, fields)
 			}
 
 			return nil
@@ -56,9 +56,7 @@ neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-0
 	}
 }
 
-func getFields(resBody []byte) ([]string, error) {
-	responseBody := api.ParseBody(resBody)
-
+func getFields(responseBody api.ResponseData) ([]string, error) {
 	fields := []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"}
 	instance, err := responseBody.GetSingleOrError()
 	if err != nil {

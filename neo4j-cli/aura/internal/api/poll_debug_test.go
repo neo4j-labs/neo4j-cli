@@ -15,19 +15,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// pollTestServer serves /v1/instances/abc returning "creating" until the
-// requested attempt, then "running".
+const (
+	pollTestOrgID     = "test-org"
+	pollTestProjectID = "test-project"
+)
+
+// pollTestServer serves the v2beta1 org/project-scoped instance path returning
+// legacy_status "creating" until the requested attempt, then "running". Serving
+// legacy_status exercises the poll response normalization.
 func pollTestServer(t *testing.T, readyAfter int32) *httptest.Server {
 	t.Helper()
 	var calls atomic.Int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/instances/abc", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v2beta1/organizations/"+pollTestOrgID+"/projects/"+pollTestProjectID+"/instances/abc", func(w http.ResponseWriter, r *http.Request) {
 		status := "creating"
 		if calls.Add(1) >= readyAfter {
 			status = "running"
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"data":{"id":"abc","status":"` + status + `"}}`)) //nolint:errcheck
+		w.Write([]byte(`{"data":{"id":"abc","legacy_status":"` + status + `"}}`)) //nolint:errcheck
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -43,7 +49,7 @@ func TestPoll_DebugEmitsLoopContext(t *testing.T) {
 	cfg.Aura.SetDebug(true)
 	cfg.Aura.SetPollingConfig(5, 0)
 
-	res, err := api.PollInstance(cfg, "abc", "creating")
+	res, err := api.PollInstance(cfg, pollTestOrgID, pollTestProjectID, "abc", "creating")
 	require.NoError(t, err)
 	assert.Equal(t, "running", res.Data.Status)
 
@@ -67,7 +73,7 @@ func TestPoll_DebugOffEmitsNoLoopLines(t *testing.T) {
 	// debug not set -> off
 	cfg.Aura.SetPollingConfig(5, 0)
 
-	_, err := api.PollInstance(cfg, "abc", "creating")
+	_, err := api.PollInstance(cfg, pollTestOrgID, pollTestProjectID, "abc", "creating")
 	require.NoError(t, err)
 	assert.NotContains(t, buf.String(), "poll attempt")
 }

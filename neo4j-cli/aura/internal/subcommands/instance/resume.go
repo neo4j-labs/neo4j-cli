@@ -44,7 +44,7 @@ neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-000
 			instanceID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
@@ -75,7 +75,7 @@ neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-000
 						return err
 					}
 
-					pollResponse, err := api.PollInstance(cfg, response.Data.Id, api.InstanceStatusResuming)
+					pollResponse, err := api.PollInstance(cfg, orgID, projectID, response.Data.Id, api.InstanceStatusResuming)
 					if err != nil {
 						return err
 					}

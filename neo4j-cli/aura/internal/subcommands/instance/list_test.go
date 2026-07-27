@@ -10,10 +10,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
-const (
-	testListOrgID     = "test-org-id"
-	testListProjectID = "YOUR_TENANT_ID"
-)
+const listInstancesPath = "/v2beta1/organizations/" + testListOrgID + "/projects/" + testListProjectID + "/instances"
 
 // registerProjectsMock registers a mock for the v2beta1 list-projects endpoint
 // that returns testListProjectID as a valid project.
@@ -31,30 +28,34 @@ func TestListInstances(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, `{
 			"data": [
 				{
 					"id": "2f49c2b3",
 					"name": "Production",
 					"tenant_id": "YOUR_TENANT_ID",
+					"legacy_status": "running",
 					"cloud_provider": "gcp"
 				},
 				{
 					"id": "b51dc964",
 					"name": "Instance01",
 					"tenant_id": "YOUR_TENANT_ID",
+					"legacy_status": "running",
 					"cloud_provider": "aws"
 				},
 				{
 					"id": "432392ae",
 					"name": "Recommendations",
 					"tenant_id": "YOUR_TENANT_ID",
+					"legacy_status": "running",
 					"cloud_provider": "azure"
 				},
 				{
 					"id": "524b7d8d",
 					"name": "Northwind",
 					"tenant_id": "YOUR_TENANT_ID",
+					"legacy_status": "running",
 					"cloud_provider": "gcp"
 				}
 			]
@@ -64,7 +65,6 @@ func TestListInstances(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
-	mockHandler.AssertCalledWithQueryParam("tenantId", testListProjectID)
 
 	helper.AssertOutJson(`{
 	  "data": [
@@ -72,25 +72,29 @@ func TestListInstances(t *testing.T) {
 		  "cloud_provider": "gcp",
 		  "id": "2f49c2b3",
 		  "name": "Production",
-		  "project_id": "YOUR_TENANT_ID"
+		  "project_id": "YOUR_TENANT_ID",
+		  "status": "running"
 		},
 		{
 		  "cloud_provider": "aws",
 		  "id": "b51dc964",
 		  "name": "Instance01",
-		  "project_id": "YOUR_TENANT_ID"
+		  "project_id": "YOUR_TENANT_ID",
+		  "status": "running"
 		},
 		{
 		  "cloud_provider": "azure",
 		  "id": "432392ae",
 		  "name": "Recommendations",
-		  "project_id": "YOUR_TENANT_ID"
+		  "project_id": "YOUR_TENANT_ID",
+		  "status": "running"
 		},
 		{
 		  "cloud_provider": "gcp",
 		  "id": "524b7d8d",
 		  "name": "Northwind",
-		  "project_id": "YOUR_TENANT_ID"
+		  "project_id": "YOUR_TENANT_ID",
+		  "status": "running"
 		}
 	  ]
 	}`)
@@ -102,7 +106,7 @@ func TestListInstances_EmptyData(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{"data": []}`)
+	mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, `{"data": []}`)
 
 	helper.ExecuteCommand("instance list --organization-id " + testListOrgID + " --project-id " + testListProjectID)
 
@@ -118,7 +122,7 @@ func TestListInstancesWithProjectIdFlag(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, `{
 			"data": [
 				{
 					"id": "2f49c2b3",
@@ -133,7 +137,6 @@ func TestListInstancesWithProjectIdFlag(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
-	mockHandler.AssertCalledWithQueryParam("tenantId", testListProjectID)
 
 	helper.AssertOutJson(`{
 	  "data": [
@@ -155,7 +158,7 @@ func TestListInstancesWithDefaultWorkspace(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, `{
 			"data": [
 				{
 					"id": "2f49c2b3",
@@ -170,14 +173,13 @@ func TestListInstancesWithDefaultWorkspace(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
-	mockHandler.AssertCalledWithQueryParam("tenantId", testListProjectID)
 }
 
 func TestListInstancesMissingOrg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{"data": []}`)
+	mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, `{"data": []}`)
 
 	helper.ExecuteCommand("instance list")
 
@@ -189,7 +191,7 @@ func TestListInstancesMissingProject(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{"data": []}`)
+	mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, `{"data": []}`)
 
 	helper.ExecuteCommand("instance list --organization-id " + testListOrgID)
 
@@ -207,11 +209,8 @@ func TestListInstancesProjectNotInOrg(t *testing.T) {
 		`{"data": []}`,
 	)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{"data": []}`)
-
 	helper.ExecuteCommand("instance list --organization-id " + testListOrgID + " --project-id unknown-project")
 
-	mockHandler.AssertCalledTimes(0)
 	helper.AssertErr("Error: could not find project unknown-project in organization " + testListOrgID)
 }
 
@@ -258,7 +257,7 @@ func TestListInstancesWithCredentialFlag(t *testing.T) {
 				`{"data": [{"id": "`+testListProjectID+`", "name": "Test Project"}]}`,
 			)
 
-			mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{"data": []}`)
+			mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, `{"data": []}`)
 
 			helper.ExecuteCommand(tc.command)
 

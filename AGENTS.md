@@ -35,7 +35,7 @@ BUILD SYSTEMS: [Go toolchain, Makefile, golangci-lint, GoReleaser, changie]. See
 - `make build` → `bin/neo4j-cli`; `make run-neo4j` (no build); `make snapshot` (goreleaser, current platform, ldflags).
 - `make npm-publish-dry` — template/ordering check; stubs missing binaries (dry-run only). Run `make snapshot` first for real binaries.
 - All `.go` files need the Neo4j copyright header (CI `addlicense`).
-- Changelog via `make changelog` **only for user-facing changes**. Non-interactive: `changie new --projects neo4j-cli --kind <kind> --body <body>`.
+- Changelog via `make changelog` **only for user-facing changes**. Non-interactive: `changie new --projects neo4j-cli --kind <kind> --body <body>`. The body describes **only the observable user-facing impact** (new/changed/removed output, flags, commands, behavior, errors) — NOT the internal mechanics that produced it. Skip pure refactors, endpoint/transport migrations, and any change invisible to the end user; if such a change has an incidental observable effect (e.g. a new output field), the entry states just that effect, not the refactor. Verify the claimed effect is real by diffing observable output (`AssertOutJson`/`AssertErr` golden strings), not by describing the implementation.
 
 ## Testing Framework
 
@@ -168,6 +168,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
   - Secrets via process env (`cmd.Env` + `docker exec -e NAME` passthrough), NEVER argv (world-readable via `/proc`). `runEnv`/`ExecWithEnv`. `PushToAura` passes creds as `NEO4J_USERNAME`/`NEO4J_PASSWORD` env.
   - Smoke test: `go test -tags=smoke ./.../docker/...` (NOT in `make test`; skips without docker). Missing-docker error suggests `alias docker=podman` if podman on PATH (`lookPathFn` seam).
 - **agent-context** — `neo4j-cli agent-context` reflects live cobra tree; hand-coded `schemaVersion`/`exitCodes`/`errorCodes`/`asyncFlag` in `agentcontext/build.go`. See [`.agents/agent-context.md`](.agents/agent-context.md).
+- **v2beta1 404 suggestions** — once a resource is migrated to the nested v2beta1 scoped path, its 404 suggestion should come natively from `api/response.go` `suggestionForResource(<singular>)` (parseResourceFromRequest tags the trailing plural/id), NOT a call-site `utils.WithNotFoundContext` rewrite — add a `case` there when migrating a resource.
 - **feature flags** — naming `flag.<area>-<feature>`, default-false, config+env override. See [`.agents/feature-flags.md`](.agents/feature-flags.md).
 - **config migrations** — `common/configmigrate/`, `_schema_version` marker, warn-and-continue, `runWith` seam, under `common/` due to internal-pkg rule. See [`.agents/config-migrations.md`](.agents/config-migrations.md).
 - **`internal/quip/`** — intentional cosmetic terminal-message helper. Keep as-is; don't document triggers, simplify, or "tidy" the obfuscation.
@@ -178,6 +179,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - An ephemeral Aura credential (e.g. env-var-synthesized via `cfg.Aura.SetActiveCredential`) is NOT in `cfg.Credentials.Aura`'s store, so `getToken` (`aura/internal/api/token.go`) MUST skip `UpdateAccessToken` for it — `UpdateAccessToken` does `c.Get(name)` which `panic`s on a not-found name. Guard with a non-panicking `cfg.Credentials.Aura.Get(name)` probe before persisting; such tokens are kept in-process only (never written to credentials.json/keyring).
 - `fileutils.WriteFile` PANICS on error; `WriteFileErr` is the error-returning twin (atomic 0600). Use `WriteFileErr` in best-effort paths (e.g. history logging).
 - `--param` Usage on `query` parent mentions `:embed` modifier (`key:embed=<text>`); full rule in README + bundle additions.md.
+- **v2beta1 scoped-instance migration** — `utils.FetchScopedInstance(cfg, orgID, projectID, instanceID)` is the v2beta1 scoped GET (native scoping, no tenant_id preflight) used by `instance get`/`delete`; the older `utils.FetchAndVerifyInstanceInProject` (v1 flat path + tenant_id comparison) MUST stay untouched for the still-v1 commands (pause/resume/update/overwrite, snapshot, graphql). A nested v2beta1 404 auto-tags resourceType=instance via `parseResourceFromRequest`, so no `WithNotFoundContext` enrichment is needed.
 - **macOS subprocess test isolation** — `clicfg/darwin.go` uses `$HOME` env (not `user.Current()`); subprocess tests pass `HOME=<tempdir>` + symlink `login.keychain-db`. go-keyring hardcodes `/usr/bin/security` (PATH stubs don't work) — use `gokeyring.MockInitWithError`.
 - **Windows CI** — path-separator handling in `expandPath`; LF-pin committed `.md`/golden/bundle via `.gitattributes`. See [`.agents/windows-ci.md`](.agents/windows-ci.md).
 

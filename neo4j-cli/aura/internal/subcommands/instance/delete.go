@@ -4,7 +4,6 @@
 package instance
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -42,12 +41,12 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 
 			instanceID := strings.TrimSpace(args[0])
 
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
-			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
+			if err := utils.ValidateResourceID("instance", instanceID); err != nil {
 				return err
 			}
 
@@ -55,9 +54,10 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
-			path := fmt.Sprintf("/instances/%s", instanceID)
+			path := api.ScopedInstancePath(orgID, projectID, instanceID)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodDelete,
+				Method:  http.MethodDelete,
+				Version: api.AuraApiVersion2,
 			})
 
 			if err != nil {
@@ -66,8 +66,8 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 			// NOTE: Instance delete should not return OK (200), it always returns 202
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
+				normalized := utils.NormalizeV2Beta1Response(responseData)
+				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 			}
 
 			return nil

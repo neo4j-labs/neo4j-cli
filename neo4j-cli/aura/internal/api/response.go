@@ -201,12 +201,29 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 	}
 }
 
+// nonIDActionSuffixes are trailing path segments that name an action rather
+// than a resource id (e.g. `.../instances/{id}/pause`). When the last segment
+// is one of these, parseResourceFromRequest treats the preceding
+// `<plural>/<id>` pair as the resource so the action is not mis-reported as an
+// id.
+var nonIDActionSuffixes = map[string]struct{}{
+	"pause":     {},
+	"resume":    {},
+	"overwrite": {},
+	"metrics":   {},
+	"invoke":    {},
+}
+
 // parseResourceFromRequest extracts a (resourceType, resourceID) pair from
 // the request URL path so the JSON error envelope can surface them on a 404.
-// Paths follow the Aura shape `/<version>/<plural-resource>/<id>[/...]` (e.g.
-// `/v1/instances/abc123` or `/v1beta5/tenants/abc123/metrics-integration`).
-// Returns ("", "") when the request, URL, or path doesn't fit the shape so
-// the envelope omitempty drops both fields rather than emitting noise.
+// Flat v1/v1beta5 paths follow `/<version>/<plural-resource>/<id>[/...]` (e.g.
+// `/v1/instances/abc123` or `/v1beta5/tenants/abc123/metrics-integration`) and
+// resolve to the first `<plural>/<id>` pair. Nested v2beta1 paths scope every
+// resource under `/<version>/organizations/{org}/projects/{proj}/<plural>/<id>`;
+// for these the scoping prefix is skipped and the *trailing* `<plural>/<id>`
+// pair is returned so 404 envelopes carry the real resource (e.g. `instance`),
+// not `organization`. Returns ("", "") when the request, URL, or path doesn't
+// fit either shape so the envelope omitempty drops both fields.
 func parseResourceFromRequest(req *http.Request) (string, string) {
 	if req == nil || req.URL == nil {
 		return "", ""
@@ -216,9 +233,32 @@ func parseResourceFromRequest(req *http.Request) (string, string) {
 	if len(segments) < 3 {
 		return "", ""
 	}
-	// Skip the version segment (segments[0]); segments[1] is the plural
-	// resource name, segments[2] is the resource id.
+
+	// Nested v2beta1 shape: skip the org/project scoping prefix and parse the
+	// remaining resource segments so the trailing resource wins.
+	if len(segments) >= 6 && segments[1] == "organizations" && segments[3] == "projects" {
+		return parseTrailingResource(segments[5:])
+	}
+
+	// Flat shape: segments[1] is the plural resource, segments[2] its id.
 	return singularise(segments[1]), segments[2]
+}
+
+// parseTrailingResource resolves the trailing `<plural>/<id>` pair from the
+// resource segments that follow the v2beta1 scoping prefix. A trailing action
+// segment (see nonIDActionSuffixes) is dropped so it is not mistaken for an id.
+// Returns ("", "") when there is no `<plural>/<id>` pair (e.g. a bare list path
+// with only a plural segment) so the envelope omitempty drops both fields.
+func parseTrailingResource(segments []string) (string, string) {
+	if len(segments) > 0 {
+		if _, isAction := nonIDActionSuffixes[segments[len(segments)-1]]; isAction {
+			segments = segments[:len(segments)-1]
+		}
+	}
+	if len(segments) < 2 {
+		return "", ""
+	}
+	return singularise(segments[len(segments)-2]), segments[len(segments)-1]
 }
 
 // suggestionForResource returns the per-resource next-action hint attached to
@@ -237,6 +277,8 @@ func suggestionForResource(resourceType string) string {
 		return "Run 'neo4j-cli aura organization list' to see available organizations."
 	case "customer-managed-key":
 		return "Run 'neo4j-cli aura customer-managed-key list' to see customer-managed keys."
+	case "session":
+		return "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project."
 	case "tenant":
 		return "Run 'neo4j-cli aura project list' to see available projects (tenants are now called projects)."
 	default:

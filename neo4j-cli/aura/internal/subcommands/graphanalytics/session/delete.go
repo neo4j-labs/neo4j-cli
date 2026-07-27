@@ -4,7 +4,6 @@
 package session
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -38,12 +37,12 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 
 			sessionID := strings.TrimSpace(args[0])
 
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
-			if _, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, projectID); err != nil {
+			if err := utils.ValidateResourceID("session", sessionID); err != nil {
 				return err
 			}
 
@@ -51,18 +50,13 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 				return err
 			}
 
-			path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionID)
+			path := api.ScopedSessionPath(orgID, projectID, sessionID)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodDelete,
+				Method:  http.MethodDelete,
+				Version: api.AuraApiVersion2,
 			})
 			if err != nil {
-				// On 404 the API layer's parseResourceFromRequest mis-segments
-				// the nested /graph-analytics/sessions/<id> path (extracts
-				// "graph-analytic"). Rewrite the context so the user gets
-				// session-specific Suggestion text. The preflight
-				// FetchAndVerifySessionInProject already covers the
-				// ownership-mismatch path.
-				return utils.WithNotFoundContext(err, "graph-analytics-session", sessionID, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.")
+				return err
 			}
 
 			if statusCode == http.StatusAccepted {

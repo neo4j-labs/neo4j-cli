@@ -17,7 +17,7 @@ func TestListSessions(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{ "data": [
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusOK, `{ "data": [
 					{
 					  "id": "s-04de43fe-67ab-4",
 					  "name": "people-and-fruits",
@@ -55,7 +55,6 @@ func TestListSessions(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
-	mockHandler.AssertCalledWithQueryParam("tenantId", testProjectID)
 
 	helper.AssertOutJson(`{
 	"data": [
@@ -100,13 +99,12 @@ func TestListSessionsWithDefaultWorkspace(t *testing.T) {
 	helper.SetDefaultProjectInConfig(testOrgID, testProjectID)
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
 
 	helper.ExecuteCommand("graph-analytics session list")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
-	mockHandler.AssertCalledWithQueryParam("tenantId", testProjectID)
 
 	helper.AssertOutJson(`{"data": []}`)
 }
@@ -117,13 +115,12 @@ func TestListSessionsWithInstanceFilter(t *testing.T) {
 
 	registerProjectsMock(&helper)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session list --organization-id %s --project-id %s --instance-id my-instance-id", testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
-	mockHandler.AssertCalledWithQueryParam("tenantId", testProjectID)
 	mockHandler.AssertCalledWithQueryParam("instanceId", "my-instance-id")
 
 	helper.AssertOutJson(`{"data": []}`)
@@ -133,7 +130,7 @@ func TestListSessionsMissingOrg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
 
 	helper.ExecuteCommand("graph-analytics session list")
 
@@ -145,7 +142,7 @@ func TestListSessionsMissingProject(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session list --organization-id %s", testOrgID))
 
@@ -163,7 +160,7 @@ func TestListSessionsProjectNotInOrg(t *testing.T) {
 		`{"data": []}`,
 	)
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
 
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session list --organization-id %s --project-id unknown-project", testOrgID))
 
@@ -211,7 +208,7 @@ func TestListSessionsWithCredentialFlag(t *testing.T) {
 				`{"data": [{"id": "`+testProjectID+`", "name": "Test Project"}]}`,
 			)
 
-			mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+			mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+testOrgID+"/projects/"+testProjectID+"/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
 
 			helper.ExecuteCommand(tc.command)
 

@@ -6,6 +6,7 @@ package utils
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
@@ -13,6 +14,21 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/spf13/cobra"
 )
+
+// ValidateResourceID rejects an ID that would break out of, or malform, the
+// scoped resource path it is interpolated into. Aura resource IDs are opaque
+// UUID/short-hex tokens, so an empty value, a "."/".." path segment, or an
+// embedded slash/backslash is always invalid. Catching it here turns a
+// silently-retargeted request into a clear validation error: url.JoinPath (used
+// by api.MakeRequest to assemble the URL) resolves "." and ".." path segments
+// against the base, so e.g. an instanceID of "../.." would otherwise point the
+// request at a parent resource rather than failing cleanly.
+func ValidateResourceID(resourceType, id string) error {
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`) {
+		return clierr.NewValidationError("invalid %s id %q", resourceType, id)
+	}
+	return nil
+}
 
 // ResolveAndValidateOrgProject resolves the organization and project IDs for
 // Aura commands using the following precedence:
@@ -29,6 +45,15 @@ import (
 func ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error) {
 	orgID, projectID, err = resolveIDs(cmd, cfg)
 	if err != nil {
+		return "", "", err
+	}
+
+	// Reject malformed IDs before the membership API call fires, so a "." / ".."
+	// / slash segment can't retarget the request path (see ValidateResourceID).
+	if err = ValidateResourceID("organization", orgID); err != nil {
+		return "", "", err
+	}
+	if err = ValidateResourceID("project", projectID); err != nil {
 		return "", "", err
 	}
 
@@ -72,23 +97,69 @@ func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string
 	return orgID, projectID, nil
 }
 
-// validateProjectInOrg calls the v2beta1 list-projects endpoint and confirms
-// that projectID appears in the response.
-func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
+// FetchProjectInOrg derives a single project from the v2beta1 list-projects
+// endpoint (GET /organizations/{orgID}/projects) by filtering for projectID.
+// It is the canonical "resolve one project" path shared by project get and the
+// org/project scope validation: an absent project yields a structured
+// clierr.NewNotFoundError with resource + suggestion.
+func FetchProjectInOrg(cfg *clicfg.Config, orgID, projectID string) (*api.Project, error) {
 	projects, err := api.ListProjects(cfg, orgID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, p := range projects.Data {
-		if p.Id == projectID {
-			return nil
+	for i := range projects.Data {
+		if projects.Data[i].Id == projectID {
+			return &projects.Data[i], nil
 		}
 	}
 
-	return clierr.NewNotFoundError("could not find project %s in organization %s", projectID, orgID).
+	return nil, clierr.NewNotFoundError("could not find project %s in organization %s", projectID, orgID).
 		WithResource("project", projectID).
 		WithSuggestion("Run 'neo4j-cli aura project list --organization-id <id>' to see available projects.")
+}
+
+// validateProjectInOrg confirms that projectID appears in the org's project
+// list, reusing the canonical FetchProjectInOrg lookup.
+func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
+	_, err := FetchProjectInOrg(cfg, orgID, projectID)
+	return err
+}
+
+// OrgFromWorkspace returns the organization portion of aura.default-workspace,
+// or an empty string when the workspace is not set or has no '/'. It is the
+// canonical org-parsing helper shared by project commands.
+func OrgFromWorkspace(cfg *clicfg.Config) string {
+	orgID, _ := defaultOrgAndProject(cfg)
+	return orgID
+}
+
+// FetchScopedInstance performs a GET on the v2beta1 org/project-scoped instance
+// path (/organizations/{orgID}/projects/{projectID}/instances/{instanceID}) and
+// returns the raw response body so the caller can reuse it for output (avoiding
+// a second round-trip in read-only commands such as "instance get").
+//
+// Scoping is native to the path, so no tenant_id comparison is performed: an
+// instance outside the project surfaces via the v2beta1 path's own 404, which
+// carries the correct resource type, id, and suggestion.
+func FetchScopedInstance(cfg *clicfg.Config, orgID, projectID, instanceID string) ([]byte, error) {
+	if err := ValidateResourceID("instance", instanceID); err != nil {
+		return nil, err
+	}
+	path := api.ScopedInstancePath(orgID, projectID, instanceID)
+	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion2,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d fetching instance", statusCode)
+	}
+
+	return resBody, nil
 }
 
 // FetchAndVerifyInstanceInProject performs a GET /instances/{instanceID} and
@@ -127,37 +198,30 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 	return resBody, nil
 }
 
-// FetchAndVerifySessionInProject performs a GET /graph-analytics/sessions/{sessionID}
-// and checks that the session's tenant_id matches projectID. It returns the raw
-// response body so the caller can reuse it for output (avoiding a second
-// round-trip in read-only commands such as "graph-analytics session get").
+// FetchScopedSession performs a GET on the v2beta1 org/project-scoped
+// graph-analytics session path
+// (/organizations/{orgID}/projects/{projectID}/graph-analytics/sessions/{sessionID})
+// and returns the raw response body so the caller can reuse it for output
+// (avoiding a second round-trip in read-only commands such as
+// "graph-analytics session get").
 //
-// If the session exists but belongs to a different project the function
-// returns (nil, "could not find session {sessionID} in project {projectID}").
-func FetchAndVerifySessionInProject(cfg *clicfg.Config, sessionID, projectID string) ([]byte, error) {
-	path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionID)
+// Scoping is native to the path, so no tenant_id comparison is performed: a
+// session outside the project surfaces via the v2beta1 path's own 404.
+func FetchScopedSession(cfg *clicfg.Config, orgID, projectID, sessionID string) ([]byte, error) {
+	if err := ValidateResourceID("session", sessionID); err != nil {
+		return nil, err
+	}
+	path := api.ScopedSessionPath(orgID, projectID, sessionID)
 	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-		Method: http.MethodGet,
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion2,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d from preflight ownership check", statusCode)
-	}
-
-	responseData := api.ParseBody(resBody)
-	session, err := responseData.GetSingleOrError()
-	if err != nil {
-		return nil, err
-	}
-
-	tenantID, _ := session["tenant_id"].(string)
-	if tenantID != projectID {
-		return nil, clierr.NewNotFoundError("could not find session %s in project %s", sessionID, projectID).
-			WithResource("graph-analytics-session", sessionID).
-			WithSuggestion("Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.")
+		return nil, fmt.Errorf("unexpected status %d fetching session", statusCode)
 	}
 
 	return resBody, nil

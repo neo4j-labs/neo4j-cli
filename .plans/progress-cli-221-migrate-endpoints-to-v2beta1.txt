@@ -1,0 +1,75 @@
+## TASK-001 — 2026-07-10T11:45:00Z
+Added centralized utils.NormalizeV2Beta1Response helper renaming legacy_status->status and tenant_id->project_id (single+list), with native fields winning over legacy sources and no input mutation. Not yet wired to any caller.
+Files: +2 new (normalize.go, normalize_test.go)
+Decisions: native destination field (status/project_id) wins over legacy source; this is a deliberate tie-break divergence from RenameResponseField, which callers will adopt in task-003/005/006.
+
+## TASK-002 — 2026-07-10T12:15:00Z
+parseResourceFromRequest now detects the nested v2beta1 shape (/<ver>/organizations/{org}/projects/{proj}/<plural>/<id>) via a segments>=6 + organizations/projects guard, skips the scoping prefix, and returns the trailing plural/id pair; flat v1 paths keep first-pair behaviour. Action suffixes (pause/resume/overwrite/metrics/invoke) are stripped so they aren't mistaken for ids.
+Files: ~2 mod (response.go, response_test.go)
+Decisions: kept flat-path resolution untouched to preserve existing snapshots/data-apis first-pair tests; scoped trailing-pair logic gated strictly to the org/project prefix. invoke added to the action allow-list per review (agent invoke path is nested v2beta1).
+
+## TASK-003 — 2026-07-10T13:05:00Z
+Migrated `aura instance list` to the v2beta1 org/project-scoped path GET /organizations/{orgID}/projects/{projectID}/instances (Version AuraApiVersion2), dropping the v1 tenantId query param and switching output mapping from RenameResponseField to utils.NormalizeV2Beta1Response (legacy_status->status, tenant_id->project_id). Added `status` to the table field list.
+Files: ~2 mod (list.go, list_test.go)
+Decisions: test now seeds legacy_status in mock rows and asserts it surfaces as status in JSON, covering the normalization path directly per review.
+
+## TASK-004 — 2026-07-10T14:05:00Z
+Migrated `aura instance create` to POST the v2beta1 org/project-scoped path (/organizations/{orgID}/projects/{projectID}/instances, Version AuraApiVersion2), including the auto-naming pre-list GET on the same scoped path (dropped the v1 tenantId query param). Added a scopedInstancesPath helper; threaded orgID into the shared resolveInstanceName/createAndStoreInstance helpers, which also migrated deploy + load's create path. renderInstanceResult tenant_id->project_id rename preserved; {data:...} unwrap and cred storage unchanged. Poll GETs stay v1 (task-008).
+Files: ~6 mod (create_core.go, create.go, deploy.go, load.go, create_test.go, deploy_test.go, load_test.go)
+Decisions: request POST body still sends tenant_id (scope now in path) — PRD V-1/REQ-F-002 only cover the path+response, so live-schema confirmation of a body project_id rename is deferred to task-011.
+
+## TASK-005 — 2026-07-10T15:05:00Z
+Migrated `aura instance get` and `delete` to the v2beta1 org/project-scoped path (/organizations/{orgID}/projects/{projectID}/instances/{id}, Version AuraApiVersion2). get uses a new utils.FetchScopedInstance (native scoping, no tenant_id preflight); delete drops its preflight GET and DELETEs the scoped path directly (confirm gate now runs before the request). Not-found surfaces via the native 404 whose envelope task-002's parseResourceFromRequest tags as resourceType=instance. Output switched from RenameResponseField to NormalizeV2Beta1Response.
+Files: ~4 mod (get.go, delete.go, resolve.go, + tests get_test.go/delete_test.go/list_test.go/resolve_test.go)
+Decisions: added FetchScopedInstance rather than mutating shared FetchAndVerifyInstanceInProject, which pause/resume/update/overwrite/snapshot/graphql still need on v1 (task-009). Moved instanceGetBody test helper to list_test.go since delete no longer needs it but v1 command tests do.
+
+## TASK-006 — 2026-07-10T16:05:00Z
+Migrated all `aura graph-analytics session` ops (create/list/get/delete) to the v2beta1 org/project-scoped path (/organizations/{orgID}/projects/{projectID}/graph-analytics/sessions[/{id}], Version AuraApiVersion2). Added utils.FetchScopedSession (native scoping, no tenant_id preflight) replacing FetchAndVerifySessionInProject; get/delete drop their preflight GET. list drops the tenantId query param; create/wait reads normalized status. Output switched from RenameResponseField to NormalizeV2Beta1Response. Added a "session" case to suggestionForResource so the native 404 keeps its session-list suggestion (parity with instance).
+Files: ~7 mod (session create/list/get/delete + tests, utils/resolve.go + resolve_test.go, api/response.go, session/helpers_test.go)
+Decisions: 404 suggestion now comes natively from suggestionForResource("session") instead of the removed WithNotFoundContext call site (task-002 makes parseResourceFromRequest tag the nested path as resourceType=session). Poll helper left on v1 per task-008.
+
+## TASK-007 — 2026-07-10T17:05:00Z
+Migrated `aura project get` to derive the single project from api.ListProjects (v2beta1 /organizations/{org}/projects) and stop calling v1 /tenants/{id}; the matched Project is marshaled into a GetProjectResponse and printed, preserving id/name output and the existing not-found error.
+Files: ~2 mod (get.go, get_test.go)
+Decisions: kept the ListProjects+filter path (per task mandate) rather than the single-fetch api.GetProject; also a behaviour fix — output now always prints the found project instead of gating on a v1 200. Added TestGetProjectMakesNoV1Call asserting the v1 handler is called 0 times; removed the now-dead TestGetProjectV1Error.
+
+## TASK-008 — 2026-07-10T18:05:00Z
+Migrated PollInstance and PollGraphAnalyticsSessionReady to poll the v2beta1 org/project-scoped paths via PollWithVersion(AuraApiVersion2); both now take orgID/projectID. Added PollResponse.normalize() (legacy_status->status, native status wins) applied before readiness is evaluated in PollWithVersion. PollSnapshot/PollCMK/PollGraphQLDataApi unchanged. Updated all 6 callers (create/deploy/load/overwrite/resume, session/create) to pass org/project; resume+overwrite now capture the previously-discarded orgID.
+Files: ~8 mod (poll.go, create.go, deploy.go, load.go, overwrite.go, resume.go, session/create.go + tests poll_debug_test.go, create_test.go, deploy_test.go, load_test.go, overwrite_test.go, session/create_test.go)
+Decisions: resume/overwrite readiness poll now hits the v2beta1 scoped GET (a status read, identical to `get`); their mutation POSTs stay v1 per task-009. Split overwrite's shared preflight+poll mock into a v1 preflight mock and a v2beta1 poll mock.
+
+## TASK-009 — 2026-07-10T19:05:00Z
+Verified the non-migrated commands stay on their versions: instance pause/resume/update/overwrite + all snapshot + all customer-managed-key POST/GET /v1/... (omit Version, default to AuraApiVersion1); all graphql (+authprovider/corspolicy/allowedorigin) pass AuraApiVersionBeta1 (v1beta5). FetchAndVerifyInstanceInProject/FetchAndVerifyCMKInProject remain v1; migration helpers (FetchScoped*, NormalizeV2Beta1Response) unused here. No production change needed — added guard tests: version->path mapping pin, panic-on-unknown, and a MakeRequest default-to-v1 assertion (the real regression vector for Version-omitting commands). resume/overwrite v2beta1 readiness poll is the intended task-008 behaviour, already asserted in their tests.
+Files: +1 new (version_path_test.go), ~1 mod (export_test.go: VersionPathForTest seam)
+Decisions: guarded the mapping AND the empty-Version defaulting in MakeRequest, since getVersionPath("") panics rather than defaulting — the default resolution lives in MakeRequest, not getVersionPath.
+
+## TASK-010 — 2026-07-10T13:29:46Z
+Fixed the e2e_exitcodes suite for the v2beta1 migration: instance list/get now resolve org/project and hit /v2beta1/organizations/{org}/projects/{proj}/instances, so the suite passes --organization-id/--project-id, registers the scoped instances path in the mock mux, and adds an always-200 list-projects validation handler; added a 402 quota-exceeded scenario (exit 5) exercising errors[].reason end-to-end. Verified casing gates, redaction/tee, and 402/404 body-shape handling already satisfied by tasks 003-008 (no other test/golden/decoder changes needed).
+Files: ~1 mod (test/e2e/exitcodes/exitcodes_test.go)
+Decisions: passed scope via flags rather than seeding a default workspace into config; list-projects handler always returns 200 with the project present so resolution proceeds to the instances request under test regardless of the scenario status.
+
+## TASK-011 — 2026-07-10T13:33:01Z
+Finalized the feature: ran `go generate ./...` (no bundle drift — no Long/Example text changed on migrated commands, so TestGenerator_RoundTrip already passes) and added a user-facing changie Minor entry describing the v2beta1 org/project-scoped endpoint migration (instance list/create/get/delete, graph-analytics session ops, project get) plus the tenant_id->project_id and legacy_status->status output changes. All final gates pass (test, fmt-check, lint 0 issues, license-check).
+Files: +1 new (.changes/unreleased changie Minor)
+
+## REVIEW — 2026-07-10T14:04:58Z
+Added 4 review tasks (task-012..task-015).
+
+## TASK-012 — 2026-07-10T20:15:00Z
+Centralized v2beta1 scoped-path construction into api/scoped_path.go (ScopedInstancesPath/ScopedInstancePath/ScopedSessionsPath/ScopedSessionPath, item forms compose collection forms). Routed all inline fmt.Sprintf sites through them: instance list/delete/create_core, session create/list/delete, api/poll.go (both pollers), utils/resolve.go FetchScoped* helpers; removed create_core's local scopedInstancesPath; dropped now-unused fmt imports.
+Files: +1 new (scoped_path.go), ~8 mod
+Decisions: builders live in api (not utils) because api/poll.go must use them and api cannot import utils (cycle). Review caught 3 unmigrated session files on first pass; fixed before completion.
+
+## TASK-013 — 2026-07-10T21:15:00Z
+Unified the copy-and-rename logic: renameMapKey(m, from, to, preferTo) is now the single copy-and-rename primitive and mapResponse the shared envelope-preserving walker. RenameResponseField routes through it with preferTo=false (unconditional move, for non-migrated v1-only responses); NormalizeV2Beta1Response with preferTo=true (native `to` wins, for v2beta1 responses carrying both). preferField/normalizeMap deleted. Doc comments make the two public helpers' relationship explicit.
+Files: ~2 mod (rename.go, normalize.go)
+Decisions: preferTo=false path now deterministically prefers the legacy `from` value (was iteration-order-dependent when both keys present); harmless since all RenameResponseField callers rename tenant_id->project_id on v1 responses that carry only tenant_id.
+
+## TASK-014 — 2026-07-10T22:15:00Z
+project get now reuses canonical utils resolution: added utils.FetchProjectInOrg (single "resolve one project" path returning a structured clierr.NewNotFoundError with resource+suggestion) and utils.OrgFromWorkspace (delegates to defaultOrgAndProject). validateProjectInOrg now delegates to FetchProjectInOrg; get.go drops its manual scan + bare fmt.Errorf; list.go's duplicate resolveOrgFromWorkspace deleted in favour of OrgFromWorkspace.
+Files: ~4 mod (utils/resolve.go, project/get.go, project/list.go, project/get_test.go)
+Decisions: get.go's missing-org branch still uses a bare fmt.Errorf (out of scope per reviewer — task targets org-parsing dedup + the not-found path).
+
+## TASK-015 — 2026-07-10T14:34:36Z
+instance/get.go now parses the response body once: getFields takes the already-parsed api.ResponseData instead of re-calling api.ParseBody on the same bytes. Output (incl. metrics_integration_url) unchanged.
+Files: ~1 mod (get.go)
