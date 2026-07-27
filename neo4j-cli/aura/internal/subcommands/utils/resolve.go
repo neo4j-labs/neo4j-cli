@@ -48,6 +48,15 @@ func ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID
 		return "", "", err
 	}
 
+	// Reject malformed IDs before the membership API call fires, so a "." / ".."
+	// / slash segment can't retarget the request path (see ValidateResourceID).
+	if err = ValidateResourceID("organization", orgID); err != nil {
+		return "", "", err
+	}
+	if err = ValidateResourceID("project", projectID); err != nil {
+		return "", "", err
+	}
+
 	if err = validateProjectInOrg(cfg, orgID, projectID); err != nil {
 		return "", "", err
 	}
