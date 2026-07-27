@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Migrate the Aura `instance` (list, create, get, delete) and `graph-analytics session` (create, list, get, delete) commands, plus `project get`, to the v2beta1 organization/project-scoped API endpoints. These commands now resolve the target organization and project and issue requests to `/v2beta1/organizations/{orgID}/projects/{projectID}/...`, with ownership scoping enforced natively by the path (the previous `tenant_id` ownership preflight is removed). In command output the instance/session `tenant_id` field is renamed to `project_id`, and the v2beta1 `legacy_status` field is surfaced as `status`, so `--wait` readiness detection is unchanged. Non-migrated commands (instance pause/resume/update/overwrite, snapshot, customer-managed-key, and graphql) remain on their existing API versions.
-time: 2026-07-10T14:31:31.703916+01:00
