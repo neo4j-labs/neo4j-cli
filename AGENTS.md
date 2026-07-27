@@ -35,7 +35,7 @@ BUILD SYSTEMS: [Go toolchain, Makefile, golangci-lint, GoReleaser, changie]. See
 - `make build` → `bin/neo4j-cli`; `make run-neo4j` (no build); `make snapshot` (goreleaser, current platform, ldflags).
 - `make npm-publish-dry` — template/ordering check; stubs missing binaries (dry-run only). Run `make snapshot` first for real binaries.
 - All `.go` files need the Neo4j copyright header (CI `addlicense`).
-- Changelog via `make changelog` **only for user-facing changes**. Non-interactive: `changie new --projects neo4j-cli --kind <kind> --body <body>`.
+- Changelog via `make changelog` **only for user-facing changes**. Non-interactive: `changie new --projects neo4j-cli --kind <kind> --body <body>`. The body describes **only the observable user-facing impact** (new/changed/removed output, flags, commands, behavior, errors) — NOT the internal mechanics that produced it. Skip pure refactors, endpoint/transport migrations, and any change invisible to the end user; if such a change has an incidental observable effect (e.g. a new output field), the entry states just that effect, not the refactor. Verify the claimed effect is real by diffing observable output (`AssertOutJson`/`AssertErr` golden strings), not by describing the implementation.
 
 ## Testing Framework
 
