@@ -1754,7 +1754,7 @@ Returns a list of virtual graphs
 
 This subcommand returns a list containing a summary of each virtual graph in the specified project, newest first. To find out more about a specific virtual graph, retrieve the details using the get subcommand.
 
-Results are cursor-paginated. When more results are available the next page's cursor is printed to stderr; pass it back with --page-token to fetch the next page.
+The API returns results a page at a time; this subcommand follows every page so the output is the complete list. Use --limit to stop early, in which case a note is written to stderr saying more results exist.
 
 Use --organization-id and --project-id to specify which project's virtual graphs to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.
 
@@ -1764,20 +1764,19 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--page-limit` | int | 0 | The maximum number of virtual graphs to return in one page. Omit to use the API default. |
-| `--page-token` | string | - | The cursor printed by a previous page's next-page hint. Omit to fetch the first page. |
+| `--limit` | int | 0 | The maximum number of virtual graphs to return. Omit to return all of them. |
 
 Examples:
 
 ```
-# List virtual graphs in a project (using flags)
+# List every virtual graph in a project (using flags)
 neo4j-cli aura virtual-graph list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # List virtual graphs using a configured default workspace
 neo4j-cli aura virtual-graph list
 
-# Fetch a bounded page and emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura virtual-graph list --page-limit 10 --format json
+# Return at most 10 and emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura virtual-graph list --limit 10 --format json
 ```
 
 ### neo4j-cli aura virtual-graph update

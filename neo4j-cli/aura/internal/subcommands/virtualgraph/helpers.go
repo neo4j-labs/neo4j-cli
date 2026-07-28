@@ -4,9 +4,6 @@
 package virtualgraph
 
 import (
-	"encoding/json"
-	"net/url"
-
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -70,25 +67,4 @@ func printVirtualGraph(cmd *cobra.Command, cfg *clicfg.Config, resBody []byte, e
 	}
 	output.PrintBodyMap(cmd, cfg, responseData, detailFieldsFor(virtualGraph, extra...))
 	return nil
-}
-
-// nextPageToken extracts the page_token query parameter from a list response's
-// links.next URL. The public API returns links.next as an absolute URL (null on
-// the last page); the CLI surfaces just the cursor so the value can be fed
-// straight back in via --page-token. Returns "" when the body carries no next
-// link, or the link is not a URL carrying a page_token.
-func nextPageToken(body []byte) string {
-	var envelope struct {
-		Links struct {
-			Next *string `json:"next"`
-		} `json:"links"`
-	}
-	if err := json.Unmarshal(body, &envelope); err != nil || envelope.Links.Next == nil {
-		return ""
-	}
-	next, err := url.Parse(*envelope.Links.Next)
-	if err != nil {
-		return ""
-	}
-	return next.Query().Get("page_token")
 }
