@@ -24,6 +24,8 @@ func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 
 Deleting a virtual graph is an asynchronous operation, and is idempotent: deleting an id that does not exist in the project succeeds. The underlying data source is not affected.
 
+Once the deletion is accepted the virtual graph stops being readable, so removal shows up as absence rather than as a state: the get subcommand reports it as not found (exit code 3) and the list subcommand stops including it. Poll for that instead of for a status. Teardown of the underlying resources continues in the background and is not reported by the API.
+
 Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
 		Example: `# Delete a virtual graph by ID
 neo4j-cli aura virtual-graph delete ge82059a --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
@@ -32,7 +34,11 @@ neo4j-cli aura virtual-graph delete ge82059a --organization-id 00000000-0000-000
 neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force --format json
 
 # Delete a virtual graph, suppressing all stdout output
-neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force > /dev/null`,
+neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force > /dev/null
+
+# Delete, then poll until the virtual graph is no longer readable
+neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force
+while neo4j-cli aura virtual-graph get ge82059a > /dev/null 2>&1; do sleep 5; done`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
