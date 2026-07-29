@@ -45,6 +45,8 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:       "Creates a new virtual graph",
 		Long: `This subcommand creates a virtual graph from an existing data source and graph data model, both created in Data Importer.
 
+Both IDs come from Data Importer, not from this CLI: --data-source-id identifies a connector configured there (for example Databricks, Snowflake or BigQuery), and --import-model-id identifies a graph data model saved against it. Set both up in Data Importer first, then pass their IDs here. See https://neo4j.com/docs/aura/import/introduction/.
+
 Creating a virtual graph is an asynchronous operation that can be waited for with --wait: the command returns immediately with status 'creating'.
 
 The initial Neo4j password is returned once, in the plain_password field of the response, and cannot be retrieved again.`,

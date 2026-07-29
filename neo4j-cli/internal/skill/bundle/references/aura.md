@@ -1661,6 +1661,8 @@ Creates a new virtual graph
 
 This subcommand creates a virtual graph from an existing data source and graph data model, both created in Data Importer.
 
+Both IDs come from Data Importer, not from this CLI: --data-source-id identifies a connector configured there (for example Databricks, Snowflake or BigQuery), and --import-model-id identifies a graph data model saved against it. Set both up in Data Importer first, then pass their IDs here. See https://neo4j.com/docs/aura/import/introduction/.
+
 Creating a virtual graph is an asynchronous operation that can be waited for with --wait: the command returns immediately with status 'creating'.
 
 The initial Neo4j password is returned once, in the plain_password field of the response, and cannot be retrieved again.
@@ -1701,6 +1703,8 @@ Starts the deletion process of a virtual graph.
 
 Deleting a virtual graph is an asynchronous operation, and is idempotent: deleting an id that does not exist in the project succeeds. The underlying data source is not affected.
 
+Once the deletion is accepted the virtual graph stops being readable, so removal shows up as absence rather than as a state: the get subcommand reports it as not found (exit code 3) and the list subcommand stops including it. Poll for that instead of for a status. Teardown of the underlying resources continues in the background and is not reported by the API.
+
 Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
 
 Usage: `neo4j-cli aura virtual-graph delete <id> [flags]`
@@ -1723,6 +1727,10 @@ neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force --format json
 
 # Delete a virtual graph, suppressing all stdout output
 neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force > /dev/null
+
+# Delete, then poll until the virtual graph is no longer readable
+neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force
+while neo4j-cli aura virtual-graph get ge82059a > /dev/null 2>&1; do sleep 5; done
 ```
 
 ### neo4j-cli aura virtual-graph get
