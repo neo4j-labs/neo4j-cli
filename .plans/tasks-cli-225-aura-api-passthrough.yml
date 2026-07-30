@@ -253,6 +253,26 @@ tasks:
       - "The task-007 status table is extended to assert the exit code AND the `retryable` envelope field for each fallback case; `make test`, `make fmt-check`, `make lint` pass."
     completed_at: null
 
+  - id: task-014
+    title: 'Unwrap a data-object envelope into its own table row'
+    description: |
+      REQ-F-018 specified `data`-as-array and "a bare object is one row", but never
+      `data`-as-object, so `{"data":{...}}` currently renders as a single `DATA`
+      column holding the stringified object. That is the shape
+      `GET .../instances/{id}` returns, and every other aura command unwraps the
+      envelope. Treat a top-level object whose sole meaningful key is `data`
+      holding an object as one row of that INNER object.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "`{\"data\":{\"id\":\"abc\",\"name\":\"x\"}}` under `--format table` yields columns `ID` and `NAME`, not a single `DATA` column."
+      - "`{\"data\":[...]}`, bare arrays, bare objects, and every fallback shape from task-008 keep their existing behaviour — the task-008 tests pass unchanged."
+      - "`{\"data\":{...},\"links\":{...}}` and `{\"data\":{...},\"errors\":[...]}` still unwrap to the inner data object, since v2beta1 pairs `data` with those siblings."
+      - "A `data` key holding a scalar or null still falls back to the verbatim body rather than producing a nonsense row."
+      - "`--format json` and `--format toon` are untouched by this change; `make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
   - id: task-012
     title: 'Regenerate the skill bundle and add README and changelog entries'
     description: |
@@ -265,6 +285,7 @@ tasks:
     dependencies:
       - task-011
       - task-013
+      - task-014
     acceptance_criteria:
       - "`go generate ./neo4j-cli/internal/skill/...` leaves a clean tree; `TestGenerator_RoundTrip` and `make generate-check` pass with the bundle committed."
       - "The README documents the endpoint-carries-the-version contract, the `{org_id}`/`{project_id}` placeholders, `--rw` on non-GET plus `--yes --force` on DELETE, and that `--format json` is verbatim so `| jq` works."

@@ -154,11 +154,14 @@ design and are cited throughout this PRD:
 - REQ-F-017: `--format toon` unmarshals to `any`, applies `stripControlDeep`, and
   `toon.Marshal`s, falling back to the verbatim body on any error (mirroring
   `printToonValue`'s existing non-panicking fallback).
-- REQ-F-018: `--format table` derives rows — a top-level object with a `data` array of
-  objects uses that array; a bare array of objects uses itself; a bare object is one row.
-  Columns are the union of row keys in **first-seen order** (deterministic). Any other shape
-  falls back to the verbatim body. Rows are fed to the existing `printTable` through a small
-  unexported `rawRows []map[string]any` implementing `AsArray()`.
+- REQ-F-018: `--format table` derives rows — a top-level object with a `data` **array** of
+  objects uses that array; a top-level object with a `data` **object** uses that inner object
+  as one row (matching how every other aura command unwraps the envelope); a bare array of
+  objects uses itself; a bare object is one row. Columns are the union of row keys in
+  **sorted** order — `encoding/json` discards the response's own key order, so sorting is the
+  only deterministic choice. Any other shape falls back to the verbatim body. Rows are fed to
+  the existing `printTable` through a small unexported `rawRows []map[string]any` implementing
+  `AsArray()`.
 - REQ-F-019: Rendering must **not** route through `api.ParseBody` or `api.ParseRawBody`, both
   of which panic on JSON that is not an object or array (`response.go:533`) — a bare string,
   number, `null`, or `[1,2,3]` response would crash. All six envelope shapes from the spec
