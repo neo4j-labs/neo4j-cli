@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'Add admin role commands: list, get, create, drop, grant, revoke'
-time: 2026-06-16T14:34:59.798538+01:00
