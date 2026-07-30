@@ -9,3 +9,8 @@ Decisions: `prepareRequest` takes versionPath as a literal string (empty = no ve
 Extracted the four-branch --rw precedence (rw set / agent / TTY / else) from `EnforceWriteGate` into exported `flags.RequireWriteAccess(cmd)`; `EnforceWriteGate` keeps its `write:true` annotation short-circuit and delegates. Added a table-driven `TestRequireWriteAccess` (all four branches + exit-2 assertion) and a nil-`--rw`-flag case; deduped the seam save/restore into `setGateSeams`.
 Files: ~common/flags/flags.go, ~common/flags/flags_test.go
 Decisions: Left `TestEnforceWriteGate_GateMatrix` untouched per the acceptance criteria, so the precedence matrix is now asserted through both entrypoints; collapsing it into the new test is optional follow-up.
+
+## TASK-003 — 2026-07-30T14:35:00Z
+Split `confirm.Require` into a thin parent-name-deriving wrapper over a new exported `RequireTyped(cmd, resourceType, resourceID)` that owns the whole --yes/--force gate; the gate contract doc moved onto RequireTyped. Added a table-driven `TestRequireTyped` (custom noun, parentless cmd, empty ID/type, both-flags, TTY accept/decline) plus a byte-identity delegation test covering both the TTY prompt and the non-TTY error copy.
+Files: ~common/confirm/confirm.go, ~common/confirm/confirm_test.go, ~common/confirm/confirmtest/confirmtest.go
+Decisions: The empty-resourceType -> "resource" fallback lives in `RequireTyped` (not the wrapper), so a parentless or unnamed-parent mount degrades identically through either entrypoint. Kept the `RequireTyped` name from the task YAML despite the mild GitHub-style "type the name to confirm" misread risk.

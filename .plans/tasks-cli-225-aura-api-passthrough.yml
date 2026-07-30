@@ -52,7 +52,7 @@ tasks:
       `confirm.RequireTyped(cmd, resourceType, resourceID string) error` carrying
       the full gate logic, and reduce `Require` to a delegation that passes the
       parent-derived type. No behaviour change for any current caller.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`RequireTyped` accepts an explicit resource type and applies the existing gate: both flags proceed, non-TTY without both errors, TTY prompts."
@@ -60,7 +60,7 @@ tasks:
       - "Prompt and error copy for existing callers (e.g. `instance delete`) are byte-identical to before."
       - "`ErrCancelled` is still returned on a declined TTY prompt, with `cancelled.` written to stderr."
       - "Tests drive both branches via `confirm.SetStdinIsTerminal` and assert the custom noun appears in the prompt."
-    completed_at: null
+    completed_at: 2026-07-30T14:35:00Z
 
   - id: task-004
     title: 'Export a non-validating utils.ResolveOrgProject helper'

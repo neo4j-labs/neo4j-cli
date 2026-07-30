@@ -2,10 +2,10 @@
 // Neo4j Sweden AB [http://neo4j.com]
 
 // Package confirm provides a shared `--yes` / `--force` gate for destructive
-// cobra leaves. Register binds the flags on cmd as a side effect; Require
-// enforces them: TTY callers get a y/N prompt, non-TTY callers must pass both
-// flags or receive a usage error (exit 2). Cancelled TTY prompts return
-// ErrCancelled so leaves can exit 0 cleanly.
+// cobra leaves. Register binds the flags on cmd as a side effect; Require and
+// RequireTyped enforce them: TTY callers get a y/N prompt, non-TTY callers must
+// pass both flags or receive a usage error (exit 2). Cancelled TTY prompts
+// return ErrCancelled so leaves can exit 0 cleanly.
 package confirm
 
 import (
@@ -51,7 +51,17 @@ func Register(cmd *cobra.Command) {
 	cmd.Flags().Bool("force", false, "Confirm the destructive action. Required together with --yes for non-TTY callers.")
 }
 
-// Require enforces the gate at call time by reading --yes and --force from
+// Require is RequireTyped with the prompt noun derived from
+// cmd.Parent().Name(); an absent or unnamed parent degrades to "resource".
+func Require(cmd *cobra.Command, resourceID string) error {
+	var resourceType string
+	if parent := cmd.Parent(); parent != nil {
+		resourceType = parent.Name()
+	}
+	return RequireTyped(cmd, resourceType, resourceID)
+}
+
+// RequireTyped enforces the gate at call time by reading --yes and --force from
 // cmd.Flags():
 //   - both flags set ⇒ proceed (no prompt).
 //   - non-TTY with either flag missing ⇒ *clierr.CLIError (exit 2).
@@ -60,20 +70,22 @@ func Register(cmd *cobra.Command) {
 //     and returns ErrCancelled. The top-level main intercepts ErrCancelled and
 //     exits 0 with no further output, so leaves can just `return err`.
 //
+// resourceType is the prompt noun, supplied explicitly rather than derived from
+// the parent command — use this over Require for a leaf mounted directly on a
+// root, where the parent names the binary or a group instead of the resource
+// being destroyed. An empty resourceType degrades to "resource".
+//
 // resourceID is interpolated into the prompt and error copy; pass "" when the
 // leaf has no positional argument and copy degrades to "this <type>".
-func Require(cmd *cobra.Command, resourceID string) error {
+func RequireTyped(cmd *cobra.Command, resourceType, resourceID string) error {
 	yes, _ := cmd.Flags().GetBool("yes")
 	force, _ := cmd.Flags().GetBool("force")
 	if yes && force {
 		return nil
 	}
 
-	resourceType := "resource"
-	if parent := cmd.Parent(); parent != nil {
-		if name := parent.Name(); name != "" {
-			resourceType = name
-		}
+	if resourceType == "" {
+		resourceType = "resource"
 	}
 
 	target := fmt.Sprintf("this %s", resourceType)
