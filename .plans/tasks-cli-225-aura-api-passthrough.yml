@@ -263,7 +263,7 @@ tasks:
       `GET .../instances/{id}` returns, and every other aura command unwraps the
       envelope. Treat a top-level object whose sole meaningful key is `data`
       holding an object as one row of that INNER object.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -272,7 +272,7 @@ tasks:
       - "`{\"data\":{...},\"links\":{...}}` and `{\"data\":{...},\"errors\":[...]}` still unwrap to the inner data object, since v2beta1 pairs `data` with those siblings."
       - "A `data` key holding a scalar or null still falls back to the verbatim body rather than producing a nonsense row."
       - "`--format json` and `--format toon` are untouched by this change; `make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-07-30T22:20:00Z
 
   - id: task-015
     title: 'Fix the Example endpoints to real v2beta1 paths (they would 404)'

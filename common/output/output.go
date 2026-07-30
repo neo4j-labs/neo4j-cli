@@ -156,7 +156,8 @@ func (r rawRows) AsArray() []map[string]any { return r }
 //     sees exactly what the server sent.
 //   - toon: the body decoded, control-stripped and re-encoded as TOON.
 //   - table: rows derived from the body shape — a `data` array of objects, a
-//     bare array of objects, or a bare object as a single row.
+//     `data` object as a single row, a bare array of objects, or a bare object
+//     as a single row.
 //
 // An empty body writes nothing. Any shape it cannot render as a table or TOON —
 // a scalar, a null, an array of non-objects, or invalid JSON — falls back to the
@@ -230,8 +231,8 @@ func printPassthroughTable(cmd *cobra.Command, body []byte) {
 	printTable(cmd, rawRows(rows), fields)
 }
 
-// passthroughRows maps a decoded response body to table rows. A top-level object
-// carrying a `data` array of objects contributes that array, a bare array of
+// passthroughRows maps a decoded response body to table rows. A `data` envelope
+// contributes its array of objects or its object as a single row, a bare array of
 // objects contributes itself, and any other object is a single row. Every other
 // shape reports false so the caller can fall back to the verbatim body.
 func passthroughRows(v any) ([]map[string]any, bool) {
@@ -240,12 +241,41 @@ func passthroughRows(v any) ([]map[string]any, bool) {
 		if rows, ok := objectArray(val["data"]); ok {
 			return rows, true
 		}
+		if inner, ok := dataEnvelope(val); ok {
+			if row, ok := inner.(map[string]any); ok {
+				return []map[string]any{row}, true
+			}
+			// `data` holding a scalar or null: a row of the envelope would just
+			// stringify it under a `data` column, so show the body instead.
+			return nil, false
+		}
 		return []map[string]any{val}, true
 	case []any:
 		return objectArray(val)
 	default:
 		return nil, false
 	}
+}
+
+// envelopeSiblings are the keys the Aura API pairs with `data` in a response
+// envelope. They are metadata about the payload, so the table drops them when it
+// unwraps `data`; `--format json` still shows the whole body.
+var envelopeSiblings = map[string]bool{"links": true, "errors": true}
+
+// dataEnvelope returns the value of `data` when every other key is an envelope
+// sibling. An object holding `data` alongside its own fields is not an envelope,
+// so it keeps rendering as itself rather than dropping those fields.
+func dataEnvelope(val map[string]any) (any, bool) {
+	inner, ok := val["data"]
+	if !ok {
+		return nil, false
+	}
+	for k := range val {
+		if k != "data" && !envelopeSiblings[k] {
+			return nil, false
+		}
+	}
+	return inner, true
 }
 
 // objectArray returns v as a slice of objects, reporting false unless v is an

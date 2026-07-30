@@ -31,6 +31,12 @@ func TestPrintPassthrough_JSONVerbatim(t *testing.T) {
 			want: "{\"data\":[{\"id\":\"a\"}],\"errors\":[{\"message\":\"partial\"}]}\n",
 		},
 		{
+			// Only the table branch unwraps a `data` object into a row.
+			name: "data object envelope not unwrapped",
+			body: `{"data":{"id":"abc","name":"x"}}`,
+			want: "{\"data\":{\"id\":\"abc\",\"name\":\"x\"}}\n",
+		},
+		{
 			name: "bare array",
 			body: `[1,2,3]`,
 			want: "[1,2,3]\n",
@@ -94,6 +100,20 @@ func TestPrintPassthrough_Toon(t *testing.T) {
 	var v any
 	assert.Error(t, json.Unmarshal([]byte(out), &v), "toon output must not be valid JSON, got: %s", out)
 	assert.True(t, strings.HasSuffix(out, "\n"))
+}
+
+func TestPrintPassthrough_ToonKeepsDataEnvelope(t *testing.T) {
+	// The table branch unwraps a `data` object into a row; toon must not.
+	cmd, cfg, stdout := newOutputCmd(t, "toon")
+	PrintPassthrough(cmd, cfg, []byte(`{"data":{"id":"abc"}}`))
+
+	out := stdout.String()
+	assert.Contains(t, out, "data")
+	assert.Contains(t, out, "abc")
+	// TOON is not JSON, so this is neither the verbatim fallback nor a table.
+	var v any
+	assert.Error(t, json.Unmarshal([]byte(out), &v), "toon output must not be valid JSON, got: %s", out)
+	assert.NotContains(t, out, "─")
 }
 
 func TestPrintPassthrough_ToonStripsControlBytes(t *testing.T) {
@@ -176,10 +196,29 @@ func TestPrintPassthrough_Table(t *testing.T) {
 			wantColumns: []string{"ID", "TIER"},
 		},
 		{
-			name:        "data object is one row of the envelope",
-			body:        `{"data":{"id":"one"}}`,
-			wantCells:   []string{"id:one"},
-			wantColumns: []string{"DATA"},
+			name:        "data object is one row of the inner object",
+			body:        `{"data":{"id":"abc","name":"x"}}`,
+			wantCells:   []string{"abc", "x"},
+			wantColumns: []string{"ID", "NAME"},
+		},
+		{
+			name:        "data object with a links sibling still unwraps",
+			body:        `{"data":{"id":"abc"},"links":{"next":"tok"}}`,
+			wantCells:   []string{"abc"},
+			wantColumns: []string{"ID"},
+		},
+		{
+			name:        "data object with an errors sibling still unwraps",
+			body:        `{"data":{"id":"abc"},"errors":[{"message":"partial"}]}`,
+			wantCells:   []string{"abc"},
+			wantColumns: []string{"ID"},
+		},
+		{
+			// Unwrapping would drop `total`, so the envelope itself is the row.
+			name:        "data object beside a foreign key is one row of the envelope",
+			body:        `{"data":{"id":"abc"},"total":1}`,
+			wantCells:   []string{"id:abc", "1"},
+			wantColumns: []string{"DATA", "TOTAL"},
 		},
 		{
 			name:        "ragged rows union all keys",
@@ -273,11 +312,20 @@ func TestPrintPassthrough_TableFallsBackToBody(t *testing.T) {
 		{name: "invalid json", body: `{"a":`},
 		{name: "plain text", body: `service unavailable`},
 		{name: "empty data array yields no columns", body: `{"data":[]}`},
+		// An envelope whose `data` cannot become a row would otherwise render a
+		// nonsense one-cell DATA table.
+		{name: "data holding a string", body: `{"data":"ok"}`},
+		{name: "data holding a number", body: `{"data":7}`},
+		{name: "data holding null", body: `{"data":null}`},
+		{name: "data holding an empty object", body: `{"data":{}}`},
+		{name: "data holding an array of scalars", body: `{"data":[1,2,3]}`},
+		{name: "data holding a scalar beside links", body: `{"data":null,"links":{"next":"t"}}`},
 		{name: "empty array", body: `[]`},
 		{name: "object with no keys", body: `{}`},
 		// printTable would read the colon as a nested-key path and render an
 		// empty cell, so the body is shown instead.
 		{name: "response key containing a colon", body: `{"a:b":"x"}`},
+		{name: "colon key inside an unwrapped data object", body: `{"data":{"a:b":"x"}}`},
 		{name: "colon key in a later row of the union", body: `[{"id":"a"},{"x:y":"b"}]`},
 	}
 	for _, tc := range tests {
