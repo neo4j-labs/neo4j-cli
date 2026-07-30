@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -31,6 +32,9 @@ const (
 	instancesBody = `{"data":[{"id":"i1","name":"one"},{"id":"i2","name":"two"}]}`
 	testOrgID     = "org-abc-123"
 	testProjectID = "proj-def-456"
+	// databasesEndpoint is the real v2beta1 databases path: v2beta1 has no flat
+	// /instances path, every operation is org/project-scoped.
+	databasesEndpoint = "v2beta1/organizations/" + testOrgID + "/projects/" + testProjectID + "/instances/00000000/databases"
 )
 
 // newAPIHelper is the plain aura test helper: cfg.Aura.BaseUrl() reduces any
@@ -249,9 +253,9 @@ func TestAPIPost_InfersMethodAndSendsFieldsAsBody(t *testing.T) {
 	helper := newAPIHelper(t)
 	defer helper.Close()
 
-	mock := helper.NewRequestHandlerMock("/v2beta1/instances/00000000/databases", http.StatusCreated, `{"data":{"name":"sales"}}`)
+	mock := helper.NewRequestHandlerMock("/"+databasesEndpoint, http.StatusCreated, `{"data":{"name":"sales"}}`)
 
-	helper.ExecuteCommand("api v2beta1/instances/00000000/databases --field name=sales --field wait=true --field size=3 --rw")
+	helper.ExecuteCommand("api " + databasesEndpoint + " --field name=sales --field wait=true --field size=3 --rw")
 
 	mock.AssertCalledTimes(1)
 	mock.AssertCalledWithMethod(http.MethodPost)
@@ -265,9 +269,9 @@ func TestAPIPost_SendsInputFileVerbatim(t *testing.T) {
 	defer helper.Close()
 
 	helper.SeedFile("database.json", `{"name":"sales","memory":"1GB"}`)
-	mock := helper.NewRequestHandlerMock("/v2beta1/instances/00000000/databases", http.StatusCreated, `{"data":{"name":"sales"}}`)
+	mock := helper.NewRequestHandlerMock("/"+databasesEndpoint, http.StatusCreated, `{"data":{"name":"sales"}}`)
 
-	helper.ExecuteCommand("api v2beta1/instances/00000000/databases --input database.json --rw")
+	helper.ExecuteCommand("api " + databasesEndpoint + " --input database.json --rw")
 
 	mock.AssertCalledTimes(1)
 	mock.AssertCalledWithMethod(http.MethodPost)
@@ -543,6 +547,22 @@ func TestAPICommand_ExampleShape(t *testing.T) {
 	}
 	assert.GreaterOrEqual(t, invocations, 3)
 	assert.Equal(t, invocations, comments, "each invocation needs its own `# comment` header")
+}
+
+var v2beta1EndpointPattern = regexp.MustCompile(`v2beta1/[^\s'"]*`)
+
+// TestAPICommand_ExampleEndpointsAreScoped pins every v2beta1 endpoint shown in
+// the help text to the org/project-scoped shape: v2beta1 has no flat paths, so a
+// flat `v2beta1/instances/...` would 404.
+func TestAPICommand_ExampleEndpointsAreScoped(t *testing.T) {
+	cmd := findAPICmd(t)
+
+	found := v2beta1EndpointPattern.FindAllString(cmd.Long+"\n"+cmd.Example, -1)
+	require.NotEmpty(t, found)
+	for _, endpoint := range found {
+		assert.True(t, strings.HasPrefix(endpoint, "v2beta1/organizations/"),
+			"v2beta1 endpoint %q must be org/project-scoped; v2beta1 has no flat paths", endpoint)
+	}
 }
 
 // findAPICmd returns the api command as mounted on the aura root, so the tests

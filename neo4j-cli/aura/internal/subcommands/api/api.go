@@ -41,16 +41,16 @@ Credential resolution, the --base-url override, --debug tracing, and the exit-co
 
 With --format json the response body is written byte-for-byte, so it can be piped into jq.`,
 		Example: `# List the databases of an instance (Aura Multi-DB, no dedicated command yet)
-neo4j-cli aura api v2beta1/instances/00000000/databases --format json
+neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instances/00000000/databases' --format json
 
 # List the projects of the organization in scope, substituting {org_id}
 neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects' --format json
 
 # Create a database from a JSON document, inferring POST
-neo4j-cli aura api v2beta1/instances/00000000/databases --input database.json --rw
+neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instances/00000000/databases' --input database.json --rw
 
 # Delete a database
-neo4j-cli aura api v2beta1/instances/00000000/databases/mydb --method DELETE --rw --yes --force
+neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instances/00000000/databases/db-1234' --method DELETE --rw --yes --force
 
 # Pass query parameters and read a single field with jq (--method GET, since a field otherwise infers POST)
 neo4j-cli aura api v1/instances --method GET --field include_deleted=true --format json | jq -r '.data[].id'`,

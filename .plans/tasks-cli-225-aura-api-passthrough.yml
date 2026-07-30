@@ -284,7 +284,7 @@ tasks:
       examples would 404. They ship in `--help` AND in
       `bundle/references/aura.md`, so an agent reading the skill would build
       failing commands for exactly the CLI-225 Multi-DB use case.
-    status: pending
+    status: completed
     dependencies:
       - task-011
     acceptance_criteria:
@@ -293,7 +293,7 @@ tasks:
       - "The `v1/instances` example is left as-is: v1 genuinely is flat."
       - "`Example` still satisfies `TestAllLeafCommands_HaveExamples` — flush-left, >=2 `#`-headed `neo4j-cli` invocations, `--rw` on writes, >=1 `--format json` — and still notes that `--field` on a read path needs an explicit `--method GET`."
       - "The bundle is regenerated so `bundle/references/aura.md` carries the corrected paths; `make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-07-30T23:05:00Z
 
   - id: task-012
     title: 'Regenerate the skill bundle and add README and changelog entries'
