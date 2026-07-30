@@ -71,62 +71,62 @@ func TestBuildRequest_Fields(t *testing.T) {
 		name string
 		// payload is the contents of testPayloadFile, defaulting to
 		// defaultPayload.
-		payload    string
-		flags      requestFlags
-		wantMethod string
-		wantBody   string
-		wantQuery  url.Values
+		payload   string
+		method    string
+		flags     requestFlags
+		wantBody  string
+		wantQuery url.Values
 	}{
 		{
-			name:       "no flags is a bare GET",
-			flags:      requestFlags{},
-			wantMethod: http.MethodGet,
-			wantQuery:  url.Values{},
+			name:      "no fields is a bare request",
+			flags:     requestFlags{},
+			method:    http.MethodGet,
+			wantQuery: url.Values{},
 		},
 		{
-			name: "typed fields become a JSON body on the inferred POST",
+			name: "typed fields become a JSON body",
 			flags: requestFlags{
 				fields: []string{"name=my-db", "memory=2GB"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"memory":"2GB","name":"my-db"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"memory":"2GB","name":"my-db"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "type inference covers literals and integers",
 			flags: requestFlags{
 				fields: []string{"yes=true", "no=false", "nothing=null", "count=10", "below=-3"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"below":-3,"count":10,"no":false,"nothing":null,"yes":true}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"below":-3,"count":10,"no":false,"nothing":null,"yes":true}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "non integer numerics and empty values stay strings",
 			flags: requestFlags{
 				fields: []string{"ratio=1.5", "version=1.2.3", "padded=0123", "empty="},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"empty":"","padded":123,"ratio":"1.5","version":"1.2.3"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"empty":"","padded":123,"ratio":"1.5","version":"1.2.3"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "raw fields are always strings",
 			flags: requestFlags{
 				rawFields: []string{"yes=true", "count=10", "nothing=null", "at=@payload.json"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"at":"@payload.json","count":"10","nothing":"null","yes":"true"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"at":"@payload.json","count":"10","nothing":"null","yes":"true"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "a value may contain further equals signs",
 			flags: requestFlags{
 				rawFields: []string{"filter=a=b=c"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"filter":"a=b=c"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"filter":"a=b=c"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "raw field wins over a typed field with the same key",
@@ -134,54 +134,54 @@ func TestBuildRequest_Fields(t *testing.T) {
 				fields:    []string{"count=10"},
 				rawFields: []string{"count=10"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"count":"10"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"count":"10"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "the last of a repeated key wins",
 			flags: requestFlags{
 				fields: []string{"count=1", "count=2"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"count":2}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"count":2}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "an at sign is only special as a prefix",
 			flags: requestFlags{
 				fields: []string{"email=someone@example.com"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"email":"someone@example.com"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"email":"someone@example.com"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "an integer beyond int64 stays a string",
 			flags: requestFlags{
 				fields: []string{"big=99999999999999999999"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"big":"99999999999999999999"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"big":"99999999999999999999"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "file field reads its value verbatim",
 			flags: requestFlags{
 				fields: []string{"query=@" + testPayloadFile},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"query":"MATCH (n) RETURN n\n"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"query":"MATCH (n) RETURN n\n"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "stdin field reads its value verbatim",
 			flags: requestFlags{
 				fields: []string{"query=@-"},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"query":"piped text"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"query":"piped text"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name:    "a file field stays a string in a body, with no type inference",
@@ -189,17 +189,16 @@ func TestBuildRequest_Fields(t *testing.T) {
 			flags: requestFlags{
 				fields: []string{"query=@" + testPayloadFile},
 			},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"query":"true"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPost,
+			wantBody:  `{"query":"true"}`,
+			wantQuery: url.Values{},
 		},
 		{
-			name: "fields are query params on an explicit GET",
+			name: "fields are query params on GET",
 			flags: requestFlags{
-				method: "get",
 				fields: []string{"include_deleted=true", "page_limit=10", "name=my db"},
 			},
-			wantMethod: http.MethodGet,
+			method: http.MethodGet,
 			wantQuery: url.Values{
 				"include_deleted": []string{"true"},
 				"page_limit":      []string{"10"},
@@ -209,10 +208,9 @@ func TestBuildRequest_Fields(t *testing.T) {
 		{
 			name: "query fields are sent verbatim, with no type inference",
 			flags: requestFlags{
-				method: "get",
 				fields: []string{"padded=0123", "nothing=null", "yes=true", "empty="},
 			},
-			wantMethod: http.MethodGet,
+			method: http.MethodGet,
 			wantQuery: url.Values{
 				"padded":  []string{"0123"},
 				"nothing": []string{"null"},
@@ -223,68 +221,61 @@ func TestBuildRequest_Fields(t *testing.T) {
 		{
 			name: "a file field reads its query value verbatim",
 			flags: requestFlags{
-				method: "get",
 				fields: []string{"query=@" + testPayloadFile},
 			},
-			wantMethod: http.MethodGet,
-			wantQuery:  url.Values{"query": []string{"MATCH (n) RETURN n\n"}},
+			method:    http.MethodGet,
+			wantQuery: url.Values{"query": []string{"MATCH (n) RETURN n\n"}},
 		},
 		{
 			name: "a stdin field reads its query value verbatim",
 			flags: requestFlags{
-				method: "delete",
 				fields: []string{"query=@-"},
 			},
-			wantMethod: http.MethodDelete,
-			wantQuery:  url.Values{"query": []string{"piped text"}},
+			method:    http.MethodDelete,
+			wantQuery: url.Values{"query": []string{"piped text"}},
 		},
 		{
 			name: "fields are query params on HEAD",
 			flags: requestFlags{
-				method: "head",
 				fields: []string{"include_deleted=false"},
 			},
-			wantMethod: http.MethodHead,
-			wantQuery:  url.Values{"include_deleted": []string{"false"}},
+			method:    http.MethodHead,
+			wantQuery: url.Values{"include_deleted": []string{"false"}},
 		},
 		{
 			name: "fields are query params on DELETE",
 			flags: requestFlags{
-				method:    "delete",
 				rawFields: []string{"database_username=neo4j"},
 			},
-			wantMethod: http.MethodDelete,
-			wantQuery:  url.Values{"database_username": []string{"neo4j"}},
+			method:    http.MethodDelete,
+			wantQuery: url.Values{"database_username": []string{"neo4j"}},
 		},
 		{
 			name: "fields are a body on PUT",
 			flags: requestFlags{
-				method: "put",
 				fields: []string{"memory=4GB"},
 			},
-			wantMethod: http.MethodPut,
-			wantBody:   `{"memory":"4GB"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPut,
+			wantBody:  `{"memory":"4GB"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "fields are a body on PATCH",
 			flags: requestFlags{
-				method: "patch",
 				fields: []string{"memory=4GB"},
 			},
-			wantMethod: http.MethodPatch,
-			wantBody:   `{"memory":"4GB"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodPatch,
+			wantBody:  `{"memory":"4GB"}`,
+			wantQuery: url.Values{},
 		},
 		{
 			name: "fields are a body on OPTIONS",
 			flags: requestFlags{
-				method: "options",
 				fields: []string{"memory=4GB"},
 			},
-			wantMethod: http.MethodOptions,
-			wantBody:   `{"memory":"4GB"}`,
-			wantQuery:  url.Values{},
+			method:    http.MethodOptions,
+			wantBody:  `{"memory":"4GB"}`,
+			wantQuery: url.Values{},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -295,9 +286,8 @@ func TestBuildRequest_Fields(t *testing.T) {
 			cfg := newParamsTestConfig(t, payload)
 			cmd := newParamsTestCmd("piped text")
 
-			got, err := buildRequest(cmd, cfg, &tt.flags)
+			got, err := buildRequest(cmd, cfg, &tt.flags, tt.method)
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantMethod, got.method)
 			assert.Equal(t, tt.wantQuery, got.query)
 
 			if tt.wantBody == "" {
@@ -311,77 +301,73 @@ func TestBuildRequest_Fields(t *testing.T) {
 
 func TestBuildRequest_Input(t *testing.T) {
 	for _, tt := range []struct {
-		name       string
-		payload    string
-		stdin      string
-		flags      requestFlags
-		wantMethod string
-		wantBody   string
+		name     string
+		payload  string
+		stdin    string
+		flags    requestFlags
+		method   string
+		wantBody string
 	}{
 		{
-			name:       "file body infers POST",
-			payload:    `{"name":"my-db"}`,
-			flags:      requestFlags{input: testPayloadFile},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"name":"my-db"}`,
+			name:     "file body is sent verbatim",
+			payload:  `{"name":"my-db"}`,
+			flags:    requestFlags{input: testPayloadFile},
+			method:   http.MethodPost,
+			wantBody: `{"name":"my-db"}`,
 		},
 		{
-			name:       "stdin body infers POST",
-			stdin:      `{"name":"piped"}`,
-			flags:      requestFlags{input: "-"},
-			wantMethod: http.MethodPost,
-			wantBody:   `{"name":"piped"}`,
+			name:     "stdin body is sent verbatim",
+			stdin:    `{"name":"piped"}`,
+			flags:    requestFlags{input: "-"},
+			method:   http.MethodPost,
+			wantBody: `{"name":"piped"}`,
 		},
 		{
-			name:       "explicit method beats inference",
-			payload:    `{"memory":"4GB"}`,
-			flags:      requestFlags{method: "patch", input: testPayloadFile},
-			wantMethod: http.MethodPatch,
-			wantBody:   `{"memory":"4GB"}`,
+			name:     "body on PATCH",
+			payload:  `{"memory":"4GB"}`,
+			flags:    requestFlags{input: testPayloadFile},
+			method:   http.MethodPatch,
+			wantBody: `{"memory":"4GB"}`,
 		},
 		{
-			name:       "top level array survives verbatim",
-			payload:    "[{\"op\":\"add\"},\n {\"op\":\"remove\"}]",
-			flags:      requestFlags{input: testPayloadFile},
-			wantMethod: http.MethodPost,
-			wantBody:   "[{\"op\":\"add\"},\n {\"op\":\"remove\"}]",
+			name:     "top level array survives verbatim",
+			payload:  "[{\"op\":\"add\"},\n {\"op\":\"remove\"}]",
+			flags:    requestFlags{input: testPayloadFile},
+			method:   http.MethodPost,
+			wantBody: "[{\"op\":\"add\"},\n {\"op\":\"remove\"}]",
 		},
 		{
-			name:       "body is not reformatted or validated",
-			payload:    "  not json at all  ",
-			flags:      requestFlags{input: testPayloadFile},
-			wantMethod: http.MethodPost,
-			wantBody:   "  not json at all  ",
+			name:     "body is not reformatted or validated",
+			payload:  "  not json at all  ",
+			flags:    requestFlags{input: testPayloadFile},
+			method:   http.MethodPost,
+			wantBody: "  not json at all  ",
 		},
 		{
-			name:       "body may accompany a GET",
-			payload:    `{"name":"my-db"}`,
-			flags:      requestFlags{method: "get", input: testPayloadFile},
-			wantMethod: http.MethodGet,
-			wantBody:   `{"name":"my-db"}`,
+			name:     "body may accompany a GET",
+			payload:  `{"name":"my-db"}`,
+			flags:    requestFlags{input: testPayloadFile},
+			method:   http.MethodGet,
+			wantBody: `{"name":"my-db"}`,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := newParamsTestConfig(t, tt.payload)
 			cmd := newParamsTestCmd(tt.stdin)
 
-			got, err := buildRequest(cmd, cfg, &tt.flags)
+			got, err := buildRequest(cmd, cfg, &tt.flags, tt.method)
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantMethod, got.method)
 			assert.Equal(t, tt.wantBody, string(got.body))
 			assert.Equal(t, url.Values{}, got.query)
 		})
 	}
 }
 
-func TestBuildRequest_UsageErrors(t *testing.T) {
+func TestResolveRequestMethod_UsageErrors(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		flags    requestFlags
 		contains string
-		// absent is text the message must not carry, so a value that may be a
-		// secret cannot creep back into it.
-		absent string
 	}{
 		{
 			name:     "input with a typed field",
@@ -398,6 +384,29 @@ func TestBuildRequest_UsageErrors(t *testing.T) {
 			flags:    requestFlags{method: "TRACE"},
 			contains: "unsupported --method",
 		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveRequestMethod(&tt.flags)
+			assert.Empty(t, got)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.contains)
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(err, &ce))
+			assert.Equal(t, 2, ce.Code)
+		})
+	}
+}
+
+func TestBuildRequest_UsageErrors(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		flags    requestFlags
+		contains string
+		// absent is text the message must not carry, so a value that may be a
+		// secret cannot creep back into it.
+		absent string
+	}{
 		{
 			name:     "field without an equals sign",
 			flags:    requestFlags{fields: []string{"name"}},
@@ -457,7 +466,7 @@ func TestBuildRequest_UsageErrors(t *testing.T) {
 			cfg := newParamsTestConfig(t, "{}")
 			cmd := newParamsTestCmd("piped text")
 
-			got, err := buildRequest(cmd, cfg, &tt.flags)
+			got, err := buildRequest(cmd, cfg, &tt.flags, http.MethodPost)
 			assert.Nil(t, got)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.contains)
@@ -586,7 +595,7 @@ func TestBuildRequest_Headers(t *testing.T) {
 
 	got, err := buildRequest(cmd, cfg, &requestFlags{
 		headers: []string{"Accept: application/json", "X-Tag: a", "x-tag: b"},
-	})
+	}, http.MethodGet)
 	require.NoError(t, err)
 	assert.Equal(t, http.Header{
 		"Accept": []string{"application/json"},
@@ -594,10 +603,11 @@ func TestBuildRequest_Headers(t *testing.T) {
 	}, got.headers)
 }
 
-// TestRegisterRequestFlags drives buildRequest through real parsed argv, which
-// is what pins the flag defaults to the inference rules: registering --method
-// with a "GET" default would silently turn `--method GET --field x=1` into a
-// POST, and no requestFlags literal could catch that.
+// TestRegisterRequestFlags drives method resolution and buildRequest through
+// real parsed argv, which is what pins the flag defaults to the inference rules:
+// registering --method with a "GET" default would silently turn
+// `--method GET --field x=1` into a POST, and no requestFlags literal could
+// catch that.
 func TestRegisterRequestFlags(t *testing.T) {
 	for _, tt := range []struct {
 		name        string
@@ -652,20 +662,24 @@ func TestRegisterRequestFlags(t *testing.T) {
 			cfg := newParamsTestConfig(t, `{"seeded":true}`)
 
 			var flags requestFlags
+			var method string
 			var got *builtRequest
 
 			cmd := newParamsTestCmd("")
 			registerRequestFlags(cmd, &flags)
 			cmd.RunE = func(cmd *cobra.Command, _ []string) error {
 				var err error
-				got, err = buildRequest(cmd, cfg, &flags)
+				if method, err = resolveRequestMethod(&flags); err != nil {
+					return err
+				}
+				got, err = buildRequest(cmd, cfg, &flags, method)
 				return err
 			}
 			cmd.SetArgs(tt.args)
 			require.NoError(t, cmd.Execute())
 
 			require.NotNil(t, got)
-			assert.Equal(t, tt.wantMethod, got.method)
+			assert.Equal(t, tt.wantMethod, method)
 			assert.Equal(t, tt.wantBody, string(got.body))
 			assert.Equal(t, tt.wantQuery, got.query)
 

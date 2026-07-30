@@ -78,31 +78,25 @@ func registerRequestFlags(cmd *cobra.Command, f *requestFlags) {
 // builtRequest is the request shape a requestFlags set describes. query is
 // always non-nil so a caller can merge the endpoint's inline query into it.
 type builtRequest struct {
-	method  string
 	body    []byte
 	query   url.Values
 	headers http.Header
 }
 
-// buildRequest resolves the HTTP method and turns the field, body, and header
-// flags into the pieces of an Aura request.
+// buildRequest turns the field, body, and header flags into the pieces of an
+// Aura request for the already-resolved method.
 //
 // Fields become query parameters for GET, HEAD, and DELETE and a JSON object
 // body for every other method; --input replaces that body with a verbatim
 // document, so the two are mutually exclusive. Type inference belongs to the
 // body path alone — a query string carries the value verbatim.
-func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags) (*builtRequest, error) {
-	method, err := resolveRequestMethod(f)
-	if err != nil {
-		return nil, err
-	}
-
+func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags, method string) (*builtRequest, error) {
 	headers, err := parseHeaders(f.headers)
 	if err != nil {
 		return nil, err
 	}
 
-	built := &builtRequest{method: method, query: url.Values{}, headers: headers}
+	built := &builtRequest{query: url.Values{}, headers: headers}
 	reader := &payloadReader{cmd: cmd, cfg: cfg}
 
 	if f.input != "" {
@@ -148,10 +142,8 @@ func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags) (*bui
 }
 
 // resolveRequestMethod resolves the HTTP method from the flag values alone,
-// touching neither the filesystem nor stdin. It is deliberately callable on its
-// own and idempotent: the caller resolves the method up front so the --rw and
-// confirm gates run before any payload is read, since a `--field key=@-` would
-// otherwise drain the stdin the confirm prompt needs to read an answer from.
+// touching neither the filesystem nor stdin, and rejects the flag combination
+// that describes two bodies at once.
 func resolveRequestMethod(f *requestFlags) (string, error) {
 	hasFields := len(f.fields) > 0 || len(f.rawFields) > 0
 	hasInput := f.input != ""

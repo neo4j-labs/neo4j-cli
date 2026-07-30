@@ -379,7 +379,7 @@ tasks:
       confirm prompt reads), but that only requires the method be resolved BEFORE
       the gates, not resolved twice. Pass the already-resolved method into
       `buildRequest(cmd, cfg, f, method)` and drop the field.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -388,7 +388,7 @@ tasks:
       - "Both gates still run before any payload read: the `--method DELETE --field x=@-` test proving the confirm prompt is not starved of stdin stays green."
       - "Method validation still rejects off-allowlist values exactly once, with the same exit-2 usage error."
       - "`make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-07-30T17:58:00Z
 
   - id: task-019
     title: 'Use the canonical IsSuccessful predicate in RawStatusError'
