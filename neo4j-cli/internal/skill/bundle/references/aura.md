@@ -348,7 +348,7 @@ Flags:
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
 | `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
-| `-F, --field` | stringArray | [] | Repeatable key=value pair, where '@<file>' ('@-' for stdin) reads the value from a file. Sent verbatim as query parameters for GET, HEAD and DELETE, and as a JSON body otherwise, where 'true', 'false', 'null' and integers become JSON literals and anything else is a string. |
+| `-F, --field` | stringArray | [] | Repeatable key=value pair, where '@<file>' ('@-' for stdin) reads the value from a file as a string. Sent verbatim as query parameters for GET, HEAD and DELETE, and as a JSON body otherwise, where a literal 'true', 'false', 'null' or integer becomes a JSON literal and anything else is a string. |
 | `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
 | `-H, --header` | stringArray | [] | Repeatable 'Name: value' request header, overlaid on the generated headers. |
 | `-i, --include` | bool | false | Print the HTTP status line and the response headers before the body. Makes stdout no longer a single JSON document, and is skipped on a failing status so the error envelope stays the only document there. |

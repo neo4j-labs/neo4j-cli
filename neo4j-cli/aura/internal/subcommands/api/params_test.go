@@ -65,8 +65,13 @@ func TestResolveMethod_UsageErrors(t *testing.T) {
 }
 
 func TestBuildRequest_Fields(t *testing.T) {
+	const defaultPayload = "MATCH (n) RETURN n\n"
+
 	for _, tt := range []struct {
-		name       string
+		name string
+		// payload is the contents of testPayloadFile, defaulting to
+		// defaultPayload.
+		payload    string
 		flags      requestFlags
 		wantMethod string
 		wantBody   string
@@ -179,6 +184,16 @@ func TestBuildRequest_Fields(t *testing.T) {
 			wantQuery:  url.Values{},
 		},
 		{
+			name:    "a file field stays a string in a body, with no type inference",
+			payload: "true",
+			flags: requestFlags{
+				fields: []string{"query=@" + testPayloadFile},
+			},
+			wantMethod: http.MethodPost,
+			wantBody:   `{"query":"true"}`,
+			wantQuery:  url.Values{},
+		},
+		{
 			name: "fields are query params on an explicit GET",
 			flags: requestFlags{
 				method: "get",
@@ -273,7 +288,11 @@ func TestBuildRequest_Fields(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := newParamsTestConfig(t, "MATCH (n) RETURN n\n")
+			payload := tt.payload
+			if payload == "" {
+				payload = defaultPayload
+			}
+			cfg := newParamsTestConfig(t, payload)
 			cmd := newParamsTestCmd("piped text")
 
 			got, err := buildRequest(cmd, cfg, &tt.flags)

@@ -66,7 +66,7 @@ func registerRequestFlags(cmd *cobra.Command, f *requestFlags) {
 	cmd.Flags().StringVarP(&f.method, flagMethod, "X", "",
 		fmt.Sprintf("HTTP method to use, from a choice of [%s]. Defaults to GET, or to POST when --field, --raw-field or --input is passed.", strings.Join(allowedMethods, ", ")))
 	cmd.Flags().StringArrayVarP(&f.fields, flagField, "F", nil,
-		"Repeatable key=value pair, where '@<file>' ('@-' for stdin) reads the value from a file. Sent verbatim as query parameters for GET, HEAD and DELETE, and as a JSON body otherwise, where 'true', 'false', 'null' and integers become JSON literals and anything else is a string.")
+		"Repeatable key=value pair, where '@<file>' ('@-' for stdin) reads the value from a file as a string. Sent verbatim as query parameters for GET, HEAD and DELETE, and as a JSON body otherwise, where a literal 'true', 'false', 'null' or integer becomes a JSON literal and anything else is a string.")
 	cmd.Flags().StringArrayVarP(&f.rawFields, flagRawField, "f", nil,
 		"Repeatable key=value pair whose value is always a string.")
 	cmd.Flags().StringVar(&f.input, flagInput, "",
@@ -90,7 +90,7 @@ type builtRequest struct {
 // Fields become query parameters for GET, HEAD, and DELETE and a JSON object
 // body for every other method; --input replaces that body with a verbatim
 // document, so the two are mutually exclusive. Type inference belongs to the
-// body path alone — a query string carries the value as typed.
+// body path alone — a query string carries the value verbatim.
 func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags) (*builtRequest, error) {
 	method, err := resolveRequestMethod(f)
 	if err != nil {
