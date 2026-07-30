@@ -84,18 +84,22 @@ func BindFormatFromFlag(cmd *cobra.Command, cfg *clicfg.Config) error {
 	return nil
 }
 
-// EnforceWriteGate rejects write-annotated commands unless --rw is true, an
-// interactive terminal is detected on stdout, or the caller is running under
-// a known agent harness (in which case --rw must be explicit). Precedence:
-//  1. --rw set         → allow
-//  2. agent detected   → require --rw (gate fires)
-//  3. stdout is a TTY  → allow (interactive human)
-//  4. otherwise        → require --rw (CI, piped script, nohup, …)
+// EnforceWriteGate rejects write-annotated commands unless RequireWriteAccess
+// allows them.
 func EnforceWriteGate(cmd *cobra.Command) error {
 	if cmd.Annotations["write"] != "true" {
 		return nil
 	}
 
+	return RequireWriteAccess(cmd)
+}
+
+// RequireWriteAccess applies the --rw precedence rules:
+//  1. --rw set         → allow
+//  2. agent detected   → require --rw (gate fires)
+//  3. stdout is a TTY  → allow (interactive human)
+//  4. otherwise        → require --rw (CI, piped script, nohup, …)
+func RequireWriteAccess(cmd *cobra.Command) error {
 	rwFlag := cmd.Flag("rw")
 	if rwFlag != nil {
 		rw, err := strconv.ParseBool(rwFlag.Value.String())

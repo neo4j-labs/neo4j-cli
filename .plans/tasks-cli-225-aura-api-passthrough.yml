@@ -33,7 +33,7 @@ tasks:
       `EnforceWriteGate` delegate to it after its `write:true` annotation check.
       This lets a command whose write-ness depends on a runtime flag value invoke
       the same precedence rules without carrying a static annotation.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`flags.RequireWriteAccess(cmd)` applies the existing precedence: `--rw` allows, agent harness rejects, TTY allows, otherwise rejects."
@@ -41,7 +41,7 @@ tasks:
       - "Behaviour is unchanged for every existing `write:true` command; existing `--rw` gate tests pass untouched."
       - "The rejection error remains `clierr.NewUsageError` with the message `this command writes; pass --rw to allow it` (exit 2)."
       - "Table-driven tests cover `RequireWriteAccess` across all four precedence branches."
-    completed_at: null
+    completed_at: 2026-07-30T14:05:00Z
 
   - id: task-003
     title: 'Add confirm.RequireTyped with an explicit resource-type override'
