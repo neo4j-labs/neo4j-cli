@@ -243,7 +243,7 @@ tasks:
       invites a retry loop. Split the fallback only — unmapped 4xx become
       `clierr.NewValidationError` (exit 6, `retryable: false`); 5xx and every other
       unmapped status keep `NewUpstreamError` (exit 8).
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -252,7 +252,7 @@ tasks:
       - "Every status `handleResponseError` maps explicitly is unchanged, so 400 stays 6, 401/403 stay 4, 404 stays 3, 402/409 stay 5, 429 stays 7, and 405 stays 8 — parity with the existing path is preserved and `handleResponseError` is still untouched."
       - "The upstream status line and body still reach `ce.Message`, scrubbed and truncated, on both fallback branches."
       - "The task-007 status table is extended to assert the exit code AND the `retryable` envelope field for each fallback case; `make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-07-30T21:35:00Z
 
   - id: task-014
     title: 'Unwrap a data-object envelope into its own table row'

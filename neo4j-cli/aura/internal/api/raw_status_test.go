@@ -17,13 +17,16 @@ import (
 
 // TestRawStatusError_StatusMatrix covers every status the v2beta1 spec documents
 // (REQ-F-027): 2xx is not an error, the modelled statuses keep the exit codes
-// handleResponseError assigns, and the statuses that panic there — 405, 413, 415,
-// 422 — fall back to an upstream error instead.
+// handleResponseError assigns, and the statuses that panic there — 413, 415,
+// 422 — fall back on class: an unmapped 4xx is a permanent validation error, an
+// unmapped 5xx is retryable. The envelope's retryable flag is asserted alongside
+// the exit code because that is what an agent harness reads to decide on a retry.
 func TestRawStatusError_StatusMatrix(t *testing.T) {
 	for _, tc := range []struct {
-		status   int
-		body     string
-		wantCode int
+		status        int
+		body          string
+		wantCode      int
+		wantRetryable bool
 	}{
 		{status: http.StatusOK, body: `{"data":[]}`, wantCode: 0},
 		{status: http.StatusCreated, body: `{"data":{"id":"a"}}`, wantCode: 0},
@@ -33,17 +36,21 @@ func TestRawStatusError_StatusMatrix(t *testing.T) {
 		{status: http.StatusUnauthorized, body: `{"errors":[{"message":"nope"}]}`, wantCode: 4},
 		{status: http.StatusForbidden, body: `{"error":"forbidden"}`, wantCode: 4},
 		{status: http.StatusNotFound, body: `{"errors":[{"message":"gone"}]}`, wantCode: 3},
-		{status: http.StatusMethodNotAllowed, body: ``, wantCode: 8},
+		{status: http.StatusMethodNotAllowed, body: ``, wantCode: 8, wantRetryable: true},
 		{status: http.StatusPaymentRequired, body: `{"errors":[{"message":"quota"}]}`, wantCode: 5},
 		{status: http.StatusConflict, body: `{"errors":[{"message":"busy"}]}`, wantCode: 5},
-		{status: http.StatusRequestEntityTooLarge, body: ``, wantCode: 8},
-		{status: http.StatusUnsupportedMediaType, body: ``, wantCode: 8},
-		{status: http.StatusUnprocessableEntity, body: `{"errors":[{"message":"nope"}]}`, wantCode: 8},
-		{status: http.StatusTooManyRequests, body: ``, wantCode: 7},
-		{status: http.StatusInternalServerError, body: `{"errors":[{"message":"boom"}]}`, wantCode: 8},
-		{status: http.StatusBadGateway, body: `<html>oops</html>`, wantCode: 8},
-		{status: http.StatusServiceUnavailable, body: ``, wantCode: 8},
-		{status: http.StatusGatewayTimeout, body: ``, wantCode: 8},
+		{status: http.StatusRequestEntityTooLarge, body: ``, wantCode: 6},
+		{status: http.StatusUnsupportedMediaType, body: ``, wantCode: 6},
+		{status: http.StatusUnprocessableEntity, body: `{"errors":[{"message":"nope"}]}`, wantCode: 6},
+		{status: http.StatusTeapot, body: ``, wantCode: 6},
+		{status: http.StatusUnavailableForLegalReasons, body: ``, wantCode: 6},
+		{status: http.StatusTooManyRequests, body: ``, wantCode: 7, wantRetryable: true},
+		{status: http.StatusInternalServerError, body: `{"errors":[{"message":"boom"}]}`, wantCode: 8, wantRetryable: true},
+		{status: http.StatusBadGateway, body: `<html>oops</html>`, wantCode: 8, wantRetryable: true},
+		{status: http.StatusServiceUnavailable, body: ``, wantCode: 8, wantRetryable: true},
+		{status: http.StatusGatewayTimeout, body: ``, wantCode: 8, wantRetryable: true},
+		{status: http.StatusInsufficientStorage, body: ``, wantCode: 8, wantRetryable: true},
+		{status: http.StatusPermanentRedirect, body: ``, wantCode: 8, wantRetryable: true},
 	} {
 		t.Run(fmt.Sprintf("%d", tc.status), func(t *testing.T) {
 			res := &api.RawResponse{
@@ -63,6 +70,7 @@ func TestRawStatusError_StatusMatrix(t *testing.T) {
 			if tc.body != "" {
 				assert.Contains(t, ce.Message, tc.body)
 			}
+			assert.Equal(t, tc.wantRetryable, ce.BuildEnvelope().Error.Retryable)
 		})
 	}
 }
@@ -186,21 +194,49 @@ func TestRawStatusError_BodyRedacted(t *testing.T) {
 
 // TestRawStatusError_BodyTruncated asserts a large body is bounded so the JSON
 // error envelope on stdout stays readable. The oversized case also crosses the
-// pre-scrub bound, which must not leave a second truncation marker behind.
+// pre-scrub bound, which must not leave a second truncation marker behind. Both
+// fallback branches are driven so neither loses the status line or the body.
 func TestRawStatusError_BodyTruncated(t *testing.T) {
-	for _, size := range []int{10_000, 500_000} {
-		t.Run(fmt.Sprintf("%d bytes", size), func(t *testing.T) {
-			res := &api.RawResponse{
-				StatusCode: http.StatusInternalServerError,
-				Status:     "500 Internal Server Error",
-				Body:       []byte(strings.Repeat("x", size)),
-			}
+	for _, fallback := range []struct {
+		status   int
+		line     string
+		wantCode int
+	}{
+		{status: http.StatusUnprocessableEntity, line: "422 Unprocessable Entity", wantCode: 6},
+		{status: http.StatusInternalServerError, line: "500 Internal Server Error", wantCode: 8},
+	} {
+		for _, size := range []int{10_000, 500_000} {
+			t.Run(fmt.Sprintf("%d/%d bytes", fallback.status, size), func(t *testing.T) {
+				res := &api.RawResponse{
+					StatusCode: fallback.status,
+					Status:     fallback.line,
+					Body:       []byte(strings.Repeat("x", size)),
+				}
 
-			ce := requireCLIErrorCode(t, api.RawStatusError(res), 8)
-			assert.Equal(t, 1, strings.Count(ce.Message, "(truncated)"))
-			assert.Less(t, len(ce.Message), 4200)
-		})
+				ce := requireCLIErrorCode(t, api.RawStatusError(res), fallback.wantCode)
+				assert.Contains(t, ce.Message, fallback.line)
+				assert.Equal(t, 1, strings.Count(ce.Message, "(truncated)"))
+				assert.Less(t, len(ce.Message), 4200)
+			})
+		}
 	}
+}
+
+// TestRawStatusError_UnmappedClientErrorBodyScrubbed asserts the unmapped-4xx
+// fallback keeps the same scrubbing as every mapped status, since a 422 body
+// echoes back the submitted payload.
+func TestRawStatusError_UnmappedClientErrorBodyScrubbed(t *testing.T) {
+	res := &api.RawResponse{
+		StatusCode: http.StatusUnprocessableEntity,
+		Status:     "422 \x1b[31mUnprocessable Entity\x1b[0m",
+		Body:       []byte(`{"errors":[{"message":"rejected","password":"hunter2"}]}`),
+	}
+
+	ce := requireCLIErrorCode(t, api.RawStatusError(res), 6)
+	assert.NotContains(t, ce.Message, "hunter2")
+	assert.NotContains(t, ce.Message, "\x1b")
+	assert.Contains(t, ce.Message, "***")
+	assert.Contains(t, ce.Message, "Unprocessable Entity")
 }
 
 // TestRawStatusError_MultibyteBodyTruncatedOnRuneBoundary asserts truncation never
@@ -241,6 +277,6 @@ func TestRawStatusError_OnLiveResponse(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ce := requireCLIErrorCode(t, api.RawStatusError(res), 8)
+	ce := requireCLIErrorCode(t, api.RawStatusError(res), 6)
 	assert.Contains(t, ce.Message, "invalid region")
 }

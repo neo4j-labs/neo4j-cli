@@ -120,14 +120,13 @@ const rawErrorBodyLimit = 4096
 // handleResponseError uses, and returns nil for any 2xx (including 201/202/204).
 //
 // Unlike handleResponseError it parses no response schema and never panics.
-// Statuses the v2beta1 spec documents but the CLI never modelled (405, 413, 415,
-// 422, …) fall back to an upstream error rather than a panic, and the upstream
-// body is folded into the message verbatim rather than being read through the
-// fixed api.Error shape — most 4xx responses on the newer endpoints declare no
-// body schema at all. That fallback marks those permanent client errors
-// retryable in the envelope, which is deliberate: with no schema to read, this
-// mapper cannot tell a permanent rejection from a transient upstream fault, and
-// over-reporting retryable is the safer half of that trade.
+// Statuses the v2beta1 spec documents but the CLI never modelled (413, 415,
+// 422, …) fall back rather than panicking, and the upstream body is folded into
+// the message verbatim rather than being read through the fixed api.Error shape
+// — most 4xx responses on the newer endpoints declare no body schema at all.
+// The fallback splits on class so the envelope's retryable hint stays honest: an
+// unmapped 4xx is a permanent client error (exit 6, not retryable), while an
+// unmapped 5xx or anything else may clear on a retry (exit 8).
 //
 // The body goes into the error, never to stdout: clierr.Render already writes a
 // JSON error envelope there, so echoing it too would put two documents on stdout.
@@ -150,6 +149,10 @@ func RawStatusError(res *RawResponse) error {
 		return clierr.NewNotFoundError("%s", detail)
 	case http.StatusPaymentRequired, http.StatusConflict:
 		return clierr.NewConflictError("%s", detail)
+	case http.StatusMethodNotAllowed:
+		// 4xx, but handleResponseError maps it to an upstream error; kept here so
+		// the class-based fallback below cannot silently diverge from that.
+		return clierr.NewUpstreamError("%s", detail)
 	case http.StatusTooManyRequests:
 		retryAfter := res.Header.Get("Retry-After")
 		err := clierr.NewRateLimitError(retryAfter, "%s", detail)
@@ -159,7 +162,13 @@ func RawStatusError(res *RawResponse) error {
 		return err
 	}
 
-	// 5xx plus every unmapped status (3xx, 405, 413, 415, 422, …).
+	if res.StatusCode >= 400 && res.StatusCode < 500 {
+		// Unmapped client errors (413, 415, 422, …): permanent, so an agent
+		// harness must not read them as retryable and loop.
+		return clierr.NewValidationError("%s", detail)
+	}
+
+	// 5xx plus every other unmapped status (3xx, …).
 	return clierr.NewUpstreamError("%s", detail)
 }
 
