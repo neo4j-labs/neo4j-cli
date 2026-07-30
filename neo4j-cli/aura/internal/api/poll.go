@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -64,6 +65,20 @@ func PollGraphAnalyticsSessionReady(cfg *clicfg.Config, orgID, projectID, sessio
 	path := ScopedSessionPath(orgID, projectID, sessionId)
 	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
 		return !slices.Contains(waitingStatus, status)
+	})
+}
+
+// PollVirtualGraph waits until the virtual graph's status leaves waitingStatus.
+//
+// The comparison is case-insensitive on purpose: the status casing returned by
+// the API is not guaranteed. A case-sensitive compare would make the first
+// poll's condition trivially true whenever the casing differs from the
+// VirtualGraphStatus* constant, returning immediately so --wait would silently
+// not wait at all.
+func PollVirtualGraph(cfg *clicfg.Config, orgID, projectID, virtualGraphID string, waitingStatus string) (*PollResponse, error) {
+	path := ScopedVirtualGraphPath(orgID, projectID, virtualGraphID)
+	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
+		return !strings.EqualFold(status, waitingStatus)
 	})
 }
 

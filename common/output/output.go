@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/neo4j/cli/common/agent"
@@ -209,6 +210,14 @@ func getNestedField(v map[string]any, subFields []string) string {
 		// escapes them, and numbers/bools carry none.
 		if s, ok := value.(string); ok {
 			return StripControl(s)
+		}
+		// encoding/json decodes every JSON number into float64, and %v renders a
+		// large one in scientific notation — an int64-typed API field such as
+		// maximum_bytes_billed would print as "1e+12" instead of its digits. Format
+		// without an exponent so the table cell shows the same value the JSON
+		// output does. 'f'/-1 keeps fractional values exact ("0.36" stays "0.36").
+		if f, ok := value.(float64); ok {
+			return strconv.FormatFloat(f, 'f', -1, 64)
 		}
 		return fmt.Sprintf("%+v", value)
 	}

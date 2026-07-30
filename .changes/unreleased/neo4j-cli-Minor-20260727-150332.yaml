@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add `aura virtual-graph` commands for managing Aura Virtual Graphs in a project: `create`, `get`, `list`, `update`, `delete` and `allowed-configs`. `create` takes `--name`, `--data-source-id`, `--import-model-id`, `--cloud-provider` and `--region`, plus optional `--memory`, `--maximum-bytes-billed` and `--wait`, and prints the initial password once as `plain_password`. `list` returns every virtual graph in the project, following the API''s pagination on your behalf; `--limit` caps how many are returned and notes on stderr when more exist'
+time: 2026-07-27T15:03:32.000000000+01:00

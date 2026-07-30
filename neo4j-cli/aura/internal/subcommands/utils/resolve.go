@@ -227,6 +227,36 @@ func FetchScopedSession(cfg *clicfg.Config, orgID, projectID, sessionID string) 
 	return resBody, nil
 }
 
+// FetchScopedVirtualGraph performs a GET on the v2beta1 org/project-scoped
+// virtual-graph path
+// (/organizations/{orgID}/projects/{projectID}/virtual-graphs/{virtualGraphID})
+// and returns the raw response body so the caller can reuse it for output
+// (avoiding a second round-trip in read-only commands such as
+// "virtual-graph get").
+//
+// Scoping is native to the path, so no tenant_id comparison is performed: a
+// virtual graph outside the project surfaces via the v2beta1 path's own 404,
+// which parseResourceFromRequest tags with resourceType "virtual-graph".
+func FetchScopedVirtualGraph(cfg *clicfg.Config, orgID, projectID, virtualGraphID string) ([]byte, error) {
+	if err := ValidateResourceID("virtual-graph", virtualGraphID); err != nil {
+		return nil, err
+	}
+	path := api.ScopedVirtualGraphPath(orgID, projectID, virtualGraphID)
+	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion2,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d fetching virtual graph", statusCode)
+	}
+
+	return resBody, nil
+}
+
 // FetchAndVerifyCMKInProject performs a GET /customer-managed-keys/{cmkID} and
 // checks that the key's tenant_id matches projectID. It returns the raw
 // response body so the caller can reuse it for output (avoiding a second

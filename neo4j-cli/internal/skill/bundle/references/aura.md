@@ -59,6 +59,13 @@
 - [neo4j-cli aura project](#neo4j-cli-aura-project)
 - [neo4j-cli aura project get](#neo4j-cli-aura-project-get)
 - [neo4j-cli aura project list](#neo4j-cli-aura-project-list)
+- [neo4j-cli aura virtual-graph](#neo4j-cli-aura-virtual-graph)
+- [neo4j-cli aura virtual-graph allowed-configs](#neo4j-cli-aura-virtual-graph-allowed-configs)
+- [neo4j-cli aura virtual-graph create](#neo4j-cli-aura-virtual-graph-create)
+- [neo4j-cli aura virtual-graph delete](#neo4j-cli-aura-virtual-graph-delete)
+- [neo4j-cli aura virtual-graph get](#neo4j-cli-aura-virtual-graph-get)
+- [neo4j-cli aura virtual-graph list](#neo4j-cli-aura-virtual-graph-list)
+- [neo4j-cli aura virtual-graph update](#neo4j-cli-aura-virtual-graph-update)
 - [neo4j-cli aura workspace](#neo4j-cli-aura-workspace)
 - [neo4j-cli aura workspace list](#neo4j-cli-aura-workspace-list)
 - [neo4j-cli aura workspace use](#neo4j-cli-aura-workspace-use)
@@ -1603,6 +1610,212 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 
 # Emit JSON for scripting
 neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-000000000000 --format json
+```
+
+## neo4j-cli aura virtual-graph
+
+Relates to Aura Virtual Graphs
+
+Relates to Aura Virtual Graphs — Neo4j instances that query an external data source (for example Databricks, Snowflake or BigQuery) through a graph data model, without copying the data.
+
+A virtual graph is built from a data source and a graph data model, both created in Data Importer, and is scoped to a project. Virtual Graphs must be enabled for your organization; if they are not, requests fail with a permission error.
+
+Usage: `neo4j-cli aura virtual-graph`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+| `--organization-id` | string | - | ID of the Aura organization |
+| `--project-id` | string | - | ID of the Aura project |
+
+### neo4j-cli aura virtual-graph allowed-configs
+
+Returns the memory configurations selectable for a virtual graph
+
+This subcommand returns the memory configurations selectable for virtual graphs in the specified project, and the default applied when --memory is omitted on create.
+
+Use the returned memory values with the --memory flag of the create and update subcommands.
+
+Usage: `neo4j-cli aura virtual-graph allowed-configs`
+
+Examples:
+
+```
+# List the selectable virtual graph configurations for a project
+neo4j-cli aura virtual-graph allowed-configs --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List the configurations using a configured default workspace
+neo4j-cli aura virtual-graph allowed-configs
+
+# Emit JSON for scripting and extract the selectable memory values with jq
+neo4j-cli aura virtual-graph allowed-configs --format json | jq -r '.data.configs[].memory'
+```
+
+### neo4j-cli aura virtual-graph create
+
+Creates a new virtual graph
+
+This subcommand creates a virtual graph from an existing data source and graph data model, both created in Data Importer.
+
+Both IDs come from Data Importer, not from this CLI: --data-source-id identifies a connector configured there (for example Databricks, Snowflake or BigQuery), and --import-model-id identifies a graph data model saved against it. Set both up in Data Importer first, then pass their IDs here. See https://neo4j.com/docs/aura/import/introduction/.
+
+Creating a virtual graph is an asynchronous operation that can be waited for with --wait: the command returns immediately with status 'creating'.
+
+The initial Neo4j password is returned once, in the plain_password field of the response, and cannot be retrieved again.
+
+Usage: `neo4j-cli aura virtual-graph create [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--cloud-provider` | cloud-provider | - | (required) The cloud provider hosting the virtual graph. |
+| `--data-source-id` | string | - | (required) The ID of a data source created in Data Importer, for example a Databricks or Snowflake connector. |
+| `--import-model-id` | string | - | (required) The ID of a graph data model stored in Data Importer. The model is fetched on your behalf to build the virtual graph. |
+| `--maximum-bytes-billed` | int64 | 0 | Per-query bytes-billed cap for BigQuery data sources. Ignored for other data-source types. |
+| `--memory` | string | - | The memory allocation, for example 4Gi. Must be one of the values from 'aura virtual-graph allowed-configs'. Omit to use the project default. |
+| `--name` | string | - | (required) The name of the virtual graph (maximum 30 characters). |
+| `--region` | string | - | (required) The cloud region hosting the virtual graph, for example europe-west1. |
+| `--wait` | bool | false | Waits until the created virtual graph is running. |
+
+Examples:
+
+```
+# Create a virtual graph on GCP from a Data Importer data source and model
+neo4j-cli aura virtual-graph create --rw --name sales-analytics --data-source-id ds-abc123 --import-model-id im-xyz789 --cloud-provider gcp --region europe-west1 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Create with an explicit memory allocation and wait until it is running
+neo4j-cli aura virtual-graph create --rw --name sales-analytics --data-source-id ds-abc123 --import-model-id im-xyz789 --cloud-provider aws --region us-east-1 --memory 8Gi --wait
+
+# Create over a BigQuery data source with a per-query bytes-billed cap, emitting JSON for scripting
+neo4j-cli aura virtual-graph create --rw --name bq-analytics --data-source-id ds-bq001 --import-model-id im-xyz789 --cloud-provider gcp --region europe-west1 --maximum-bytes-billed 1099511627776 --format json
+```
+
+### neo4j-cli aura virtual-graph delete
+
+Deletes a virtual graph
+
+Starts the deletion process of a virtual graph.
+
+Deleting a virtual graph is an asynchronous operation, and is idempotent: deleting an id that does not exist in the project succeeds. The underlying data source is not affected.
+
+Once the deletion is accepted the virtual graph stops being readable, so removal shows up as absence rather than as a state: the get subcommand reports it as not found (exit code 3) and the list subcommand stops including it. Poll for that instead of for a status. Teardown of the underlying resources continues in the background and is not reported by the API.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura virtual-graph delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete a virtual graph by ID
+neo4j-cli aura virtual-graph delete ge82059a --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+
+# Delete a virtual graph using a configured default workspace, emitting JSON for scripting
+neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force --format json
+
+# Delete a virtual graph, suppressing all stdout output
+neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force > /dev/null
+
+# Delete, then poll until the virtual graph is no longer readable
+neo4j-cli aura virtual-graph delete ge82059a --rw --yes --force
+while neo4j-cli aura virtual-graph get ge82059a > /dev/null 2>&1; do sleep 5; done
+```
+
+### neo4j-cli aura virtual-graph get
+
+Returns virtual graph details
+
+This subcommand returns details about a specific virtual graph in the specified project.
+
+Use --organization-id and --project-id to specify which project the virtual graph belongs to, or configure a default with 'aura workspace use <org-id>/<project-id>'.
+
+Usage: `neo4j-cli aura virtual-graph get <id>`
+
+Examples:
+
+```
+# Get details of a virtual graph by ID
+neo4j-cli aura virtual-graph get ge82059a --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Get details using a configured default workspace
+neo4j-cli aura virtual-graph get ge82059a
+
+# Emit JSON for scripting and extract the Bolt URL with jq
+neo4j-cli aura virtual-graph get ge82059a --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.bolt_url'
+```
+
+### neo4j-cli aura virtual-graph list
+
+Returns a list of virtual graphs
+
+This subcommand returns a list containing a summary of each virtual graph in the specified project, newest first. To find out more about a specific virtual graph, retrieve the details using the get subcommand.
+
+The API returns results a page at a time; this subcommand follows every page so the output is the complete list. Use --limit to stop early, in which case a note is written to stderr saying more results exist.
+
+Use --organization-id and --project-id to specify which project's virtual graphs to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.
+
+Usage: `neo4j-cli aura virtual-graph list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--limit` | int | 0 | The maximum number of virtual graphs to return. Omit to return all of them. |
+
+Examples:
+
+```
+# List every virtual graph in a project (using flags)
+neo4j-cli aura virtual-graph list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List virtual graphs using a configured default workspace
+neo4j-cli aura virtual-graph list
+
+# Return at most 10 and emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura virtual-graph list --limit 10 --format json
+```
+
+### neo4j-cli aura virtual-graph update
+
+Updates a virtual graph
+
+This subcommand renames a virtual graph, resizes its memory allocation, and/or updates its graph model schema from a Data Importer model.
+
+Updating a virtual graph is an asynchronous operation: the API acknowledges the request and applies it in the background, so the details printed on completion may still show the pre-update state. Re-run the get subcommand to observe the applied change.
+
+Usage: `neo4j-cli aura virtual-graph update <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--import-model-id` | string | - | The ID of a graph data model stored in Data Importer. When provided, the virtual graph's graph model schema is updated from this model. |
+| `--memory` | string | - | The new memory allocation, for example 8Gi. Must be one of the values from 'aura virtual-graph allowed-configs'. |
+| `--name` | string | - | The new name of the virtual graph (maximum 30 characters). |
+
+Examples:
+
+```
+# Rename a virtual graph
+neo4j-cli aura virtual-graph update ge82059a --name renamed-analytics --rw --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Resize a virtual graph to 8Gi of memory
+neo4j-cli aura virtual-graph update ge82059a --memory 8Gi --rw
+
+# Update the graph model schema from a Data Importer model, emitting JSON for scripting
+neo4j-cli aura virtual-graph update ge82059a --import-model-id im-xyz789 --rw --format json
 ```
 
 ## neo4j-cli aura workspace

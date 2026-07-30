@@ -221,6 +221,28 @@ func TestPrintBodyMap_TableControlChars(t *testing.T) {
 	assert.Contains(t, out, "42", "numeric cell rendered unchanged")
 }
 
+// TestPrintBodyMap_TableLargeNumbers is a regression test for large integral
+// JSON numbers rendering in scientific notation. encoding/json decodes every
+// JSON number into float64, so an int64-typed API field (observed on Aura's
+// virtual-graph maximum_bytes_billed) printed as "1e+12" in a table cell while
+// the JSON output showed the digits. Fractional values must stay exact.
+func TestPrintBodyMap_TableLargeNumbers(t *testing.T) {
+	cmd, cfg, stdout := newOutputCmd(t, "table")
+	// Values arrive as float64 because they come from a json.Unmarshal of the
+	// API response body, not as Go ints.
+	data := simpleData{rows: []map[string]any{
+		{"cap": float64(1000000000000), "price": float64(0.36), "small": float64(42)},
+	}}
+
+	PrintBodyMap(cmd, cfg, data, []string{"cap", "price", "small"})
+
+	out := stdout.String()
+	assert.Contains(t, out, "1000000000000", "large integral number must render as digits, not 1e+12")
+	assert.NotContains(t, out, "1e+12")
+	assert.Contains(t, out, "0.36", "fractional value must stay exact")
+	assert.Contains(t, out, "42")
+}
+
 func TestStripControl(t *testing.T) {
 	tests := []struct {
 		name string

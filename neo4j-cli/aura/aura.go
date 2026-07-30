@@ -22,6 +22,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/instance"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/organization"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/project"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/virtualgraph"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/workspace"
 )
 
@@ -60,6 +61,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(organization.NewCmd(cfg))
 	cmd.AddCommand(project.NewCmd(cfg))
 	cmd.AddCommand(graphanalytics.NewCmd(cfg))
+	cmd.AddCommand(virtualgraph.NewCmd(cfg))
 	cmd.AddCommand(agent.NewCmd(cfg))
 	cmd.AddCommand(graphql.NewCmd(cfg))
 
