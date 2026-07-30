@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: '`aura instance list` output now includes the instance `status`.'
-time: 2026-07-27T11:17:21.827548+01:00
