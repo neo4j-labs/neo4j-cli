@@ -14,7 +14,7 @@ tasks:
       rewritten to call it, so a second entrypoint can reuse the exact same auth
       and SSRF gating. This is a pure refactor with no observable behaviour
       change; the existing suite is the safety net.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A single unexported helper owns base-URL validation, credential resolution, header/token acquisition, and the debug request emit."
@@ -22,7 +22,7 @@ tasks:
       - "`response_test.go`'s status-to-exit-code matrix and `stdout_invariance_debug_test.go` pass without modification."
       - "`handleResponseError` is not modified."
       - "`make test` passes."
-    completed_at: null
+    completed_at: 2026-07-30T13:42:00Z
 
   - id: task-002
     title: 'Extract flags.RequireWriteAccess from EnforceWriteGate'

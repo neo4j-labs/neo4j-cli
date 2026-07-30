@@ -66,55 +66,18 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	}
 
 	bodyBytes := marshalBody(config.PostBody)
-	var body io.Reader
-	if bodyBytes != nil {
-		body = bytes.NewReader(bodyBytes)
-	}
 
-	baseUrl := cfg.Aura.BaseUrl()
-	if err := urlcheck.ValidateRemoteURL(baseUrl); err != nil {
-		return responseBody, 0, clierr.NewUsageError("aura base-url rejected: %s", err.Error())
-	}
 	if config.Version == "" {
 		config.Version = AuraApiVersion1
 	}
 	versionPath := getVersionPath(config.Version)
 
-	u, err := url.ParseRequestURI(baseUrl)
-	if err != nil {
-		return responseBody, 0, clierr.NewUsageError("aura base-url is invalid: %s", err.Error())
-	}
-	u = u.JoinPath(versionPath)
-	u = u.JoinPath(path)
-
-	addQueryParams(u, config.QueryParams)
-
-	urlString := u.String()
-	req, err := http.NewRequest(method, urlString, body)
-
-	if err != nil {
-		panic(err)
-	}
-
-	var credential *credentials.AuraCredential
-	if active := cfg.Aura.ActiveCredential(); active != nil {
-		credential = active
-	} else {
-		credential, err = cfg.Credentials.Aura.GetDefault()
-		if err != nil {
-			return responseBody, 0, err
-		}
-	}
-
-	req.Header, err = getHeaders(credential, cfg, warnW)
+	req, credential, err := prepareRequest(cfg, method, versionPath, path, bodyBytes, queryValues(config.QueryParams), warnW)
 	if err != nil {
 		return responseBody, 0, err
 	}
 
 	debug := cfg.Aura.Debug()
-	if debug {
-		debugRequest(method, urlString, req.Header, bodyBytes)
-	}
 
 	start := time.Now()
 	res, err := client.Do(req)
@@ -156,6 +119,64 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	return responseBody, res.StatusCode, handleResponseError(res, credential, cfg)
 }
 
+// prepareRequest is the shared prologue for every Aura request entrypoint, so a
+// second entrypoint inherits identical auth and SSRF gating. An empty
+// versionPath omits the version segment entirely. The returned credential is
+// the one the request was signed with, needed to clear a stale access token on
+// a 401.
+func prepareRequest(cfg *clicfg.Config, method, versionPath, path string, bodyBytes []byte, queryParams url.Values, warnW io.Writer) (*http.Request, *credentials.AuraCredential, error) {
+	baseUrl := cfg.Aura.BaseUrl()
+	if err := urlcheck.ValidateRemoteURL(baseUrl); err != nil {
+		return nil, nil, clierr.NewUsageError("aura base-url rejected: %s", err.Error())
+	}
+
+	u, err := url.ParseRequestURI(baseUrl)
+	if err != nil {
+		return nil, nil, clierr.NewUsageError("aura base-url is invalid: %s", err.Error())
+	}
+	if versionPath != "" {
+		u = u.JoinPath(versionPath)
+	}
+	u = u.JoinPath(path)
+
+	addQueryParams(u, queryParams)
+
+	var body io.Reader
+	if bodyBytes != nil {
+		body = bytes.NewReader(bodyBytes)
+	}
+
+	urlString := u.String()
+	// http.NewRequest only fails on a malformed method token or an unparsable
+	// URL, both already screened by the callers; it is returned rather than
+	// panicked on so no entrypoint inherits a panic on user-supplied input.
+	req, err := http.NewRequest(method, urlString, body)
+	if err != nil {
+		return nil, nil, clierr.NewUsageError("aura request could not be built: %s", err.Error())
+	}
+
+	var credential *credentials.AuraCredential
+	if active := cfg.Aura.ActiveCredential(); active != nil {
+		credential = active
+	} else {
+		credential, err = cfg.Credentials.Aura.GetDefault()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	req.Header, err = getHeaders(credential, cfg, warnW)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if cfg.Aura.Debug() {
+		debugRequest(method, urlString, req.Header, bodyBytes)
+	}
+
+	return req, credential, nil
+}
+
 func getVersionPath(version AuraApiVersion) string {
 	switch version {
 	case AuraApiVersion1:
@@ -182,14 +203,30 @@ func marshalBody(data map[string]any) []byte {
 	return jsonData
 }
 
-func addQueryParams(u *url.URL, params map[string]string) {
-	if params != nil {
-		q := u.Query()
-		for key, val := range params {
+func queryValues(params map[string]string) url.Values {
+	if len(params) == 0 {
+		return nil
+	}
+
+	values := make(url.Values, len(params))
+	for key, val := range params {
+		values.Add(key, val)
+	}
+	return values
+}
+
+func addQueryParams(u *url.URL, params url.Values) {
+	if len(params) == 0 {
+		return
+	}
+
+	q := u.Query()
+	for key, vals := range params {
+		for _, val := range vals {
 			q.Add(key, val)
 		}
-		u.RawQuery = q.Encode()
 	}
+	u.RawQuery = q.Encode()
 }
 
 // Checks status code is 2xx

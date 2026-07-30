@@ -1,0 +1,6 @@
+# Progress: cli-225-aura-api-passthrough
+
+## TASK-001 — 2026-07-30T13:42:00Z
+Extracted MakeRequest's prologue (base-url SSRF gate, URL/version/path join, query params, request build, credential resolution, getHeaders, --debug request emit) into unexported `prepareRequest`; MakeRequest delegates. Pure refactor, existing suite green untouched.
+Files: ~neo4j-cli/aura/internal/api/api.go
+Decisions: `prepareRequest` takes versionPath as a literal string (empty = no version segment) and query params as `url.Values` (new `queryValues` converts MakeRequest's map) — both shapes exist for task-006's RawRequestConfig; task-006 MUST assert the empty-versionPath and repeated-query-key paths or they stay uncovered. http.NewRequest failure now returns a usage error instead of panicking (unreachable for MakeRequest; keeps the future raw entrypoint panic-free). getVersionPath is now evaluated before the base-url validation — divergence only for an invalid Version constant, a programmer error that panics under both orderings.
