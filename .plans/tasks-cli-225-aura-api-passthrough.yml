@@ -150,7 +150,7 @@ tasks:
       body byte-for-byte, `toon` converts with a verbatim fallback, and `table`
       derives columns from the response shape. It must never route through
       `api.ParseBody`/`ParseRawBody`, which panic on non-object/array JSON.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`json` writes the body byte-for-byte with one trailing newline — nothing reordered, reindented, or re-enveloped — and an empty body writes nothing."
@@ -158,7 +158,7 @@ tasks:
       - "`table` uses a `data` array of objects, a bare array of objects, or a bare object as one row, with columns being the union of keys in deterministic first-seen order."
       - "A bare string, number, `null`, `[1,2,3]`, or invalid JSON falls back to verbatim output in every format and never panics."
       - "Rows reach the existing `printTable` via a small unexported `AsArray()` implementation; no new json-tagged output struct is added."
-    completed_at: null
+    completed_at: 2026-07-30T18:05:00Z
 
   - id: task-009
     title: 'Add endpoint parsing, validation, and org/project placeholder substitution'
