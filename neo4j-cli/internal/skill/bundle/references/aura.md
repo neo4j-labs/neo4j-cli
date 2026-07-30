@@ -10,6 +10,7 @@
 - [neo4j-cli aura agent list](#neo4j-cli-aura-agent-list)
 - [neo4j-cli aura agent replace](#neo4j-cli-aura-agent-replace)
 - [neo4j-cli aura agent update](#neo4j-cli-aura-agent-update)
+- [neo4j-cli aura api](#neo4j-cli-aura-api)
 - [neo4j-cli aura customer-managed-key](#neo4j-cli-aura-customer-managed-key)
 - [neo4j-cli aura customer-managed-key create](#neo4j-cli-aura-customer-managed-key-create)
 - [neo4j-cli aura customer-managed-key delete](#neo4j-cli-aura-customer-managed-key-delete)
@@ -322,6 +323,60 @@ neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --tools '[{"nam
 
 # Update an agent and emit the response as JSON
 neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --description "updated" --rw --format json
+```
+
+## neo4j-cli aura api
+
+Makes an authenticated request to an arbitrary Aura API endpoint
+
+Makes an authenticated request to an arbitrary Aura API endpoint and prints the response.
+
+The endpoint is the path after the API host, including the API version segment ('v1/instances', 'v2beta1/organizations/{org_id}/projects'), so an endpoint the CLI has no dedicated command for — or an API version it does not know about — is reachable without a CLI release. A leading '/' is accepted and an inline query string is merged with any --field values.
+
+'{org_id}' and '{project_id}' (aliases '{org}' and '{project}') are substituted from --organization-id/--project-id or the default workspace, and only when the endpoint actually uses them.
+
+Credential resolution, the --base-url override, --debug tracing, and the exit-code contract are shared with every other Aura command. Any method other than GET or HEAD requires --rw, and DELETE additionally requires confirmation (--yes --force when non-interactive).
+
+With --format json the response body is written byte-for-byte, so it can be piped into jq.
+
+Usage: `neo4j-cli aura api <endpoint> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+| `-F, --field` | stringArray | [] | Repeatable key=value pair. 'true', 'false', 'null' and integers become JSON literals, '@<file>' ('@-' for stdin) reads the value from a file, anything else is a string. Sent as query parameters for GET, HEAD and DELETE, and as a JSON body otherwise. |
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `-H, --header` | stringArray | [] | Repeatable 'Name: value' request header, overlaid on the generated headers. |
+| `-i, --include` | bool | false | Print the HTTP status line and the response headers before the body. Makes stdout no longer a single JSON document, and is skipped on a failing status so the error envelope stays the only document there. |
+| `--input` | string | - | File holding the request body, sent verbatim; '-' reads it from stdin. Cannot be combined with --field or --raw-field. |
+| `-X, --method` | string | - | HTTP method to use, from a choice of [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]. Defaults to GET, or to POST when --field, --raw-field or --input is passed. |
+| `--organization-id` | string | - | ID of the Aura organization |
+| `--project-id` | string | - | ID of the Aura project |
+| `-f, --raw-field` | stringArray | [] | Repeatable key=value pair whose value is always a string. |
+| `--silent` | bool | false | Do not print the response body; with --include the headers are still printed. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# List the databases of an instance (Aura Multi-DB, no dedicated command yet)
+neo4j-cli aura api v2beta1/instances/00000000/databases --format json
+
+# List the projects of the organization in scope, substituting {org_id}
+neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects' --format json
+
+# Create a database from a JSON document, inferring POST
+neo4j-cli aura api v2beta1/instances/00000000/databases --input database.json --rw
+
+# Delete a database
+neo4j-cli aura api v2beta1/instances/00000000/databases/mydb --method DELETE --rw --yes --force
+
+# Pass query parameters and read a single field with jq (--method GET, since a field otherwise infers POST)
+neo4j-cli aura api v1/instances --method GET --field include_deleted=true --format json | jq -r '.data[].id'
 ```
 
 ## neo4j-cli aura customer-managed-key

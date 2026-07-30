@@ -211,7 +211,7 @@ tasks:
       root only owns `--debug`. `RunE` composes tasks 006-010, calls
       `flags.RequireWriteAccess` for non-GET/HEAD methods, then
       `confirm.RequireTyped` for DELETE.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -231,7 +231,7 @@ tasks:
       - "`RunE` sets `RawRequestConfig.WarnW` to `cmd.ErrOrStderr()` so a keyring-failure warning can never reach stdout and break the single-JSON-document invariant."
       - "`RunE` checks `err != nil` before rendering any body: `MakeRawRequest` returns BOTH a response and an auth error on HTTP 401, so rendering first would print a body and swallow the auth failure."
       - "A gate test walks the `api` command's flags and asserts every secret-bearing long name and shorthand (`--header`/`-H`, `--field`/`-F`, `--raw-field`/`-f`) is matched by `clievents.RedactArgs`, so renaming a shorthand cannot silently fail open."
-    completed_at: null
+    completed_at: 2026-07-30T20:40:00Z
 
   - id: task-013
     title: 'Split the RawStatusError fallback so unmapped 4xx are not retryable'

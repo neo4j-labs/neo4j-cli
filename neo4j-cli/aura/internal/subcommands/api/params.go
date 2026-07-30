@@ -91,15 +91,7 @@ type builtRequest struct {
 // body for every other method; --input replaces that body with a verbatim
 // document, so the two are mutually exclusive.
 func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags) (*builtRequest, error) {
-	hasFields := len(f.fields) > 0 || len(f.rawFields) > 0
-	hasInput := f.input != ""
-
-	if hasFields && hasInput {
-		return nil, clierr.NewUsageError("--%s cannot be combined with --%s or --%s", flagInput, flagField, flagRawField).
-			WithSuggestion("Put every value in the --input document, or drop --input and pass each value as --field/--raw-field.")
-	}
-
-	method, err := resolveMethod(f.method, hasFields || hasInput)
+	method, err := resolveRequestMethod(f)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +104,7 @@ func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags) (*bui
 	built := &builtRequest{method: method, query: url.Values{}, headers: headers}
 	reader := &payloadReader{cmd: cmd, cfg: cfg}
 
-	if hasInput {
+	if f.input != "" {
 		body, err := reader.read(flagInput, f.input)
 		if err != nil {
 			return nil, err
@@ -143,6 +135,23 @@ func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags) (*bui
 	built.body = body
 
 	return built, nil
+}
+
+// resolveRequestMethod resolves the HTTP method from the flag values alone,
+// touching neither the filesystem nor stdin. It is deliberately callable on its
+// own and idempotent: the caller resolves the method up front so the --rw and
+// confirm gates run before any payload is read, since a `--field key=@-` would
+// otherwise drain the stdin the confirm prompt needs to read an answer from.
+func resolveRequestMethod(f *requestFlags) (string, error) {
+	hasFields := len(f.fields) > 0 || len(f.rawFields) > 0
+	hasInput := f.input != ""
+
+	if hasFields && hasInput {
+		return "", clierr.NewUsageError("--%s cannot be combined with --%s or --%s", flagInput, flagField, flagRawField).
+			WithSuggestion("Put every value in the --input document, or drop --input and pass each value as --field/--raw-field.")
+	}
+
+	return resolveMethod(f.method, hasFields || hasInput)
 }
 
 // resolveMethod upper-cases and validates the method, defaulting to GET and

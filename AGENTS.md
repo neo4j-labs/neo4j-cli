@@ -176,6 +176,8 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 
 ## Misc
 
+- `cfg.Aura.BaseUrl()`/`AuthUrl()` run `removePathParametersFromUrl` — any configured path is dropped, leaving `scheme://host`. A test base-url of `<server>/v1` therefore contributes NO path segment; don't "fix" a doubled prefix by overriding it.
+- `cmd.Flags()` does NOT include a command's own persistent flags until cobra parses argv (`mergePersistentFlags` runs in `ParseFlags`). A test inspecting an unexecuted command's flag surface must use `cmd.LocalFlags()`.
 - `aura-client` cred cmd lives in TWO places: `neo4j-cli/internal/subcommands/credential/credential.go` (shipped, user-facing `credential aura-client add`, feeds the bundle) AND `aura/internal/subcommands/credential/add.go` (in-process/test only). Flag/Long changes hit BOTH; only `go generate ./neo4j-cli/internal/skill/...` needed (aura tree has no generated bundle). README leads with `credential aura-client add` (standalone aura not shipped).
 - An ephemeral Aura credential (e.g. env-var-synthesized via `cfg.Aura.SetActiveCredential`) is NOT in `cfg.Credentials.Aura`'s store, so `getToken` (`aura/internal/api/token.go`) MUST skip `UpdateAccessToken` for it — `UpdateAccessToken` does `c.Get(name)` which `panic`s on a not-found name. Guard with a non-panicking `cfg.Credentials.Aura.Get(name)` probe before persisting; such tokens are kept in-process only (never written to credentials.json/keyring).
 - `fileutils.WriteFile` PANICS on error; `WriteFileErr` is the error-returning twin (atomic 0600). Use `WriteFileErr` in best-effort paths (e.g. history logging).
