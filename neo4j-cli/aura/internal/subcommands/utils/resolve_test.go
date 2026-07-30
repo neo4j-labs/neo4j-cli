@@ -299,6 +299,90 @@ func buildCountingServer(t *testing.T, requests *atomic.Int64) *httptest.Server 
 	return srv
 }
 
+// TestResolveOrgID_And_ResolveProjectID pins that each ID resolves on its own,
+// so an org-scoped call does not demand a project (and vice versa).
+func TestResolveOrgID_And_ResolveProjectID(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		args            []string
+		extraCfg        string
+		wantOrg         string
+		wantOrgErr      string
+		wantOrgCode     int
+		wantProject     string
+		wantProjectErr  string
+		wantProjectCode int
+	}{
+		{
+			name:            "org flag only",
+			args:            []string{"--organization-id", testOrgID},
+			wantOrg:         testOrgID,
+			wantProjectErr:  "no project specified",
+			wantProjectCode: 2,
+		},
+		{
+			name:        "project flag only",
+			args:        []string{"--project-id", testProjectID},
+			wantOrgErr:  "no organization specified",
+			wantOrgCode: 2,
+			wantProject: testProjectID,
+		},
+		{
+			name:        "both from default workspace",
+			extraCfg:    fmt.Sprintf(`, "default-workspace": "%s/%s"`, testOrgID, testProjectID),
+			wantOrg:     testOrgID,
+			wantProject: testProjectID,
+		},
+		{
+			name:            "malformed ids",
+			args:            []string{"--organization-id", "..", "--project-id", "a/b"},
+			wantOrgErr:      `invalid organization id ".."`,
+			wantOrgCode:     6,
+			wantProjectErr:  `invalid project id "a/b"`,
+			wantProjectCode: 6,
+		},
+		{
+			name:            "legacy default-tenant hint is org only",
+			extraCfg:        `, "default-tenant": "legacy-tenant-id"`,
+			wantOrgErr:      "no default workspace set",
+			wantOrgCode:     2,
+			wantProjectErr:  "no project specified",
+			wantProjectCode: 2,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int64
+			srv := buildCountingServer(t, &requests)
+			cfg := buildTestConfig(t, srv.URL, tc.extraCfg)
+			cmd := newTestCmd(t, tc.args)
+
+			gotOrg, orgErr := utils.ResolveOrgID(cmd, cfg)
+			assertResolved(t, tc.wantOrg, tc.wantOrgErr, tc.wantOrgCode, gotOrg, orgErr)
+
+			gotProject, projectErr := utils.ResolveProjectID(cmd, cfg)
+			assertResolved(t, tc.wantProject, tc.wantProjectErr, tc.wantProjectCode, gotProject, projectErr)
+
+			assert.Zero(t, requests.Load(), "single-ID resolution must not issue any HTTP request")
+		})
+	}
+}
+
+func assertResolved(t *testing.T, wantID, wantErrContain string, wantCode int, gotID string, err error) {
+	t.Helper()
+
+	if wantErrContain != "" {
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), wantErrContain)
+		var ce *clierr.CLIError
+		require.True(t, errors.As(err, &ce))
+		assert.Equal(t, wantCode, ce.Code)
+		return
+	}
+
+	require.NoError(t, err)
+	assert.Equal(t, wantID, gotID)
+}
+
 func TestResolveOrgProject(t *testing.T) {
 	for _, tc := range []struct {
 		name           string

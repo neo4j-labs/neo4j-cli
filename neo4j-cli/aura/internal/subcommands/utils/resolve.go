@@ -47,42 +47,37 @@ func ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID
 	return orgID, projectID, nil
 }
 
-// ResolveOrgProject resolves the organization and project IDs using the
-// following precedence:
-//
-//   - Organization ID: (1) --organization-id flag; (2) org portion of
-//     aura.default-workspace; (3) error.
-//   - Project ID: (1) --project-id flag; (2) project portion of
-//     aura.default-workspace; (3) if aura.default-tenant is set but
-//     aura.default-workspace is not, return a migration message; (4) error.
+// ResolveOrgProject resolves the organization and project IDs via ResolveOrgID
+// and ResolveProjectID (see those for the precedence), reporting a missing
+// organization before a missing project.
 //
 // Both IDs are validated, but no HTTP request is issued: project membership is
 // left to the scoped request the caller is about to make. Use it when an extra
 // GET /organizations/{orgID}/projects round trip would buy nothing.
 func ResolveOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error) {
-	orgID, projectID, err = resolveIDs(cmd, cfg)
+	orgID, err = ResolveOrgID(cmd, cfg)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Reject malformed IDs before they reach a request path, so a "." / ".." /
-	// slash segment can't retarget it (see ValidateResourceID).
-	if err = ValidateResourceID("organization", orgID); err != nil {
-		return "", "", err
-	}
-	if err = ValidateResourceID("project", projectID); err != nil {
+	projectID, err = ResolveProjectID(cmd, cfg)
+	if err != nil {
 		return "", "", err
 	}
 
 	return orgID, projectID, nil
 }
 
-// resolveIDs applies the flag + config resolution order and returns (orgID,
-// projectID). It does NOT make any API calls.
-func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error) {
-	defaultOrg, defaultProject := defaultOrgAndProject(cfg)
+// ResolveOrgID resolves and validates the organization ID from (1) the
+// --organization-id flag; (2) the org portion of aura.default-workspace;
+// otherwise a usage error — replaced by a migration hint when the legacy
+// aura.default-tenant is set and aura.default-workspace is not. No HTTP request
+// is issued. Use it over ResolveOrgProject when the request needs no project, so
+// an org-scoped call (e.g. listing the projects in an org) does not demand one.
+func ResolveOrgID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
+	defaultOrg, _ := defaultOrgAndProject(cfg)
 
-	// Resolve org ID.
+	var orgID string
 	if flagVal, _ := cmd.Flags().GetString(flags.OrgIDFlag); flagVal != "" {
 		orgID = flagVal
 	} else if defaultOrg != "" {
@@ -90,24 +85,43 @@ func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string
 	} else {
 		// Check for legacy default-tenant before returning generic error.
 		if cfg.Aura.Get("default-tenant") != nil && cfg.Aura.Get("default-tenant") != "" {
-			return "", "", clierr.NewUsageError("no default workspace set; run 'aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting").
+			return "", clierr.NewUsageError("no default workspace set; run 'aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting").
 				WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting.")
 		}
-		return "", "", clierr.NewUsageError("no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'").
+		return "", clierr.NewUsageError("no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'").
 			WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--organization-id'.")
 	}
 
-	// Resolve project ID.
+	// Reject malformed IDs before they reach a request path, so a "." / ".." /
+	// slash segment can't retarget it (see ValidateResourceID).
+	if err := ValidateResourceID("organization", orgID); err != nil {
+		return "", err
+	}
+
+	return orgID, nil
+}
+
+// ResolveProjectID resolves and validates the project ID from (1) the
+// --project-id flag; (2) the project portion of aura.default-workspace;
+// otherwise a usage error. No HTTP request is issued.
+func ResolveProjectID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
+	_, defaultProject := defaultOrgAndProject(cfg)
+
+	var projectID string
 	if flagVal, _ := cmd.Flags().GetString(flags.ProjectIDFlag); flagVal != "" {
 		projectID = flagVal
 	} else if defaultProject != "" {
 		projectID = defaultProject
 	} else {
-		return "", "", clierr.NewUsageError("no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'").
+		return "", clierr.NewUsageError("no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'").
 			WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.")
 	}
 
-	return orgID, projectID, nil
+	if err := ValidateResourceID("project", projectID); err != nil {
+		return "", err
+	}
+
+	return projectID, nil
 }
 
 // FetchProjectInOrg derives a single project from the v2beta1 list-projects

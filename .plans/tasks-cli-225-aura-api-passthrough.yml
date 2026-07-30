@@ -170,7 +170,7 @@ tasks:
       substitutes `{org_id}`/`{project_id}` (with `{org}`/`{project}` as aliases)
       via `utils.ResolveOrgProject`. Validation must keep the request pinned to the
       already-SSRF-gated base host.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -179,7 +179,8 @@ tasks:
       - "Any `.` or `..` path segment is a usage error, so `url.JoinPath` cannot retarget the request."
       - "Placeholders are substituted only when present, so a placeholder-free path resolves with no workspace configured and issues no resolution error."
       - "Substituted org and project values pass through `utils.ValidateResourceID`; both the snake_case and short alias tokens are supported."
-    completed_at: null
+      - "Only the IDs the endpoint references are resolved, so an org-only path needs no project in scope; an unsupported `{...}` token is a usage error rather than being shipped upstream."
+    completed_at: 2026-07-30T18:55:00Z
 
   - id: task-010
     title: 'Add field, body, header parsing and HTTP method inference'
