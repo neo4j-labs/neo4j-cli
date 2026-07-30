@@ -194,9 +194,15 @@ design and are cited throughout this PRD:
   other command.
 - REQ-F-027: `RawStatusError` returns `nil` for 2xx and otherwise maps the status to the
   **same `clierr` codes** `handleResponseError` uses — 400→6 validation, 401/403→4 auth,
-  404→3 not-found, 402/409→5 conflict, 429→7 rate-limited (carrying `Retry-After`), 5xx→8
-  upstream — with `clierr.NewUpstreamError` as the fallback for anything unmapped
-  (413/415/422/…). It never panics and never depends on the body parsing.
+  404→3 not-found, 402/409→5 conflict, 405→8 upstream, 429→7 rate-limited (carrying
+  `Retry-After`), 5xx→8 upstream. The catch-all splits on status **class**: an unmapped
+  **4xx** (413, 415, 422, …) returns `clierr.NewValidationError` — exit 6,
+  `retryable: false` — because a permanent client rejection must never invite an agent
+  harness to retry-loop; unmapped 5xx/3xx keep `NewUpstreamError` (exit 8, retryable).
+  405 keeps an explicit upstream case so parity with `handleResponseError` survives the
+  class split. Known limitation: 408 and 425 are genuinely transient 4xx that the class
+  signal alone cannot distinguish, so they are reported non-retryable; neither appears in
+  the v2beta1 spec. It never panics and never depends on the body parsing.
 - REQ-F-028: The upstream response body is folded into the returned error's `ce.Message`,
   `StripControl`ed and truncated (~4 KB), rather than written to stdout. `clierr.Render`
   already writes the JSON error envelope to stdout (`render.go:85-87`), so echoing the body
