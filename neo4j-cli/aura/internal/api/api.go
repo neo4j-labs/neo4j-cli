@@ -60,19 +60,20 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		panic(fmt.Sprintf("method not set in requests %s", path))
 	}
 
-	warnW := config.WarnW
-	if warnW == nil {
-		warnW = os.Stderr
-	}
-
 	bodyBytes := marshalBody(config.PostBody)
 
 	if config.Version == "" {
 		config.Version = AuraApiVersion1
 	}
-	versionPath := getVersionPath(config.Version)
 
-	req, credential, err := prepareRequest(cfg, method, versionPath, path, bodyBytes, queryValues(config.QueryParams), warnW)
+	req, credential, err := prepareRequest(cfg, &RawRequestConfig{
+		Method:      method,
+		VersionPath: getVersionPath(config.Version),
+		Path:        path,
+		Body:        bodyBytes,
+		QueryParams: queryValues(config.QueryParams),
+		WarnW:       config.WarnW,
+	})
 	if err != nil {
 		return responseBody, 0, err
 	}
@@ -120,11 +121,13 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 }
 
 // prepareRequest is the shared prologue for every Aura request entrypoint, so a
-// second entrypoint inherits identical auth and SSRF gating. An empty
-// versionPath omits the version segment entirely. The returned credential is
-// the one the request was signed with, needed to clear a stale access token on
-// a 401.
-func prepareRequest(cfg *clicfg.Config, method, versionPath, path string, bodyBytes []byte, queryParams url.Values, warnW io.Writer) (*http.Request, *credentials.AuraCredential, error) {
+// second entrypoint inherits identical auth and SSRF gating. RawRequestConfig
+// doubles as its input: MakeRequest fills one in after marshalling its body and
+// resolving its version enum. config.Headers are overlaid on the generated auth
+// headers before the debug emit, so the trace shows what is actually sent. The
+// returned credential is the one the request was signed with, needed to clear a
+// stale access token on a 401.
+func prepareRequest(cfg *clicfg.Config, config *RawRequestConfig) (*http.Request, *credentials.AuraCredential, error) {
 	baseUrl := cfg.Aura.BaseUrl()
 	if err := urlcheck.ValidateRemoteURL(baseUrl); err != nil {
 		return nil, nil, clierr.NewUsageError("aura base-url rejected: %s", err.Error())
@@ -134,23 +137,23 @@ func prepareRequest(cfg *clicfg.Config, method, versionPath, path string, bodyBy
 	if err != nil {
 		return nil, nil, clierr.NewUsageError("aura base-url is invalid: %s", err.Error())
 	}
-	if versionPath != "" {
-		u = u.JoinPath(versionPath)
+	if config.VersionPath != "" {
+		u = u.JoinPath(config.VersionPath)
 	}
-	u = u.JoinPath(path)
+	u = u.JoinPath(config.Path)
 
-	addQueryParams(u, queryParams)
+	addQueryParams(u, config.QueryParams)
 
 	var body io.Reader
-	if bodyBytes != nil {
-		body = bytes.NewReader(bodyBytes)
+	if config.Body != nil {
+		body = bytes.NewReader(config.Body)
 	}
 
 	urlString := u.String()
 	// http.NewRequest only fails on a malformed method token or an unparsable
 	// URL, both already screened by the callers; it is returned rather than
 	// panicked on so no entrypoint inherits a panic on user-supplied input.
-	req, err := http.NewRequest(method, urlString, body)
+	req, err := http.NewRequest(config.Method, urlString, body)
 	if err != nil {
 		return nil, nil, clierr.NewUsageError("aura request could not be built: %s", err.Error())
 	}
@@ -165,16 +168,36 @@ func prepareRequest(cfg *clicfg.Config, method, versionPath, path string, bodyBy
 		}
 	}
 
+	warnW := config.WarnW
+	if warnW == nil {
+		warnW = os.Stderr
+	}
+
 	req.Header, err = getHeaders(credential, cfg, warnW)
 	if err != nil {
 		return nil, nil, err
 	}
+	overlayHeaders(req.Header, config.Headers)
 
 	if cfg.Aura.Debug() {
-		debugRequest(method, urlString, req.Header, bodyBytes)
+		debugRequest(config.Method, urlString, req.Header, config.Body)
 	}
 
 	return req, credential, nil
+}
+
+// overlayHeaders replaces, rather than appends to, each generated header the
+// caller also supplies, so an explicit Accept or Content-Type wins outright.
+// extra must hold at most one spelling of any given header name (as it does when
+// built through http.Header's Add/Set), since map iteration order would
+// otherwise decide which spelling survives.
+func overlayHeaders(header, extra http.Header) {
+	for name, values := range extra {
+		header.Del(name)
+		for _, value := range values {
+			header.Add(name, value)
+		}
+	}
 }
 
 func getVersionPath(version AuraApiVersion) string {

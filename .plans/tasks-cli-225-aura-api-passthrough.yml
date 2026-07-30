@@ -109,7 +109,7 @@ tasks:
       (*RawResponse, error)` built on the task-001 helper. It returns the body on
       every status, never calls `handleResponseError`, skips the
       2xx-embedded-errors trap, and never panics.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -119,7 +119,7 @@ tasks:
       - "Transport and body-read failures return `clierr.NewUpstreamError` instead of panicking; a request body is sent verbatim including a top-level JSON array."
       - "On HTTP 401 the stale access token is cleared via the existing `formatAuthorizationError` path."
       - "User-supplied headers are overlaid on the generated auth headers, and `--debug` emits the `[aura-debug] >`/`<` lines through the `debugW` seam."
-    completed_at: null
+    completed_at: 2026-07-30T15:55:00Z
 
   - id: task-007
     title: 'Add RawStatusError mapping every HTTP status to a clierr code'
