@@ -4,10 +4,13 @@
 package api
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
@@ -105,4 +108,91 @@ func MakeRawRequest(cfg *clicfg.Config, config *RawRequestConfig) (*RawResponse,
 	}
 
 	return raw, nil
+}
+
+// rawErrorBodyLimit bounds how many bytes of the upstream body are folded into
+// the returned error message. clierr.Render puts that message in a JSON envelope
+// on stdout, so an unbounded body (an HTML error page, a spec document) would
+// swamp it.
+const rawErrorBodyLimit = 4096
+
+// RawStatusError maps a RawResponse's HTTP status onto the same clierr codes
+// handleResponseError uses, and returns nil for any 2xx (including 201/202/204).
+//
+// Unlike handleResponseError it parses no response schema and never panics.
+// Statuses the v2beta1 spec documents but the CLI never modelled (405, 413, 415,
+// 422, …) fall back to an upstream error rather than a panic, and the upstream
+// body is folded into the message verbatim rather than being read through the
+// fixed api.Error shape — most 4xx responses on the newer endpoints declare no
+// body schema at all. That fallback marks those permanent client errors
+// retryable in the envelope, which is deliberate: with no schema to read, this
+// mapper cannot tell a permanent rejection from a transient upstream fault, and
+// over-reporting retryable is the safer half of that trade.
+//
+// The body goes into the error, never to stdout: clierr.Render already writes a
+// JSON error envelope there, so echoing it too would put two documents on stdout.
+func RawStatusError(res *RawResponse) error {
+	if res == nil {
+		return clierr.NewUpstreamError("aura api request produced no response")
+	}
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return nil
+	}
+
+	detail := rawErrorDetail(res)
+
+	switch res.StatusCode {
+	case http.StatusBadRequest:
+		return clierr.NewValidationError("%s", detail)
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return clierr.NewAuthError("%s", detail).WithSuggestion(authSuggestion)
+	case http.StatusNotFound:
+		return clierr.NewNotFoundError("%s", detail)
+	case http.StatusPaymentRequired, http.StatusConflict:
+		return clierr.NewConflictError("%s", detail)
+	case http.StatusTooManyRequests:
+		retryAfter := res.Header.Get("Retry-After")
+		err := clierr.NewRateLimitError(retryAfter, "%s", detail)
+		if retryAfter != "" {
+			return err.WithSuggestion(fmt.Sprintf("Retry after %s seconds.", retryAfter))
+		}
+		return err
+	}
+
+	// 5xx plus every unmapped status (3xx, 405, 413, 415, 422, …).
+	return clierr.NewUpstreamError("%s", detail)
+}
+
+// rawErrorDetail renders the status line and the upstream body as one message
+// line. Both halves pass through scrub (RedactText then StripControl) because
+// both are upstream-controlled: the reason phrase is not filtered by net/http,
+// and the body echoes back whatever was submitted, which may include a secret.
+func rawErrorDetail(res *RawResponse) string {
+	status := strings.TrimSpace(scrub(res.Status))
+	if status == "" {
+		status = strings.TrimSpace(fmt.Sprintf("%d %s", res.StatusCode, http.StatusText(res.StatusCode)))
+	}
+
+	// Pre-bound before scrubbing so a multi-megabyte error page doesn't pay for
+	// several regex passes to produce a few KB of message. The generous outer
+	// limit keeps redaction safe: a secret split by the outer cut is dropped by
+	// the final one.
+	body := strings.TrimSpace(scrub(truncateBytes(string(res.Body), rawErrorBodyLimit*16)))
+	if body == "" {
+		return fmt.Sprintf("aura api request failed with status %s", status)
+	}
+	return fmt.Sprintf("aura api request failed with status %s: %s", status, truncateBytes(body, rawErrorBodyLimit))
+}
+
+// truncateBytes cuts s to at most limit bytes without splitting a UTF-8 rune,
+// marking the result so a reader knows the upstream body continued.
+func truncateBytes(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	cut := limit
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "... (truncated)"
 }

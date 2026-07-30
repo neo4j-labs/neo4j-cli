@@ -130,7 +130,7 @@ tasks:
       unmapped statuses such as 413, 415, and 422. It never parses a response
       schema and never panics; the upstream body is folded into `ce.Message`,
       `StripControl`ed and truncated to roughly 4 KB.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -139,7 +139,7 @@ tasks:
       - "A 400 with an empty body, and one with a non-JSON body, both return a clean error rather than panicking."
       - "The upstream body appears in `ce.Message`, control-stripped and truncated; 2xx (including 201/202/204) returns nil."
       - "Table-driven tests cover every status the v2beta1 spec documents: 200/201/202/204 and 400/401/403/404/405/409/413/415/422/429/500."
-    completed_at: null
+    completed_at: 2026-07-30T17:20:00Z
 
   - id: task-008
     title: 'Add output.PrintPassthrough for verbatim and derived rendering'
