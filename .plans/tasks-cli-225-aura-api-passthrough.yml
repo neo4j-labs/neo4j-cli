@@ -227,6 +227,9 @@ tasks:
       - "On a non-2xx status, stdout holds exactly one JSON document (`AssertOutIsValidJSON`) and the upstream body is surfaced via the error, not echoed to stdout."
       - "The `Example` is flush-left with at least three `#`-headed `neo4j-cli` invocations, `--rw` on the writes and at least one `--format json`; `TestAllLeafCommands_HaveExamples` and the kebab-case input gate pass."
       - "A package `main_test.go` seeds `commonoutput.IsAgent` to false so format assertions are stable under `CLAUDECODE`."
+      - "`RunE` sets `RawRequestConfig.WarnW` to `cmd.ErrOrStderr()` so a keyring-failure warning can never reach stdout and break the single-JSON-document invariant."
+      - "`RunE` checks `err != nil` before rendering any body: `MakeRawRequest` returns BOTH a response and an auth error on HTTP 401, so rendering first would print a body and swallow the auth failure."
+      - "A gate test walks the `api` command's flags and asserts every secret-bearing long name and shorthand (`--header`/`-H`, `--field`/`-F`, `--raw-field`/`-f`) is matched by `clievents.RedactArgs`, so renaming a shorthand cannot silently fail open."
     completed_at: null
 
   - id: task-012
