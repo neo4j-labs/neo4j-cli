@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -279,6 +280,118 @@ func TestResolveAndValidateOrgProject_TableDrivenResolutionOrder(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantOrg, gotOrg)
 			assert.Equal(t, tc.wantProject, gotProject)
+		})
+	}
+}
+
+// buildCountingServer creates an httptest.Server that records every request it
+// receives, so a caller can assert a resolution path issues no HTTP call at all.
+// It answers with a parseable empty list so an unexpected call still reaches the
+// request-count assertion instead of panicking inside api.ParseBody.
+func buildCountingServer(t *testing.T, requests *atomic.Int64) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"data": []}`)) //nolint:errcheck
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestResolveOrgProject(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		args           []string
+		extraCfg       string
+		wantOrg        string
+		wantProject    string
+		wantErrContain string
+		wantCode       int
+		wantSuggestion string
+	}{
+		{
+			name:        "ids from flags",
+			args:        []string{"--organization-id", testOrgID, "--project-id", testProjectID},
+			wantOrg:     testOrgID,
+			wantProject: testProjectID,
+		},
+		{
+			name:        "ids from default workspace",
+			extraCfg:    fmt.Sprintf(`, "default-workspace": "%s/%s"`, testOrgID, testProjectID),
+			wantOrg:     testOrgID,
+			wantProject: testProjectID,
+		},
+		{
+			name:        "flags take precedence over default workspace",
+			args:        []string{"--organization-id", testOrgID, "--project-id", testProjectID},
+			extraCfg:    `, "default-workspace": "other-org/other-proj"`,
+			wantOrg:     testOrgID,
+			wantProject: testProjectID,
+		},
+		{
+			name:           "missing organization",
+			args:           []string{"--project-id", testProjectID},
+			wantErrContain: "no organization specified",
+			wantCode:       2,
+			wantSuggestion: "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--organization-id'.",
+		},
+		{
+			name:           "missing project",
+			args:           []string{"--organization-id", testOrgID},
+			wantErrContain: "no project specified",
+			wantCode:       2,
+			wantSuggestion: "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.",
+		},
+		{
+			name:           "legacy default-tenant migration hint",
+			extraCfg:       `, "default-tenant": "legacy-tenant-id"`,
+			wantErrContain: "no default workspace set",
+			wantCode:       2,
+			wantSuggestion: "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting.",
+		},
+		{
+			name:           "traversal organization id is rejected",
+			args:           []string{"--organization-id", "../..", "--project-id", testProjectID},
+			wantErrContain: `invalid organization id "../.."`,
+			wantCode:       6,
+		},
+		{
+			name:           "traversal project id is rejected",
+			args:           []string{"--organization-id", testOrgID, "--project-id", "a/b"},
+			wantErrContain: `invalid project id "a/b"`,
+			wantCode:       6,
+		},
+		{
+			name:           "over-segmented default workspace is rejected",
+			extraCfg:       `, "default-workspace": "a/b/c"`,
+			wantErrContain: `invalid organization id "a/b"`,
+			wantCode:       6,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int64
+			srv := buildCountingServer(t, &requests)
+			cfg := buildTestConfig(t, srv.URL, tc.extraCfg)
+
+			cmd := newTestCmd(t, tc.args)
+
+			gotOrg, gotProject, err := utils.ResolveOrgProject(cmd, cfg)
+
+			if tc.wantErrContain != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrContain)
+				var ce *clierr.CLIError
+				require.True(t, errors.As(err, &ce))
+				assert.Equal(t, tc.wantCode, ce.Code)
+				assert.Equal(t, tc.wantSuggestion, ce.Suggestion)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantOrg, gotOrg)
+				assert.Equal(t, tc.wantProject, gotProject)
+			}
+
+			assert.Zero(t, requests.Load(), "ResolveOrgProject must not issue any HTTP request")
 		})
 	}
 }

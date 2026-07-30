@@ -31,7 +31,24 @@ func ValidateResourceID(resourceType, id string) error {
 }
 
 // ResolveAndValidateOrgProject resolves the organization and project IDs for
-// Aura commands using the following precedence:
+// Aura commands via ResolveOrgProject (see there for the precedence), then calls
+// GET /organizations/{orgID}/projects (v2beta1) and returns an error when the
+// resolved projectID is not found in the list.
+func ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error) {
+	orgID, projectID, err = ResolveOrgProject(cmd, cfg)
+	if err != nil {
+		return "", "", err
+	}
+
+	if err = validateProjectInOrg(cfg, orgID, projectID); err != nil {
+		return "", "", err
+	}
+
+	return orgID, projectID, nil
+}
+
+// ResolveOrgProject resolves the organization and project IDs using the
+// following precedence:
 //
 //   - Organization ID: (1) --organization-id flag; (2) org portion of
 //     aura.default-workspace; (3) error.
@@ -39,25 +56,21 @@ func ValidateResourceID(resourceType, id string) error {
 //     aura.default-workspace; (3) if aura.default-tenant is set but
 //     aura.default-workspace is not, return a migration message; (4) error.
 //
-// After resolving both IDs it calls GET /organizations/{orgID}/projects
-// (v2beta1) and returns an error when the resolved projectID is not found in
-// the list.
-func ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error) {
+// Both IDs are validated, but no HTTP request is issued: project membership is
+// left to the scoped request the caller is about to make. Use it when an extra
+// GET /organizations/{orgID}/projects round trip would buy nothing.
+func ResolveOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error) {
 	orgID, projectID, err = resolveIDs(cmd, cfg)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Reject malformed IDs before the membership API call fires, so a "." / ".."
-	// / slash segment can't retarget the request path (see ValidateResourceID).
+	// Reject malformed IDs before they reach a request path, so a "." / ".." /
+	// slash segment can't retarget it (see ValidateResourceID).
 	if err = ValidateResourceID("organization", orgID); err != nil {
 		return "", "", err
 	}
 	if err = ValidateResourceID("project", projectID); err != nil {
-		return "", "", err
-	}
-
-	if err = validateProjectInOrg(cfg, orgID, projectID); err != nil {
 		return "", "", err
 	}
 

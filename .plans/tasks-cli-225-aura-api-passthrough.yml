@@ -71,15 +71,15 @@ tasks:
       private `resolveIDs` (lines 69-98) plus `ValidateResourceID`, but performs
       **no** API call. It must not reuse `ResolveAndValidateOrgProject`, which
       spends an extra `GET /organizations/{org}/projects` round trip.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`ResolveOrgProject` returns the same IDs `ResolveAndValidateOrgProject` would for valid input, with no HTTP request issued."
       - "It reuses the existing `resolveIDs` precedence rather than duplicating it, and validates both IDs via `ValidateResourceID`."
       - "The existing usage errors for a missing organization or project (including the legacy `default-tenant` migration hint) are preserved."
-      - "`ResolveAndValidateOrgProject` and its callers are unchanged."
+      - "`ResolveAndValidateOrgProject`'s observable behaviour and its callers are unchanged; it delegates resolution + ID validation to `ResolveOrgProject`."
       - "Tests cover flag-supplied IDs, default-workspace IDs, and the missing-workspace error paths, asserting zero API calls."
-    completed_at: null
+    completed_at: 2026-07-30T15:05:00Z
 
   - id: task-005
     title: 'Redact --header values and --field/--raw-field secret keys'
