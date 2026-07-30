@@ -153,26 +153,32 @@ func TestRawStatusError_UnknownStatusCode(t *testing.T) {
 // TestRawStatusError_ControlStripped asserts an ANSI escape cannot reach the
 // terminal (or the tee file) through the error message, from either
 // upstream-controlled half: net/http does not filter the reason phrase, and the
-// body is whatever the endpoint returned.
+// body is whatever the endpoint returned. The unmapped-4xx row covers the
+// class-based fallback; scrubbing happens in rawErrorDetail before the status
+// switch, so it is status-independent by construction.
 func TestRawStatusError_ControlStripped(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		status string
-		body   string
+		name       string
+		statusCode int
+		status     string
+		phrase     string
+		body       string
+		wantCode   int
 	}{
-		{name: "body", status: "409 Conflict", body: "\x1b[31mred\x1b[0m"},
-		{name: "reason phrase", status: "409 \x1b[31mConflict\x1b[0m", body: "red"},
+		{name: "body", statusCode: http.StatusConflict, status: "409 Conflict", phrase: "Conflict", body: "\x1b[31mred\x1b[0m", wantCode: 5},
+		{name: "reason phrase", statusCode: http.StatusConflict, status: "409 \x1b[31mConflict\x1b[0m", phrase: "Conflict", body: "red", wantCode: 5},
+		{name: "unmapped 4xx", statusCode: http.StatusUnprocessableEntity, status: "422 \x1b[31mUnprocessable Entity\x1b[0m", phrase: "Unprocessable Entity", body: "\x1b[31mred\x1b[0m", wantCode: 6},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			res := &api.RawResponse{
-				StatusCode: http.StatusConflict,
+				StatusCode: tc.statusCode,
 				Status:     tc.status,
 				Body:       []byte(tc.body),
 			}
 
-			ce := requireCLIErrorCode(t, api.RawStatusError(res), 5)
+			ce := requireCLIErrorCode(t, api.RawStatusError(res), tc.wantCode)
 			assert.NotContains(t, ce.Message, "\x1b")
-			assert.Contains(t, ce.Message, "Conflict")
+			assert.Contains(t, ce.Message, tc.phrase)
 			assert.Contains(t, ce.Message, "red")
 		})
 	}
@@ -220,23 +226,6 @@ func TestRawStatusError_BodyTruncated(t *testing.T) {
 			})
 		}
 	}
-}
-
-// TestRawStatusError_UnmappedClientErrorBodyScrubbed asserts the unmapped-4xx
-// fallback keeps the same scrubbing as every mapped status, since a 422 body
-// echoes back the submitted payload.
-func TestRawStatusError_UnmappedClientErrorBodyScrubbed(t *testing.T) {
-	res := &api.RawResponse{
-		StatusCode: http.StatusUnprocessableEntity,
-		Status:     "422 \x1b[31mUnprocessable Entity\x1b[0m",
-		Body:       []byte(`{"errors":[{"message":"rejected","password":"hunter2"}]}`),
-	}
-
-	ce := requireCLIErrorCode(t, api.RawStatusError(res), 6)
-	assert.NotContains(t, ce.Message, "hunter2")
-	assert.NotContains(t, ce.Message, "\x1b")
-	assert.Contains(t, ce.Message, "***")
-	assert.Contains(t, ce.Message, "Unprocessable Entity")
 }
 
 // TestRawStatusError_MultibyteBodyTruncatedOnRuneBoundary asserts truncation never

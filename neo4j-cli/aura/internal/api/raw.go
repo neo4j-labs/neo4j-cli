@@ -125,8 +125,10 @@ const rawErrorBodyLimit = 4096
 // the message verbatim rather than being read through the fixed api.Error shape
 // — most 4xx responses on the newer endpoints declare no body schema at all.
 // The fallback splits on class so the envelope's retryable hint stays honest: an
-// unmapped 4xx is a permanent client error (exit 6, not retryable), while an
-// unmapped 5xx or anything else may clear on a retry (exit 8).
+// unmapped 4xx is treated as a permanent client error (exit 6, not retryable),
+// while an unmapped 5xx or anything else may clear on a retry (exit 8). The
+// class is the only signal available here, so the handful of transient 4xx the
+// spec never documents (408, 425) are reported as permanent too.
 //
 // The body goes into the error, never to stdout: clierr.Render already writes a
 // JSON error envelope there, so echoing it too would put two documents on stdout.
@@ -163,8 +165,8 @@ func RawStatusError(res *RawResponse) error {
 	}
 
 	if res.StatusCode >= 400 && res.StatusCode < 500 {
-		// Unmapped client errors (413, 415, 422, …): permanent, so an agent
-		// harness must not read them as retryable and loop.
+		// Unmapped client errors (413, 415, 422, …): treated as permanent, so an
+		// agent harness must not read them as retryable and loop.
 		return clierr.NewValidationError("%s", detail)
 	}
 
