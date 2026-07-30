@@ -58,18 +58,12 @@ func substitutePlaceholders(cmd *cobra.Command, cfg *clicfg.Config, raw string) 
 		if err != nil {
 			return "", err
 		}
-		if err := checkPlaceholderValue("organization", orgID); err != nil {
-			return "", err
-		}
 		raw = replaceTokens(raw, orgPlaceholders, orgID)
 	}
 
 	if containsAny(raw, projectPlaceholders) {
 		projectID, err := utils.ResolveProjectID(cmd, cfg)
 		if err != nil {
-			return "", err
-		}
-		if err := checkPlaceholderValue("project", projectID); err != nil {
 			return "", err
 		}
 		raw = replaceTokens(raw, projectPlaceholders, projectID)
@@ -84,17 +78,6 @@ func substitutePlaceholders(cmd *cobra.Command, cfg *clicfg.Config, raw string) 
 	}
 
 	return raw, nil
-}
-
-// checkPlaceholderValue rejects the characters utils.ValidateResourceID allows
-// but which would restructure the endpoint once spliced into it: substitution
-// runs before parsing, so a "?" would start the query string, "#" a fragment, and
-// "%" an escape sequence.
-func checkPlaceholderValue(resourceType, id string) error {
-	if strings.ContainsAny(id, "?#%") {
-		return clierr.NewValidationError("invalid %s id %q", resourceType, id)
-	}
-	return nil
 }
 
 // parseEndpoint splits the endpoint into a version segment, the remaining path,

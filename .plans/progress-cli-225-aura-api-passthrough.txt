@@ -77,3 +77,8 @@ Decisions: Every README endpoint AND query param was checked against https://api
 
 ## REVIEW — 2026-07-30T16:26:46Z
 Added 5 review tasks (task-016..task-020).
+
+## TASK-016 — 2026-07-30T16:32:15Z
+Folded the `?#%` rule into `utils.ValidateResourceID` (now `/\?#%` plus the existing empty/`.`/`..` rules) and deleted `checkPlaceholderValue` and both call sites from endpoint.go. Added `?`/`#`/`%` rows to TestValidateResourceID and a table-driven `TestGetInstanceRejectsMalformedID` proving the hardening reaches the other ~9 callers.
+Files: ~neo4j-cli/aura/internal/subcommands/utils/resolve.go, ~neo4j-cli/aura/internal/subcommands/utils/resolve_test.go, ~neo4j-cli/aura/internal/subcommands/api/endpoint.go, ~neo4j-cli/aura/internal/subcommands/instance/get_test.go
+Decisions: The two endpoint tests that pinned `?#%` rejection ("query injecting organization id", "escape injecting project id") pass UNCHANGED — the message shape and exit 6 were already byte-identical, so they now assert the shared validator through resolveEndpoint. Every ValidateResourceID call site takes an opaque UUID/short-hex Aura id, so widening the charset breaks no legitimate input. No reviewer verdict was received this iteration (agent went idle without reporting); findings above are self-review only.

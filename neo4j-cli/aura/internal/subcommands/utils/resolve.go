@@ -17,14 +17,15 @@ import (
 
 // ValidateResourceID rejects an ID that would break out of, or malform, the
 // scoped resource path it is interpolated into. Aura resource IDs are opaque
-// UUID/short-hex tokens, so an empty value, a "."/".." path segment, or an
-// embedded slash/backslash is always invalid. Catching it here turns a
+// UUID/short-hex tokens, so an empty value, a "."/".." path segment, an embedded
+// slash/backslash, or a "?"/"#"/"%" is always invalid. Catching it here turns a
 // silently-retargeted request into a clear validation error: url.JoinPath (used
 // by api.MakeRequest to assemble the URL) resolves "." and ".." path segments
 // against the base, so e.g. an instanceID of "../.." would otherwise point the
-// request at a parent resource rather than failing cleanly.
+// request at a parent resource rather than failing cleanly, while a "?" would
+// start a query string, a "#" a fragment, and a "%" an escape sequence.
 func ValidateResourceID(resourceType, id string) error {
-	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`) {
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\?#%`) {
 		return clierr.NewValidationError("invalid %s id %q", resourceType, id)
 	}
 	return nil

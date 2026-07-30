@@ -249,6 +249,24 @@ func TestGetInstanceMissingProject(t *testing.T) {
 	helper.AssertErr("Error: no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
 }
 
+// TestGetInstanceRejectsMalformedID covers the shared ValidateResourceID guard:
+// each of these ids would otherwise restructure the scoped instance path rather
+// than failing cleanly.
+func TestGetInstanceRejectsMalformedID(t *testing.T) {
+	for _, instanceId := range []string{"..", "x%2e%2e", "x?admin=true", "x#frag"} {
+		t.Run(instanceId, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			registerProjectsMock(&helper)
+
+			helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
+
+			helper.AssertErr(fmt.Sprintf("Error: invalid instance id %q", instanceId))
+		})
+	}
+}
+
 func TestGetInstanceProjectNotInOrg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()

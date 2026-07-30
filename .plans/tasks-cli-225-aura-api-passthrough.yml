@@ -332,7 +332,7 @@ tasks:
       `ValidateResourceID` call sites (instance, session, virtual-graph, snapshot)
       for free, since every one of them also interpolates the id into a request
       path. Net: -12 lines, -1 concept, +9 call sites protected.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -341,7 +341,7 @@ tasks:
       - "The existing `a..b`, uuid and short-hex cases in resolve_test.go remain green and unmodified, and the endpoint tests that pinned `?#%` rejection still pass (retargeted at the shared validator)."
       - "A table case proves the hardening reaches at least one other caller (e.g. `instance get` rejecting an id containing `%`)."
       - "`make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-07-30T16:32:15Z
 
   - id: task-017
     title: 'Stop round-tripping --field type inference for query methods'

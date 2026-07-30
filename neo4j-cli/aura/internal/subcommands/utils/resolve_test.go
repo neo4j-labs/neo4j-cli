@@ -570,6 +570,9 @@ func TestValidateResourceID(t *testing.T) {
 		{name: "traversal", id: "../../../target", wantErr: true},
 		{name: "embedded slash", id: "a/b", wantErr: true},
 		{name: "embedded backslash", id: `a\b`, wantErr: true},
+		{name: "query separator", id: "x?admin=true", wantErr: true},
+		{name: "fragment separator", id: "x#frag", wantErr: true},
+		{name: "percent escape", id: "x%2e%2e", wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := utils.ValidateResourceID("instance", tc.id)
