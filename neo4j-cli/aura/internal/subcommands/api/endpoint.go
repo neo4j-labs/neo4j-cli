@@ -122,7 +122,7 @@ func parseEndpoint(raw string) (*parsedEndpoint, error) {
 	}
 	if u.Fragment != "" {
 		return nil, clierr.NewUsageError("endpoint %q must not contain a '#' fragment", trimmed).
-			WithSuggestion("Pass only the path and query string, e.g. 'v1/instances?include_deleted=true'.")
+			WithSuggestion("Pass only the path and query string, e.g. 'v1/instances?tenantId={project_id}'.")
 	}
 
 	// url.JoinPath resolves "." and ".." against the base URL, so such a segment

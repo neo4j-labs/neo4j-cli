@@ -196,6 +196,57 @@ neo4j-cli aura agent invoke <agent-id> --input "hello" --rw
 neo4j-cli aura agent invoke <agent-id> --input "hello" --format json --rw
 ```
 
+### Arbitrary API endpoints
+
+`neo4j-cli aura api <endpoint>` makes an authenticated request to any Aura API endpoint and prints the response — the escape hatch for a feature that has no dedicated command yet, or an API version this CLI release doesn't know about. Credential resolution, `--credential`, `--base-url`, `--debug`, and the exit-code contract are shared with every other Aura command.
+
+**The endpoint carries its own version segment** — nothing is prefixed for you. `v1` paths are flat (`v1/instances`), while `v2beta1` paths are scoped under the organization and project (`v2beta1/organizations/{org_id}/projects/{project_id}/instances`). A leading `/` is accepted, and an inline `?query` is merged with any `--field` values (a `--field` wins on a key collision). Endpoint reference: the [Aura API specification](https://neo4j.com/docs/aura/platform/api/specification/).
+
+`{org_id}` and `{project_id}` (aliases `{org}` and `{project}`) are substituted from `--organization-id`/`--project-id` or the [default workspace](#setting-a-default-workspace), and only when the endpoint actually uses them — so a path referencing neither needs no workspace configured. Any other `{...}` token is rejected rather than sent upstream; fill in instance, database, and backup ids yourself.
+
+```bash
+# List the databases of an instance (Aura Multi-DB — no dedicated command yet)
+neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instances/<instance-id>/databases' --format json
+
+# v1 is flat; a placeholder is substituted in the inline query too, and --format json
+# is verbatim so jq sees exactly what the API returned
+neo4j-cli aura api 'v1/instances?tenantId={project_id}' --format json | jq -r '.data[].id'
+
+# Query parameters on a read path — note the explicit --method GET
+neo4j-cli aura api 'v2beta1/organizations/{org}/projects' --method GET --field status=active --format json
+```
+
+Any method other than `GET`/`HEAD` requires `--rw`, and `DELETE` additionally requires confirmation — a TTY prompts, non-interactive use needs `--yes --force`. Both gates run before the request is built, so a rejected write reads nothing from stdin and issues no request.
+
+```bash
+# Create a database from a JSON document — a body infers POST
+neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instances/<instance-id>/databases' \
+  --input database.json --rw
+
+# Restore a database from a backup, building the JSON body from typed fields
+neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instances/<instance-id>/databases/<database-id>/restore' \
+  --field id=backup-5678 --rw
+
+# Delete a database
+neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instances/<instance-id>/databases/<database-id>' \
+  --method DELETE --rw --yes --force
+```
+
+Flags (`neo4j-cli aura api --help` is canonical):
+
+- `--method`/`-X` — one of `GET HEAD POST PUT PATCH DELETE OPTIONS`.
+- `--field`/`-F` and `--raw-field`/`-f` — repeatable `key=value`. `-F` turns `true`, `false`, `null` and integers into JSON literals and reads `@<file>` (`@-` for stdin) from a file; `-f` always yields a string.
+- `--input` — the whole request body, verbatim from a file or `-`. Mutually exclusive with the field flags.
+- `--header`/`-H` — repeatable `Name: value`, overlaid on the generated headers.
+- `--include`/`-i` and `--silent` — print the status line and response headers before the body, and suppress the body (headers still print when combined with `--include`).
+
+Two behaviours worth knowing before you reach for them:
+
+- **A `--field` on a read path needs an explicit `--method GET`.** With no `--method`, any `--field`, `--raw-field`, or `--input` infers `POST` (matching `gh api`), which would then also demand `--rw`. Fields travel as query parameters for `GET`, `HEAD` and `DELETE`, and as a JSON object body for every other method.
+- **`--include` prints nothing on a failing status.** On a non-2xx the JSON error envelope stays the only document on stdout; the upstream status and body are surfaced through the error rather than echoed. `--include` on a success does make stdout no longer a single JSON document, so drop it when piping to `jq`.
+
+`--format json` writes the response body byte-for-byte — nothing reordered, reindented, or re-enveloped. `--format table` derives its columns from the response shape and `--format toon` converts the body; both fall back to printing the body verbatim for a shape they can't render.
+
 ## Local Neo4j
 
 Two ways to run Neo4j locally from the CLI: drive a [Neo4j Desktop 2](https://neo4j.com/download/) install via its local relate API, or shell out to `docker`.

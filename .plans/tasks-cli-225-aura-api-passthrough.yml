@@ -303,7 +303,7 @@ tasks:
       `bundle/references/aura.md`. Add a README section for `aura api` and a
       changie entry. The changelog body describes only the observable user-facing
       surface, never the internal `raw.go` mechanics.
-    status: pending
+    status: completed
     dependencies:
       - task-011
       - task-013
@@ -316,4 +316,4 @@ tasks:
       - "A `.changes/unreleased/` entry exists via `changie new --projects neo4j-cli --kind Minor`, describing only the new command, its flags, and its output behaviour."
       - "All new `.go` files carry the Neo4j copyright header and `make license-check` passes."
       - "`make test`, `make fmt-check`, and `make lint` all pass."
-    completed_at: null
+    completed_at: 2026-07-30T23:55:00Z

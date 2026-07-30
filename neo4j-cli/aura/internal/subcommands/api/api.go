@@ -53,7 +53,7 @@ neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instanc
 neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instances/00000000/databases/db-1234' --method DELETE --rw --yes --force
 
 # Pass query parameters and read a single field with jq (--method GET, since a field otherwise infers POST)
-neo4j-cli aura api v1/instances --method GET --field include_deleted=true --format json | jq -r '.data[].id'`,
+neo4j-cli aura api v1/instances --method GET --field tenantId=11111111 --format json | jq -r '.data[].id'`,
 		Args: cobra.ExactArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cfg.Aura.BindBaseUrl(cmd.Flags().Lookup("base-url"))
