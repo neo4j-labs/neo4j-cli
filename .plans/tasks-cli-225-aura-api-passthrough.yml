@@ -274,6 +274,27 @@ tasks:
       - "`--format json` and `--format toon` are untouched by this change; `make test`, `make fmt-check`, `make lint` pass."
     completed_at: null
 
+  - id: task-015
+    title: 'Fix the Example endpoints to real v2beta1 paths (they would 404)'
+    description: |
+      `api.go`'s `Example` uses `v2beta1/instances/00000000/databases`, but
+      v2beta1 has NO flat `/instances/...` path — every databases operation is
+      scoped as `/organizations/{org_id}/projects/{project_id}/instances/{instance_id}/databases`
+      (verified against https://api.neo4j.io/v2beta1/spec.json). Four of the five
+      examples would 404. They ship in `--help` AND in
+      `bundle/references/aura.md`, so an agent reading the skill would build
+      failing commands for exactly the CLI-225 Multi-DB use case.
+    status: pending
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "Every v2beta1 endpoint in the `Example` and `Long` fields is a real path in https://api.neo4j.io/v2beta1/spec.json — the databases ones become `v2beta1/organizations/{org_id}/projects/{project_id}/instances/<instance-id>/databases[...]`."
+      - "The placeholder-substitution examples still demonstrate `{org_id}`/`{project_id}`, which the corrected scoped paths do naturally."
+      - "The `v1/instances` example is left as-is: v1 genuinely is flat."
+      - "`Example` still satisfies `TestAllLeafCommands_HaveExamples` — flush-left, >=2 `#`-headed `neo4j-cli` invocations, `--rw` on writes, >=1 `--format json` — and still notes that `--field` on a read path needs an explicit `--method GET`."
+      - "The bundle is regenerated so `bundle/references/aura.md` carries the corrected paths; `make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
   - id: task-012
     title: 'Regenerate the skill bundle and add README and changelog entries'
     description: |
@@ -287,8 +308,10 @@ tasks:
       - task-011
       - task-013
       - task-014
+      - task-015
     acceptance_criteria:
       - "`go generate ./neo4j-cli/internal/skill/...` leaves a clean tree; `TestGenerator_RoundTrip` and `make generate-check` pass with the bundle committed."
+      - "Every endpoint shown in the README is a real path (v2beta1 ones verified against https://api.neo4j.io/v2beta1/spec.json), and the README notes that `--field` on a read path needs an explicit `--method GET` and that `--include` prints nothing on a non-2xx."
       - "The README documents the endpoint-carries-the-version contract, the `{org_id}`/`{project_id}` placeholders, `--rw` on non-GET plus `--yes --force` on DELETE, and that `--format json` is verbatim so `| jq` works."
       - "A `.changes/unreleased/` entry exists via `changie new --projects neo4j-cli --kind Minor`, describing only the new command, its flags, and its output behaviour."
       - "All new `.go` files carry the Neo4j copyright header and `make license-check` passes."
