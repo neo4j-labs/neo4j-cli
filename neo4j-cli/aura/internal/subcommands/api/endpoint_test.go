@@ -9,48 +9,10 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
-	auraflags "github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
-	"github.com/neo4j/cli/test/utils/testfs"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-const (
-	testOrgID     = "org-abc-123"
-	testProjectID = "proj-def-456"
-)
-
-// newEndpointTestConfig builds a config with no base-url and no credentials:
-// endpoint resolution must never issue a request, so any regression that does
-// fails loudly rather than reaching a live host.
-func newEndpointTestConfig(t *testing.T, extraAuraCfg string) *clicfg.Config {
-	t.Helper()
-
-	cfgJSON := fmt.Sprintf(`{"format": "json", "aura": {"auth-url": "", "base-url": ""%s}}`, extraAuraCfg)
-	fs, err := testfs.GetTestFs(cfgJSON, "{}")
-	require.NoError(t, err)
-
-	return clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-}
-
-// newEndpointTestCmd registers the org/project flags and parses args so
-// Flags().GetString sees them, mirroring how the api command is mounted.
-func newEndpointTestCmd(t *testing.T, args []string) *cobra.Command {
-	t.Helper()
-
-	cmd := &cobra.Command{
-		Use:  "api",
-		RunE: func(cmd *cobra.Command, args []string) error { return nil },
-	}
-	auraflags.RegisterOrgProjectFlags(cmd)
-	cmd.SetArgs(args)
-	require.NoError(t, cmd.Execute())
-
-	return cmd
-}
 
 func TestParseEndpoint(t *testing.T) {
 	for _, tt := range []struct {

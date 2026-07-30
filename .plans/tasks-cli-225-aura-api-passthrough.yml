@@ -191,7 +191,7 @@ tasks:
       typed `--field` and string `--raw-field` pairs, reads `--input` bodies from a
       file or stdin, and parses repeatable `--header` values. Fields route to query
       params or a JSON body depending on the method.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`--method` is case-insensitive, upper-cased, and rejects off-allowlist values as usage errors; the default is `GET` and inference yields `POST` only when no explicit method was passed."
@@ -199,7 +199,7 @@ tasks:
       - "Fields become query parameters for GET, HEAD, and DELETE, and a JSON object request body for all other methods."
       - "`--input` supplies the body verbatim from a file or `-`, supports a top-level JSON array, and combining it with `--field`/`--raw-field` is a usage error."
       - "`--header` accepts repeatable `Name: value` pairs and rejects malformed names and CR/LF in values as usage errors."
-    completed_at: null
+    completed_at: 2026-07-30T19:55:00Z
 
   - id: task-011
     title: 'Wire up and register the aura api command with its write and delete gates'
