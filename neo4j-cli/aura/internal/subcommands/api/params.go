@@ -66,7 +66,7 @@ func registerRequestFlags(cmd *cobra.Command, f *requestFlags) {
 	cmd.Flags().StringVarP(&f.method, flagMethod, "X", "",
 		fmt.Sprintf("HTTP method to use, from a choice of [%s]. Defaults to GET, or to POST when --field, --raw-field or --input is passed.", strings.Join(allowedMethods, ", ")))
 	cmd.Flags().StringArrayVarP(&f.fields, flagField, "F", nil,
-		"Repeatable key=value pair. 'true', 'false', 'null' and integers become JSON literals, '@<file>' ('@-' for stdin) reads the value from a file, anything else is a string. Sent as query parameters for GET, HEAD and DELETE, and as a JSON body otherwise.")
+		"Repeatable key=value pair, where '@<file>' ('@-' for stdin) reads the value from a file. Sent verbatim as query parameters for GET, HEAD and DELETE, and as a JSON body otherwise, where 'true', 'false', 'null' and integers become JSON literals and anything else is a string.")
 	cmd.Flags().StringArrayVarP(&f.rawFields, flagRawField, "f", nil,
 		"Repeatable key=value pair whose value is always a string.")
 	cmd.Flags().StringVar(&f.input, flagInput, "",
@@ -89,7 +89,8 @@ type builtRequest struct {
 //
 // Fields become query parameters for GET, HEAD, and DELETE and a JSON object
 // body for every other method; --input replaces that body with a verbatim
-// document, so the two are mutually exclusive.
+// document, so the two are mutually exclusive. Type inference belongs to the
+// body path alone — a query string carries the value as typed.
 func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags) (*builtRequest, error) {
 	method, err := resolveRequestMethod(f)
 	if err != nil {
@@ -122,13 +123,22 @@ func buildRequest(cmd *cobra.Command, cfg *clicfg.Config, f *requestFlags) (*bui
 	}
 
 	if slices.Contains(queryFieldMethods, method) {
-		for key, value := range fields {
-			built.query.Set(key, fieldQueryValue(value))
+		for _, field := range fields {
+			built.query.Set(field.key, field.value)
 		}
 		return built, nil
 	}
 
-	body, err := json.Marshal(fields)
+	payload := make(map[string]any, len(fields))
+	for _, field := range fields {
+		if field.inferType {
+			payload[field.key] = jsonFieldValue(field.value)
+			continue
+		}
+		payload[field.key] = field.value
+	}
+
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, clierr.NewUsageError("could not encode the --%s values as a JSON body: %s", flagField, err.Error())
 	}
@@ -175,22 +185,34 @@ func resolveMethod(raw string, hasPayload bool) (string, error) {
 	return method, nil
 }
 
-// parseFields merges the typed --field and the always-string --raw-field
-// entries into one set. Raw entries are applied last, so a key given to both
-// keeps its raw string value.
-func parseFields(reader *payloadReader, typed, raw []string) (map[string]any, error) {
-	fields := make(map[string]any, len(typed)+len(raw))
+// resolvedField is one field entry with any '@<file>' reference already read.
+// inferType marks a --field entry written as a literal, the only shape JSON type
+// inference applies to — a file's contents and a --raw-field stay strings.
+type resolvedField struct {
+	key       string
+	value     string
+	inferType bool
+}
+
+// parseFields merges the --field and --raw-field entries into one ordered list.
+// Raw entries come last, so a key given to both keeps its raw string value.
+func parseFields(reader *payloadReader, typed, raw []string) ([]resolvedField, error) {
+	fields := make([]resolvedField, 0, len(typed)+len(raw))
 
 	for _, entry := range typed {
 		key, value, err := splitField(flagField, entry)
 		if err != nil {
 			return nil, err
 		}
-		converted, err := typedFieldValue(reader, key, value)
-		if err != nil {
-			return nil, err
+		if source, isFile := strings.CutPrefix(value, "@"); isFile {
+			contents, err := readFieldFile(reader, key, source)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, resolvedField{key: key, value: contents})
+			continue
 		}
-		fields[key] = converted
+		fields = append(fields, resolvedField{key: key, value: value, inferType: true})
 	}
 
 	for _, entry := range raw {
@@ -198,7 +220,7 @@ func parseFields(reader *payloadReader, typed, raw []string) (map[string]any, er
 		if err != nil {
 			return nil, err
 		}
-		fields[key] = value
+		fields = append(fields, resolvedField{key: key, value: value})
 	}
 
 	return fields, nil
@@ -219,56 +241,41 @@ func splitField(flag, entry string) (string, string, error) {
 	return key, value, nil
 }
 
-// typedFieldValue applies --field's type inference: an "@" prefix reads the
-// value from that file ("@-" from stdin) as a string, "true"/"false"/"null" and
-// integer-looking values become JSON literals, and everything else stays a
-// string.
+// readFieldFile resolves a --field '@<file>' reference, with "-" meaning stdin,
+// into its contents.
+func readFieldFile(reader *payloadReader, key, source string) (string, error) {
+	if source == "" {
+		return "", clierr.NewUsageError("invalid --%s %q: expected @<file>, or @- to read stdin", flagField, key)
+	}
+	contents, err := reader.read(flagField, source)
+	if err != nil {
+		return "", err
+	}
+	return string(contents), nil
+}
+
+// jsonFieldValue applies --field's type inference for a JSON request body:
+// "true"/"false"/"null" and integer-looking values become JSON literals, and
+// everything else stays a string.
 //
 // Inference is textual, so a numeric-looking string loses its leading zeros
 // ("0123" becomes 123) and a decimal ("1.5") stays a string; --raw-field is the
 // escape hatch for both.
-func typedFieldValue(reader *payloadReader, key, value string) (any, error) {
-	if source, isFile := strings.CutPrefix(value, "@"); isFile {
-		if source == "" {
-			return nil, clierr.NewUsageError("invalid --%s %q: expected @<file>, or @- to read stdin", flagField, key)
-		}
-		contents, err := reader.read(flagField, source)
-		if err != nil {
-			return nil, err
-		}
-		return string(contents), nil
-	}
-
+func jsonFieldValue(value string) any {
 	switch value {
 	case "true":
-		return true, nil
+		return true
 	case "false":
-		return false, nil
+		return false
 	case "null":
-		return nil, nil
+		return nil
 	}
 
 	if number, err := strconv.ParseInt(value, 10, 64); err == nil {
-		return number, nil
+		return number
 	}
 
-	return value, nil
-}
-
-// fieldQueryValue renders a parsed field value as a query parameter.
-func fieldQueryValue(value any) string {
-	switch typed := value.(type) {
-	case string:
-		return typed
-	case bool:
-		return strconv.FormatBool(typed)
-	case int64:
-		return strconv.FormatInt(typed, 10)
-	}
-
-	// nil, the only other shape a field can hold. A query string cannot express
-	// it, so it becomes an empty value.
-	return ""
+	return value
 }
 
 // payloadReader reads the file and stdin payloads referenced by --input and

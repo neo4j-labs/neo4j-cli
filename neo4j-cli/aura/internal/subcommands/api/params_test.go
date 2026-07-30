@@ -182,15 +182,46 @@ func TestBuildRequest_Fields(t *testing.T) {
 			name: "fields are query params on an explicit GET",
 			flags: requestFlags{
 				method: "get",
-				fields: []string{"include_deleted=true", "page_limit=10", "nothing=null", "name=my db"},
+				fields: []string{"include_deleted=true", "page_limit=10", "name=my db"},
 			},
 			wantMethod: http.MethodGet,
 			wantQuery: url.Values{
 				"include_deleted": []string{"true"},
 				"page_limit":      []string{"10"},
-				"nothing":         []string{""},
 				"name":            []string{"my db"},
 			},
+		},
+		{
+			name: "query fields are sent verbatim, with no type inference",
+			flags: requestFlags{
+				method: "get",
+				fields: []string{"padded=0123", "nothing=null", "yes=true", "empty="},
+			},
+			wantMethod: http.MethodGet,
+			wantQuery: url.Values{
+				"padded":  []string{"0123"},
+				"nothing": []string{"null"},
+				"yes":     []string{"true"},
+				"empty":   []string{""},
+			},
+		},
+		{
+			name: "a file field reads its query value verbatim",
+			flags: requestFlags{
+				method: "get",
+				fields: []string{"query=@" + testPayloadFile},
+			},
+			wantMethod: http.MethodGet,
+			wantQuery:  url.Values{"query": []string{"MATCH (n) RETURN n\n"}},
+		},
+		{
+			name: "a stdin field reads its query value verbatim",
+			flags: requestFlags{
+				method: "delete",
+				fields: []string{"query=@-"},
+			},
+			wantMethod: http.MethodDelete,
+			wantQuery:  url.Values{"query": []string{"piped text"}},
 		},
 		{
 			name: "fields are query params on HEAD",

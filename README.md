@@ -235,7 +235,7 @@ neo4j-cli aura api 'v2beta1/organizations/{org_id}/projects/{project_id}/instanc
 Flags (`neo4j-cli aura api --help` is canonical):
 
 - `--method`/`-X` — one of `GET HEAD POST PUT PATCH DELETE OPTIONS`.
-- `--field`/`-F` and `--raw-field`/`-f` — repeatable `key=value`. `-F` turns `true`, `false`, `null` and integers into JSON literals and reads `@<file>` (`@-` for stdin) from a file; `-f` always yields a string.
+- `--field`/`-F` and `--raw-field`/`-f` — repeatable `key=value`. `-F` reads `@<file>` (`@-` for stdin) from a file; `-f` always yields a string. In a JSON body `-F` turns `true`, `false`, `null` and integers into JSON literals, while a query parameter carries the value verbatim.
 - `--input` — the whole request body, verbatim from a file or `-`. Mutually exclusive with the field flags.
 - `--header`/`-H` — repeatable `Name: value`, overlaid on the generated headers.
 - `--include`/`-i` and `--silent` — print the status line and response headers before the body, and suppress the body (headers still print when combined with `--include`).

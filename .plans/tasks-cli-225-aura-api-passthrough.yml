@@ -356,7 +356,7 @@ tasks:
       resolution is shared, JSON-literal inference is body-only — and let the query
       branch use the raw string. The command is unreleased so there is no
       compatibility cost.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -365,7 +365,7 @@ tasks:
       - "`@file` and `@-` resolution still works on both the query and body paths, since it is the shared half of the seam."
       - "`fieldQueryValue` is deleted, and the `--field` usage string no longer implies type inference applies on read paths."
       - "`make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-07-30T17:12:00Z
 
   - id: task-018
     title: 'Resolve the HTTP method once and drop builtRequest.method'
