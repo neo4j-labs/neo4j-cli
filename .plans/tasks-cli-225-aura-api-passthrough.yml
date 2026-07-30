@@ -415,7 +415,7 @@ tasks:
       specified" (exit 2, usage). The progress log acknowledges no test covered that
       pair, and it still does not — so the ordering can silently drift back. This is
       a shipped behaviour change with no coverage.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -423,4 +423,4 @@ tasks:
       - "A companion case pins that a valid org with a missing project still reports the exit-2 \"no project specified\" usage error."
       - "Both cases assert zero HTTP requests, consistent with the rest of that table."
       - "`make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-07-30T19:12:00Z

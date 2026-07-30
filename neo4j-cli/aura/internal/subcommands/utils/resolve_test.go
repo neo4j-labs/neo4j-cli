@@ -428,6 +428,15 @@ func TestResolveOrgProject(t *testing.T) {
 			wantSuggestion: "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.",
 		},
 		{
+			// Pairs with "missing project" above: swapping the two resolution
+			// calls inside ResolveOrgProject would flip this to exit 2
+			// "no project specified".
+			name:           "malformed organization id beats missing project",
+			args:           []string{"--organization-id", "../.."},
+			wantErrContain: `invalid organization id "../.."`,
+			wantCode:       6,
+		},
+		{
 			name:           "legacy default-tenant migration hint",
 			extraCfg:       `, "default-tenant": "legacy-tenant-id"`,
 			wantErrContain: "no default workspace set",

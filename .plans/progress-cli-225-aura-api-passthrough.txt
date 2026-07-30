@@ -97,3 +97,8 @@ Decisions: The gate-ordering rationale survives only at runRequest (api.go:87-88
 `RawStatusError`'s open-coded 2xx range now calls the package's canonical `IsSuccessful`; `>= 200 && <= 299` is the same integer set as `>= 200 && < 300`, so the status matrix's 200/201/202/204 nil rows pin it unchanged.
 Files: ~neo4j-cli/aura/internal/api/raw.go
 Decisions: Reviewer verdict LGTM, no findings. `desktopclient/discovery.go`'s open-coded 2xx check is outside the aura import boundary and stays.
+
+## TASK-020 — 2026-07-30T19:12:00Z
+Added a `TestResolveOrgProject` case pinning that a malformed `--organization-id` with no project reports the malformed org (exit 6) rather than "no project specified" (exit 2) — the ordering the task-009 resolveIDs split changed.
+Files: ~neo4j-cli/aura/internal/subcommands/utils/resolve_test.go
+Decisions: Only ONE case added — the criteria's "companion" (valid org + missing project -> exit 2) is the pre-existing "missing project" row, so a second would be duplicate table data (reviewer concurred). The new case is the ONLY row that discriminates the ordering: "traversal organization id is rejected" supplies a valid --project-id, so it passes under either order. Zero-HTTP comes from the table-wide assertion; empty wantSuggestion also pins that the validation error carries none. Reviewer verdict LGTM; its low-priority note applied (comment trimmed to just the drift it catches).
