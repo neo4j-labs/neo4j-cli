@@ -397,14 +397,14 @@ tasks:
       at raw.go:139, while `IsSuccessful` — the canonical 2xx predicate — is
       defined ~100 lines away in the same package at api.go:256. Same set,
       duplicated rule.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
       - "`RawStatusError` calls `api.IsSuccessful` instead of open-coding the range check."
       - "The 2xx rows of the status matrix (200/201/202/204) still return nil, and no other status changes code."
       - "`make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-07-30T18:34:00Z
 
   - id: task-020
     title: 'Pin the reordered org/project resolution error precedence'

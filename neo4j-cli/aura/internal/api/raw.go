@@ -136,7 +136,7 @@ func RawStatusError(res *RawResponse) error {
 	if res == nil {
 		return clierr.NewUpstreamError("aura api request produced no response")
 	}
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	if IsSuccessful(res.StatusCode) {
 		return nil
 	}
 

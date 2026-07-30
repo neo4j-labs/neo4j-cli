@@ -92,3 +92,8 @@ Decisions: `inferType` is false for an `@file` value, preserving the old behavio
 `runRequest` now resolves the method once and passes it to `buildRequest(cmd, cfg, f, method)`; `builtRequest.method` and the "idempotent" doc paragraph defending the double resolve are gone. `RawRequestConfig.Method` reads the local.
 Files: ~neo4j-cli/aura/internal/subcommands/api/api.go, ~neo4j-cli/aura/internal/subcommands/api/params.go, ~neo4j-cli/aura/internal/subcommands/api/params_test.go
 Decisions: The gate-ordering rationale survives only at runRequest (api.go:87-88), where it actually constrains — the callee no longer needs to know. Reviewer verdict LGTM; its medium note (a `resolveAndBuild` test helper I had added was the one addition in a deletion task) applied: helper deleted, `TestBuildRequest_Fields`/`_Input` now take `method` as an INPUT column and assert only query-vs-body routing, the two `--input`+`--field` conflict rows and the off-allowlist row moved to a new `TestResolveRequestMethod_UsageErrors`, and `TestRegisterRequestFlags` inlines resolve+build so argv-driven POST inference stays pinned.
+
+## TASK-019 — 2026-07-30T18:34:00Z
+`RawStatusError`'s open-coded 2xx range now calls the package's canonical `IsSuccessful`; `>= 200 && <= 299` is the same integer set as `>= 200 && < 300`, so the status matrix's 200/201/202/204 nil rows pin it unchanged.
+Files: ~neo4j-cli/aura/internal/api/raw.go
+Decisions: Reviewer verdict LGTM, no findings. `desktopclient/discovery.go`'s open-coded 2xx check is outside the aura import boundary and stays.
