@@ -317,3 +317,110 @@ tasks:
       - "All new `.go` files carry the Neo4j copyright header and `make license-check` passes."
       - "`make test`, `make fmt-check`, and `make lint` all pass."
     completed_at: 2026-07-30T23:55:00Z
+
+  - id: task-016
+    title: 'Fold the ?#% placeholder rule into ValidateResourceID and delete checkPlaceholderValue'
+    description: |
+      `checkPlaceholderValue` (endpoint.go:89-98) is a second ID-validation
+      function applied immediately after `utils.ResolveOrgID`/`ResolveProjectID`
+      have already run `ValidateResourceID`, emitting a byte-identical message
+      shape (`"invalid %s id %q"`) and the same clierr code. Two functions, one
+      concept, complementary character sets — a bespoke helper where a canonical
+      utility already exists. `?`, `#` and `%` are never valid in an Aura resource
+      id, so the rule belongs in `ValidateResourceID` (resolve.go:26). Pushing it
+      down deletes the helper and both call sites, and hardens the other ~10
+      `ValidateResourceID` call sites (instance, session, virtual-graph, snapshot)
+      for free, since every one of them also interpolates the id into a request
+      path. Net: -12 lines, -1 concept, +9 call sites protected.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`ValidateResourceID` rejects any id containing `?`, `#` or `%` in addition to its existing empty / `.` / `..` / slash / backslash rules."
+      - "`checkPlaceholderValue` and both of its call sites are deleted; endpoint.go no longer imports anything solely for it."
+      - "The existing `a..b`, uuid and short-hex cases in resolve_test.go remain green and unmodified, and the endpoint tests that pinned `?#%` rejection still pass (retargeted at the shared validator)."
+      - "A table case proves the hardening reaches at least one other caller (e.g. `instance get` rejecting an id containing `%`)."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
+  - id: task-017
+    title: 'Stop round-tripping --field type inference for query methods'
+    description: |
+      For GET/HEAD/DELETE every `--field` is parsed into a typed `any` (int64,
+      bool, nil) by `typedFieldValue` and then converted straight back to a string
+      by `fieldQueryValue` (params.go:124-128, 258-272). Parse then un-parse in the
+      same function, buying nothing and losing data on a command whose entire
+      promise is "send what I say": `--field x=0123` ships `x=123` and
+      `--field x=null` ships `x=` (empty). Typed inference is only meaningful when
+      building a JSON body. Split `typedFieldValue` at its real seam — `@file`/`@-`
+      resolution is shared, JSON-literal inference is body-only — and let the query
+      branch use the raw string. The command is unreleased so there is no
+      compatibility cost.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`--field x=0123` on a GET sends the query value `0123` verbatim, and `--field x=null` sends the literal string `null`, each pinned by a test."
+      - "`--field` on a POST still infers JSON literals for `true`/`false`/`null`/integers, and `--raw-field` still always sends a string — the task-010 body tests stay green."
+      - "`@file` and `@-` resolution still works on both the query and body paths, since it is the shared half of the seam."
+      - "`fieldQueryValue` is deleted, and the `--field` usage string no longer implies type inference applies on read paths."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
+  - id: task-018
+    title: 'Resolve the HTTP method once and drop builtRequest.method'
+    description: |
+      `runRequest` resolves `method` at api.go:89 for the gates, `buildRequest`
+      resolves it again at params.go:94, and `runRequest` then ignores its own
+      value and reads `built.method` at api.go:117. The doc comment defends this by
+      declaring `buildRequest` "idempotent" — a constraint invented to accommodate
+      the duplication. The gate-ordering rationale it protects is real and must be
+      preserved (a `--field key=@-` would otherwise drain the stdin that the
+      confirm prompt reads), but that only requires the method be resolved BEFORE
+      the gates, not resolved twice. Pass the already-resolved method into
+      `buildRequest(cmd, cfg, f, method)` and drop the field.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "The method is resolved exactly once per invocation; `buildRequest` accepts it as a parameter and `builtRequest` no longer carries a `method` field."
+      - "The idempotency claim and the three lines of comment defending it are gone."
+      - "Both gates still run before any payload read: the `--method DELETE --field x=@-` test proving the confirm prompt is not starved of stdin stays green."
+      - "Method validation still rejects off-allowlist values exactly once, with the same exit-2 usage error."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
+  - id: task-019
+    title: 'Use the canonical IsSuccessful predicate in RawStatusError'
+    description: |
+      `RawStatusError` open-codes `res.StatusCode >= 200 && res.StatusCode < 300`
+      at raw.go:139, while `IsSuccessful` — the canonical 2xx predicate — is
+      defined ~100 lines away in the same package at api.go:256. Same set,
+      duplicated rule.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`RawStatusError` calls `api.IsSuccessful` instead of open-coding the range check."
+      - "The 2xx rows of the status matrix (200/201/202/204) still return nil, and no other status changes code."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
+  - id: task-020
+    title: 'Pin the reordered org/project resolution error precedence'
+    description: |
+      Splitting `resolveIDs` into `ResolveOrgID`/`ResolveProjectID` reordered error
+      reporting: a malformed `--organization-id` combined with a missing project now
+      reports the malformed org (exit 6, validation) instead of "no project
+      specified" (exit 2, usage). The progress log acknowledges no test covered that
+      pair, and it still does not — so the ordering can silently drift back. This is
+      a shipped behaviour change with no coverage.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`TestResolveOrgProject` gains a case for a malformed `--organization-id` together with a missing project, asserting the malformed-org error and exit code 6."
+      - "A companion case pins that a valid org with a missing project still reports the exit-2 \"no project specified\" usage error."
+      - "Both cases assert zero HTTP requests, consistent with the rest of that table."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
