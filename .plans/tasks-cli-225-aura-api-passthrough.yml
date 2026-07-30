@@ -232,6 +232,27 @@ tasks:
       - "A gate test walks the `api` command's flags and asserts every secret-bearing long name and shorthand (`--header`/`-H`, `--field`/`-F`, `--raw-field`/`-f`) is matched by `clievents.RedactArgs`, so renaming a shorthand cannot silently fail open."
     completed_at: null
 
+  - id: task-013
+    title: 'Split the RawStatusError fallback so unmapped 4xx are not retryable'
+    description: |
+      REQ-F-027 sent every unmapped status to `NewUpstreamError`, which carries
+      `retryable: true`. That is wrong for permanent client errors: 413, 415, and
+      422 are all documented v2beta1 responses (422 covers "the database limit for
+      the Instance being reached"), and telling an agent harness to retry them
+      invites a retry loop. Split the fallback only — unmapped 4xx become
+      `clierr.NewValidationError` (exit 6, `retryable: false`); 5xx and every other
+      unmapped status keep `NewUpstreamError` (exit 8).
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "Unmapped 4xx (notably 413, 415, 422, plus e.g. 418/451) return exit 6 `validation_error` with `retryable: false` in the envelope."
+      - "Unmapped non-4xx (5xx, 3xx) still return exit 8 `upstream_error` with `retryable: true`."
+      - "Every status `handleResponseError` maps explicitly is unchanged, so 400 stays 6, 401/403 stay 4, 404 stays 3, 402/409 stay 5, 429 stays 7, and 405 stays 8 — parity with the existing path is preserved and `handleResponseError` is still untouched."
+      - "The upstream status line and body still reach `ce.Message`, scrubbed and truncated, on both fallback branches."
+      - "The task-007 status table is extended to assert the exit code AND the `retryable` envelope field for each fallback case; `make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
   - id: task-012
     title: 'Regenerate the skill bundle and add README and changelog entries'
     description: |
@@ -243,6 +264,7 @@ tasks:
     status: pending
     dependencies:
       - task-011
+      - task-013
     acceptance_criteria:
       - "`go generate ./neo4j-cli/internal/skill/...` leaves a clean tree; `TestGenerator_RoundTrip` and `make generate-check` pass with the bundle committed."
       - "The README documents the endpoint-carries-the-version contract, the `{org_id}`/`{project_id}` placeholders, `--rw` on non-GET plus `--yes --force` on DELETE, and that `--format json` is verbatim so `| jq` works."
