@@ -89,7 +89,7 @@ tasks:
       written to telemetry, panic text, or on-disk history. Separately, generalise
       `isParamFlag` (line 282) to also match `field` and `raw-field` so the
       existing `redactParamValue` scrubs secret-looking keys selectively.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`RedactArgs` replaces any `--header`/`-H` value with `***`, in both space-separated and `=`-separated forms."
@@ -97,7 +97,7 @@ tasks:
       - "The `--param` redaction behaviour is unchanged, and the kv-flag matcher is single-sourced rather than duplicated."
       - "Table-driven tests in `common/clievents` cover header redaction plus secret and non-secret field keys."
       - "`make test` passes."
-    completed_at: null
+    completed_at: 2026-07-30T16:35:00Z
 
   - id: task-006
     title: 'Add MakeRawRequest: a non-panicking arbitrary-endpoint request path'
