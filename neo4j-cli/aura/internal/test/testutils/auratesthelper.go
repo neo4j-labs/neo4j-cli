@@ -344,6 +344,8 @@ func NewAuraTestHelper(t *testing.T) AuraTestHelper {
 				"aura": {
 					"credentials": [{
 						"name": "test-cred",
+						"client-id": "test-client-id",
+						"client-secret": "test-client-secret",
 						"access-token": "dsa",
 						"token-expiry": 123
 					}],

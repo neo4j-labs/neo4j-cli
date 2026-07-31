@@ -20,6 +20,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/customermanagedkey"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphql"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/instance"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/login"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/organization"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/project"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/virtualgraph"
@@ -55,6 +56,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		return nil
 	}
 
+	cmd.AddCommand(login.NewCmd(cfg))
 	cmd.AddCommand(workspace.NewCmd(cfg))
 	cmd.AddCommand(customermanagedkey.NewCmd(cfg))
 	cmd.AddCommand(instance.NewCmd(cfg))

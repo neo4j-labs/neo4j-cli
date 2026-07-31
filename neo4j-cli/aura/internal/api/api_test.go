@@ -335,6 +335,34 @@ func TestMakeRequest_2xxWithEmbeddedErrors(t *testing.T) {
 	assert.Equal(t, "Run 'neo4j-cli aura instance list' to see available instances.", ce.Suggestion)
 }
 
+// TestGetToken_EmptyClientSecret_AuthError verifies that getToken surfaces a
+// clierr.AuthError (exit 4) with a re-login hint when ClientSecret is empty and
+// the token is absent/expired — preventing the client-credentials grant from
+// firing with an empty secret and producing a cryptic 401 from the auth server.
+func TestGetToken_EmptyClientSecret_AuthError(t *testing.T) {
+	// Server is set up but should never be reached — the empty-secret guard
+	// fires before any HTTP traffic.
+	srv, _ := setupServer(t)
+
+	cfg := buildTestConfig(t, srv.URL, `{
+		"aura": {
+			"credentials": [{"name":"c","client-id":"id","client-secret":"","access-token":"","token-expiry":0}],
+			"default-credential": "c"
+		}
+	}`)
+
+	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion1,
+	})
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 4, ce.Code)
+	assert.Contains(t, ce.Error(), "neo4j-cli aura login")
+}
+
 // TestGetToken_401_AuthError locks the task-004 reclassification: an aura
 // token-endpoint 401 (invalid/expired/revoked client credentials) surfaces as
 // *CLIError with Code == 4 (auth), not the previous usage exit.

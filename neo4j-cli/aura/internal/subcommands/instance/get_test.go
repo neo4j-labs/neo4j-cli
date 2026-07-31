@@ -374,8 +374,8 @@ func TestUnauthorizedAccessTokenRefresh(t *testing.T) {
 			helper.AssertCredentialsValue("aura.credentials", `[
 	{
 		"name": "test-cred",
-		"client-id": "",
-		"client-secret": "",
+		"client-id": "test-client-id",
+		"client-secret": "test-client-secret",
 		"access-token": "",
 		"token-expiry": 0
 	}

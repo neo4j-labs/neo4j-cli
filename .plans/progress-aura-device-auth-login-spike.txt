@@ -1,0 +1,45 @@
+## TASK-001 — 2026-05-21T00:00:00Z
+Scaffolded the `neo4j-cli aura login` leaf command with copyright header, flush-left Example (≥3 invocations), and `RunE returning nil`; mounted in `aura.NewCmd`; regenerated skill bundle.
+Files: +neo4j-cli/aura/internal/subcommands/login/login.go, ~neo4j-cli/aura/aura.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+
+## TASK-002 — 2026-05-21T01:00:00Z
+Added `loginConfig` struct, four `envXxx` constants, and `readLoginConfig()` helper that returns a `clierr.NewUsageError` naming the first unset env var; wired into `RunE`. Table-driven unit test covers happy path and each of the four missing-var cases.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login.go, +neo4j-cli/aura/internal/subcommands/login/login_test.go
+
+## TASK-003 — 2026-05-21T02:00:00Z
+Added `deviceCodeResponse` struct, package-level `httpClient` var (test seam), `requestDeviceCode()` helper that POSTs form-encoded `client_id`+`audience` and parses the JSON response, and `printVerificationPrompt()` that writes to stderr using `verification_uri_complete` when present or falls back to `verification_uri`+`user_code`. Wired both into `RunE`.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login.go
+Decisions: `httpClient` as a package-level var (not injected) matches the `execClient` / `clientFactory` pattern used in the docker subsystem for test seam without altering the public API.
+
+## TASK-004 — 2026-05-21T03:00:00Z
+Added `pollForToken()` with RFC 8628 error handling: `authorization_pending` (continue), `slow_down` (+5s interval), `expired_token`/`access_denied` (clierr.UsageError), context timeout (pre/post-sleep guards + httpClient.Do check). Added `sleepFn` package-level var as test seam. `RunE` now calls `pollForToken` and prints `access_token` to stdout.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login.go
+Decisions: `resp.Body.Close()` called inline (not deferred) inside the poll loop to avoid accumulating unclosed bodies across iterations.
+
+## TASK-005 — 2026-05-21T04:00:00Z
+Expanded `login_test.go` with full-flow httptest.NewServer-based tests covering: happy path (with and without `verification_uri_complete`), `authorization_pending`→success (N pending then success), `slow_down` interval recording, `expired_token`/`access_denied` error cases, context timeout via `ExecuteContext`, device endpoint 500 error, and all four missing-env-var cases. Uses `httpClient` and `sleepFn` package-level test seams; `writeJSON` helper centralises nolint annotation.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login_test.go
+
+## TASK-006 — 2026-05-21T05:00:00Z
+Ran `go generate ./neo4j-cli/internal/skill/...`; bundle was already up to date from task-001 scaffold. Verified all CI gates pass: make test, make fmt-check, make lint (0 issues), make license-check.
+Files: ~.plans/tasks-aura-device-auth-login-spike.yml
+
+## TASK-007 — 2026-05-21T06:00:00Z
+Added `AddOrUpdateFromToken(name, clientId, accessToken string, expiresIn int64) error` to `AuraCredentials`; upserts token credential with 60s expiry tolerance, sets default only when none is configured. Table-driven tests cover add-new, update-existing, and both default-setting scenarios.
+Files: ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/aura_test.go
+
+## TASK-008 — 2026-05-21T07:00:00Z
+Changed `pollForToken` return type from `(string, error)` to `(*tokenResponse, error)`; added `ExpiresIn int` to `tokenResponse`; `RunE` now calls `cfg.Credentials.Aura.AddOrUpdateFromToken` and prints confirmation to stderr instead of token to stdout. Tests updated: `newTestConfig`+`buildAndRunWithCfg` helpers use in-memory FS credentials; happy-path and pending-then-success tests assert credential persisted and no token on stdout; skill bundle regenerated.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login.go, ~neo4j-cli/aura/internal/subcommands/login/login_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+
+## TASK-009 — 2026-05-21T08:00:00Z
+Added empty-`ClientSecret` guard in `getToken` before the client-credentials HTTP call; surfaces a `clierr.AuthError` with a re-login hint instead of a cryptic 401. Updated `NewAuraTestHelper` fixture to include non-empty `client-id`/`client-secret`, fixing downstream test assertions in `get_test.go`.
+Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_test.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go, ~neo4j-cli/aura/internal/subcommands/instance/get_test.go
+
+## TASK-010 — 2026-05-21T09:00:00Z
+Ran `go generate ./neo4j-cli/internal/skill/...`; bundle was already up to date (regenerated in task-008). Verified all final CI gates pass: make test, make fmt-check, make lint (0 issues), make license-check.
+Files: ~.plans/tasks-aura-device-auth-login-spike.yml
+
+## TASK-011 — 2026-05-21T10:00:00Z
+`AddOrUpdateFromToken` now unconditionally sets `DefaultCredential` in both code paths (update-existing and append-new); confirmation message updated to "set as default"; `Long` and skill bundle refreshed.
+Files: ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/aura_test.go, ~neo4j-cli/aura/internal/subcommands/login/login.go, ~neo4j-cli/aura/internal/subcommands/login/login_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md

@@ -1,0 +1,223 @@
+feature: aura-device-auth-login-spike
+prd: ./prd-aura-device-auth-login-spike.md
+created_at: 2026-05-21T00:00:00Z
+updated_at: 2026-05-21T13:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold login command and mount in aura tree"
+    description: |
+      Create neo4j-cli/aura/internal/subcommands/login/login.go with a stub
+      cobra.Command (Use: "login", Short description, flush-left Example field
+      with ≥3 invocations, RunE returning nil). Add the Neo4j copyright header.
+      Mount with cmd.AddCommand(login.NewCmd(cfg)) in neo4j-cli/aura/aura.go NewCmd.
+      The .env.aura-login-spike.example and .gitignore entry are already in place.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/aura/internal/subcommands/login/login.go exists with copyright header"
+      - "login.NewCmd(cfg) is added to aura.NewCmd in aura.go"
+      - "neo4j-cli aura login --help runs without error"
+      - "Example field is non-empty and flush-left (TestAllLeafCommands_HaveExamples passes)"
+      - "make fmt-check and make build pass"
+    completed_at: "2026-05-21T00:00:00Z"
+
+  - id: task-002
+    title: "Implement env var reading and validation"
+    description: |
+      Add a loginConfig struct and a readLoginConfig() helper inside login.go that
+      reads NEO4J_AURA_LOGIN_DEVICE_ENDPOINT, NEO4J_AURA_LOGIN_TOKEN_ENDPOINT,
+      NEO4J_AURA_LOGIN_CLIENT_ID, and NEO4J_AURA_LOGIN_AUDIENCE via os.Getenv.
+      Return a clierr.UsageError naming the first missing or empty variable.
+      Call readLoginConfig() at the top of RunE.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "readLoginConfig returns an error naming the unset variable when any of the four env vars is missing or empty"
+      - "readLoginConfig returns a populated struct when all four vars are set"
+      - "RunE surfaces the error from readLoginConfig without panicking"
+      - "Table-driven test in login_test.go covers: all vars set (ok), each var individually missing (error names the var)"
+    completed_at: "2026-05-21T01:00:00Z"
+
+  - id: task-003
+    title: "Implement device code request and print verification prompt"
+    description: |
+      In RunE, POST to loginConfig.DeviceEndpoint with form fields client_id and
+      audience, parse the JSON response into a deviceCodeResponse struct (device_code,
+      user_code, verification_uri, verification_uri_complete, expires_in, interval).
+      Print a message to stderr directing the user to open verification_uri_complete
+      (falling back to verification_uri + user_code if complete is absent).
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "POST body contains client_id and audience from env config"
+      - "deviceCodeResponse struct covers all required fields"
+      - "verification_uri_complete is used when present; falls back to verification_uri + user_code"
+      - "User-facing prompt is printed to stderr (not stdout, which is reserved for the token)"
+      - "HTTP error from device endpoint surfaces a clear error message"
+    completed_at: "2026-05-21T02:00:00Z"
+
+  - id: task-004
+    title: "Implement token polling loop with all RFC 8628 error handling"
+    description: |
+      Add a poll loop that fires a POST to loginConfig.TokenEndpoint with grant_type
+      urn:ietf:params:oauth:grant-type:device_code, client_id, and device_code.
+      Use context.WithTimeout from deviceCodeResponse.ExpiresIn. Sleep for the
+      current interval (starting from deviceCodeResponse.Interval) between polls.
+      Handle authorization_pending (continue), slow_down (interval += 5, continue),
+      expired_token (return error), access_denied (return error). On success parse
+      the access_token and print it to stdout.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "authorization_pending is silently swallowed and polling continues"
+      - "slow_down increases the sleep interval by 5 seconds before next poll"
+      - "expired_token returns a clear clierr.UsageError"
+      - "access_denied returns a clear clierr.UsageError"
+      - "Context timeout (expires_in elapsed) returns a clear error"
+      - "Successful token response prints access_token to stdout"
+    completed_at: "2026-05-21T03:00:00Z"
+
+  - id: task-005
+    title: "Write table-driven tests for the login command"
+    description: |
+      Create neo4j-cli/aura/internal/subcommands/login/login_test.go with a
+      httptest.NewServer-based mock covering the full flow. Use table-driven tests
+      for: successful login, authorization_pending then success, slow_down backoff,
+      expired_token error, access_denied error, context timeout, and each missing
+      env var. Use the testutils helpers from neo4j-cli/aura/internal/test/testutils/
+      where applicable.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "login_test.go exists with copyright header"
+      - "Happy-path test: mock returns device code then access token; command prints token to stdout"
+      - "authorization_pending then success: mock returns pending N times then success"
+      - "slow_down: test verifies interval increases (via elapsed time or injected sleep seam)"
+      - "expired_token and access_denied: command returns non-nil error with descriptive message"
+      - "Missing env var: each of the four vars tested individually; error names the missing var"
+      - "make test passes"
+    completed_at: "2026-05-21T04:00:00Z"
+
+  - id: task-006
+    title: "Regenerate skill bundle and run all final gates"
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... to regenerate the skill bundle
+      after the new login command was added to the tree. Commit the regenerated bundle
+      alongside the source changes. Verify all CI gates pass locally.
+    status: completed
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... runs without error"
+      - "TestGenerator_RoundTrip passes (no bundle drift)"
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+      - "make license-check passes"
+    completed_at: "2026-05-21T05:00:00Z"
+
+  - id: task-007
+    title: "Add AddOrUpdateFromToken to AuraCredentials"
+    description: |
+      Add AddOrUpdateFromToken(name, clientId, accessToken string, expiresIn int64) error
+      to common/clicfg/credentials/aura.go. If a credential with the given name already
+      exists, update its AccessToken and TokenExpiry in-place and call onUpdate. If the
+      name is new, append a new AuraCredential (ClientSecret left empty) and set it as
+      the default if no default is currently set. Compute TokenExpiry using the same
+      60-second tolerance as UpdateAccessToken.
+    status: completed
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "AddOrUpdateFromToken adds a new credential when the name does not exist"
+      - "AddOrUpdateFromToken updates AccessToken and TokenExpiry in-place when the name already exists"
+      - "New credential is set as default if DefaultCredential was empty; existing default is not overwritten"
+      - "TokenExpiry is computed as now + (expiresIn - 60) * 1000 milliseconds"
+      - "Table-driven unit tests in common/clicfg/credentials/ cover add-new, update-existing, and default-setting cases"
+      - "make test passes"
+    completed_at: "2026-05-21T06:00:00Z"
+
+  - id: task-008
+    title: "Persist token in login command and print confirmation"
+    description: |
+      Update pollForToken to return the full tokenResponse struct (not just the access_token
+      string) so the caller has access to expires_in. In RunE, after a successful poll call
+      cfg.Credentials.Aura.AddOrUpdateFromToken("login", cfg.ClientId, token.AccessToken,
+      token.ExpiresIn) to persist the credential. Replace the stdout token print with a
+      confirmation message on stderr. Update login_test.go to assert the credential is stored
+      and the confirmation message is printed.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "pollForToken returns tokenResponse (struct) instead of string"
+      - "RunE calls AddOrUpdateFromToken with the correct arguments after a successful poll"
+      - "Confirmation message is printed to stderr, not stdout"
+      - "Raw token is no longer printed to stdout"
+      - "login_test.go updated: asserts credential persisted and confirmation message emitted"
+      - "make test passes"
+    completed_at: "2026-05-21T07:00:00Z"
+
+  - id: task-009
+    title: "Graceful re-login error in getToken for empty-ClientSecret credentials"
+    description: |
+      In neo4j-cli/aura/internal/api/token.go, after the HasValidAccessToken() check fails,
+      add a guard: if credential.ClientSecret == "", return a clierr.AuthError telling the
+      user their session has expired and to re-run 'neo4j-cli aura login'. This prevents
+      the existing client-credentials grant from firing with an empty secret and producing
+      a cryptic 401 from the auth server.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "getToken returns a clierr.AuthError (not a panic or HTTP 401) when ClientSecret is empty and token is absent or expired"
+      - "Error message names the re-login command: 'neo4j-cli aura login'"
+      - "Existing client-credentials path is unaffected when ClientSecret is non-empty"
+      - "Unit test in api/token_test.go (or api_test.go) covers the empty-secret branch"
+      - "make test passes"
+    completed_at: "2026-05-21T08:00:00Z"
+
+  - id: task-010
+    title: "Regenerate skill bundle and run all final gates"
+    description: |
+      Regenerate the skill bundle with go generate ./neo4j-cli/internal/skill/... after
+      the login command output changed (no longer prints a token; confirmation message
+      updated). Run all CI gates to confirm the integration is clean.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... runs without error"
+      - "TestGenerator_RoundTrip passes (no bundle drift)"
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+      - "make license-check passes"
+    completed_at: "2026-05-21T09:00:00Z"
+
+  - id: task-011
+    title: "Fix: always set login credential as default after successful login"
+    description: |
+      AddOrUpdateFromToken currently sets the credential as default only when
+      DefaultCredential == "". This means users with a pre-existing credential see
+      subsequent aura commands fail with a 401 because the old default keeps winning.
+      Change AddOrUpdateFromToken to always set the named credential as the default
+      (unconditionally). Update the confirmation message in login RunE to say the
+      credential has been set as default. Update affected tests.
+    status: completed
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "AddOrUpdateFromToken always sets DefaultCredential to the given name, even when another default already exists"
+      - "After login, GetDefault() returns the login credential regardless of prior default"
+      - "Login confirmation message includes 'set as default'"
+      - "Unit tests in common/clicfg/credentials/ updated to assert default is always overwritten"
+      - "login_test.go updated to match new confirmation message"
+      - "make test passes"
+      - "make fmt-check and make lint pass"
+    completed_at: "2026-05-21T10:00:00Z"

@@ -661,7 +661,7 @@ func TestCreatePreRunERejectsNilDbms(t *testing.T) {
 	// JSON unmarshal, exercising the "credential storage is not available" guard.
 	credentialsJSON := `{
 		"aura": {
-			"credentials": [{"name": "test-cred", "access-token": "dsa", "token-expiry": 123}],
+			"credentials": [{"name": "test-cred", "client-id": "test-client-id", "client-secret": "test-client-secret", "access-token": "dsa", "token-expiry": 123}],
 			"default-credential": "test-cred"
 		},
 		"dbms": null

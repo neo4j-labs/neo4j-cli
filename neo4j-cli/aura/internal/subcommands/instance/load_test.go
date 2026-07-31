@@ -76,7 +76,7 @@ func (h *loadHarness) run(command string) error {
 	}`, h.server.URL, h.server.URL)
 	credsJSON := `{
 		"aura": {
-			"credentials": [{"name": "test-cred", "access-token": "dsa", "token-expiry": 123}],
+			"credentials": [{"name": "test-cred", "client-id": "test-client-id", "client-secret": "test-client-secret", "access-token": "dsa", "token-expiry": 123}],
 			"default-credential": "test-cred"
 		}
 	}`
