@@ -136,3 +136,7 @@ Files: +common/skill/mcpconfig.go, +common/skill/mcpconfig_test.go, +neo4j-cli/i
 Inject --no-print-password for docker create under MCP (mirrors injectFormat pattern), add credential store availability probe at mcp serve startup that returns actionable clierr error when keyring is locked/unreachable. Existing dbconn.ResolveConn path handles zero-credential resolution with no MCP-side change. All gates pass.
 Files: ~neo4j-cli/internal/subcommands/mcp/serve.go, ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go
 Decisions: --no-print-password injection lives in server.go's handlerFor alongside injectFormat, not in the executor, so normal CLI behaviour is unchanged (human running docker create still sees password). Credential probe uses probeKeyringFn seam (var, not function call) so tests swap a stub. Probe fires only when credential-storage is keyring; insecure mode skips it.
+
+## TASK-018 — 2026-08-04T23:55:00Z
+Regenerated skill bundle (no drift — flag default-false), added changie Minor entry describing the user-facing mcp command group, and documented four MCP conventions in AGENTS.md: stdio fd-swap, tool-result redaction obligation, RegisterSecretValue hazard for MCP transcripts, and docker create's missing RegisterSecretValue gap.
+Files: ~AGENTS.md, +.changes/unreleased/neo4j-cli-Minor-20260804-234825.yaml, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt

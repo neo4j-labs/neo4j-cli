@@ -444,7 +444,7 @@ tasks:
       covering the stdio fd-swap requirement, the redaction obligation for tool
       results, and the fact that a new secret-minting leaf that skips
       RegisterSecretValue will leak into MCP transcripts.
-    status: pending
+    status: completed
     dependencies:
       - task-016
       - task-017
@@ -454,7 +454,7 @@ tasks:
       - 'AGENTS.md documents the fd swap, the tool-result redaction obligation and the RegisterSecretValue hazard'
       - 'make test, make fmt-check, make lint and make license-check all pass'
       - 'CI exercises the flag-on path via NEO4J_CLI_FLAG_MCP_SERVER=1'
-    completed_at: null
+    completed_at: 2026-08-04T23:55:00Z
 
   - id: task-019
     title: 'Validate discovery convergence end to end in Claude Desktop'
