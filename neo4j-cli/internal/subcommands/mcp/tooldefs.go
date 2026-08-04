@@ -136,6 +136,19 @@ func toolDefinitions() []*mcpsdk.Tool {
 			},
 		},
 		{
+			Name:        "neo4j_cli_list_targets",
+			Title:       "List reachable Neo4j targets",
+			Description: "Discover Neo4j database targets across all local sources — Docker containers, Neo4j Desktop DBMSes, stored credential profiles, and Aura instances — and return a single merged table. Individual source failures (e.g. no Docker, no Desktop, no Aura credentials) degrade to a noted omission rather than failing the tool. Use this as the first query in any chat session to answer 'What Neo4j do I have?'",
+			Annotations: &mcpsdk.ToolAnnotations{
+				ReadOnlyHint:   true,
+				IdempotentHint: true,
+			},
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
 			Name:        "neo4j_cli_read_docs",
 			Title:       "Read neo4j-cli documentation",
 			Description: "Read the documentation for a neo4j-cli command from the embedded skill bundle. The `command` parameter is a space-separated CLI path (e.g. `docker load`, `docker`, `aura`). Returns the matched section's prose, flags and examples. A tree name alone (e.g. `aura`) returns only the table of contents and tree overview, not its child commands. Use `offset` and `max_chars` for pagination through large sections (default 6000 chars, max 20000). The bundle is the same documentation the `neo4j-cli skill install` command writes onto disk, sourced from the generated reference files.",

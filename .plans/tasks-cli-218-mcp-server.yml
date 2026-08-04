@@ -283,7 +283,7 @@ tasks:
       Layer three is authoritative and must not be bypassed or reimplemented, so a
       bug in the MCP layer cannot produce an unflagged write. Annotate the tool
       destructiveHint and openWorldHint.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -292,7 +292,7 @@ tasks:
       - 'EnforceWriteGate is still the authoritative gate; no MCP-side reimplementation of write policy exists'
       - 'The tool carries destructiveHint and openWorldHint'
       - 'A write executed through the tool produces the same on-disk effect as the equivalent CLI invocation'
-    status: completed
+      - 'AMENDED: --rw is NOT rejected in run_write args (unlike run) — it is the legitimate way to satisfy the authoritative EnforceWriteGate. alwaysKnownFlags {rw, format} lets it pass flag validation on stub trees.'
     completed_at: 2026-08-04T19:45:00Z
 
   - id: task-012
@@ -303,7 +303,7 @@ tasks:
       `aura instance list`, returning one table of reachable targets. Individual
       source failures degrade to a noted omission rather than failing the whole tool,
       since a user without Docker or without Aura credentials is the common case.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -311,7 +311,8 @@ tasks:
       - 'A failing or unavailable source is reported as an omission and does not fail the tool'
       - 'The tool carries readOnlyHint and idempotentHint'
       - 'Output field names are snake_case per the repo OUTPUT casing rule'
-    completed_at: null
+      - 'No test performs real mDNS discovery, a real Aura network call, or reads real credentials (no afero.NewOsFs)'
+    completed_at: 2026-08-04T18:02:20Z
 
   - id: task-013
     title: 'Wire mcp serve over stdio with the instructions field and format injection'

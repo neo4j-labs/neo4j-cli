@@ -97,3 +97,8 @@ Decisions:
 - WriteAllowed added to Gates struct (not a separate parameter) so task-013 sets it from serve --rw alongside AllowAura/AllowCredentialWrite.
 - alwaysKnownFlags in run.go avoids requiring every test stub to register root-level flags. Only --rw and --format.
 - Authoritative gate test (TestHandleRunWrite_AuthoritativeGate) uses a writeGateRootFactory with EnforceWriteGate installed and proves layer 3 catches writes without --rw even when MCP-layer gates are open.
+
+## TASK-012 — 2026-08-04T18:02:20Z
+Fifth and final tool `neo4j_cli_list_targets` (readOnly+idempotent, no params): fans out over docker/desktop/credential-dbms/aura-instance list and merges into one table; an unavailable source becomes a noted omission rather than a failure.
+Files: +list_targets.go, +list_targets_test.go, ~tooldefs.go
+Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED without committing; also repaired a duplicate `status:` line the child left in task-011's block.
