@@ -115,6 +115,29 @@ func TestConfigSet(t *testing.T) {
 			command: "config set --rw flag.unknown-thing true",
 			wantErr: `Error: invalid config key: "flag.unknown-thing"`,
 		},
+		{
+			name:            "set flag.mcp-server to true with rw persists the literal dotted key",
+			command:         "config set --rw flag.mcp-server true",
+			wantConfigKey:   `flag\.mcp-server`,
+			wantConfigValue: "true",
+		},
+		{
+			name:            "set flag.mcp-server to false with rw persists false",
+			command:         "config set --rw flag.mcp-server false",
+			wantConfigKey:   `flag\.mcp-server`,
+			wantConfigValue: "false",
+		},
+		{
+			name:    "set flag.mcp-server to a non-boolean with rw returns error",
+			command: "config set --rw flag.mcp-server maybe",
+			wantErr: `Error: invalid value for "flag.mcp-server": maybe (valid values: true, false)`,
+		},
+		{
+			name:         "set flag.mcp-server without rw errors",
+			command:      "config set flag.mcp-server true",
+			wantErr:      "Error: this command writes; pass --rw to allow it",
+			wantOutEmpty: true,
+		},
 		// Credential-storage mode
 		{
 			name:            "set credential-storage to keyring with rw succeeds",

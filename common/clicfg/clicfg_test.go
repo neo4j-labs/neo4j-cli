@@ -16,9 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestConfig(t *testing.T, scope clicfg.ConfigScope) *clicfg.Config {
+// newTestConfig builds a Config over an in-memory FS seeded with configJSON.
+// afero.NewOsFs is deliberately never used here: the dev machine has real
+// credentials on disk.
+func newTestConfig(t *testing.T, scope clicfg.ConfigScope, configJSON string) *clicfg.Config {
 	t.Helper()
-	fs, err := testfs.GetDefaultTestFs()
+	fs, err := testfs.GetTestFs(configJSON, `{}`)
 	require.NoError(t, err)
 	return clicfg.NewConfig(fs, "test", scope)
 }
@@ -109,7 +112,7 @@ func TestResolveConfigKey(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := newTestConfig(t, tc.scope)
+			cfg := newTestConfig(t, tc.scope, `{}`)
 			gotNamespace, gotKey, err := clicfg.ResolveConfigKey(tc.key, cfg)
 
 			if tc.wantErr != "" {
@@ -268,7 +271,7 @@ func TestAuraConfigActiveCredential(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := newTestConfig(t, clicfg.AuraScope)
+			cfg := newTestConfig(t, clicfg.AuraScope, `{}`)
 			tc.setup(cfg)
 			got := cfg.Aura.ActiveCredential()
 			if tc.wantNil {

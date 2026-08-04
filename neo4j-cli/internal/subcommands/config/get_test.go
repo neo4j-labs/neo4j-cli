@@ -110,6 +110,23 @@ func TestConfigGet(t *testing.T) {
 				assert.NotContains(t, outStr, "flag.")
 			},
 		},
+		{
+			name:    "get flag.mcp-server returns registry default false",
+			command: "config get flag.mcp-server --format json",
+			wantOut: `{
+	"flag.mcp-server": false
+}`,
+		},
+		{
+			name: "get flag.mcp-server returns true when set in config",
+			configSetup: func(h *neo4jTestHelper) {
+				h.setConfigValue(`flag\.mcp-server`, true)
+			},
+			command: "config get flag.mcp-server --format json",
+			wantOut: `{
+	"flag.mcp-server": true
+}`,
+		},
 	}
 
 	for _, tc := range tests {
@@ -136,4 +153,18 @@ func TestConfigGet(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestConfigGetFlagFromEnv covers the CI-facing combination: the flag env var
+// set in the environment and read back through the user-facing `config get`.
+func TestConfigGetFlagFromEnv(t *testing.T) {
+	t.Setenv("NEO4J_CLI_FLAG_MCP_SERVER", "1")
+
+	h := newNeo4jTestHelper(t)
+	h.executeCommand("config get flag.mcp-server --format json")
+
+	h.assertErr("")
+	h.assertOut(`{
+	"flag.mcp-server": true
+}`)
 }

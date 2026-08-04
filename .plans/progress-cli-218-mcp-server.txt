@@ -1,0 +1,9 @@
+## TASK-001 — 2026-08-04T10:20:02Z
+Registered flag.mcp-server as the first production clicfg.Registry entry (Default false, full metadata), proving the existing env + config-file override machinery end to end. No MCP code.
+Files: ~common/clicfg/flags.go, +common/clicfg/flags_ext_test.go, ~common/clicfg/clicfg_test.go, ~neo4j-cli/internal/subcommands/config/get.go, ~neo4j-cli/internal/subcommands/config/get_test.go, ~neo4j-cli/internal/subcommands/config/set_test.go, ~.plans/prd-cli-218-mcp-server.md
+Decisions:
+- IntroducedIn 1.12.0 (latest released is v1.11.0); re-verify in task-018 when the changie entry lands.
+- REQ-F-005 was inaccurate: `config list` does NOT enumerate Registry keys (Printable walks only Global/Aura ValidConfigKeys, asserted by pre-existing get_test.go:107), nor does tab-completion. Both are correct per feature-flags.md; PRD + task criterion amended rather than adding plumbing.
+- Registry tests must be an EXTERNAL clicfg_test file: they build a real NewConfig via testfs, and testfs imports clicfg.
+- Tests read the production Registry while flags_test.go/clicfg_test.go swap that global for a sentinel map — safe only because nothing in the package calls t.Parallel(); documented in the file header.
+- Pre-existing, unfixed: FlagSet.Enabled returns false for unregistered keys BEFORE consulting overrides, so the four SetForTest("flag.aura-beta", true) calls in aura/internal/api/organization_test.go are dead no-ops (flag.aura-beta is retired and absent from Registry). Also .agents/feature-flags.md:40 still claims production reads flag.aura-beta via the Registry. Needs its own ticket.
