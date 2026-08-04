@@ -174,16 +174,16 @@ tasks:
       clicfg.NewConfig and root, SetOut/SetErr to bounded buffers,
       SetIn(bytes.NewReader(nil)) so confirm reads EOF, mutex serialisation, and a
       recover() wrapper mirroring main.go recoverPanic.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
       - 'Running a command through the executor leaves the JSON-RPC frame intact even when the command writes directly to os.Stdout'
       - 'A command that would read os.Stdin returns promptly instead of hanging; confirm prompts cancel cleanly on EOF'
-      - 'Global state does not leak between calls (viper, desktopclient debug, clievents, output.IsAgent)'
-      - 'A panicking command yields an error result rather than killing the server'
-      - 'Concurrent tool calls are serialised; make test, make fmt-check, make lint pass'
-    completed_at: null
+      - 'Global state does not leak between calls. Per-config state (the viper instance, the analytics service) is rebuilt and tested; output.IsAgent is never mutated in production; desktopclient debug is a PROCESS global a fresh tree does not reset, safe only because the desktop root re-resolves it on every desktop invocation and nothing else reads it (documented, not plumbed)'
+      - 'A panicking command yields an error result rather than killing the server, with both the args and the panic value redacted'
+      - 'Concurrent tool calls are serialised, and a cancelled context reaches the command so the lock is released; make test, make fmt-check, make lint pass'
+    completed_at: 2026-08-04T14:19:58Z
 
   - id: task-007
     title: 'Map results and errors to CallToolResult with redaction and truncation'

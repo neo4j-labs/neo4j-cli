@@ -30,6 +30,14 @@ func NewCmd(cfg *clicfg.Config, newRoot RootFactory) *cobra.Command {
 			"(`neo4j-cli config set flag.mcp-server true`, or NEO4J_CLI_FLAG_MCP_SERVER=1).",
 	}
 
+	// newRoot is consumed by the leaves that dispatch CLI commands; validating
+	// it for the whole group means a wiring mistake in app.go surfaces as a
+	// reportable error on the first `mcp` invocation rather than as a nil
+	// dereference in the middle of a tool call.
+	cmd.PersistentPreRunE = func(*cobra.Command, []string) error {
+		return validateWiring(cfg, newRoot)
+	}
+
 	RegisterGateFlags(cmd)
 
 	cmd.AddCommand(newToolsCmd(cfg))
