@@ -239,7 +239,7 @@ tasks:
       roughly 3 KB menu for the 92 KB aura file. Support offset and max_chars
       (default 6000, max 20000) with a continuation hint and next_offset. Filter the
       `completion` entry, which agentcontext includes but the bundle does not.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -248,7 +248,7 @@ tasks:
       - 'Results never exceed max_chars; truncated results end with a continuation hint and carry next_offset in structuredContent'
       - 'A test asserts every entry list_commands can emit resolves to a reference file, with completion explicitly filtered'
       - 'No second documentation corpus is introduced; the committed bundle remains the only source'
-    completed_at: null
+    completed_at: 2026-08-04T18:26:00Z
 
   - id: task-010
     title: 'Implement neo4j_cli_run for read-only paths with pre-exec validation'

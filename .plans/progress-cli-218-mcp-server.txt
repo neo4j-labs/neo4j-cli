@@ -81,3 +81,7 @@ Files: +neo4j-cli/internal/subcommands/mcp/result.go, +neo4j-cli/internal/subcom
 First real tool `neo4j_cli_list_commands` (readOnly+idempotent): no-arg returns 12 top-level trees, `tree` arg lists that tree's commands as `use: short` lines. Projects `agentcontext.BuildContext` via the stored RootFactory; `completion` filtered. `mcp tools --format json` now lists one tool; the old `"[]"` test updated.
 Files: +list_commands.go, +list_commands_test.go, ~mcp.go, ~tooldefs.go, ~tools_test.go
 Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED without committing; fixed a duplicate `status: pending` the child left in task-007's block.
+
+## TASK-009 — 2026-08-04T18:26:00Z
+Implemented neo4j_cli_read_docs tool — resolves a space-separated CLI path against the embedded skill bundle by matching the heading with the full command path, returning content until the next sibling heading at the same level. Tree-only (H1) requests return Contents TOC + tree prose only, never children. Supports offset/max_chars pagination (default 6000, max 20000) with continuation hint and next_offset in structuredContent. All text sanitized through RedactText+StripControl per REQ-F-031. Drift hazard test cross-references every list_commands entry against the bundle, filtering completion.
+Files: +read_docs.go, +read_docs_test.go, +read_docs_drift_test.go, ~tooldefs.go

@@ -84,6 +84,33 @@ func toolDefinitions() []*mcpsdk.Tool {
 				},
 			},
 		},
+		{
+			Name:        "neo4j_cli_read_docs",
+			Title:       "Read neo4j-cli documentation",
+			Description: "Read the documentation for a neo4j-cli command from the embedded skill bundle. The `command` parameter is a space-separated CLI path (e.g. `docker load`, `docker`, `aura`). Returns the matched section's prose, flags and examples. A tree name alone (e.g. `aura`) returns only the table of contents and tree overview, not its child commands. Use `offset` and `max_chars` for pagination through large sections (default 6000 chars, max 20000). The bundle is the same documentation the `neo4j-cli skill install` command writes onto disk, sourced from the generated reference files.",
+			Annotations: &mcpsdk.ToolAnnotations{
+				ReadOnlyHint:   true,
+				IdempotentHint: true,
+			},
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"command": map[string]any{
+						"type":        "string",
+						"description": "The CLI command path (e.g. 'docker load', 'docker'). The first token is a top-level tree name.",
+					},
+					"offset": map[string]any{
+						"type":        "integer",
+						"description": "Character offset from the start of the matched section. Default 0.",
+					},
+					"max_chars": map[string]any{
+						"type":        "integer",
+						"description": "Maximum characters to return. Default 6000, max 20000.",
+					},
+				},
+				"required": []string{"command"},
+			},
+		},
 	}
 }
 
