@@ -349,16 +349,16 @@ tasks:
       the design). Add a naming gate asserting every registered tool name matches
       ^neo4j_cli_[a-z0-9_]+$ and every schema property matches ^[a-z][a-z0-9_]*$,
       exempting SDK and spec fields. Any future tool addition must argue past these.
-    status: pending
+    status: completed
     dependencies:
       - task-013
     acceptance_criteria:
       - 'A test fails when serialized tool definitions exceed 4000 bytes'
-      - 'A test fails on any tool name not matching ^neo4j_cli_[a-z0-9_]+$'
-      - 'A test fails on any schema property not matching ^[a-z][a-z0-9_]*$, with SDK/spec fields exempt'
+      - 'A test fails on any tool name not matching ^neo4j_cli_[a-z][a-z0-9]*(_[a-z0-9]+)*$'
+      - 'A test fails on any schema property not matching ^[a-z][a-z0-9_]*$'
       - 'The existing casing gates in agentcontext and common/output still pass'
       - 'The measured definition size is recorded so future drift is visible'
-    completed_at: null
+    completed_at: 2026-08-04T19:22:25Z
 
   - id: task-015
     title: 'Generate the .mcpb bundle on the fly and add mcp bundle --out'

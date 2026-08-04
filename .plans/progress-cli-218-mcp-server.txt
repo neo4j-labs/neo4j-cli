@@ -107,3 +107,12 @@ Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED wi
 Wired `mcp serve` over stdio: IOTransport on the ClaimStdio files, five tools from toolDefinitions(), 918-byte instructions field, --rw/--allow-aura/--allow-credential-write/--format/--max-output-chars moved onto serve. Verified by manual JSON-RPC smoke test (initialize + tools/list).
 Files: +serve.go, +server.go, +server_test.go, ~allow.go, ~allow_test.go, ~mcp.go, ~mcp_test.go, ~testdata/policy.golden
 Decisions: finalize run by parent after child agent stalled mid-review. `mcp serve` classified deny in policy.golden (no recursive servers). Tool defs measure 3259 B via `mcp tools --format json`, under the 4000 B budget task-014 gates; the wire tools/list response is larger (4874 B) because the SDK injects schema scaffolding the budget does not cover.
+
+## TASK-014 — 2026-08-04T19:22:25Z
+Added token-budget (4000 B ceiling on `toolRows` serialization of `toolDefinitions()`) and tool-naming (regex gates for tool names and schema properties) CI gates, both reading from `toolDefinitions()` so they cannot be bypassed. Mutation-verified: budget gate fails at ceiling=1; naming gate catches camelCase tool names (`neo4jCliRun`) and camelCase schema properties (`Command`). The existing whole-tree gates (TestAllLeafCommands_HaveExamples, TestInputIdentifiers_AreKebabCase) still pass; no per-package duplicates added.
+Files: +neo4j-cli/internal/subcommands/mcp/tooldefs_gate_test.go, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt, ~AGENTS.md
+Decisions:
+- Budget measures the `toolRows` projection (used by `mcp tools --format json` and `server.go`), not the SDK wire response (4874 B). PRD ceiling was written against this surface.
+- `instructions` field (918 B) deliberately NOT folded into the budget — it is sent once at initialize and lives in the cached prompt prefix, not per-tool-definition.
+- Reviewer removed `exemptNamingFields` map (speculative generality — SDK fields never appear inside `InputSchema["properties"]`).
+- Tightened tool name regex from `^neo4j_cli_[a-z0-9_]+$` to `^neo4j_cli_[a-z][a-z0-9]*(_[a-z0-9]+)*$` to prevent double underscores, trailing underscores, and purely numeric segments.
