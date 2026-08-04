@@ -47,21 +47,60 @@ tasks:
     completed_at: 2026-08-04T12:31:58Z
 
   - id: task-003
-    title: 'Add the official Go MCP SDK dependency pinned to v1.4.1'
+    title: 'SUPERSEDED (folded into task-004) — Add the official Go MCP SDK dependency pinned to v1.4.1'
     description: |
+      DO NOT IMPLEMENT. There is no code change to make here. The go.mod/go.sum pin
+      moved to task-004; the audit below is this task's recorded output. If you have
+      selected this task, mark it completed and move on — in particular do NOT add a
+      blank-import or `tool`-directive placeholder to make the pin stick, which is
+      the specific wrong turn this note exists to prevent.
+
       Add `github.com/modelcontextprotocol/go-sdk` at v1.4.1 stable to go.mod. Do
       not use v1.7.0-pre.1: this binary is signed, notarized and shipped through
       five channels, and the design needs no 2026-07-28 spec feature. Verify the
       transitive dependency set stays pure Go so GoReleaser can keep cross-building
       linux/windows/darwin by amd64/arm64.
+
+      SUPERSEDED — fold the go.mod/go.sum change into task-004, which contains the
+      first real import. This task cannot stand alone: nothing imports the SDK yet,
+      and an unimported require line is not merely tidy-fragile, it is incomplete
+      and self-deleting. Three independent findings, each verified in this repo:
+        1. `.goreleaser.yaml` runs `go mod tidy` in `before.hooks`, so the RELEASE
+           pipeline itself deletes an unimported pin on every build.
+        2. `go mod tidy` provably strips the pin from BOTH go.mod and go.sum.
+        3. `go get` alone writes only the go-sdk h1 + go.mod hashes into go.sum and
+           NONE of the four transitive deps' hashes, because no package imports
+           `mcp`. The committed state therefore could not build the SDK, so
+           task-004 must re-run go get/tidy regardless.
+        4. Consequently a standalone commit here is not merely fragile: after
+           `go get` + `tidy` with no importer the residual diff is 18 insertions /
+           18 deletions bumping six `golang.org/x` modules with NO go-sdk pin at
+           all — an unexplained six-module dependency bump.
+      Both escape hatches were tested and rejected:
+        - A `//go:build tools` blank import does survive tidy, but that idiom exists
+          to retain executable build tools, not a library the very next task imports
+          for real. It is a commit-boundary prop.
+        - A `tool` directive (go.mod already has `tool go.uber.org/mock/mockgen`,
+          which makes this look inviting) also survives tidy and pulls full hashes,
+          but `mcp` is a LIBRARY: `go tool <pkg>` fails with "package is not a main
+          package" and the entry permanently pollutes `go tool` output. Worse,
+          `go mod edit -tool` records no version, so tidy resolves to latest
+          (v1.7.0), silently defeating the v1.4.1 pin.
+
+      The VERIFICATION half of this task is done, and its results are permanent
+      facts about immutable v1.4.1 (see task-004 criteria). Task-004 inherits them
+      and need not redo the audit.
     status: pending
-    dependencies: []
+    dependencies:
+      - task-004
     acceptance_criteria:
-      - 'go.mod and go.sum pin github.com/modelcontextprotocol/go-sdk v1.4.1'
-      - 'go mod why confirms no cgo-requiring transitive dependency was introduced'
-      - 'A cross-compile smoke check succeeds for darwin/arm64, linux/amd64 and windows/amd64'
-      - 'make test and make lint pass with the new dependency present'
+      - 'SUPERSEDED by task-004 — no standalone commit. Criteria below are recorded as VERIFIED against v1.4.1 and carried into task-004.'
+      - 'VERIFIED: transitive set is pure Go — adds google/jsonschema-go v0.4.2, segmentio/encoding v0.5.4, segmentio/asm v1.1.3, yosida95/uritemplate/v3 v3.0.2. Zero CgoFiles in the ./neo4j-cli dep graph under CGO_ENABLED=0 on darwin/arm64, linux/amd64 and windows/amd64. segmentio/asm is Go SIMD assembly, not cgo, and has pure-Go fallbacks.'
+      - 'VERIFIED: CGO_ENABLED=0 go build ./... succeeds with the SDK linked in for every target GoReleaser produces — goos linux/windows/darwin with the default goarch set (amd64, arm64 and 386 all clean). .goreleaser.yaml sets goos but no goarch, so the matrix is GoReleaser''s default, not a hard-coded six.'
+      - 'VERIFIED: make test, make lint (0 issues), make fmt-check and make build all pass with the SDK linked in.'
+      - 'VERIFIED: the SDK forces six golang.org/x MVS upgrades — mod 0.27.0=>0.32.0, net 0.43.0=>0.49.0, sync 0.16.0=>0.19.0, term 0.34.0=>0.39.0, text 0.28.0=>0.33.0, tools 0.36.0=>0.41.0 (via the SDK requiring x/tools v0.41.0). All gates pass with them. NOTE: these bumps do NOT revert when the SDK is removed, so they must land in the same commit as the SDK, not leak in separately.'
     completed_at: null
+    audited_at: 2026-08-04T12:51:42Z
 
   - id: task-004
     title: 'Scaffold the mcp command group behind the feature flag'
@@ -73,11 +112,23 @@ tasks:
       `func(*clicfg.Config) *cobra.Command` root factory to break the import cycle
       (app must import mcp, so mcp cannot import app). Every leaf is visible when
       the flag is on; no leaf sets Hidden.
+
+      ALSO CARRIES task-003 (folded in): this task contains the first real import of
+      the SDK, so the go.mod/go.sum pin lands here. Run
+      `go get github.com/modelcontextprotocol/go-sdk@v1.4.1` then `go mod tidy` in
+      the same commit as the first importing package — an unimported require line is
+      stripped by tidy AND by GoReleaser's `before.hooks`. Pin v1.4.1 stable; do not
+      take a pre-release. (Observed 2026-08-04: v1.5.0, v1.6.1 and v1.7.0 stable now
+      exist; v1.7.0 is no longer a pre-release as the PRD assumed, but v1.4.1 remains
+      the conservative choice since nothing in the design needs a newer spec feature.
+      A bump is a separate, deliberate decision.) The transitive audit is already
+      done — see task-003's VERIFIED criteria; do not redo it.
     status: pending
     dependencies:
       - task-001
-      - task-003
     acceptance_criteria:
+      - 'go.mod and go.sum pin github.com/modelcontextprotocol/go-sdk v1.4.1, added in the same commit as the first importing package, and survive go mod tidy'
+      - 'The six forced golang.org/x upgrades (mod, net, sync, term, text, tools) land in this same commit; go mod tidy is idempotent afterwards'
       - 'With the flag off, neo4j-cli --help shows no mcp group and agent-context output is unchanged'
       - 'With the flag on, mcp and all its leaves appear in help; mcp tools --format json runs without a transport'
       - 'The root factory is injected from app.go and mcp does not import neo4j-cli/app'

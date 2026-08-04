@@ -35,6 +35,7 @@ BUILD SYSTEMS: [Go toolchain, Makefile, golangci-lint, GoReleaser, changie]. See
 - `make build` → `bin/neo4j-cli`; `make run-neo4j` (no build); `make snapshot` (goreleaser, current platform, ldflags).
 - `make npm-publish-dry` — template/ordering check; stubs missing binaries (dry-run only). Run `make snapshot` first for real binaries.
 - All `.go` files need the Neo4j copyright header (CI `addlicense`).
+- A new dependency MUST land in the same commit as its first real import: `.goreleaser.yaml` runs `go mod tidy` in `before.hooks`, and tidy strips an unimported `require` from go.mod **and** go.sum (`go get` alone also records none of its transitive hashes). `CGO_ENABLED=0` is pinned and `goarch` is unset, so vet a new dep against GoReleaser's *default* arch set (386 included), not just amd64/arm64.
 - Changelog via `make changelog` **only for user-facing changes**. Non-interactive: `changie new --projects neo4j-cli --kind <kind> --body <body>`. The body describes **only the observable user-facing impact** (new/changed/removed output, flags, commands, behavior, errors) — NOT the internal mechanics that produced it. Skip pure refactors, endpoint/transport migrations, and any change invisible to the end user; if such a change has an incidental observable effect (e.g. a new output field), the entry states just that effect, not the refactor. Verify the claimed effect is real by diffing observable output (`AssertOutJson`/`AssertErr` golden strings), not by describing the implementation.
 
 ## Testing Framework
