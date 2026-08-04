@@ -374,7 +374,8 @@ tasks:
       plaintext: neo4j_cli_path, allow_writes (default false), neo4j_credential,
       allowed_databases, result_row_limit (default 500) and NO NEO4J_PASSWORD. Treat
       icon as optional and omit it in v1.
-    status: pending
+    status: completed
+    completed_at: 2026-08-04T22:00:00Z
     dependencies:
       - task-013
     acceptance_criteria:
@@ -383,7 +384,6 @@ tasks:
       - 'npx @anthropic-ai/mcpb validate accepts the generated manifest'
       - 'user_config contains no password field; allow_writes defaults to false'
       - 'The generator omits icon cleanly rather than referencing a missing file'
-    completed_at: null
 
   - id: task-016
     title: 'Add mcp install/remove/list/check for Claude Desktop'

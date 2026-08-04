@@ -9,8 +9,12 @@
 package mcp_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
+	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -198,4 +202,43 @@ func runApp(t *testing.T, mcpEnabled bool, args ...string) (stdout, stderr *byte
 	cmd.SetErr(stderr)
 	err = cmd.Execute()
 	return stdout, stderr, err
+}
+
+// openTestBundle generates a test .mcpb and returns its zip reader.
+func openTestBundle(t *testing.T) (string, *zip.ReadCloser) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "test.mcpb")
+	err := mcp.GenerateBundle(path)
+	require.NoError(t, err)
+	r, err := zip.OpenReader(path)
+	require.NoError(t, err)
+	return path, r
+}
+
+// readTestManifest generates a test .mcpb and returns the decoded manifest.
+func readTestManifest(t *testing.T) (string, map[string]any) {
+	t.Helper()
+	path, r := openTestBundle(t)
+	defer func() { _ = r.Close() }()
+	data := readZipFile(t, r, "manifest.json")
+	var manifest map[string]any
+	require.NoError(t, json.Unmarshal(data, &manifest))
+	return path, manifest
+}
+
+// readZipFile reads the named entry from a zip reader into memory.
+func readZipFile(t *testing.T, r *zip.ReadCloser, name string) []byte {
+	t.Helper()
+	for _, f := range r.File {
+		if f.Name == name {
+			rc, err := f.Open()
+			require.NoError(t, err)
+			data, err := io.ReadAll(rc)
+			_ = rc.Close()
+			require.NoError(t, err)
+			return data
+		}
+	}
+	t.Fatalf("entry %q not found in zip", name)
+	return nil
 }

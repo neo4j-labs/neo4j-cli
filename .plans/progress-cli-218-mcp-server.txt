@@ -116,3 +116,13 @@ Decisions:
 - `instructions` field (918 B) deliberately NOT folded into the budget — it is sent once at initialize and lives in the cached prompt prefix, not per-tool-definition.
 - Reviewer removed `exemptNamingFields` map (speculative generality — SDK fields never appear inside `InputSchema["properties"]`).
 - Tightened tool name regex from `^neo4j_cli_[a-z0-9_]+$` to `^neo4j_cli_[a-z][a-z0-9]*(_[a-z0-9]+)*$` to prevent double underscores, trailing underscores, and purely numeric segments.
+
+## TASK-015 — 2026-08-04T22:00:00Z
+Built the manifest generator (GenerateBundle) and `mcp bundle --out <path>` leaf, producing a valid .mcpb zip (manifest.json + README.md, no binary) with manifest_version "0.3", tools derived from toolDefinitions(), user_config with no secret fields, and icon cleanly omitted. Validated against `npx @anthropic-ai/mcpb validate` — passes. The shared function is GenerateBundle(path string) error; task-016 calls it with a cache-dir path.
+Files: +neo4j-cli/internal/subcommands/mcp/manifest.go, +neo4j-cli/internal/subcommands/mcp/bundle.go, +neo4j-cli/internal/subcommands/mcp/manifest_test.go, +neo4j-cli/internal/subcommands/mcp/bundle_test.go, ~neo4j-cli/internal/subcommands/mcp/mcp.go, ~neo4j-cli/internal/subcommands/mcp/mcp_helpers_test.go, ~neo4j-cli/internal/subcommands/mcp/testdata/policy.golden, ~.plans/tasks-cli-218-mcp-server.yml
+Decisions:
+- tools[] in the manifest carries only "name" (validated against mcpb@2.1.2 schema), not title/hints — those come from the runtime tools/list response. The PRD/task description's assumption that hints are in the manifest was corrected against the real validator.
+- Platforms use MCPB spec enum: darwin, win32, linux (not "windows").
+- privacy_policies is []string of URLs, not []objects (validated schema).
+- user_config fields each require title+description (validated schema).
+- Author is an object {"name": "Neo4j"} (validated schema).
