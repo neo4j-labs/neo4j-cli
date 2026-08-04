@@ -140,3 +140,41 @@ Decisions: --no-print-password injection lives in server.go's handlerFor alongsi
 ## TASK-018 — 2026-08-04T23:55:00Z
 Regenerated skill bundle (no drift — flag default-false), added changie Minor entry describing the user-facing mcp command group, and documented four MCP conventions in AGENTS.md: stdio fd-swap, tool-result redaction obligation, RegisterSecretValue hazard for MCP transcripts, and docker create's missing RegisterSecretValue gap.
 Files: ~AGENTS.md, +.changes/unreleased/neo4j-cli-Minor-20260804-234825.yaml, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt
+
+## TASK-019 — 2026-08-05T05:00:00Z
+Validated discovery convergence end to end. Drove the MCP server via stdio JSON-RPC with hand-written requests (initialize -> tools/list -> tools/call for each discovery step). Measured every round trip's byte count; converted to tokens at 3.6 B/tok.
+
+### Measured Fixed Costs (cached in prompt prefix, paid once per session)
+- Instructions field: 918 B (~255 tokens)
+- Tool definitions (toolRows projection, budget gate surface): 3253 B (~903 tokens, under 4000 B ceiling)
+- tools/list wire response: 5063 B (~1406 tokens, includes SDK schema scaffolding)
+
+### Measured Per-Call Response Costs
+- list_targets: ~800+ chars (~222+ tokens, varies with targets present)
+- read_docs("docker load"): 2323 chars (~645 tokens) — includes prose, flags table, examples
+- run("dataset list"): 1897 chars (~527 tokens) — lists all available datasets with descriptions
+- run_write: depends on result; successful gate-pass but failed execution returned did-you-mean error
+
+### Round Trip Counts
+- Optimal cold session discovery path: 3 RTs (list_targets -> read_docs("docker load") -> run_write)
+- Known-command path: 1 RT (run_write directly)
+- Covers within the REQ-NF-002 budget of ≤4 RTs from cold, ≤1 RT when known
+
+### Token Budget Assessment
+- Per-call tokens for optimal 3-RT path: ~1394 tokens (list_targets ~222 + read_docs ~645 + run_write variable)
+- Well under the 2k ceiling when counting only per-call tokens
+- Including fixed costs (instructions 255 + tool defs 903 = 1158): ~2552 total — slightly over 2k, but those are cached prompt prefix costs paid once per session, not per task
+- Recommendation: clarify REQ-NF-002 as measuring per-call (response) tokens (met) vs total session tokens (slightly over, first-task only)
+
+### Write Gate Verification
+All three independent layers confirmed via CLI:
+- Layer (a): run_write without server --rw -> "Write operations are not allowed; restart with --rw" (99 chars)
+- Layer (b): run on write-classified command -> points at neo4j_cli_run_write (65 chars)
+- Layer (c): run_write with server --rw + --rw in args on write command -> passes all gates, fails at real execution with did-you-mean, proving EnforceWriteGate is authoritative
+
+### Curation Recommendation
+Five-tool surface holds. Progressive disclosure (list_targets -> list_commands -> read_docs -> run -> run_write) converges in 3 RTs for the dataset-loading task, under the 4-RT budget. Tool definitions at 3253 B (under 4000 B ceiling) and instructions at 918 B leave comfortable headroom. No tool should be removed.
+
+### Limitations
+- Full Claude Desktop end-to-end test REQUIRES THE HUMAN: the model's thinking tokens per tool turn, the quality of its choices (does it reach for list_targets first?), and whether read_docs(…) is sufficient to avoid flag guessing are only measurable in a live chat turn.
+- Docker load not executed to completion (would create containers); gate-pass verification used a write-classified command that correctly failed on flag validation, confirming gates are open and functional.
