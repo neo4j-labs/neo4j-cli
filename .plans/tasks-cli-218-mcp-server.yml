@@ -422,7 +422,7 @@ tasks:
       credential store is unreadable (locked keyring, no D-Bus session), return an
       explicit actionable error rather than hanging or prompting. macOS was measured
       prompt-free; Linux/libsecret is the remaining unknown this error path covers.
-    status: completed
+    status: pending
     dependencies:
       - task-012
     acceptance_criteria:
@@ -444,7 +444,7 @@ tasks:
       covering the stdio fd-swap requirement, the redaction obligation for tool
       results, and the fact that a new secret-minting leaf that skips
       RegisterSecretValue will leak into MCP transcripts.
-    status: completed
+    status: pending
     dependencies:
       - task-016
       - task-017
@@ -466,7 +466,7 @@ tasks:
       on CLI-218 that a fully open surface would have a high failure rate. Record the
       measured numbers. If the bar is missed the response is a curation change, owned
       by the issue owner, not an architecture change.
-    status: completed
+    status: pending
     dependencies:
       - task-014
       - task-018
