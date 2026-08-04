@@ -4,9 +4,11 @@
 package skill
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAggregateCatalog(t *testing.T) {
@@ -183,5 +185,19 @@ func TestAggregateCatalog(t *testing.T) {
 			assert.Equal(t, tc.wantSkill, got.Skill, "skill")
 			assert.Equal(t, tc.wantAvailable, got.AvailableVersion, "available version")
 		})
+	}
+}
+
+// TestBuildInventorySkipsMCPOnlyAgents keeps `skill list` and `skill check`
+// row counts pinned to the skill-capable subset, so an MCP-only catalog
+// entry cannot appear as a bogus row.
+func TestBuildInventorySkipsMCPOnlyAgents(t *testing.T) {
+	setGOOSForTest(t, "darwin")
+	memFs := setupHomeWithAgents(t, filepath.FromSlash("/Users/alice"), "claude-code", "claude-desktop")
+
+	rows := BuildInventory(memFs, skillNameForTests, "1.7.0", nil)
+	require.Len(t, rows, len(SkillAgents()))
+	for _, r := range rows {
+		assert.True(t, r.Agent.SupportsSkills(), "row for non-skill agent %q", r.Agent.Name)
 	}
 }

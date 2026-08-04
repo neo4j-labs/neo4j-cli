@@ -48,13 +48,13 @@ type InventoryRow struct {
 	Status           string
 }
 
-// BuildInventory enumerates one row per (skill × agent). Self-skill rows
-// always come first (one per agent in AGENTS order); catalog rows follow
-// in plugin.json order. Reserved catalog entries (collisions with self /
-// binary-name) are skipped. When `cat` is nil only self-skill rows are
-// returned.
+// BuildInventory enumerates one row per (skill × skill-capable agent).
+// Self-skill rows always come first (one per agent in catalog order);
+// catalog rows follow in plugin.json order. Reserved catalog entries
+// (collisions with self / binary-name) are skipped. When `cat` is nil only
+// self-skill rows are returned.
 func BuildInventory(filesystem afero.Fs, binaryName, binaryVersion string, cat *catalog.Catalog) []InventoryRow {
-	out := make([]InventoryRow, 0, len(AGENTS))
+	out := make([]InventoryRow, 0, skillAgentCount())
 	out = append(out, inventoryRowsForSkill(filesystem, binaryName, sourceEmbedded, binaryVersion)...)
 	if cat == nil {
 		return out
@@ -88,16 +88,17 @@ func catalogSkillVersion(filesystem afero.Fs, cat *catalog.Catalog, name, binary
 // installed/installed_version are read from `filesystem`; status is
 // classified by statusFor against `availableVersion`.
 func inventoryRowsForSkill(filesystem afero.Fs, skillName, source, availableVersion string) []InventoryRow {
-	rows := make([]InventoryRow, 0, len(AGENTS))
-	for i := range AGENTS {
+	agents := SkillAgents()
+	rows := make([]InventoryRow, 0, len(agents))
+	for _, a := range agents {
 		row := InventoryRow{
 			Skill:            skillName,
 			Source:           source,
-			Agent:            &AGENTS[i],
+			Agent:            a,
 			AvailableVersion: availableVersion,
 		}
-		row.Detected = agentDetected(filesystem, &AGENTS[i])
-		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, &AGENTS[i], skillName)
+		row.Detected = agentDetected(filesystem, a)
+		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, a, skillName)
 		row.Status = statusFor(row.Installed, row.InstalledVersion, row.AvailableVersion)
 		rows = append(rows, row)
 	}
@@ -136,7 +137,7 @@ func boolStr(b bool) string {
 // aggregateCatalog folds per-agent rows for a single catalog skill into one
 // summary. Skill and AvailableVersion are taken from the first row (all
 // rows for one skill share these). InstalledAgents preserves input order
-// (which is AGENTS catalog order by BuildInventory's construction).
+// (which is skill-capable catalog order by BuildInventory's construction).
 //
 // Priority: drift > unknown-version > partial > installed > not-installed.
 func aggregateCatalog(rows []InventoryRow) catalogSummary {

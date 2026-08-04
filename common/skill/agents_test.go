@@ -15,18 +15,159 @@ import (
 
 func TestAGENTSCatalog(t *testing.T) {
 	// Catalog must match the Rust reference (plus Antigravity), in this
-	// order. Locking order means stable `skill list` output across releases.
+	// order, with MCP-only entries appended. Locking order means stable
+	// `skill list` output across releases.
 	expected := []string{
 		"claude-code", "cursor", "windsurf", "copilot", "antigravity", "gemini-cli",
-		"cline", "codex", "pi", "opencode", "junie",
+		"cline", "codex", "pi", "opencode", "junie", "claude-desktop",
 	}
 	require.Len(t, AGENTS, len(expected))
 	for i, want := range expected {
 		assert.Equal(t, want, AGENTS[i].Name, "agent at index %d", i)
 		assert.NotEmpty(t, AGENTS[i].DisplayName)
 		assert.NotEmpty(t, AGENTS[i].DetectDir)
-		assert.NotEmpty(t, AGENTS[i].SkillsDir)
+		assert.True(t, AGENTS[i].SupportsSkills() || AGENTS[i].SupportsMCP(),
+			"agent %q supports neither skills nor MCP", AGENTS[i].Name)
+		if AGENTS[i].SupportsMCP() {
+			assert.NotEmpty(t, AGENTS[i].MCPFormat, "MCP-capable agent %q needs an MCPFormat", AGENTS[i].Name)
+		}
 	}
+}
+
+// TestAgentNamesIsSkillCapableOnly is a bundle-drift guard: agentNames() is
+// interpolated into the `skill install` / `skill remove` Long text, which is
+// rendered into the committed skill bundle. Adding an MCP-only catalog entry
+// must not change this list.
+func TestAgentNamesIsSkillCapableOnly(t *testing.T) {
+	assert.Equal(t, []string{
+		"claude-code", "cursor", "windsurf", "copilot", "antigravity", "gemini-cli",
+		"cline", "codex", "pi", "opencode", "junie",
+	}, agentNames())
+}
+
+func TestMCPAgentNames(t *testing.T) {
+	assert.Equal(t, []string{"claude-desktop"}, MCPAgentNames())
+}
+
+func TestSkillAndMCPAgentsPartitionTheCatalog(t *testing.T) {
+	for _, a := range SkillAgents() {
+		assert.NotEmpty(t, a.SkillsDir, "SkillAgents must only return skill targets")
+	}
+	for _, a := range MCPAgents() {
+		assert.NotEmpty(t, a.MCPConfig, "MCPAgents must only return MCP targets")
+	}
+	// claude-desktop is MCP-only: it must never reach a skill code path.
+	assert.NotContains(t, agentNames(), "claude-desktop")
+	assert.Nil(t, findSkillAgent("claude-desktop"))
+	assert.False(t, isAgentName("claude-desktop"))
+	assert.NotNil(t, FindAgent("claude-desktop"), "FindAgent stays catalog-wide")
+}
+
+func TestClaudeDesktopPathsPerPlatform(t *testing.T) {
+	tests := []struct {
+		name       string
+		goos       string
+		home       string
+		appData    string
+		wantDetect string
+		wantConfig string
+		wantOk     bool
+	}{
+		{
+			name:       "darwin uses Library/Application Support",
+			goos:       "darwin",
+			home:       filepath.FromSlash("/Users/alice"),
+			wantDetect: filepath.Join("/Users/alice", "Library", "Application Support", "Claude"),
+			wantConfig: filepath.Join("/Users/alice", "Library", "Application Support", "Claude", "claude_desktop_config.json"),
+			wantOk:     true,
+		},
+		{
+			name:       "windows uses APPDATA",
+			goos:       "windows",
+			home:       filepath.FromSlash("/Users/alice"),
+			appData:    filepath.FromSlash("/Users/alice/AppData/Roaming"),
+			wantDetect: filepath.Join("/Users/alice", "AppData", "Roaming", "Claude"),
+			wantConfig: filepath.Join("/Users/alice", "AppData", "Roaming", "Claude", "claude_desktop_config.json"),
+			wantOk:     true,
+		},
+		{
+			name:       "windows falls back to HOME/AppData/Roaming when APPDATA is unset",
+			goos:       "windows",
+			home:       filepath.FromSlash("/Users/alice"),
+			wantDetect: filepath.Join("/Users/alice", "AppData", "Roaming", "Claude"),
+			wantConfig: filepath.Join("/Users/alice", "AppData", "Roaming", "Claude", "claude_desktop_config.json"),
+			wantOk:     true,
+		},
+		{
+			name:       "linux falls back to the XDG config dir",
+			goos:       "linux",
+			home:       filepath.FromSlash("/home/alice"),
+			wantDetect: filepath.Join("/home/alice", ".config", "Claude"),
+			wantConfig: filepath.Join("/home/alice", ".config", "Claude", "claude_desktop_config.json"),
+			wantOk:     true,
+		},
+		{
+			name:   "darwin with no HOME is unresolvable",
+			goos:   "darwin",
+			home:   "",
+			wantOk: false,
+		},
+		{
+			name:   "windows with neither APPDATA nor HOME is unresolvable",
+			goos:   "windows",
+			home:   "",
+			wantOk: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setGOOSForTest(t, tc.goos)
+			t.Setenv("HOME", tc.home)
+			t.Setenv("XDG_CONFIG_HOME", "")
+			t.Setenv("APPDATA", tc.appData)
+
+			a := FindAgent("claude-desktop")
+			require.NotNil(t, a)
+
+			dp, ok := a.DetectPath()
+			assert.Equal(t, tc.wantOk, ok)
+			cp, cok := a.MCPConfigPath()
+			assert.Equal(t, tc.wantOk, cok)
+			if !tc.wantOk {
+				return
+			}
+			assert.Equal(t, tc.wantDetect, dp)
+			assert.Equal(t, tc.wantConfig, cp)
+			// Mixed separators would break MemMapFs lookups and afero
+			// path comparisons on Windows.
+			if os.PathSeparator != '/' {
+				assert.NotContains(t, dp, "/")
+				assert.NotContains(t, cp, "/")
+			}
+		})
+	}
+}
+
+// TestPathAccessorsRefuseAbsentCapability pins the guard that keeps a
+// mis-filtered caller from writing to a relative path: an absent capability
+// resolves to ok=false, never to an empty-but-usable path.
+func TestPathAccessorsRefuseAbsentCapability(t *testing.T) {
+	t.Setenv("HOME", "/home/alice")
+
+	skillOnly := FindAgent("claude-code")
+	require.NotNil(t, skillOnly)
+	require.False(t, skillOnly.SupportsMCP())
+	cp, ok := skillOnly.MCPConfigPath()
+	assert.False(t, ok)
+	assert.Empty(t, cp)
+
+	mcpOnly := FindAgent("claude-desktop")
+	require.NotNil(t, mcpOnly)
+	require.False(t, mcpOnly.SupportsSkills())
+	sp, ok := mcpOnly.SkillsPath()
+	assert.False(t, ok)
+	assert.Empty(t, sp)
 }
 
 func TestExpandPath(t *testing.T) {
@@ -261,6 +402,26 @@ func TestDetectAgentsIgnoresFile(t *testing.T) {
 
 	got := DetectAgents(fs)
 	assert.Empty(t, got)
+}
+
+func TestDetectMCPAgents(t *testing.T) {
+	setGOOSForTest(t, "darwin")
+	t.Setenv("HOME", filepath.FromSlash("/Users/alice"))
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	fs := afero.NewMemMapFs()
+	assert.Empty(t, DetectMCPAgents(fs))
+
+	claudeDir := filepath.Join(filepath.FromSlash("/Users/alice"), "Library", "Application Support", "Claude")
+	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
+
+	got := DetectMCPAgents(fs)
+	require.Len(t, got, 1)
+	assert.Equal(t, "claude-desktop", got[0].Name)
+
+	// The skill-side projection must stay blind to it even though its
+	// detect dir now exists — it has no skills directory to write into.
+	assert.Empty(t, DetectAgents(fs))
 }
 
 func TestAgentDetectAndSkillsPath(t *testing.T) {

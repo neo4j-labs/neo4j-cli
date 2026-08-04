@@ -7,3 +7,13 @@ Decisions:
 - Registry tests must be an EXTERNAL clicfg_test file: they build a real NewConfig via testfs, and testfs imports clicfg.
 - Tests read the production Registry while flags_test.go/clicfg_test.go swap that global for a sentinel map — safe only because nothing in the package calls t.Parallel(); documented in the file header.
 - Pre-existing, unfixed: FlagSet.Enabled returns false for unregistered keys BEFORE consulting overrides, so the four SetForTest("flag.aura-beta", true) calls in aura/internal/api/organization_test.go are dead no-ops (flag.aura-beta is retired and absent from Registry). Also .agents/feature-flags.md:40 still claims production reads flag.aura-beta via the Registry. Needs its own ticket.
+
+## TASK-002 — 2026-08-04T12:31:58Z
+Added MCPConfig/MCPFormat to skill.Agent plus an MCP-only claude-desktop entry, and split the catalog into capability projections (SkillAgents/MCPAgents) so every skill-side consumer ignores MCP-only entries. agentNames() is unchanged, so the committed bundle does not drift.
+Files: ~common/skill/agents.go, ~common/skill/helpers.go, ~common/skill/installer.go, ~common/skill/inventory.go, ~common/skill/list.go, ~common/skill/agents_test.go, +common/skill/agents_helpers_test.go, ~common/skill/installer_test.go, ~common/skill/inventory_test.go, ~common/skill/list_test.go, ~common/skill/install_test.go, ~common/skill/remove_test.go
+Decisions:
+- New `$APP_SUPPORT` token in expandPath maps to Electron's `appData` (darwin Library/Application Support, windows %APPDATA%, else XDG config) — Claude Desktop is Electron, so the non-darwin/windows branch stays a real path rather than an error; an absent dir already means not-detected. `currentGOOS` is the test seam (process global — no t.Parallel()).
+- SkillsPath()/MCPConfigPath() return ok=false on absent capability rather than ("", true). Without that guard filepath.Join("", skillName) is a relative path a mis-filtered caller would write into cwd.
+- FindAgent stays catalog-wide (task-016 needs it for MCP); the skill surface goes through findSkillAgent, so `skill install --agent claude-desktop` is ErrUnknownAgent.
+- Reviewer-noted UX gap for a later task: formatAgentErr should point an MCP-only agent name at `mcp install --agent <name>` once that leaf exists (task-016). Also confirm MCPAgents/MCPAgentNames/DetectMCPAgents/MCPConfigPath each gain a production caller in task-016 — delete any that does not.
+- Type is `MCPFormat` (not `Format`) so it cannot be mistaken for the CLI's --format output format.

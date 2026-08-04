@@ -20,7 +20,7 @@ import (
 var ErrNoAgentsDetected = errors.New("skill: no supported agents detected")
 
 // ErrUnknownAgent is returned by Install / Remove when agentFilter does not
-// match any entry in the AGENTS catalog (case-insensitive).
+// match any skill-capable entry in the AGENTS catalog (case-insensitive).
 var ErrUnknownAgent = errors.New("skill: unknown agent")
 
 // ErrAgentNotDetected is returned by Install when agentFilter matches a
@@ -118,7 +118,7 @@ func Remove(filesystem afero.Fs, skillName, agentFilter string) ([]*Agent, error
 	if agentFilter == "" {
 		targets = DetectAgents(filesystem)
 	} else {
-		a := FindAgent(agentFilter)
+		a := findSkillAgent(agentFilter)
 		if a == nil {
 			return nil, fmt.Errorf("%w: %q", ErrUnknownAgent, agentFilter)
 		}
@@ -138,20 +138,21 @@ func Remove(filesystem afero.Fs, skillName, agentFilter string) ([]*Agent, error
 	return targets, nil
 }
 
-// List returns one AgentInstall per agent in the AGENTS catalog. Detected
-// reflects DetectDir presence; Installed reflects SKILL.md presence under
-// `<skillsDir>/<skillName>/`. InstalledVersion is the parsed frontmatter
-// value (empty string when not installed or unparseable).
+// List returns one AgentInstall per skill-capable agent, in catalog order.
+// Detected reflects DetectDir presence; Installed reflects SKILL.md presence
+// under `<skillsDir>/<skillName>/`. InstalledVersion is the parsed
+// frontmatter value (empty string when not installed or unparseable).
 func List(filesystem afero.Fs, skillName string) ([]AgentInstall, error) {
 	if skillName == "" {
 		return nil, errors.New("skill: empty skill name")
 	}
 
-	out := make([]AgentInstall, 0, len(AGENTS))
-	for i := range AGENTS {
-		row := AgentInstall{Agent: &AGENTS[i]}
-		row.Detected = agentDetected(filesystem, &AGENTS[i])
-		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, &AGENTS[i], skillName)
+	agents := SkillAgents()
+	out := make([]AgentInstall, 0, len(agents))
+	for _, a := range agents {
+		row := AgentInstall{Agent: a}
+		row.Detected = agentDetected(filesystem, a)
+		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, a, skillName)
 		out = append(out, row)
 	}
 	return out, nil
@@ -168,7 +169,7 @@ func resolveTargets(filesystem afero.Fs, agentFilter string) ([]*Agent, error) {
 		}
 		return targets, nil
 	}
-	a := FindAgent(agentFilter)
+	a := findSkillAgent(agentFilter)
 	if a == nil {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownAgent, agentFilter)
 	}

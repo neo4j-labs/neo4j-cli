@@ -95,7 +95,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - Adding/changing a command in the tree (incl. sub-sub-pkgs like `credential/dbms/`) → `references/<cmd>.md` drifts.
 - `Long`/`Example` changes on `credential/...` or `query/...` commands.
 - Changing `ValidFormatValues` in `clicfg.go` (affects `--format` help → bundle).
-- Mutating `common/skill/AGENTS` catalog (install/remove Long embeds `agentNames()`).
+- Mutating `common/skill/AGENTS` catalog (install/remove Long embeds `agentNames()`). The catalog is capability-by-presence (`SkillsDir`/`MCPConfig`), so skill-side code must project via `SkillAgents()`, never walk `AGENTS` — an MCP-only entry in `agentNames()` drifts the bundle.
 
 `make generate-check` = `go generate ./...` + `git diff --exit-code`; only meaningful on a clean tree (CI). Locally commit source + regenerated bundle together. Editing a bundle file directly is futile (generate overwrites). To simulate drift, mutate a cobra input (e.g. a `Short` in `app.go`).
 

@@ -36,7 +36,7 @@ tasks:
       win32 `%APPDATA%\Claude`), reading the HOME env var rather than user.Current()
       per the clicfg/darwin.go precedent. Ship this as its own commit ahead of any
       MCP work so a skill-side regression stays bisectable.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'skill.Agent has MCPConfig and MCPFormat; a claude-desktop entry exists with no SkillsDir'
@@ -44,7 +44,7 @@ tasks:
       - 'skill list, skill install, skill remove and BuildInventory ignore MCP-only entries; existing row-count expectations still hold'
       - 'Platform-specific path expansion resolves the Claude Desktop directory on darwin and win32, driven by the HOME env var'
       - 'Tests use afero MemMapFs and never afero.NewOsFs(); make test, make fmt-check, make lint pass'
-    completed_at: null
+    completed_at: 2026-08-04T12:31:58Z
 
   - id: task-003
     title: 'Add the official Go MCP SDK dependency pinned to v1.4.1'
