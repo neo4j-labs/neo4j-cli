@@ -205,7 +205,8 @@ tasks:
       - 'docker create driven against the fake docker client produces a CallToolResult that does not contain the generated password'
       - 'Control and ANSI bytes are neutralised in returned text'
       - 'Output beyond max-output-chars is truncated with tee_path surfaced for the remainder'
-    completed_at: null
+    status: completed
+    completed_at: "2026-08-04T15:15:00Z"
 
   - id: task-008
     title: 'Implement neo4j_cli_list_commands as an agentcontext projection'
