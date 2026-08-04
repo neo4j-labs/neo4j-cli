@@ -90,7 +90,7 @@ tasks:
       The VERIFICATION half of this task is done, and its results are permanent
       facts about immutable v1.4.1 (see task-004 criteria). Task-004 inherits them
       and need not redo the audit.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -99,7 +99,7 @@ tasks:
       - 'VERIFIED: CGO_ENABLED=0 go build ./... succeeds with the SDK linked in for every target GoReleaser produces — goos linux/windows/darwin with the default goarch set (amd64, arm64 and 386 all clean). .goreleaser.yaml sets goos but no goarch, so the matrix is GoReleaser''s default, not a hard-coded six.'
       - 'VERIFIED: make test, make lint (0 issues), make fmt-check and make build all pass with the SDK linked in.'
       - 'VERIFIED: the SDK forces six golang.org/x MVS upgrades — mod 0.27.0=>0.32.0, net 0.43.0=>0.49.0, sync 0.16.0=>0.19.0, term 0.34.0=>0.39.0, text 0.28.0=>0.33.0, tools 0.36.0=>0.41.0 (via the SDK requiring x/tools v0.41.0). All gates pass with them. NOTE: these bumps do NOT revert when the SDK is removed, so they must land in the same commit as the SDK, not leak in separately.'
-    completed_at: null
+    completed_at: 2026-08-04T12:51:42Z
     audited_at: 2026-08-04T12:51:42Z
 
   - id: task-004
