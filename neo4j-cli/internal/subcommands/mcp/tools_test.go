@@ -5,7 +5,6 @@ package mcp_test
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,11 +22,8 @@ func TestTools_JSONManifest(t *testing.T) {
 	stdout, stderr, err := runApp(t, true, "mcp", "tools", "--format", "json")
 	require.NoError(t, err, "stderr=%s", stderr.String())
 
-	// No tool definitions exist yet, so the honest current contract is an empty
-	// JSON array — never `null`, which would not decode as a list. The
-	// per-row assertions below are the contract each definition must meet as
-	// they are added.
-	assert.Equal(t, "[]", strings.TrimSpace(stdout.String()))
+	// The JSON array must never be `null`, which would not decode as a list.
+	// The per-row assertions below are the contract each definition must meet.
 
 	var rows []map[string]any
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &rows),

@@ -76,3 +76,8 @@ Decisions:
 ## TASK-007 — 2026-08-04T15:15:00Z
 Built MapCommandResult that turns a CommandResult into mcpsdk.CallToolResult with isError, structuredContent (BuildEnvelope + stdout/stderr/argv), rune-safe truncation at MaxOutputChars (default 8000), and RedactText+StripControl sanitisation on every string. Added docker/export_test.go seams (randSource, listenerFactory, clientFactory) usable by future integration tests. 12 new tests cover: success, plain error, CLIError envelope, retryable codes, JSON password redaction, control-byte stripping, truncation, tee_path surfacing, redacted args, stderr fallback, multi-format secret sanitisation, and zero-max fallback.
 Files: +neo4j-cli/internal/subcommands/mcp/result.go, +neo4j-cli/internal/subcommands/mcp/result_test.go, ~neo4j-cli/internal/subcommands/docker/export_test.go
+
+## TASK-008 — 2026-08-04T16:07:56Z
+First real tool `neo4j_cli_list_commands` (readOnly+idempotent): no-arg returns 12 top-level trees, `tree` arg lists that tree's commands as `use: short` lines. Projects `agentcontext.BuildContext` via the stored RootFactory; `completion` filtered. `mcp tools --format json` now lists one tool; the old `"[]"` test updated.
+Files: +list_commands.go, +list_commands_test.go, ~mcp.go, ~tooldefs.go, ~tools_test.go
+Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED without committing; fixed a duplicate `status: pending` the child left in task-007's block.

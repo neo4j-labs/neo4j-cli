@@ -17,9 +17,17 @@ import (
 // group, so this package must not import app.
 type RootFactory func(*clicfg.Config) *cobra.Command
 
+// storedRootFactory is the injected factory, kept for tool-definition
+// initialization and tool handlers that need to project the live tree.
+var storedRootFactory RootFactory
+var storedVersion string
+
 // NewCmd returns the `mcp` parent command. newRoot is the injected root factory
 // (see RootFactory) that the leaves use to build a tree per tool call.
 func NewCmd(cfg *clicfg.Config, newRoot RootFactory) *cobra.Command {
+	storedRootFactory = newRoot
+	storedVersion = cfg.Version
+
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Expose neo4j-cli to MCP clients such as Claude Desktop",
@@ -35,7 +43,11 @@ func NewCmd(cfg *clicfg.Config, newRoot RootFactory) *cobra.Command {
 	// reportable error on the first `mcp` invocation rather than as a nil
 	// dereference in the middle of a tool call.
 	cmd.PersistentPreRunE = func(*cobra.Command, []string) error {
-		return validateWiring(cfg, newRoot)
+		if err := validateWiring(cfg, newRoot); err != nil {
+			return err
+		}
+		ensureToolDefinitions(cfg)
+		return nil
 	}
 
 	RegisterGateFlags(cmd)

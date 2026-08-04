@@ -5,15 +5,86 @@ package mcp
 
 import (
 	"encoding/json"
+	"sync"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/neo4j/cli/common/clicfg"
+	"github.com/spf13/afero"
 )
 
-// toolDefinitions returns the tool definitions, in the order tools are
-// advertised to clients. Both `mcp tools` and the server read them from here, so
-// the printed surface cannot drift from the registered one.
+var (
+	// toolTreeNames is the enum for the neo4j_cli_list_commands `tree`
+	// parameter, populated from the live tree at server start so new top-level
+	// trees auto-surface.
+	toolTreeNames []string
+
+	// storedFlagStates captures the feature-flag state at server start so both
+	// the tool-definition enum (ensureToolDefinitions) and the tool handler
+	// (HandleListCommands) build trees with the same flag configuration.
+	storedFlagStates map[string]bool
+
+	toolDefsOnce sync.Once
+)
+
+// ensureToolDefinitions populates toolTreeNames from the live tree. The config's
+// flag state is mirrored so flag-gated trees (mcp itself) appear in the enum.
+// Called from the mcp parent's PersistentPreRunE, once per process.
+func ensureToolDefinitions(srcCfg *clicfg.Config) {
+	toolDefsOnce.Do(func() {
+		if storedRootFactory == nil {
+			return
+		}
+		storedFlagStates = make(map[string]bool)
+		for name := range clicfg.Registry {
+			enabled := srcCfg.Flags.Enabled(name)
+			storedFlagStates[name] = enabled
+		}
+		cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion, clicfg.GlobalScope)
+		defer cfg.Events.Flush()
+		for name, enabled := range storedFlagStates {
+			if enabled {
+				cfg.Flags.SetForTest(name, true)
+			}
+		}
+		root := storedRootFactory(cfg)
+		for _, sub := range root.Commands() {
+			if !sub.IsAvailableCommand() {
+				continue
+			}
+			name := sub.Name()
+			if name == "completion" {
+				continue
+			}
+			toolTreeNames = append(toolTreeNames, name)
+		}
+	})
+}
+
+// toolDefinitions returns the tool definitions the server registers, in the
+// order tools are advertised to clients. Both `mcp tools` and the server read
+// them from here, so the printed surface cannot drift from the registered one.
 func toolDefinitions() []*mcpsdk.Tool {
-	return nil
+	return []*mcpsdk.Tool{
+		{
+			Name:        "neo4j_cli_list_commands",
+			Title:       "List neo4j-cli commands",
+			Description: "List the neo4j-cli command trees. Without `tree` returns the index of top-level trees. With `tree` returns that tree's commands as `use: short` lines.",
+			Annotations: &mcpsdk.ToolAnnotations{
+				ReadOnlyHint:   true,
+				IdempotentHint: true,
+			},
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"tree": map[string]any{
+						"type":        "string",
+						"enum":        toolTreeNames,
+						"description": "A top-level command tree to expand (e.g. docker, aura). When omitted returns the tree index.",
+					},
+				},
+			},
+		},
+	}
 }
 
 // toolRows projects tool definitions into snake_case output rows. The SDK's own

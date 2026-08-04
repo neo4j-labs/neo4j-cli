@@ -196,7 +196,7 @@ tasks:
       and error string through clievents.RedactText then output.StripControl, since
       under MCP these strings are uploaded into the model context. Truncate output
       at --max-output-chars (default 8000) and surface tee_path.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -205,7 +205,6 @@ tasks:
       - 'docker create driven against the fake docker client produces a CallToolResult that does not contain the generated password'
       - 'Control and ANSI bytes are neutralised in returned text'
       - 'Output beyond max-output-chars is truncated with tee_path surfaced for the remainder'
-    status: completed
     completed_at: "2026-08-04T15:15:00Z"
 
   - id: task-008
@@ -217,7 +216,7 @@ tasks:
       source, and generate the `tree` enum from the live tree at server start so a
       new top-level tree auto-surfaces. Never return the full agent-context envelope,
       which measures 283 KB / roughly 75k tokens.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -225,7 +224,8 @@ tasks:
       - 'A tree argument lists that tree''s commands; the enum is derived from the live tree, not hard-coded'
       - 'The tool never emits the full agent-context envelope'
       - 'Tool name and schema properties are snake_case and prefixed neo4j_cli_'
-    completed_at: null
+      - 'completion is filtered (cobra injects it at Execute time; the bundle generator runs pre-Execute) so the catalog and the docs resolver agree'
+    completed_at: 2026-08-04T16:07:56Z
 
   - id: task-009
     title: 'Implement neo4j_cli_read_docs as a skill-bundle heading slicer'
