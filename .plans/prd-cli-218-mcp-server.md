@@ -103,10 +103,12 @@ Two conclusions drive the design: **`agent-context` can never be a tool result**
   | Policy | Paths |
   |---|---|
   | `deny` | `update`, `mcp`, `completion`, `history clear`, `config set credential-storage` — swaps the running binary / recursive servers / silently downgrades keyring→plaintext |
-  | `gated:allow-aura` | `aura instance create/resize/destroy/overwrite`, `aura agent *`, `customer-managed-key *` — **costs real money** |
-  | `gated:allow-credential-write` | `credential * add/remove/use/set-embed` — mints and stores keys in the OS keyring |
-  | `write` (→ `neo4j_cli_run_write` only) | everything carrying `Annotations["write"]="true"` (~83 leaves) |
-  | `allow` | `dataset`, `docker`, `desktop`, `query`, `admin`, `config get/list`, `credential */list|get`, `skill`, `history list`, `agent-context`, all `aura … list/get` |
+  | `gated:allow-aura` | every write under `aura`, plus all of `aura agent` and `aura customer-managed-key` including their reads — **costs real money** |
+  | `gated:allow-credential-write` | every write under `credential` (`add`/`remove`/`use`/`set-embed`) — mints and stores keys in the OS keyring |
+  | `write` (→ `neo4j_cli_run_write` only) | everything carrying `Annotations["write"]="true"` (~83 leaves), plus `query --rw` |
+  | `allow` | reads under `dataset`, `docker`, `desktop`, `query`, `admin`, `config`, `credential`, `skill`, `history`, `agent-context`, `aura` |
+
+  **AMENDED (task-005)** against the real tree: the gated-Aura row named `aura instance resize`/`destroy`, which do not exist (resizing is `instance update`, destroying is `instance delete`), and enumerating leaves would have left `aura graphql create`, `aura graph-analytics session create` and `aura virtual-graph create` — all of which bill — on plain `write`. The rule is therefore keyed on `Annotations["write"]` **within** the `aura` and `credential` subtrees rather than on a leaf list, so a new provisioning or credential-minting leaf is gated the day it lands. Precedence is `deny` > `gated` > `write` > `allow`, with the longest matching prefix winning inside the gated list, so a path in a static list AND carrying the write annotation resolves by the list (`history clear` denies; `aura instance create` gates). The `allow` row is stated as whole trees because writes below them are intercepted first; and `query` is annotated *read* (it gates writes on its own `--rw` at execution time), so `--rw` in its args escalates it to `write` in the table itself rather than relying on the tool layer's `--rw` rejection. Two safety properties are gate-tested: an unlisted top-level tree defaults to `deny` even when write-annotated (`TestPolicyTable_ClassifiesEveryCommandPath`), and any change to any command's policy diffs a committed golden (`TestPolicyTable_Golden`).
 
 - **REQ-F-027**: The `gated:*` policies are opt-in via `mcp serve` flags (`--allow-aura`, `--allow-credential-write`) and the corresponding generated-manifest `user_config` booleans, both default `false`.
 

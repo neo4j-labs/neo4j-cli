@@ -146,16 +146,22 @@ tasks:
       and credential mutation (it mints keyring entries). Classify write as anything
       carrying Annotations["write"]="true". Add the corresponding --allow-aura and
       --allow-credential-write opt-in flags, both default false.
-    status: pending
+
+      AMENDED (task-005): the PRD's gated-Aura leaf list was wrong about the tree
+      (`aura instance resize`/`destroy` do not exist) and enumerating leaves would
+      have left billing leaves like `aura graphql create` on plain `write`. The
+      table keys the gated policies on Annotations["write"] WITHIN the `aura` and
+      `credential` subtrees instead; see the amended REQ-F-026.
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
-      - 'Classify() returns the documented policy for a representative path in every category'
-      - 'A gate test walks the live cobra tree and fails on any command path the table does not classify'
-      - 'Unclassified paths default to deny rather than allow'
-      - 'aura instance create and credential dbms add are refused unless the matching --allow-* flag is set'
-      - 'make test, make fmt-check, make lint pass'
-    completed_at: null
+      - 'Classify() returns the documented policy for a representative path in every category (it returns (Policy, bool); the bool distinguishes an explicit rule from the default deny)'
+      - 'A gate test walks the live cobra tree and fails on any command path the table does not classify. Two gates: TestPolicyTable_ClassifiesEveryCommandPath (unlisted top-level tree) and TestPolicyTable_Golden (a committed path->policy snapshot, which is what catches a NEW LEAF under an already-exposed tree — the first gate alone cannot). Both mutation-verified.'
+      - 'Unclassified paths default to deny rather than allow, including when write-annotated: the exposed-tree check runs BEFORE the annotation, so a new tree cannot launder itself into `write`'
+      - 'aura instance create and credential dbms add are refused unless the matching --allow-* flag is set; --allow-aura does not open the credential gate'
+      - 'make test, make fmt-check, make lint, make license-check pass; no skill-bundle drift'
+    completed_at: 2026-08-04T13:45:44Z
 
   - id: task-006
     title: 'Build the in-process executor with stdio fd swap and per-call isolation'

@@ -1,0 +1,189 @@
+admin	allow
+admin database	allow
+admin database create	write
+admin database drop	write
+admin database get	allow
+admin database list	allow
+admin database start	write
+admin database stop	write
+admin privilege	allow
+admin privilege deny	write
+admin privilege deny database	write
+admin privilege deny dbms	write
+admin privilege deny entity	write
+admin privilege deny graph	write
+admin privilege deny label	write
+admin privilege deny load	write
+admin privilege deny property	write
+admin privilege grant	write
+admin privilege grant database	write
+admin privilege grant dbms	write
+admin privilege grant entity	write
+admin privilege grant graph	write
+admin privilege grant label	write
+admin privilege grant load	write
+admin privilege grant property	write
+admin privilege list	allow
+admin privilege revoke	write
+admin privilege revoke database	write
+admin privilege revoke dbms	write
+admin privilege revoke entity	write
+admin privilege revoke graph	write
+admin privilege revoke label	write
+admin privilege revoke load	write
+admin privilege revoke property	write
+admin role	allow
+admin role create	write
+admin role drop	write
+admin role get	allow
+admin role grant	write
+admin role list	allow
+admin role revoke	write
+admin user	allow
+admin user activate	write
+admin user create	write
+admin user drop	write
+admin user get	allow
+admin user list	allow
+admin user rename	write
+admin user set-password	write
+admin user suspend	write
+agent-context	allow
+aura	allow
+aura agent	gated:allow-aura
+aura agent create	gated:allow-aura
+aura agent delete	gated:allow-aura
+aura agent get	gated:allow-aura
+aura agent invoke	gated:allow-aura
+aura agent list	gated:allow-aura
+aura agent replace	gated:allow-aura
+aura agent update	gated:allow-aura
+aura customer-managed-key	gated:allow-aura
+aura customer-managed-key create	gated:allow-aura
+aura customer-managed-key delete	gated:allow-aura
+aura customer-managed-key get	gated:allow-aura
+aura customer-managed-key list	gated:allow-aura
+aura graph-analytics	allow
+aura graph-analytics session	allow
+aura graph-analytics session create	gated:allow-aura
+aura graph-analytics session delete	gated:allow-aura
+aura graph-analytics session get	allow
+aura graph-analytics session list	allow
+aura graphql	allow
+aura graphql auth-provider	allow
+aura graphql auth-provider create	gated:allow-aura
+aura graphql auth-provider delete	gated:allow-aura
+aura graphql auth-provider get	allow
+aura graphql auth-provider list	allow
+aura graphql cors-policy	allow
+aura graphql cors-policy allowed-origin	allow
+aura graphql cors-policy allowed-origin add	gated:allow-aura
+aura graphql cors-policy allowed-origin remove	gated:allow-aura
+aura graphql create	gated:allow-aura
+aura graphql delete	gated:allow-aura
+aura graphql get	allow
+aura graphql list	allow
+aura graphql pause	gated:allow-aura
+aura graphql resume	gated:allow-aura
+aura graphql update	gated:allow-aura
+aura instance	allow
+aura instance create	gated:allow-aura
+aura instance delete	gated:allow-aura
+aura instance deploy	gated:allow-aura
+aura instance get	allow
+aura instance list	allow
+aura instance load	gated:allow-aura
+aura instance overwrite	gated:allow-aura
+aura instance pause	gated:allow-aura
+aura instance resume	gated:allow-aura
+aura instance snapshot	allow
+aura instance snapshot create	gated:allow-aura
+aura instance snapshot get	allow
+aura instance snapshot list	allow
+aura instance update	gated:allow-aura
+aura organization	allow
+aura organization get	allow
+aura organization list	allow
+aura project	allow
+aura project get	allow
+aura project list	allow
+aura virtual-graph	allow
+aura virtual-graph allowed-configs	allow
+aura virtual-graph create	gated:allow-aura
+aura virtual-graph delete	gated:allow-aura
+aura virtual-graph get	allow
+aura virtual-graph list	allow
+aura virtual-graph update	gated:allow-aura
+aura workspace	allow
+aura workspace list	allow
+aura workspace use	gated:allow-aura
+config	allow
+config get	allow
+config list	allow
+config set	write
+credential	allow
+credential aura-client	allow
+credential aura-client add	gated:allow-credential-write
+credential aura-client list	allow
+credential aura-client remove	gated:allow-credential-write
+credential aura-client use	gated:allow-credential-write
+credential dbms	allow
+credential dbms add	gated:allow-credential-write
+credential dbms list	allow
+credential dbms remove	gated:allow-credential-write
+credential dbms set-embed	gated:allow-credential-write
+credential dbms use	gated:allow-credential-write
+credential embed	allow
+credential embed add	gated:allow-credential-write
+credential embed list	allow
+credential embed remove	gated:allow-credential-write
+credential embed use	gated:allow-credential-write
+dataset	allow
+dataset list	allow
+desktop	allow
+desktop connection	allow
+desktop connection create	write
+desktop connection delete	write
+desktop connection list	allow
+desktop connection update	write
+desktop dbms	allow
+desktop dbms create	write
+desktop dbms delete	write
+desktop dbms list	allow
+desktop dbms load	write
+desktop dbms plugin	allow
+desktop dbms plugin available	allow
+desktop dbms plugin install	write
+desktop dbms plugin list	allow
+desktop dbms plugin uninstall	write
+desktop dbms start	write
+desktop dbms stop	write
+desktop dbms upgrade	write
+desktop doctor	allow
+desktop install	write
+desktop list	allow
+docker	allow
+docker create	write
+docker delete	write
+docker get	allow
+docker list	allow
+docker load	write
+docker start	write
+docker stop	write
+history	allow
+history clear	deny
+history list	allow
+mcp	deny
+mcp tools	deny
+query	allow
+query :embed	allow
+query :schema	allow
+skill	allow
+skill check	allow
+skill install	write
+skill list	allow
+skill print	allow
+skill refresh	write
+skill remove	write
+update	deny
+update check	deny

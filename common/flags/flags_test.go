@@ -300,6 +300,26 @@ func TestRegisterAuraCredentialFlag_PriorHook(t *testing.T) {
 	}
 }
 
+// TestIsWriteCommand pins the exported annotation reader shared with the MCP
+// policy table: only the exact "true" string counts as a write.
+func TestIsWriteCommand(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		annotations map[string]string
+		want        bool
+	}{
+		{name: "no annotations", annotations: nil, want: false},
+		{name: "write true", annotations: map[string]string{"write": "true"}, want: true},
+		{name: "write false", annotations: map[string]string{"write": "false"}, want: false},
+		{name: "write TRUE is not true", annotations: map[string]string{"write": "TRUE"}, want: false},
+		{name: "other annotation", annotations: map[string]string{"other": "true"}, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsWriteCommand(&cobra.Command{Use: "x", Annotations: tc.annotations}))
+		})
+	}
+}
+
 func TestEnforceWriteGate(t *testing.T) {
 	for _, tc := range []struct {
 		name        string

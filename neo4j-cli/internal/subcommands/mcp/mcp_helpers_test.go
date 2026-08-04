@@ -10,6 +10,7 @@ package mcp_test
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -28,6 +29,80 @@ func newAppCmd(t *testing.T, mcpEnabled bool) *cobra.Command {
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 	cfg.Flags.SetForTest("flag.mcp-server", mcpEnabled)
 	return app.NewCmd(cfg)
+}
+
+// newAppCmdEveryFlagEnabled builds the live tree with EVERY registered feature
+// flag forced on, so the whole-tree policy gate also covers subtrees app.NewCmd
+// mounts only behind a flag. It mirrors the identically named helper in
+// agentcontext's tests; test helpers cannot be shared across packages, and the
+// only alternative — a production helper that builds a fully flag-on tree —
+// would be a test-only seam in shipped code.
+func newAppCmdEveryFlagEnabled(t *testing.T) *cobra.Command {
+	t.Helper()
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	for name := range clicfg.Registry {
+		cfg.Flags.SetForTest(name, true)
+	}
+	return app.NewCmd(cfg)
+}
+
+// executableCommands returns every command below root in tree order. Hidden and
+// deprecated commands are INCLUDED: help visibility is irrelevant to the policy
+// table, since the MCP executor can reach anything cobra can dispatch. Only
+// cobra's generated `help` command is skipped.
+func executableCommands(root *cobra.Command) []*cobra.Command {
+	var out []*cobra.Command
+	var walk func(cmd *cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		for _, sub := range cmd.Commands() {
+			if sub.Name() == "help" {
+				continue
+			}
+			out = append(out, sub)
+			walk(sub)
+		}
+	}
+	walk(root)
+	return out
+}
+
+// findCommand resolves a space-separated command path against root, failing the
+// test when it does not resolve to exactly that command.
+func findCommand(t *testing.T, root *cobra.Command, path string) *cobra.Command {
+	t.Helper()
+	tokens := strings.Fields(path)
+	cmd, _, err := root.Find(tokens)
+	require.NoError(t, err, "resolving %q", path)
+	require.Equal(t, path, strings.Join(commandPathOf(cmd), " "), "%q did not resolve to itself", path)
+	return cmd
+}
+
+// commandPathOf mirrors the production path derivation for assertion purposes.
+func commandPathOf(cmd *cobra.Command) []string {
+	var path []string
+	for c := cmd; c != nil && c.Parent() != nil; c = c.Parent() {
+		path = append([]string{c.Name()}, path...)
+	}
+	return path
+}
+
+// syntheticCmd builds a standalone `neo4j-cli <path...>` chain, for paths the
+// live tree cannot supply: `completion` (cobra injects it at Execute() time,
+// after the tree the gate walks) and paths that do not exist at all, which is
+// how the default-deny branch is reached.
+func syntheticCmd(write bool, path ...string) *cobra.Command {
+	cmd := &cobra.Command{Use: "neo4j-cli"}
+	for _, name := range path {
+		child := &cobra.Command{Use: name}
+		cmd.AddCommand(child)
+		cmd = child
+	}
+	if write {
+		cmd.Annotations = map[string]string{"write": "true"}
+	}
+	return cmd
 }
 
 // findSubcommand returns the direct subcommand of parent with the given name,

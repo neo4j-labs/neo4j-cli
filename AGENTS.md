@@ -103,6 +103,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 
 - Skill `Example:` fields render flush-left (`render.go` TrimSpaces first line only) — write multi-line Examples with NO leading indent.
 - Every runnable leaf needs a flush-left `Example:` (≥2 invocations, `# comment` per invocation, `neo4j-cli` prefix, `--rw` on writes, ≥1 `--format json` on reads). Gate: `TestAllLeafCommands_HaveExamples` (agentcontext).
+- Adding/renaming ANY command also diffs `neo4j-cli/internal/subcommands/mcp/testdata/policy.golden` (its MCP policy). Decide whether the new policy is right, then `go test ./neo4j-cli/internal/subcommands/mcp -update`.
 - `description.txt` frontmatter: single paragraph, ≤1024 chars, third-person; name each credential subtree explicitly.
 
 ## Changie

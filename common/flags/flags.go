@@ -84,10 +84,17 @@ func BindFormatFromFlag(cmd *cobra.Command, cfg *clicfg.Config) error {
 	return nil
 }
 
+// IsWriteCommand reports whether cmd is annotated as a write. It is the single
+// reader of the annotation string, so a second consumer (the MCP policy table)
+// cannot drift from what EnforceWriteGate below actually enforces.
+func IsWriteCommand(cmd *cobra.Command) bool {
+	return cmd.Annotations["write"] == "true"
+}
+
 // EnforceWriteGate rejects write-annotated commands unless RequireWriteAccess
 // allows them.
 func EnforceWriteGate(cmd *cobra.Command) error {
-	if cmd.Annotations["write"] != "true" {
+	if !IsWriteCommand(cmd) {
 		return nil
 	}
 

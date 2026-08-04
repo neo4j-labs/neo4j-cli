@@ -30,6 +30,8 @@ func NewCmd(cfg *clicfg.Config, newRoot RootFactory) *cobra.Command {
 			"(`neo4j-cli config set flag.mcp-server true`, or NEO4J_CLI_FLAG_MCP_SERVER=1).",
 	}
 
+	RegisterGateFlags(cmd)
+
 	cmd.AddCommand(newToolsCmd(cfg))
 
 	return cmd
