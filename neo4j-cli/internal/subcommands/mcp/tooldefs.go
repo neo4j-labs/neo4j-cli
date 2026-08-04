@@ -85,6 +85,29 @@ func toolDefinitions() []*mcpsdk.Tool {
 			},
 		},
 		{
+			Name:        "neo4j_cli_run",
+			Title:       "Run a neo4j-cli command (read-only)",
+			Description: "Execute a neo4j-cli read-only command. The `command` parameter is a validated CLI path (e.g. `docker load`, `query`). The `args` parameter supplies additional positional arguments and flags as separate array elements (e.g. `[\"--name\", \"mycontainer\"]`), capped at 64 items. Write-classified commands are refused and return a usage error naming `neo4j_cli_run_write`. Unknown flags are detected before execution with a did-you-mean suggestion. Use `neo4j_cli_list_commands` to explore available commands and `neo4j_cli_read_docs` to learn their flags before calling this tool.",
+			Annotations: &mcpsdk.ToolAnnotations{
+				ReadOnlyHint: true,
+			},
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"command": map[string]any{
+						"type":        "string",
+						"description": "The CLI command to run, e.g. 'docker load', 'query'. Must be a read-only command; write-classified commands return an error pointing at neo4j_cli_run_write.",
+					},
+					"args": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string"},
+						"description": "Additional positional arguments and flags as separate array elements (e.g. ['--name', 'mycontainer']). Capped at 64 items. Do not include --rw or --debug here.",
+					},
+				},
+				"required": []string{"command"},
+			},
+		},
+		{
 			Name:        "neo4j_cli_read_docs",
 			Title:       "Read neo4j-cli documentation",
 			Description: "Read the documentation for a neo4j-cli command from the embedded skill bundle. The `command` parameter is a space-separated CLI path (e.g. `docker load`, `docker`, `aura`). Returns the matched section's prose, flags and examples. A tree name alone (e.g. `aura`) returns only the table of contents and tree overview, not its child commands. Use `offset` and `max_chars` for pagination through large sections (default 6000 chars, max 20000). The bundle is the same documentation the `neo4j-cli skill install` command writes onto disk, sourced from the generated reference files.",

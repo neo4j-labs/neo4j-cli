@@ -261,7 +261,7 @@ tasks:
       traces go to package-global debugW seams). Validate flag long-names against the
       resolved leaf''s agentcontext.Flag list with a did-you-mean suggestion, which is
       cheaper than an exec. Cap args at 64 items.
-    status: pending
+    status: completed
     dependencies:
       - task-007
       - task-009
@@ -271,7 +271,7 @@ tasks:
       - 'An unknown flag returns usage_error with a did-you-mean suggestion and no command execution'
       - 'run("query") with empty args returns a usage error and does NOT hang the server'
       - 'args is capped at 64 items; the tool carries readOnlyHint'
-    completed_at: null
+    completed_at: 2026-08-04T19:05:00Z
 
   - id: task-011
     title: 'Implement neo4j_cli_run_write behind three independent write gates'

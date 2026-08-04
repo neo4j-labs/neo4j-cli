@@ -154,11 +154,22 @@ func testRootFactory(cfg *clicfg.Config) *cobra.Command {
 
 // setupListCommandsTest populates the package-level globals the tool handler
 // depends on, using a stub tree to avoid an import cycle with package app.
+// Saves and restores globals so independent internal test suites do not
+// interfere with each other.
 func setupListCommandsTest(t *testing.T) {
 	t.Helper()
 	if storedRootFactory != nil {
 		return
 	}
+	prevVersion := storedVersion
+	prevFlagStates := storedFlagStates
+	prevRootFactory := storedRootFactory
+	t.Cleanup(func() {
+		storedVersion = prevVersion
+		storedFlagStates = prevFlagStates
+		storedRootFactory = prevRootFactory
+	})
+
 	storedVersion = "test"
 	storedFlagStates = map[string]bool{}
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
