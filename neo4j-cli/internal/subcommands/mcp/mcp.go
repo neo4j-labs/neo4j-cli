@@ -50,9 +50,8 @@ func NewCmd(cfg *clicfg.Config, newRoot RootFactory) *cobra.Command {
 		return nil
 	}
 
-	RegisterGateFlags(cmd)
-
 	cmd.AddCommand(newToolsCmd(cfg))
+	cmd.AddCommand(newServeCmd(cfg))
 
 	return cmd
 }

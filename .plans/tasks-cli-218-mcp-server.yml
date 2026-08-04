@@ -326,7 +326,7 @@ tasks:
       mcp serve --format json changing that default; do not rely on
       output.ResolveOutput''s agent-harness branch, which reads the server process env.
       format is deliberately not a tool parameter.
-    status: pending
+    status: completed
     dependencies:
       - task-011
       - task-012
@@ -336,7 +336,9 @@ tasks:
       - 'toon is injected as the default format for executed commands; --format json overrides it; format is not a tool parameter'
       - 'Handler tests run over the SDK NewInMemoryTransports() with no subprocess, socket or port binding'
       - 'serve is NOT annotated write:"true", so EnforceWriteGate does not demand --rw merely to start the server'
-    completed_at: null
+      - 'VERIFIED by manual JSON-RPC smoke test: initialize returns capabilities + a 918-byte instructions field, tools/list returns the five tools, and a clean client disconnect after a completed request exits 0. Transport is IOTransport over the ClaimStdio files, never StdioTransport.'
+      - 'The mcp serve leaf is classified deny in testdata/policy.golden (no recursive servers), and go generate produces no skill-bundle drift because the group is flag-gated'
+    completed_at: 2026-08-04T18:52:01Z
 
   - id: task-014
     title: 'Add the token-budget and tool-naming CI gates'

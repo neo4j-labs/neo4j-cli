@@ -174,16 +174,13 @@ func Check(cmd *cobra.Command, args []string, gates Gates) error {
 	return nil
 }
 
-// RegisterGateFlags adds the two opt-in gate flags, both default false.
-//
-// They are persistent flags on the `mcp` parent rather than local flags on
-// `mcp serve` only because `serve` does not exist yet; move them down when it
-// lands so they stop appearing on the read-only leaves.
+// RegisterGateFlags adds the two opt-in gate flags to a command. Now only used
+// by tests; serve.go adds its own local flags via addServeFlags.
 func RegisterGateFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool(AllowAuraFlag, false,
-		"Let MCP clients provision, modify and delete Aura resources, which costs money. Applies to 'mcp serve'.")
+		"Let MCP clients provision, modify and delete Aura resources, which costs money")
 	cmd.PersistentFlags().Bool(AllowCredentialWriteFlag, false,
-		"Let MCP clients add, remove and select stored credentials in the OS keyring. Applies to 'mcp serve'.")
+		"Let MCP clients add, remove and select stored credentials in the OS keyring")
 }
 
 // GatesFromCommand reads the two opt-in gate flags (--allow-aura and

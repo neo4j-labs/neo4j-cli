@@ -289,37 +289,28 @@ func TestCheck_Gates(t *testing.T) {
 	}
 }
 
-// TestGateFlags_DefaultFalseAndInherited checks both gate flags exist on the
-// live tree, default to false, and are readable from a leaf by inheritance.
-func TestGateFlags_DefaultFalseAndInherited(t *testing.T) {
+// TestGateFlags_RegisteredOnServe checks both gate flags exist on the serve
+// command, default to false, and are readable. The flags were moved from the
+// mcp parent to serve in task-013.
+func TestGateFlags_RegisteredOnServe(t *testing.T) {
 	root := newAppCmdEveryFlagEnabled(t)
-	group := findSubcommand(root, "mcp")
-	require.NotNil(t, group)
+	serve := findSubcommand(findSubcommand(root, "mcp"), "serve")
+	require.NotNil(t, serve)
 
 	for _, name := range []string{"allow-aura", "allow-credential-write"} {
-		flag := group.PersistentFlags().Lookup(name)
-		require.NotNil(t, flag, "--%s must be registered", name)
+		flag := serve.Flags().Lookup(name)
+		require.NotNil(t, flag, "--%s must be registered on serve", name)
 		assert.Equal(t, "false", flag.DefValue, "--%s must be opt-in", name)
 	}
 
-	leaf := findSubcommand(group, "tools")
-	require.NotNil(t, leaf)
-	gates, err := mcp.GatesFromCommand(leaf)
+	gates, err := mcp.GatesFromCommand(serve)
 	require.NoError(t, err)
 	assert.Equal(t, mcp.Gates{}, gates, "both gates closed before any flag is set")
 
-	require.NoError(t, group.PersistentFlags().Set("allow-aura", "true"))
-	gates, err = mcp.GatesFromCommand(leaf)
+	require.NoError(t, serve.Flags().Set("allow-aura", "true"))
+	gates, err = mcp.GatesFromCommand(serve)
 	require.NoError(t, err)
 	assert.Equal(t, mcp.Gates{AllowAura: true}, gates)
-}
-
-// TestGateFlags_ParseFromArgv proves the parked flags are actually accepted on
-// the command line while they live on the `mcp` parent, so `mcp serve` inherits
-// a working flag rather than a declaration nobody ever parsed.
-func TestGateFlags_ParseFromArgv(t *testing.T) {
-	_, stderr, err := runApp(t, true, "mcp", "tools", "--allow-aura", "--allow-credential-write")
-	require.NoError(t, err, "stderr=%s", stderr.String())
 }
 
 // TestGatesFromCommand_MissingFlagErrors pins the fail-loudly choice: a caller

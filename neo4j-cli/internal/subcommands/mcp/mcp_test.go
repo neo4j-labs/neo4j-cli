@@ -35,6 +35,10 @@ func TestMCPGroup_PresentWhenFlagEnabled(t *testing.T) {
 	tools := findSubcommand(group, "tools")
 	require.NotNil(t, tools, "the tools leaf must be registered")
 	assert.False(t, tools.Hidden)
+
+	serve := findSubcommand(group, "serve")
+	require.NotNil(t, serve, "the serve leaf must be registered")
+	assert.False(t, serve.Hidden)
 }
 
 // TestMCPGroup_EnabledByEnvVar covers the override surface CI uses to exercise

@@ -102,3 +102,8 @@ Decisions:
 Fifth and final tool `neo4j_cli_list_targets` (readOnly+idempotent, no params): fans out over docker/desktop/credential-dbms/aura-instance list and merges into one table; an unavailable source becomes a noted omission rather than a failure.
 Files: +list_targets.go, +list_targets_test.go, ~tooldefs.go
 Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED without committing; also repaired a duplicate `status:` line the child left in task-011's block.
+
+## TASK-013 — 2026-08-04T18:52:01Z
+Wired `mcp serve` over stdio: IOTransport on the ClaimStdio files, five tools from toolDefinitions(), 918-byte instructions field, --rw/--allow-aura/--allow-credential-write/--format/--max-output-chars moved onto serve. Verified by manual JSON-RPC smoke test (initialize + tools/list).
+Files: +serve.go, +server.go, +server_test.go, ~allow.go, ~allow_test.go, ~mcp.go, ~mcp_test.go, ~testdata/policy.golden
+Decisions: finalize run by parent after child agent stalled mid-review. `mcp serve` classified deny in policy.golden (no recursive servers). Tool defs measure 3259 B via `mcp tools --format json`, under the 4000 B budget task-014 gates; the wire tools/list response is larger (4874 B) because the SDK injects schema scaffolding the budget does not cover.
