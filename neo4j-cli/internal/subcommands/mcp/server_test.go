@@ -6,11 +6,14 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +74,7 @@ func serverTestRootFactory(_ *clicfg.Config) *cobra.Command {
 			return nil
 		},
 	})
-	docker.AddCommand(&cobra.Command{
+	createCmd := &cobra.Command{
 		Use:         "create",
 		Short:       "Create a container",
 		Annotations: map[string]string{"write": "true"},
@@ -80,7 +83,9 @@ func serverTestRootFactory(_ *clicfg.Config) *cobra.Command {
 			_, _ = c.OutOrStdout().Write([]byte("created: " + name + "\n"))
 			return nil
 		},
-	})
+	}
+	createCmd.Flags().Bool("no-print-password", false, "Suppress password")
+	docker.AddCommand(createCmd)
 	docker.AddCommand(&cobra.Command{
 		Use: "load", Short: "Load a dataset", RunE: func(c *cobra.Command, _ []string) error {
 			_, _ = c.OutOrStdout().Write([]byte("loaded\n"))
@@ -307,4 +312,134 @@ func TestServe_NotAnnotatedWrite(t *testing.T) {
 	// so EnforceWriteGate would demand --rw merely to start the server,
 	// destroying the read-only default (REQ-NF-006).
 	assert.Empty(t, serve.Annotations, "serve must not carry annotations")
+}
+
+// ----- No-print-password injection tests -----
+
+func TestServer_NoPrintPasswordInjection(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"command":"docker create","args":["--name","test"]}`),
+		},
+	}
+	modified := injectNoPrintPassword(req)
+	require.NotSame(t, req, modified, "injectNoPrintPassword must modify docker create request")
+
+	var args map[string]any
+	require.NoError(t, json.Unmarshal(modified.Params.Arguments, &args))
+	argList, ok := args["args"].([]any)
+	require.True(t, ok)
+	require.Contains(t, argList, "--no-print-password")
+	require.Equal(t, "--no-print-password", argList[0], "--no-print-password must be the first arg")
+	require.Contains(t, argList, "--name")
+	require.Contains(t, argList, "test")
+}
+
+func TestServer_NoPrintPasswordNotInjectedWhenPresent(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"command":"docker create","args":["--no-print-password","--name","test"]}`),
+		},
+	}
+	modified := injectNoPrintPassword(req)
+	require.Same(t, req, modified, "injectNoPrintPassword must not modify when flag already present")
+}
+
+func TestServer_NoPrintPasswordNotInjectedForOtherCommands(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"command":"docker list","args":[]}`),
+		},
+	}
+	modified := injectNoPrintPassword(req)
+	require.Same(t, req, modified, "injectNoPrintPassword must not modify non-docker-create commands")
+}
+
+func TestServer_NoPrintPasswordNotInjectedForEmptyRequest(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{}`),
+		},
+	}
+	modified := injectNoPrintPassword(req)
+	require.Same(t, req, modified, "injectNoPrintPassword must not modify empty request")
+}
+
+func TestServer_NoPrintPasswordNotInjectedWhenPresentWithEquals(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"command":"docker create","args":["--no-print-password=true","--name","test"]}`),
+		},
+	}
+	modified := injectNoPrintPassword(req)
+	require.Same(t, req, modified, "injectNoPrintPassword must not modify when --no-print-password=value is present")
+}
+
+func TestServer_NoPrintPasswordNotInjectedWhenNoCommand(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"args":["--name","test"]}`),
+		},
+	}
+	modified := injectNoPrintPassword(req)
+	require.Same(t, req, modified, "injectNoPrintPassword must not modify when no command specified")
+}
+
+// ----- Credential store probe tests -----
+
+func TestCheckCredentialStore_KeyringUnavailable(t *testing.T) {
+	prevProbe := probeKeyringFn
+	t.Cleanup(func() { probeKeyringFn = prevProbe })
+
+	probeKeyringFn = func() error {
+		return errors.New("simulated keyring failure")
+	}
+
+	fs, err := testfs.GetTestFs(`{"credential-storage":"keyring"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	defer cfg.Events.Flush()
+
+	err = checkCredentialStore(cfg)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "error must be a CLIError")
+	require.Equal(t, 1, ce.Code)
+	assert.Contains(t, ce.Message, "OS keyring is locked")
+	assert.Contains(t, ce.Message, "config set credential-storage insecure")
+}
+
+func TestCheckCredentialStore_KeyringOK(t *testing.T) {
+	prevProbe := probeKeyringFn
+	t.Cleanup(func() { probeKeyringFn = prevProbe })
+
+	probeKeyringFn = func() error {
+		return nil
+	}
+
+	fs, err := testfs.GetTestFs(`{"credential-storage":"keyring"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	defer cfg.Events.Flush()
+
+	err = checkCredentialStore(cfg)
+	require.NoError(t, err)
+}
+
+func TestCheckCredentialStore_InsecureModeSkipsProbe(t *testing.T) {
+	prevProbe := probeKeyringFn
+	t.Cleanup(func() { probeKeyringFn = prevProbe })
+
+	probeKeyringFn = func() error {
+		return errors.New("should not be called")
+	}
+
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	defer cfg.Events.Flush()
+
+	err = checkCredentialStore(cfg)
+	require.NoError(t, err, "insecure mode must skip probe")
 }

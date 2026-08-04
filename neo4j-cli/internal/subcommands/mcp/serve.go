@@ -8,6 +8,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
 )
@@ -44,6 +45,31 @@ func newServeCmd(cfg *clicfg.Config) *cobra.Command {
 	return cmd
 }
 
+// probeKeyringFn is the injectable seam for credential store availability at
+// server start. Production wires credentials.ProbeKeyringAvailability; tests
+// swap in a stub so the test does not depend on the real OS keyring.
+var probeKeyringFn = credentials.ProbeKeyringAvailability
+
+// checkCredentialStore returns an actionable error when the credential storage
+// mode is "keyring" but the OS keyring daemon is unreachable. A locked or
+// unavailable keyring would hang on the first credential read during a tool
+// call; checking at server start catches it early.
+func checkCredentialStore(cfg *clicfg.Config) error {
+	if cfg.Global.CredentialStorage() != credentials.StorageModeKeyring {
+		return nil
+	}
+	if err := probeKeyringFn(); err != nil {
+		return clierr.NewFatalError(
+			"OS keyring is locked or unavailable (%v).\n"+
+				"To store credentials in plaintext instead, run:\n"+
+				"  neo4j-cli config set credential-storage insecure --rw\n"+
+				"\n...or unlock your keyring.",
+			err,
+		)
+	}
+	return nil
+}
+
 // addServeFlags registers the serve command's flags. The gate flags were previously
 // persistent flags on the `mcp` parent (task-005 parked them there because `serve`
 // did not exist yet).
@@ -73,6 +99,10 @@ func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 		AllowAura:            allowAura,
 		AllowCredentialWrite: allowCredWrite,
 		WriteAllowed:         writeAllowed,
+	}
+
+	if err := checkCredentialStore(cfg); err != nil {
+		return err
 	}
 
 	exec, err := NewExecutor(cfg, storedRootFactory)

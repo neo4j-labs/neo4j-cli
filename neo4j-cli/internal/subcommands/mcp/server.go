@@ -107,6 +107,7 @@ func (s *serverState) handlerFor(name string) func(ctx context.Context, req *mcp
 	case "neo4j_cli_run_write":
 		return func(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
 			modifiedReq := injectFormat(req, s.defaultFormat)
+			modifiedReq = injectNoPrintPassword(modifiedReq)
 			return HandleRunWrite(ctx, modifiedReq, s.exec, s.gates, s.newRoot)
 		}
 	case "neo4j_cli_list_targets":
@@ -175,3 +176,55 @@ func hasFormatFlag(args []any) bool {
 // maxOutputChars stores the --max-output-chars value from serve for future
 // wiring into MapCommandResult's ResultOptions. Currently unused: handlers
 // use DefaultMaxOutputChars (8000) which matches the flag's default.
+
+// injectNoPrintPassword injects --no-print-password into the args array when
+// the command is "docker create" and the flag is not already present. Under MCP
+// a generated password must not enter the model context.
+func injectNoPrintPassword(req *mcpsdk.CallToolRequest) *mcpsdk.CallToolRequest {
+	if req == nil || req.Params == nil || req.Params.Arguments == nil {
+		return req
+	}
+	var args map[string]any
+	if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+		return req
+	}
+	command, _ := args["command"].(string)
+	if command != "docker create" {
+		return req
+	}
+	existing, _ := args["args"].([]any)
+	if hasNoPrintPasswordFlag(existing) {
+		return req
+	}
+	// Prepend --no-print-password so docker create omits the password from its
+	// output without the model having to know about the flag.
+	newArgs := make([]any, 0, len(existing)+2)
+	newArgs = append(newArgs, "--no-print-password")
+	newArgs = append(newArgs, existing...)
+	args["args"] = newArgs
+
+	raw, err := json.Marshal(args)
+	if err != nil {
+		return req
+	}
+	return &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: raw,
+		},
+	}
+}
+
+// hasNoPrintPasswordFlag reports whether args already contains
+// --no-print-password in any supported spelling.
+func hasNoPrintPasswordFlag(args []any) bool {
+	for _, a := range args {
+		s, ok := a.(string)
+		if !ok {
+			continue
+		}
+		if s == "--no-print-password" || strings.HasPrefix(s, "--no-print-password=") {
+			return true
+		}
+	}
+	return false
+}

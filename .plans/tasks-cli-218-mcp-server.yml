@@ -422,7 +422,7 @@ tasks:
       credential store is unreadable (locked keyring, no D-Bus session), return an
       explicit actionable error rather than hanging or prompting. macOS was measured
       prompt-free; Linux/libsecret is the remaining unknown this error path covers.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -431,7 +431,7 @@ tasks:
       - 'docker create through run_write stores a credential and does not print the generated password'
       - 'An unreadable or locked credential store yields an actionable clierr error, never a hang or a prompt'
       - 'Tests use testfs.GetTestFs and never afero.NewOsFs()'
-    completed_at: null
+    completed_at: 2026-08-04T21:45:00Z
 
   - id: task-018
     title: 'Regenerate the skill bundle, add the changie entry and document conventions'
