@@ -292,7 +292,8 @@ tasks:
       - 'EnforceWriteGate is still the authoritative gate; no MCP-side reimplementation of write policy exists'
       - 'The tool carries destructiveHint and openWorldHint'
       - 'A write executed through the tool produces the same on-disk effect as the equivalent CLI invocation'
-    completed_at: null
+    status: completed
+    completed_at: 2026-08-04T19:45:00Z
 
   - id: task-012
     title: 'Implement neo4j_cli_list_targets as a multi-source discovery fan-out'

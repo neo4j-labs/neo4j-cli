@@ -37,10 +37,12 @@ const (
 )
 
 // Gates records which gated policies the operator opted into when starting the
-// server. Both default false.
+// server. All default false. WriteAllowed is the process gate for the write
+// tool (layer 1); the other two control gated policies (layer 2).
 type Gates struct {
 	AllowAura            bool
 	AllowCredentialWrite bool
+	WriteAllowed         bool
 }
 
 // deniedPaths are subtrees that are never executable over MCP, matched as
@@ -184,9 +186,12 @@ func RegisterGateFlags(cmd *cobra.Command) {
 		"Let MCP clients add, remove and select stored credentials in the OS keyring. Applies to 'mcp serve'.")
 }
 
-// GatesFromCommand reads the gate flags off cmd, local or inherited. A missing
-// flag is an error rather than a closed gate, so a caller that forgot
-// RegisterGateFlags fails loudly instead of silently refusing every gated call.
+// GatesFromCommand reads the two opt-in gate flags (--allow-aura and
+// --allow-credential-write) off cmd, local or inherited. It does NOT populate
+// WriteAllowed — that flag (--rw) belongs to the serve command and is set
+// separately by task-013's serve handler. A missing flag is an error rather
+// than a closed gate, so a caller that forgot RegisterGateFlags fails loudly
+// instead of silently refusing every gated call.
 func GatesFromCommand(cmd *cobra.Command) (Gates, error) {
 	aura, err := gateFlagValue(cmd, AllowAuraFlag)
 	if err != nil {

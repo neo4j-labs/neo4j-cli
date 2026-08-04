@@ -23,6 +23,10 @@ var (
 	// (HandleListCommands) build trees with the same flag configuration.
 	storedFlagStates map[string]bool
 
+	// hintTrue is a shared pointer for DestructiveHint and OpenWorldHint
+	// annotations that need a *bool pointing to true.
+	hintTrue = true
+
 	toolDefsOnce sync.Once
 )
 
@@ -102,6 +106,30 @@ func toolDefinitions() []*mcpsdk.Tool {
 						"type":        "array",
 						"items":       map[string]any{"type": "string"},
 						"description": "Additional positional arguments and flags as separate array elements (e.g. ['--name', 'mycontainer']). Capped at 64 items. Do not include --rw or --debug here.",
+					},
+				},
+				"required": []string{"command"},
+			},
+		},
+		{
+			Name:        "neo4j_cli_run_write",
+			Title:       "Run a neo4j-cli command (write)",
+			Description: "Execute a write-classified neo4j-cli command. The `command` parameter is a validated CLI path (e.g. `docker create`, `credential dbms add`). The `args` parameter supplies additional positional arguments and flags as separate array elements (e.g. `[\"--name\", \"mycontainer\"]`), capped at 64 items. Read-classified commands are refused and return a usage error naming `neo4j_cli_run`. Unknown flags are detected before execution with a did-you-mean suggestion. Write commands require `--rw` in `args` to pass the CLI's own write gate. Use `neo4j_cli_list_commands` and `neo4j_cli_read_docs` to learn about commands before calling this tool.",
+			Annotations: &mcpsdk.ToolAnnotations{
+				DestructiveHint: &hintTrue,
+				OpenWorldHint:   &hintTrue,
+			},
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"command": map[string]any{
+						"type":        "string",
+						"description": "The CLI command to run, e.g. 'docker create', 'credential dbms add'. Must be a write-classified command; read commands return an error pointing at neo4j_cli_run.",
+					},
+					"args": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string"},
+						"description": "Additional positional arguments and flags as separate array elements (e.g. ['--name', 'mycontainer']). Capped at 64 items. Write commands need --rw in args to pass the CLI's write gate.",
 					},
 				},
 				"required": []string{"command"},

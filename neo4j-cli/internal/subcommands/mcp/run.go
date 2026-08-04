@@ -140,6 +140,14 @@ func runError(msg string) *mcpsdk.CallToolResult {
 	}
 }
 
+// alwaysKnownFlags are flag names that are universally registered on the
+// production root (--rw, --format) and so are always valid in any args.
+// Listed here rather than expecting every stub tree to register them.
+var alwaysKnownFlags = map[string]bool{
+	"rw":     true,
+	"format": true,
+}
+
 // validateRunFlags checks every --flag in args against the command's known
 // flag names (local + inherited, excluding hidden). Unknown flags return a
 // usage-style error with a did-you-mean suggestion.
@@ -153,7 +161,7 @@ func validateRunFlags(cmd *cobra.Command, args []string) error {
 		if flagName == "" {
 			continue
 		}
-		if known[flagName] {
+		if known[flagName] || alwaysKnownFlags[flagName] {
 			continue
 		}
 		if suggestion := closestFlag(flagName, known); suggestion != "" {

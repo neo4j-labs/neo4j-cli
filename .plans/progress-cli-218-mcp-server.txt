@@ -89,3 +89,11 @@ Files: +read_docs.go, +read_docs_test.go, +read_docs_drift_test.go, ~tooldefs.go
 ## TASK-010 — 2026-08-04T19:05:00Z
 Implemented neo4j_cli_run tool (readOnlyHint) taking command + args as separate params (args capped at 64). Pre-exec validation: write-classified commands refused with neo4j_cli_run_write hint; --rw/--debug in args rejected; flag long-names validated with Levenshtein did-you-mean; query with empty args caught before exec (stdin leaf guard). Uses existing Executor and MapCommandResult for execution/redaction. Updated setupListCommandsTest with save/restore global state for test isolation.
 Files: +run.go, +run_test.go, ~tooldefs.go, ~list_commands_test.go
+
+## TASK-011 — 2026-08-04T19:45:00Z
+Implemented neo4j_cli_run_write with three-layer write gating: process gate (WriteAllowed in Gates), policy table (Check), and authoritative EnforceWriteGate inside Execute. Reuses run's helpers (parseRunArgs, validateRunFlags, isStdinLeaf, runError). Added alwaysKnownFlags (--rw, --format) to validateRunFlags so root-level flags pass validation on any tree. Gates.WriteAllowed added for task-013 to wire from serve --rw.
+Files: +run_write.go, +run_write_test.go, ~run.go, ~tooldefs.go, ~allow.go
+Decisions:
+- WriteAllowed added to Gates struct (not a separate parameter) so task-013 sets it from serve --rw alongside AllowAura/AllowCredentialWrite.
+- alwaysKnownFlags in run.go avoids requiring every test stub to register root-level flags. Only --rw and --format.
+- Authoritative gate test (TestHandleRunWrite_AuthoritativeGate) uses a writeGateRootFactory with EnforceWriteGate installed and proves layer 3 catches writes without --rw even when MCP-layer gates are open.
