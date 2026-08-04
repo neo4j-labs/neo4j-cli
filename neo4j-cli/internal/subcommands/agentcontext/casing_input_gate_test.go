@@ -24,9 +24,10 @@ var kebabCase = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 //
 // The current tree already complies; this gate guards future additions (a
 // stray `--bad_flag` or a snake/camel command name fails with the offending
-// path / identifier named).
+// path / identifier named). Every feature flag is enabled so flag-gated
+// subtrees are covered too.
 func TestInputIdentifiers_AreKebabCase(t *testing.T) {
-	root := newAppCmd(t)
+	root := newAppCmdEveryFlagEnabled(t)
 
 	var walk func(c *cobra.Command, path string)
 	walk = func(c *cobra.Command, path string) {

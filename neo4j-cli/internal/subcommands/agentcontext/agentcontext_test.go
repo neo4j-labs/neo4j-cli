@@ -31,6 +31,22 @@ func newAppCmd(t *testing.T) *cobra.Command {
 	return app.NewCmd(cfg)
 }
 
+// newAppCmdEveryFlagEnabled builds the live tree with EVERY registered feature
+// flag forced on, so the whole-tree invariant gates below also cover subtrees
+// that app.NewCmd mounts only behind a flag (they are absent from newAppCmd's
+// default tree, which the shape assertions in this package depend on — hence a
+// separate helper rather than a change to newAppCmd).
+func newAppCmdEveryFlagEnabled(t *testing.T) *cobra.Command {
+	t.Helper()
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	for name := range clicfg.Registry {
+		cfg.Flags.SetForTest(name, true)
+	}
+	return app.NewCmd(cfg)
+}
+
 // runAgentContext invokes `agent-context` with the given extra args via the
 // live app tree, returning stdout/stderr buffers and the Execute error.
 func runAgentContext(t *testing.T, extraArgs ...string) (stdout, stderr *bytes.Buffer, err error) {
@@ -225,8 +241,11 @@ func TestAgentContext_HelpExamples(t *testing.T) {
 //
 // Failure messages name the offending command by its full path (e.g.
 // `neo4j-cli aura instance list`) so a missed leaf is trivial to localise.
+//
+// The tree is built with every feature flag enabled so flag-gated subtrees are
+// held to the same bar as the always-mounted ones.
 func TestAllLeafCommands_HaveExamples(t *testing.T) {
-	root := newAppCmd(t)
+	root := newAppCmdEveryFlagEnabled(t)
 
 	var walk func(c *cobra.Command, path string)
 	walk = func(c *cobra.Command, path string) {

@@ -123,7 +123,7 @@ tasks:
       the conservative choice since nothing in the design needs a newer spec feature.
       A bump is a separate, deliberate decision.) The transitive audit is already
       done — see task-003's VERIFIED criteria; do not redo it.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -132,9 +132,9 @@ tasks:
       - 'With the flag off, neo4j-cli --help shows no mcp group and agent-context output is unchanged'
       - 'With the flag on, mcp and all its leaves appear in help; mcp tools --format json runs without a transport'
       - 'The root factory is injected from app.go and mcp does not import neo4j-cli/app'
-      - 'Both leaves carry a flush-left Example: with at least 2 hash-commented invocations and at least one --format json, satisfying TestAllLeafCommands_HaveExamples'
+      - 'AMENDED (was "Both leaves…"): this task creates ONE leaf, `tools` — `serve` is task-013 — so the criterion is that every leaf the group has carries a flush-left Example: with >=2 hash-commented invocations and >=1 --format json. Satisfied THROUGH TestAllLeafCommands_HaveExamples rather than beside it: that gate (and the sibling INPUT-casing gate) now build the tree via a new agentcontext newAppCmdEveryFlagEnabled helper that flips every clicfg.Registry entry on, so flag-gated subtrees are covered by the existing whole-tree gates and every future flag-gated group is covered for free. No duplicated per-group gate.'
       - 'make generate-check reports no bundle drift (the tree is unchanged while the flag is off)'
-    completed_at: null
+    completed_at: 2026-08-04T13:16:04Z
 
   - id: task-005
     title: 'Implement the command policy table with a full-tree classification gate'
