@@ -1,0 +1,417 @@
+feature: cli-218-mcp-server
+prd: ./prd-cli-218-mcp-server.md
+created_at: 2026-08-04T10:05:37Z
+updated_at: 2026-08-04T10:05:37Z
+
+tasks:
+  - id: task-001
+    title: 'Register flag.mcp-server as the first clicfg.Registry entry'
+    description: |
+      Add a `flag.mcp-server` entry to the `Registry` map in `common/clicfg/flags.go`
+      with Default false, Owner, Gates, IntroducedIn and RemovalCondition populated.
+      This is the first production entry in a map that is currently empty, so this
+      task also proves the existing override machinery end to end. Both override
+      surfaces come free: `NEO4J_CLI_FLAG_MCP_SERVER=1` via `FlagNameToEnv`, and
+      `neo4j-cli config set flag.mcp-server true`. No MCP code yet.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'Registry contains flag.mcp-server with Default false and all metadata fields populated'
+      - 'cfg.Flags.Enabled("flag.mcp-server") returns false by default, true with NEO4J_CLI_FLAG_MCP_SERVER=1'
+      - 'neo4j-cli config set flag.mcp-server true persists the key, and config get / config list surface it with no new plumbing'
+      - 'Tests cover BOTH flag states per .agents/feature-flags.md'
+      - 'make test, make fmt-check, make lint, make license-check all pass'
+    completed_at: null
+
+  - id: task-002
+    title: 'Extend skill.Agent with MCP capability fields and add claude-desktop'
+    description: |
+      Add optional `MCPConfig string` and `MCPFormat Format` fields to `skill.Agent`
+      in `common/skill/agents.go`, plus a `claude-desktop` entry. Capability is
+      expressed by presence: empty SkillsDir means not a skill target, empty
+      MCPConfig means not an MCP target. Filter `agentNames()` on SkillsDir and add
+      a sibling projection filtered on MCPConfig. Apply the same filter in
+      `Install`, `Remove`, `List` and `BuildInventory`. Extend path expansion for
+      platform-specific locations (darwin `~/Library/Application Support/Claude`,
+      win32 `%APPDATA%\Claude`), reading the HOME env var rather than user.Current()
+      per the clicfg/darwin.go precedent. Ship this as its own commit ahead of any
+      MCP work so a skill-side regression stays bisectable.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'skill.Agent has MCPConfig and MCPFormat; a claude-desktop entry exists with no SkillsDir'
+      - 'agentNames() output is byte-identical to before, so the committed skill bundle does not drift and make generate-check stays clean'
+      - 'skill list, skill install, skill remove and BuildInventory ignore MCP-only entries; existing row-count expectations still hold'
+      - 'Platform-specific path expansion resolves the Claude Desktop directory on darwin and win32, driven by the HOME env var'
+      - 'Tests use afero MemMapFs and never afero.NewOsFs(); make test, make fmt-check, make lint pass'
+    completed_at: null
+
+  - id: task-003
+    title: 'Add the official Go MCP SDK dependency pinned to v1.4.1'
+    description: |
+      Add `github.com/modelcontextprotocol/go-sdk` at v1.4.1 stable to go.mod. Do
+      not use v1.7.0-pre.1: this binary is signed, notarized and shipped through
+      five channels, and the design needs no 2026-07-28 spec feature. Verify the
+      transitive dependency set stays pure Go so GoReleaser can keep cross-building
+      linux/windows/darwin by amd64/arm64.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'go.mod and go.sum pin github.com/modelcontextprotocol/go-sdk v1.4.1'
+      - 'go mod why confirms no cgo-requiring transitive dependency was introduced'
+      - 'A cross-compile smoke check succeeds for darwin/arm64, linux/amd64 and windows/amd64'
+      - 'make test and make lint pass with the new dependency present'
+    completed_at: null
+
+  - id: task-004
+    title: 'Scaffold the mcp command group behind the feature flag'
+    description: |
+      Create `neo4j-cli/internal/subcommands/mcp/` with parent `mcp.go` (at most 80
+      lines, NewCmd plus one AddCommand per leaf) and a `tools` leaf that prints the
+      registered tool manifest without starting a transport. Register the group from
+      `app.go` only when `flag.mcp-server` is enabled, and inject a
+      `func(*clicfg.Config) *cobra.Command` root factory to break the import cycle
+      (app must import mcp, so mcp cannot import app). Every leaf is visible when
+      the flag is on; no leaf sets Hidden.
+    status: pending
+    dependencies:
+      - task-001
+      - task-003
+    acceptance_criteria:
+      - 'With the flag off, neo4j-cli --help shows no mcp group and agent-context output is unchanged'
+      - 'With the flag on, mcp and all its leaves appear in help; mcp tools --format json runs without a transport'
+      - 'The root factory is injected from app.go and mcp does not import neo4j-cli/app'
+      - 'Both leaves carry a flush-left Example: with at least 2 hash-commented invocations and at least one --format json, satisfying TestAllLeafCommands_HaveExamples'
+      - 'make generate-check reports no bundle drift (the tree is unchanged while the flag is off)'
+    completed_at: null
+
+  - id: task-005
+    title: 'Implement the command policy table with a full-tree classification gate'
+    description: |
+      Add `mcp/allow.go` classifying every command path as deny, gated:allow-aura,
+      gated:allow-credential-write, write, or allow, defaulting to deny for anything
+      unclassified. Deny `update`, `mcp`, `completion`, `history clear` and
+      `config set credential-storage`. Gate Aura provisioning (it costs real money)
+      and credential mutation (it mints keyring entries). Classify write as anything
+      carrying Annotations["write"]="true". Add the corresponding --allow-aura and
+      --allow-credential-write opt-in flags, both default false.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - 'Classify() returns the documented policy for a representative path in every category'
+      - 'A gate test walks the live cobra tree and fails on any command path the table does not classify'
+      - 'Unclassified paths default to deny rather than allow'
+      - 'aura instance create and credential dbms add are refused unless the matching --allow-* flag is set'
+      - 'make test, make fmt-check, make lint pass'
+    completed_at: null
+
+  - id: task-006
+    title: 'Build the in-process executor with stdio fd swap and per-call isolation'
+    description: |
+      Execute commands in-process against a freshly built cobra tree per call rather
+      than re-executing the binary, so model-supplied secrets never reach a child
+      argv and typed *clierr.CLIError survives. After the transport captures stdout,
+      redirect the process os.Stdout to os.Stderr and os.Stdin to os.DevNull so no
+      stray read or write can corrupt or consume the JSON-RPC frame. Per call: fresh
+      clicfg.NewConfig and root, SetOut/SetErr to bounded buffers,
+      SetIn(bytes.NewReader(nil)) so confirm reads EOF, mutex serialisation, and a
+      recover() wrapper mirroring main.go recoverPanic.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - 'Running a command through the executor leaves the JSON-RPC frame intact even when the command writes directly to os.Stdout'
+      - 'A command that would read os.Stdin returns promptly instead of hanging; confirm prompts cancel cleanly on EOF'
+      - 'Global state does not leak between calls (viper, desktopclient debug, clievents, output.IsAgent)'
+      - 'A panicking command yields an error result rather than killing the server'
+      - 'Concurrent tool calls are serialised; make test, make fmt-check, make lint pass'
+    completed_at: null
+
+  - id: task-007
+    title: 'Map results and errors to CallToolResult with redaction and truncation'
+    description: |
+      Mirror main.go: errors.As into *clierr.CLIError with a clierr.NewFatalError
+      fallback, and return CallToolResult{isError: true} as a tool error rather than
+      a JSON-RPC error. Put ce.BuildEnvelope() verbatim into structuredContent
+      alongside stdout, stderr and redacted argv, reusing an already-documented
+      contract. Never call clierr.Render, which writes to streams. Pass every result
+      and error string through clievents.RedactText then output.StripControl, since
+      under MCP these strings are uploaded into the model context. Truncate output
+      at --max-output-chars (default 8000) and surface tee_path.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - 'A failing command returns isError true with code, exit_code, message, suggestion, retryable and tee_path in structuredContent'
+      - 'JSON-RPC errors are reserved for unknown tool and malformed params; command failures never surface as protocol errors'
+      - 'docker create driven against the fake docker client produces a CallToolResult that does not contain the generated password'
+      - 'Control and ANSI bytes are neutralised in returned text'
+      - 'Output beyond max-output-chars is truncated with tee_path surfaced for the remainder'
+    completed_at: null
+
+  - id: task-008
+    title: 'Implement neo4j_cli_list_commands as an agentcontext projection'
+    description: |
+      Add the catalog tool: no argument returns the 12 top-level trees, a `tree`
+      argument returns every command in that tree as `use: short` lines. Project
+      `agentcontext.BuildContext(root, version)` rather than introducing a new data
+      source, and generate the `tree` enum from the live tree at server start so a
+      new top-level tree auto-surfaces. Never return the full agent-context envelope,
+      which measures 283 KB / roughly 75k tokens.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - 'No-argument output lists the 12 top-level trees and stays around 750 bytes'
+      - 'A tree argument lists that tree''s commands; the enum is derived from the live tree, not hard-coded'
+      - 'The tool never emits the full agent-context envelope'
+      - 'Tool name and schema properties are snake_case and prefixed neo4j_cli_'
+    completed_at: null
+
+  - id: task-009
+    title: 'Implement neo4j_cli_read_docs as a skill-bundle heading slicer'
+    description: |
+      Resolve a space-separated CLI path against the embedded skill bundle
+      (`skill.Bundle`, `references/<tree>.md`) by matching the heading whose text is
+      the full command path and returning until the next heading of level at most the
+      matched level. This works because render.go walkRender already emits headings
+      like `## neo4j-cli docker load`. A tree name alone returns that file''s
+      `## Contents` TOC plus the tree''s own prose and never its children, giving a
+      roughly 3 KB menu for the 92 KB aura file. Support offset and max_chars
+      (default 6000, max 20000) with a continuation hint and next_offset. Filter the
+      `completion` entry, which agentcontext includes but the bundle does not.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - 'read_docs("docker load") returns that leaf''s prose, flag table and example invocations'
+      - 'read_docs("aura") returns the Contents TOC and tree prose only, never child sections'
+      - 'Results never exceed max_chars; truncated results end with a continuation hint and carry next_offset in structuredContent'
+      - 'A test asserts every entry list_commands can emit resolves to a reference file, with completion explicitly filtered'
+      - 'No second documentation corpus is introduced; the committed bundle remains the only source'
+    completed_at: null
+
+  - id: task-010
+    title: 'Implement neo4j_cli_run for read-only paths with pre-exec validation'
+    description: |
+      Add the read-only execution tool taking `command` (a validated CLI path) and
+      `args` (remaining positionals and flags as separate array elements), so args
+      can never introduce a subcommand token. Reject write-classified commands with a
+      usage_error naming neo4j_cli_run_write. Reject a literal --rw in args (pointing
+      at the write tool, so the policy layer cannot be bypassed) and --debug (whose
+      traces go to package-global debugW seams). Validate flag long-names against the
+      resolved leaf''s agentcontext.Flag list with a did-you-mean suggestion, which is
+      cheaper than an exec. Cap args at 64 items.
+    status: pending
+    dependencies:
+      - task-007
+      - task-009
+    acceptance_criteria:
+      - 'run refuses a write-annotated command and names neo4j_cli_run_write'
+      - 'A literal --rw or --debug in args is rejected with a usage_error'
+      - 'An unknown flag returns usage_error with a did-you-mean suggestion and no command execution'
+      - 'run("query") with empty args returns a usage error and does NOT hang the server'
+      - 'args is capped at 64 items; the tool carries readOnlyHint'
+    completed_at: null
+
+  - id: task-011
+    title: 'Implement neo4j_cli_run_write behind three independent write gates'
+    description: |
+      Add the destructive execution tool, accepting only write-classified commands.
+      Gate it three ways: mcp serve without --rw rejects every call before building a
+      tree; the policy table classifies the path; and the CLI''s own
+      flags.EnforceWriteGate fires inside Execute() off cmd.Annotations["write"].
+      Layer three is authoritative and must not be bypassed or reimplemented, so a
+      bug in the MCP layer cannot produce an unflagged write. Annotate the tool
+      destructiveHint and openWorldHint.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - 'run_write fails when mcp serve was started without --rw and succeeds when it was'
+      - 'run_write refuses a non-write command and points at neo4j_cli_run'
+      - 'EnforceWriteGate is still the authoritative gate; no MCP-side reimplementation of write policy exists'
+      - 'The tool carries destructiveHint and openWorldHint'
+      - 'A write executed through the tool produces the same on-disk effect as the equivalent CLI invocation'
+    completed_at: null
+
+  - id: task-012
+    title: 'Implement neo4j_cli_list_targets as a multi-source discovery fan-out'
+    description: |
+      Add the entry-point tool that answers "what Neo4j do I have?" by fanning out
+      over `docker list`, `desktop dbms list`, `credential dbms list` and
+      `aura instance list`, returning one table of reachable targets. Individual
+      source failures degrade to a noted omission rather than failing the whole tool,
+      since a user without Docker or without Aura credentials is the common case.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - 'All four sources are queried and merged into a single result'
+      - 'A failing or unavailable source is reported as an omission and does not fail the tool'
+      - 'The tool carries readOnlyHint and idempotentHint'
+      - 'Output field names are snake_case per the repo OUTPUT casing rule'
+    completed_at: null
+
+  - id: task-013
+    title: 'Wire mcp serve over stdio with the instructions field and format injection'
+    description: |
+      Assemble the server in `server.go` so it is testable without a transport, and
+      register exactly the five neo4j_cli_* tools. Set the MCP `instructions` field
+      (sent once at initialize, inside the cached prompt prefix) carrying the 12-tree
+      index plus orientation rules: run `query :schema` before writing Cypher, prefer
+      read_docs over guessing flags, never call run_write without user confirmation.
+      Inject --format toon into executed commands when args contains no --format, with
+      mcp serve --format json changing that default; do not rely on
+      output.ResolveOutput''s agent-harness branch, which reads the server process env.
+      format is deliberately not a tool parameter.
+    status: pending
+    dependencies:
+      - task-011
+      - task-012
+    acceptance_criteria:
+      - 'mcp serve speaks stdio MCP and lists exactly the five neo4j_cli_* tools with correct annotations'
+      - 'The instructions field carries the tree index and orientation rules and is sent once at initialize'
+      - 'toon is injected as the default format for executed commands; --format json overrides it; format is not a tool parameter'
+      - 'Handler tests run over the SDK NewInMemoryTransports() with no subprocess, socket or port binding'
+      - 'serve is NOT annotated write:"true", so EnforceWriteGate does not demand --rw merely to start the server'
+    completed_at: null
+
+  - id: task-014
+    title: 'Add the token-budget and tool-naming CI gates'
+    description: |
+      Turn the context-window constraint into a gate rather than an intention. Add a
+      golden test on `mcp tools --format json` that fails if serialized tool
+      definitions exceed 4000 bytes (roughly 1.1k tokens, about 1.8x headroom over
+      the design). Add a naming gate asserting every registered tool name matches
+      ^neo4j_cli_[a-z0-9_]+$ and every schema property matches ^[a-z][a-z0-9_]*$,
+      exempting SDK and spec fields. Any future tool addition must argue past these.
+    status: pending
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - 'A test fails when serialized tool definitions exceed 4000 bytes'
+      - 'A test fails on any tool name not matching ^neo4j_cli_[a-z0-9_]+$'
+      - 'A test fails on any schema property not matching ^[a-z][a-z0-9_]*$, with SDK/spec fields exempt'
+      - 'The existing casing gates in agentcontext and common/output still pass'
+      - 'The measured definition size is recorded so future drift is visible'
+    completed_at: null
+
+  - id: task-015
+    title: 'Generate the .mcpb bundle on the fly and add mcp bundle --out'
+    description: |
+      Build the manifest generator and `mcp bundle --out <path>`, producing a zip
+      containing manifest.json and README.md with NO binary inside, following the
+      verified Bear pattern. Use manifest_version 0.3, name neo4j-cli, display_name
+      "Neo4j CLI", server.type binary, and entry_point plus mcp_config.command
+      resolving to this binary''s absolute path via os.Executable(), with
+      args ["mcp","serve"]. Set tools_generated false with an explicit tools[] array
+      carrying title plus readOnlyHint/destructiveHint per tool. user_config carries a
+      selector, not secrets, because the Claude Extensions Settings sidecar is
+      plaintext: neo4j_cli_path, allow_writes (default false), neo4j_credential,
+      allowed_databases, result_row_limit (default 500) and NO NEO4J_PASSWORD. Treat
+      icon as optional and omit it in v1.
+    status: pending
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - 'mcp bundle --out X.mcpb produces a valid zip containing manifest.json and no binary'
+      - 'mcp_config.command is this binary''s absolute path from os.Executable(), with args ["mcp","serve"]'
+      - 'npx @anthropic-ai/mcpb validate accepts the generated manifest'
+      - 'user_config contains no password field; allow_writes defaults to false'
+      - 'The generator omits icon cleanly rather than referencing a missing file'
+    completed_at: null
+
+  - id: task-016
+    title: 'Add mcp install/remove/list/check for Claude Desktop'
+    description: |
+      Add the install leaves mirroring the skill analogues, reusing --agent,
+      DetectAgents, FindAgent and the existing filter error semantics (empty means
+      all detected, unknown gives ErrUnknownAgent, known-but-undetected gives
+      ErrAgentNotDetected). install generates the .mcpb, writes it under the user
+      cache dir and opens it so Claude Desktop shows its own install UI; it also
+      supports writing mcpServers."neo4j-cli" into claude_desktop_config.json as an
+      alternative. Any config write is a surgical merge, never a rewrite: read into
+      map[string]any, set only that one key, then atomic temp-file plus rename
+      preserving mode. The server key is neo4j-cli so it cannot collide with an
+      existing neo4j-prefixed entry.
+    status: pending
+    dependencies:
+      - task-002
+      - task-015
+    acceptance_criteria:
+      - 'mcp install --agent claude-desktop installs into Claude Desktop and the connector loads and lists its tools'
+      - 'A golden test proves merging into a realistic claude_desktop_config.json preserves preferences, globalShortcut and a pre-existing mcpServers entry'
+      - 'Config writes are atomic (temp-file plus rename) and preserve file mode'
+      - 'mcp list, mcp check and mcp remove behave per the skill analogues, including unknown-agent and undetected-agent errors; remove is idempotent'
+      - 'The server key written is neo4j-cli'
+    completed_at: null
+
+  - id: task-017
+    title: 'Resolve credentials with zero typing and fail loudly on a locked keyring'
+    description: |
+      Make the happy path require no typed credentials by resolving through the
+      existing dbconn.ResolveConn precedence (--credential selector, stored default
+      dbms credential, .env walk-up, OS env, then neo4j://localhost:7687). Make the
+      "I have no database" flow work end to end via docker create, which already
+      generates a password, stores a dbms credential and can suppress the password
+      from output; make --no-print-password the default under MCP. When the
+      credential store is unreadable (locked keyring, no D-Bus session), return an
+      explicit actionable error rather than hanging or prompting. macOS was measured
+      prompt-free; Linux/libsecret is the remaining unknown this error path covers.
+    status: pending
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - 'A stored dbms credential is used with no credentials supplied through the MCP surface'
+      - 'The neo4j_credential selector picks a named credential; precedence matches dbconn.ResolveConn'
+      - 'docker create through run_write stores a credential and does not print the generated password'
+      - 'An unreadable or locked credential store yields an actionable clierr error, never a hang or a prompt'
+      - 'Tests use testfs.GetTestFs and never afero.NewOsFs()'
+    completed_at: null
+
+  - id: task-018
+    title: 'Regenerate the skill bundle, add the changie entry and document conventions'
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` and commit any regenerated
+      output together with the source change. With the flag default false the tree is
+      unchanged, so the bundle should NOT drift; drift here is a signal the gating is
+      wrong. Add a changie entry describing only the observable surface (the new mcp
+      commands behind flag.mcp-server), not the internals. Add an AGENTS.md note
+      covering the stdio fd-swap requirement, the redaction obligation for tool
+      results, and the fact that a new secret-minting leaf that skips
+      RegisterSecretValue will leak into MCP transcripts.
+    status: pending
+    dependencies:
+      - task-016
+      - task-017
+    acceptance_criteria:
+      - 'make generate-check passes on a clean tree'
+      - 'A changie entry exists under .changes/unreleased/ describing only the user-facing surface'
+      - 'AGENTS.md documents the fd swap, the tool-result redaction obligation and the RegisterSecretValue hazard'
+      - 'make test, make fmt-check, make lint and make license-check all pass'
+      - 'CI exercises the flag-on path via NEO4J_CLI_FLAG_MCP_SERVER=1'
+    completed_at: null
+
+  - id: task-019
+    title: 'Validate discovery convergence end to end in Claude Desktop'
+    description: |
+      Install the generated bundle in Claude Desktop and run the real task: "find my
+      local Neo4j and load the movies dataset". Measure round trips and tokens against
+      REQ-NF-002 (at most 4 round trips and 2k tokens from a cold session, 1 round trip
+      when the command is already known). This is the empirical answer to the concern
+      on CLI-218 that a fully open surface would have a high failure rate. Record the
+      measured numbers. If the bar is missed the response is a curation change, owned
+      by the issue owner, not an architecture change.
+    status: pending
+    dependencies:
+      - task-014
+      - task-018
+    acceptance_criteria:
+      - 'The task completes in one chat turn using at most 4 tool round trips'
+      - 'Measured definition and conversation token counts are recorded against REQ-NF-002'
+      - 'The discovery path (read_docs then run) converges without the model guessing invalid flags'
+      - 'A write is correctly refused until run_write is used with the gate open'
+      - 'Findings are written up with a recommendation on whether the five-tool curation holds'
+    completed_at: null
