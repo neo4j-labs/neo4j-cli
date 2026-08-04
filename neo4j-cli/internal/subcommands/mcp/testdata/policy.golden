@@ -175,6 +175,10 @@ history clear	deny
 history list	allow
 mcp	deny
 mcp bundle	deny
+mcp check	deny
+mcp install	deny
+mcp list	deny
+mcp remove	deny
 mcp serve	deny
 mcp tools	deny
 query	allow

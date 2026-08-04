@@ -16,9 +16,14 @@ import (
 // formatAgentErr converts skill-package sentinel errors into user-facing
 // usage errors that include the valid agent names. Other errors pass
 // through unchanged. Used by install + remove leaves.
+// When ErrUnknownAgent names an MCP-only agent, the error points at
+// `mcp install --agent <name>` instead of listing skill agents.
 func formatAgentErr(err error) error {
 	switch {
 	case errors.Is(err, ErrUnknownAgent):
+		if name := extractAgentName(err); name != "" && isMCPOnlyAgent(name) {
+			return clierr.NewUsageError("unknown agent: %q is an MCP-only agent — use 'mcp install --agent %s' instead", name, name)
+		}
 		return clierr.NewUsageError("%v\nvalid agents: %s", err, strings.Join(agentNames(), ", "))
 	case errors.Is(err, ErrAgentNotDetected):
 		return clierr.NewUsageError("%v", err)
@@ -27,6 +32,25 @@ func formatAgentErr(err error) error {
 	default:
 		return err
 	}
+}
+
+// isMCPOnlyAgent reports whether name matches a catalog entry that supports
+// MCP but not skills. Used so `skill install --agent claude-desktop` produces
+// a helpful error pointing at `mcp install --agent <name>`.
+func isMCPOnlyAgent(name string) bool {
+	a := FindAgent(name)
+	return a != nil && a.SupportsMCP() && !a.SupportsSkills()
+}
+
+// extractAgentName attempts to extract the quoted agent name from an
+// ErrUnknownAgent-wrapping error which is formatted as `skill: unknown agent: "name"`.
+func extractAgentName(err error) string {
+	msg := err.Error()
+	// Format: 'skill: unknown agent: "name"'
+	if idx := strings.LastIndex(msg, ": "); idx >= 0 {
+		return strings.Trim(msg[idx+2:], `"`)
+	}
+	return ""
 }
 
 // agentNames lists the skill-capable agent names. Load-bearing: it is

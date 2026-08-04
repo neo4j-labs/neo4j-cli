@@ -226,6 +226,43 @@ func readTestManifest(t *testing.T) (string, map[string]any) {
 	return path, manifest
 }
 
+// newMCPInstallFixture builds the live tree over a MemMapFs with the Claude
+// Desktop detect dir seeded (when detected=true) and HOME set, so install
+// tests can exercise agent detection and config writes without touching disk.
+func newMCPInstallFixture(t *testing.T, detected bool) (*bytes.Buffer, *bytes.Buffer, *cobra.Command) {
+	t.Helper()
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+
+	if detected {
+		t.Setenv("HOME", "/Users/test")
+		claudeDir := "/Users/test/Library/Application Support/Claude"
+		require.NoError(t, fs.MkdirAll(claudeDir, 0755))
+	}
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	for name := range clicfg.Registry {
+		cfg.Flags.SetForTest(name, true)
+	}
+	root := app.NewCmd(cfg)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+
+	return stdout, stderr, root
+}
+
+// runMCPApp is like runApp but uses the MCP-install fixture if detected.
+func runMCPApp(t *testing.T, detected bool, args ...string) (stdout, stderr *bytes.Buffer, err error) {
+	t.Helper()
+	stdout, stderr, root := newMCPInstallFixture(t, detected)
+	root.SetArgs(args)
+	err = root.Execute()
+	return stdout, stderr, err
+}
+
 // readZipFile reads the named entry from a zip reader into memory.
 func readZipFile(t *testing.T, r *zip.ReadCloser, name string) []byte {
 	t.Helper()

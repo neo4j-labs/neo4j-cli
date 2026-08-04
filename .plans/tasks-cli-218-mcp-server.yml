@@ -398,7 +398,8 @@ tasks:
       map[string]any, set only that one key, then atomic temp-file plus rename
       preserving mode. The server key is neo4j-cli so it cannot collide with an
       existing neo4j-prefixed entry.
-    status: pending
+    status: completed
+    completed_at: 2026-08-04T22:45:00Z
     dependencies:
       - task-002
       - task-015
@@ -408,7 +409,6 @@ tasks:
       - 'Config writes are atomic (temp-file plus rename) and preserve file mode'
       - 'mcp list, mcp check and mcp remove behave per the skill analogues, including unknown-agent and undetected-agent errors; remove is idempotent'
       - 'The server key written is neo4j-cli'
-    completed_at: null
 
   - id: task-017
     title: 'Resolve credentials with zero typing and fail loudly on a locked keyring'
@@ -422,7 +422,7 @@ tasks:
       credential store is unreadable (locked keyring, no D-Bus session), return an
       explicit actionable error rather than hanging or prompting. macOS was measured
       prompt-free; Linux/libsecret is the remaining unknown this error path covers.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -444,7 +444,7 @@ tasks:
       covering the stdio fd-swap requirement, the redaction obligation for tool
       results, and the fact that a new secret-minting leaf that skips
       RegisterSecretValue will leak into MCP transcripts.
-    status: pending
+    status: completed
     dependencies:
       - task-016
       - task-017
@@ -466,7 +466,7 @@ tasks:
       on CLI-218 that a fully open surface would have a high failure rate. Record the
       measured numbers. If the bar is missed the response is a curation change, owned
       by the issue owner, not an architecture change.
-    status: pending
+    status: completed
     dependencies:
       - task-014
       - task-018
