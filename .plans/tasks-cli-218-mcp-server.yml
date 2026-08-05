@@ -511,7 +511,7 @@ tasks:
       surprising shared-mutable-state hazard. Replace with a simple
       func boolPtr(v bool) *bool { return &v } and materialise a fresh pointer per
       definition so no tool shares annotation state.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'No package-level shared *bool pointer for hint values; each tool definition materialises its own via boolPtr or equivalent'
@@ -519,7 +519,7 @@ tasks:
       - 'The token-budget and naming gates still pass'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T08:21:09Z
 
   - id: task-022
     title: 'Collapse injectFormat/injectNoPrintPassword into a single injectFlag helper'

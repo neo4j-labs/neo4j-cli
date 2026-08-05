@@ -23,12 +23,12 @@ var (
 	// (HandleListCommands) build trees with the same flag configuration.
 	storedFlagStates map[string]bool
 
-	// hintTrue is a shared pointer for DestructiveHint and OpenWorldHint
-	// annotations that need a *bool pointing to true.
-	hintTrue = true
-
 	toolDefsOnce sync.Once
 )
+
+// boolPtr returns a pointer to v, materializing a fresh *bool per call so no
+// two tool definitions share annotation state.
+func boolPtr(v bool) *bool { return &v }
 
 // ensureToolDefinitions populates toolTreeNames from the live tree. The config's
 // flag state is mirrored so flag-gated trees (mcp itself) appear in the enum.
@@ -116,8 +116,8 @@ func toolDefinitions() []*mcpsdk.Tool {
 			Title:       "Run a neo4j-cli command (write)",
 			Description: "Execute a write-classified neo4j-cli command. The `command` parameter is a validated CLI path (e.g. `docker create`, `credential dbms add`). The `args` parameter supplies additional positional arguments and flags as separate array elements (e.g. `[\"--name\", \"mycontainer\"]`), capped at 64 items. Read-classified commands are refused and return a usage error naming `neo4j_cli_run`. Unknown flags are detected before execution with a did-you-mean suggestion. Write commands require `--rw` in `args` to pass the CLI's own write gate. Use `neo4j_cli_list_commands` and `neo4j_cli_read_docs` to learn about commands before calling this tool.",
 			Annotations: &mcpsdk.ToolAnnotations{
-				DestructiveHint: &hintTrue,
-				OpenWorldHint:   &hintTrue,
+				DestructiveHint: boolPtr(true),
+				OpenWorldHint:   boolPtr(true),
 			},
 			InputSchema: map[string]any{
 				"type": "object",
