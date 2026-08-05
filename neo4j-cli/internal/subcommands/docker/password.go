@@ -41,12 +41,14 @@ const generatedPasswordBytes = 16
 // consumers that DO capture successful stdout, notably CLI-218's `mcp serve`,
 // whose default format is toon.
 //
-// Only GENERATED passwords are registered. An operator-supplied --password is
-// deliberately left unregistered: redaction of a known value is a literal
-// strings.ReplaceAll, so a short value like "neo4j" would rewrite
-// `neo4j://localhost:7687`, `neo4j:enterprise` and `username: neo4j` to *** in
-// every capture. Argv-level cover for --password already exists via
-// clievents.RedactArgs.
+// In the docker leaves only GENERATED passwords are registered — an
+// operator-supplied --password is deliberately left unregistered: redaction of a
+// known value is a literal strings.ReplaceAll, so a short value like "neo4j"
+// would rewrite `neo4j://localhost:7687`, `neo4j:enterprise` and
+// `username: neo4j` to *** in every capture. Argv-level cover for --password
+// already exists via clievents.RedactArgs. This is deliberately asymmetric with
+// the desktop leaves (desktop/dbms/create.go, desktop/connection/create.go and
+// update.go), which DO register operator-supplied passwords.
 func generatePassword() (string, error) {
 	buf := make([]byte, generatedPasswordBytes)
 	if _, err := io.ReadFull(randSource, buf); err != nil {
