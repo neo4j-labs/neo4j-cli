@@ -5,7 +5,6 @@ package docker
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -440,16 +439,6 @@ func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client do
 		URI:      uri,
 		Password: password,
 	}, nil
-}
-
-// generatePassword mints a base64 URL-safe password from randSource, matching
-// the docker create generator so credentials are interchangeable.
-func generatePassword() (string, error) {
-	buf := make([]byte, generatedPasswordBytes)
-	if _, err := io.ReadFull(randSource, buf); err != nil {
-		return "", fmt.Errorf("generate password: %w", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
 // copyFile copies src to dst, creating dst with 0644 perms (the in-container
