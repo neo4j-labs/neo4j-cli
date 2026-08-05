@@ -552,7 +552,8 @@ tasks:
       precise equality: s == "--format" || strings.HasPrefix(s, "--format="), and the
       same for --no-print-password. This removes the implicit dependency on the flag
       catalog and is cleaner.
-    status: pending
+    status: completed
+    completed_at: 2026-08-05T00:00:00Z
     dependencies:
       - task-022
     acceptance_criteria:
@@ -560,7 +561,6 @@ tasks:
       - 'No behavior change for existing flags; existing tests pass'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
 
   - id: task-024
     title: 'isStdinLeaf as a cobra annotation, not a hard-coded list'

@@ -194,3 +194,7 @@ Files: ~tooldefs.go
 ## TASK-022 — 2026-08-05T08:28:31Z
 Collapsed injectFormat/injectNoPrintPassword/hasFormatFlag/hasNoPrintPasswordFlag into injectFlag(req, predicate, flagItems...) — a single generic helper that unmarshals Args, checks a caller-provided predicate, prepends flag items, and remarshals. injectFormat kept as a thin wrapper (adds the empty-format guard). shouldInjectFormat and shouldInjectNoPrintPassword are the two predicate implementations. No behavior change: 253 mcp tests pass.
 Files: ~server.go, ~server_test.go
+
+## TASK-023 — 2026-08-05T00:00:00Z
+Tightened shouldInjectFormat's HasPrefix check to exact equality (s == "--format" || strings.HasPrefix(s, "--format=")), removing implicit dependency on the flag catalog. shouldInjectNoPrintPassword already used precise matching (unchanged). Added two tests matching NoPrintPassword coverage: equals-form and prefix-collision. 255 mcp tests pass (was 253). All gates green.
+Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go

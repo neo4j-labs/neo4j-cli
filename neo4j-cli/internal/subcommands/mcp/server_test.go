@@ -205,6 +205,36 @@ func TestServer_FormatInjectionNilArgs(t *testing.T) {
 	require.Contains(t, argList, "toon")
 }
 
+// TestServer_FormatInjectionJsonEquals proves the format injection respects
+// --format=value (equals form) and does not inject.
+func TestServer_FormatInjectionJsonEquals(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"command":"docker list","args":["--format=json"]}`),
+		},
+	}
+	modified := injectFormat(req, "toon")
+	require.Same(t, req, modified, "injectFormat must not modify when --format=value is present")
+}
+
+// TestServer_FormatInjectionPrefixCollision proves --formatting does NOT
+// suppress format injection (the earlier HasPrefix would have matched).
+func TestServer_FormatInjectionPrefixCollision(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"command":"docker list","args":["--formatting"]}`),
+		},
+	}
+	modified := injectFormat(req, "toon")
+	require.NotSame(t, req, modified, "injectFormat must inject when --formatting (not --format) is present")
+	var args map[string]any
+	require.NoError(t, json.Unmarshal(modified.Params.Arguments, &args))
+	argList, ok := args["args"].([]any)
+	require.True(t, ok)
+	require.Contains(t, argList, "--format")
+	require.Contains(t, argList, "toon")
+}
+
 // TestServer_FormatInjectionEmptyArgs proves injection works when args is
 // present but empty.
 func TestServer_FormatInjectionEmptyArgs(t *testing.T) {

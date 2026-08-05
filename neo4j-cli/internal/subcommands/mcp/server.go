@@ -137,7 +137,7 @@ func shouldInjectFormat(args map[string]any) bool {
 		if !ok {
 			continue
 		}
-		if strings.HasPrefix(s, "--format") {
+		if s == "--format" || strings.HasPrefix(s, "--format=") {
 			return false
 		}
 	}
