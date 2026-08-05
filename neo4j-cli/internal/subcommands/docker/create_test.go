@@ -22,6 +22,7 @@ import (
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
@@ -1760,4 +1761,96 @@ func TestCreate_NoPrintPassword_StdoutAndStderrFreeOfPassword(t *testing.T) {
 	combined := stdout + stderr
 	assert.NotContains(t, combined, expectedPassword,
 		"combined stdout+stderr must NOT contain the generated password; stdout=%q stderr=%q", stdout, stderr)
+}
+
+// TestCreate_GeneratedPassword_ScrubbedFromRedactedCapture — CLI-228, the
+// primary pin. For every format `docker create` can render, the generated
+// password must be gone after a pass through clievents.RedactText. Each subtest
+// asserts both halves of the contract: raw stdout STILL carries the password
+// (this fix leaves human-facing output byte-identical) and the redacted copy
+// does not.
+//
+// Scope caveat — this pins a HELPER-LEVEL invariant ("the minted value is
+// registered, therefore RedactText can scrub it"), NOT a closed end-to-end leak.
+// The test calls RedactText itself; no production path currently feeds
+// SUCCESSFUL stdout through it (the tee buffer is persisted only when the
+// command fails, and --debug covers stderr plus env NAMES only).
+//
+// --format is passed explicitly in every subtest because the default resolution
+// is environment-dependent (output.ResolveOutput: explicit flag > agent harness
+// → toon > TTY → table > json), so an implicit default would silently retarget
+// the matrix depending on where the suite runs.
+//
+// Each subtest consumes a distinct randSource byte so it registers its own
+// literal in the process-global, additive knownSecrets registry (which has no
+// exported reset) and cannot be carried by a sibling's registration.
+func TestCreate_GeneratedPassword_ScrubbedFromRedactedCapture(t *testing.T) {
+	tests := []struct {
+		name     string
+		format   string
+		randByte byte
+	}{
+		// table and toon are the two formats that actually leak pre-fix: both
+		// put the value on a different line from its header (a box-drawing cell
+		// and a TOON array row). toon matters most — it is the agent-harness
+		// default.
+		{"table", "table", 0x02},
+		{"toon", "toon", 0x03},
+		// json passes both BEFORE and AFTER this fix: `"password":"<v>"` is
+		// already caught by textJSONFieldRe. It is here so the matrix documents
+		// coverage of every renderable format, not because it pins this change.
+		{"json", "json", 0x04},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			origRand := randSource
+			randSource = constantReader{b: tc.randByte}
+			defer func() { randSource = origRand }()
+			expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{tc.randByte}, generatedPasswordBytes))
+
+			_, _, stdout, err := runCreate(t, "--name dev --format "+tc.format)
+			require.NoError(t, err)
+
+			require.Contains(t, stdout, expectedPassword,
+				"%s stdout must still render the generated password verbatim; got: %q", tc.name, stdout)
+
+			redacted := clievents.RedactText(stdout)
+			assert.NotContains(t, redacted, expectedPassword,
+				"%s output must not survive redaction with the generated password intact; redacted: %q", tc.name, redacted)
+			assert.Contains(t, redacted, "***",
+				"%s redacted output must show the placeholder where the password was; redacted: %q", tc.name, redacted)
+		})
+	}
+}
+
+// TestCreate_Ephemeral_GeneratedPassword_ScrubbedFromRedactedCapture covers the
+// --ephemeral `.env` blob, the one `docker create` output path that bypasses the
+// table/JSON/TOON renderer entirely.
+//
+// Honest framing: this test passes BEFORE the fix too. The blob's
+// `NEO4J_PASSWORD=<v>` line is caught by RedactText's unanchored
+// textAssignmentRe, which matches on the `PASSWORD=` substring, so the assertion
+// holds whether or not the value is registered. It is a regression guard for the
+// blob path — it would catch a future reshaping that moves the value off its key
+// — not a pin of CLI-228. The same helper-level caveat as the format-matrix test
+// above applies: it calls RedactText itself rather than exercising a live
+// capture surface.
+func TestCreate_Ephemeral_GeneratedPassword_ScrubbedFromRedactedCapture(t *testing.T) {
+	origRand := randSource
+	randSource = constantReader{b: 0x05}
+	defer func() { randSource = origRand }()
+	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x05}, generatedPasswordBytes))
+
+	_, _, _, stdout, _, err := runCreateForEphemeral(t, "--name tmp --ephemeral")
+	require.NoError(t, err)
+
+	require.Contains(t, stdout, "NEO4J_PASSWORD="+expectedPassword,
+		"env blob must still carry the generated password verbatim; got: %q", stdout)
+
+	redacted := clievents.RedactText(stdout)
+	assert.NotContains(t, redacted, expectedPassword,
+		"env blob must not survive redaction with the generated password intact; redacted: %q", redacted)
+	assert.Contains(t, redacted, "NEO4J_PASSWORD=***",
+		"redacted env blob must keep the key and show the placeholder; redacted: %q", redacted)
 }
