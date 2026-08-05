@@ -4,6 +4,7 @@
 package mcp
 
 import (
+	"os"
 	"strconv"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -88,8 +89,19 @@ func addServeFlags(cmd *cobra.Command) {
 
 // serveRun is the implementation of the serve command. It reads flags, builds the
 // executor, claims stdio, creates the MCP server, and runs it until interrupted.
+// The --rw flag is the primary write gate; NEO4J_CLI_MCP_ALLOW_WRITES is an env
+// fallback so a .mcpb manifest can wire the settings-UI toggle through to the
+// server without a CLI flag (Claude Desktop spawns the binary with env vars, not
+// flags the user can edit).
 func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 	writeAllowed, _ := strconv.ParseBool(cmd.Flag("rw").Value.String())
+	if !writeAllowed {
+		if v, ok := os.LookupEnv("NEO4J_CLI_MCP_ALLOW_WRITES"); ok {
+			if b, err := strconv.ParseBool(v); err == nil {
+				writeAllowed = b
+			}
+		}
+	}
 	allowAura, _ := strconv.ParseBool(cmd.Flag(AllowAuraFlag).Value.String())
 	allowCredWrite, _ := strconv.ParseBool(cmd.Flag(AllowCredentialWriteFlag).Value.String())
 	defaultFormat := cmd.Flag("format").Value.String()
