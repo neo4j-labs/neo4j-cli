@@ -35,8 +35,9 @@ type mcpbServer struct {
 }
 
 type mcpbMCPConfig struct {
-	Command string   `json:"command"`
-	Args    []string `json:"args"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     map[string]string `json:"env,omitempty"`
 }
 
 type mcpbAuthor struct {
@@ -130,8 +131,11 @@ func newManifest(binPath string) *mcpbManifest {
 			Type:       "binary",
 			EntryPoint: binPath,
 			MCPConfig: mcpbMCPConfig{
-				Command: binPath,
+				Command: "${user_config.neo4j_cli_path}",
 				Args:    []string{"mcp", "serve"},
+				Env: map[string]string{
+					"NEO4J_CLI_FLAG_MCP_SERVER": "1",
+				},
 			},
 		},
 		ToolsGenerated: false,
@@ -142,7 +146,6 @@ func newManifest(binPath string) *mcpbManifest {
 				Default:     binPath,
 				Title:       "Neo4j CLI path",
 				Description: "Path to the neo4j-cli binary. Auto-set when generated.",
-				Required:    true,
 			},
 			"allow_writes": {
 				Type:        "boolean",

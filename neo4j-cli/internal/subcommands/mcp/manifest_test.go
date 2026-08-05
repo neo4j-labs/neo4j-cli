@@ -57,10 +57,12 @@ func TestGenerateBundle_ManifestFields(t *testing.T) {
 	assert.Equal(t, []any{"mcp", "serve"}, args)
 }
 
-// TestGenerateBundle_ServerCommandIsExecutablePath verifies that
-// mcp_config.command is set to an absolute path (derived from os.Executable())
-// with args ["mcp","serve"] (REQ-F-038).
-func TestGenerateBundle_ServerCommandIsExecutablePath(t *testing.T) {
+// TestGenerateBundle_ServerCommandUsesUserConfigVar verifies that
+// mcp_config.command references ${user_config.neo4j_cli_path} (so the user can
+// override the binary path in the settings UI) and that the env block carries
+// NEO4J_CLI_FLAG_MCP_SERVER=1 so the spawned process sees the feature flag on.
+// entry_point remains the absolute path from os.Executable() (REQ-F-038).
+func TestGenerateBundle_ServerCommandUsesUserConfigVar(t *testing.T) {
 	_, manifest := readTestManifest(t)
 
 	server, _ := manifest["server"].(map[string]any)
@@ -68,18 +70,22 @@ func TestGenerateBundle_ServerCommandIsExecutablePath(t *testing.T) {
 
 	command, ok := mcpCfg["command"].(string)
 	require.True(t, ok)
-	assert.NotEmpty(t, command)
-	// Must be an absolute path (os.Executable() returns absolute)
-	assert.True(t, len(command) > 0 && command[0] == '/',
-		"mcp_config.command should be an absolute path, got %q", command)
+	assert.Equal(t, "${user_config.neo4j_cli_path}", command,
+		"mcp_config.command should reference the user_config variable so the settings UI controls it")
 
-	// entry_point should match
+	// entry_point is the absolute path from os.Executable()
 	entryPoint, _ := server["entry_point"].(string)
-	assert.Equal(t, command, entryPoint,
-		"entry_point must match mcp_config.command")
+	assert.True(t, len(entryPoint) > 0 && entryPoint[0] == '/',
+		"entry_point should be an absolute path, got %q", entryPoint)
 
 	args, _ := mcpCfg["args"].([]any)
 	assert.Equal(t, []any{"mcp", "serve"}, args)
+
+	// env must carry the feature flag so the spawned process registers the mcp group
+	env, ok := mcpCfg["env"].(map[string]any)
+	require.True(t, ok, "mcp_config.env must be present")
+	assert.Equal(t, "1", env["NEO4J_CLI_FLAG_MCP_SERVER"],
+		"env must set NEO4J_CLI_FLAG_MCP_SERVER=1 so the flag is on in the spawned process")
 }
 
 // TestGenerateBundle_NoPasswordInUserConfig enforces REQ-F-039: user_config
@@ -126,11 +132,13 @@ func TestGenerateBundle_NoPasswordInUserConfig(t *testing.T) {
 	assert.NotEmpty(t, rl["title"])
 	assert.NotEmpty(t, rl["description"])
 
-	// neo4j_cli_path has title, description and required
+	// neo4j_cli_path has title, description and a default; NOT required
+	// (the default is the generating binary's path, so the user doesn't
+	// have to fill it in)
 	np, ok := uc["neo4j_cli_path"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "file", np["type"])
-	assert.Equal(t, true, np["required"])
+	assert.NotEmpty(t, np["default"], "neo4j_cli_path should default to the generating binary")
 	assert.NotEmpty(t, np["title"])
 	assert.NotEmpty(t, np["description"])
 }
