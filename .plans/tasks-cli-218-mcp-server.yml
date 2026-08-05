@@ -793,7 +793,7 @@ tasks:
       note also AGENTS.md's Windows CI guidance. Do NOT weaken or skip the tests on
       Windows — they must actually exercise the surgical merge on all three
       platforms.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'The test derives its config path from the same expansion the production code uses, rather than hardcoding a darwin path'
@@ -802,7 +802,7 @@ tasks:
       - 'A cross-platform check confirms the fix (e.g. GOOS-parameterised table cases via the currentGOOS seam)'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T14:09:26Z
 
   - id: task-033
     title: 'Replace placeholder .mcpb icon with the real Neo4j CLI glyph'

@@ -237,6 +237,10 @@ Added 2 review tasks (task-031..task-032) from PR #232 CI failures: CodeQL high-
 Bounded `len(existing)` to `MaxRunArgs` (64) inside `injectFlag` before it reaches `make()` capacity, closing the CodeQL `go/allocation-size-overflow` high-severity alert. Chose truncation over rejection: `injectFlag` returns `*mcpsdk.CallToolRequest` with no error-signalling path, so silently skipping injection (returning the original req) is worse than truncating. The handler's own 64-item cap in `resolveCommand` re-checks the truncated args, so behavior is consistent. Added `TestServer_InjectFlagTruncatesOversizedArgs` asserting a >64-item args array is capped rather than allocated at full size.
 Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go
 
+## TASK-032 — 2026-08-05T14:09:26Z
+Fixed four Windows-only mcpconfig_test failures by deriving config paths from `a.MCPConfigPath()` (same expandPath the production code uses) instead of hardcoding darwin literals (`/Users/test/Library/Application Support/Claude`). Added a GOOS-parameterised cross-platform test exercising the surgical merge for darwin/windows/linux via the currentGOOS seam. No t.Parallel() needed (process-global seam). All gates pass: make test (no FAIL), make fmt-check, make lint (0 issues).
+Files: ~common/skill/mcpconfig_test.go, ~AGENTS.md, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt
+
 ## REVIEW — 2026-08-05T13:58:00Z
 Added 1 task (task-033): replace the placeholder .mcpb icon with the real Neo4j CLI glyph. Official SVG committed at neo4j-cli/internal/subcommands/mcp/icon.svg. No rasteriser available in-session (rsvg-convert/inkscape/magick/cairosvg absent; qlmanage produced a blank image), so rasterisation is deferred to the task.
 

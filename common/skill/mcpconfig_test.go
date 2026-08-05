@@ -6,6 +6,7 @@ package skill
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -36,16 +37,16 @@ func TestWriteMCPConfig_SurgicalMerge(t *testing.T) {
 	data, err := json.MarshalIndent(existing, "", "  ")
 	require.NoError(t, err)
 
-	claudeDir := "/Users/test/Library/Application Support/Claude"
-	configPath := claudeDir + "/claude_desktop_config.json"
-	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
-	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
-
-	// Install neo4j-cli
 	a := &Agent{
 		Name:      "claude-desktop",
 		MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
 	}
+	configPath, ok := a.MCPConfigPath()
+	require.True(t, ok)
+	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
+	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
+
+	// Install neo4j-cli
 	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
 
 	// Read back and verify surgical merge
@@ -83,9 +84,13 @@ func TestWriteMCPConfig_AtomicWritePreservesMode(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	t.Setenv("HOME", "/Users/test")
 
-	claudeDir := "/Users/test/Library/Application Support/Claude"
-	configPath := claudeDir + "/claude_desktop_config.json"
-	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
+	a := &Agent{
+		Name:      "claude-desktop",
+		MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
+	}
+	configPath, ok := a.MCPConfigPath()
+	require.True(t, ok)
+	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
 	require.NoError(t, afero.WriteFile(fs, configPath, []byte("{}"), 0600))
 
 	// Capture the original mode
@@ -93,10 +98,6 @@ func TestWriteMCPConfig_AtomicWritePreservesMode(t *testing.T) {
 	require.NoError(t, err)
 	origMode := info.Mode()
 
-	a := &Agent{
-		Name:      "claude-desktop",
-		MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
-	}
 	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
 
 	info, err = fs.Stat(configPath)
@@ -108,15 +109,15 @@ func TestWriteMCPConfig_NewFileCreated(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	t.Setenv("HOME", "/Users/test")
 
-	claudeDir := "/Users/test/Library/Application Support/Claude"
-	configPath := claudeDir + "/claude_desktop_config.json"
-	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
-
-	// No config file exists yet
 	a := &Agent{
 		Name:      "claude-desktop",
 		MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
 	}
+	configPath, ok := a.MCPConfigPath()
+	require.True(t, ok)
+	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
+
+	// No config file exists yet
 	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
 
 	raw, err := afero.ReadFile(fs, configPath)
@@ -167,15 +168,15 @@ func TestRemoveMCPConfig_RemovesEntry(t *testing.T) {
 	data, err := json.MarshalIndent(config, "", "  ")
 	require.NoError(t, err)
 
-	claudeDir := "/Users/test/Library/Application Support/Claude"
-	configPath := claudeDir + "/claude_desktop_config.json"
-	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
-	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
-
 	a := &Agent{
 		Name:      "claude-desktop",
 		MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
 	}
+	configPath, ok := a.MCPConfigPath()
+	require.True(t, ok)
+	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
+	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
+
 	require.NoError(t, RemoveMCPConfig(fs, a))
 
 	raw, err := afero.ReadFile(fs, configPath)
@@ -202,14 +203,15 @@ func TestMCPList_OrderAndDetection(t *testing.T) {
 
 	// Set HOME and create a detect dir for claude-desktop to emulate detection
 	t.Setenv("HOME", "/Users/test")
-	claudeDir := "/Users/test/Library/Application Support/Claude"
-	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
-
-	// Install neo4j-cli
 	a := &Agent{
 		Name:      "claude-desktop",
+		DetectDir: "$APP_SUPPORT/Claude",
 		MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
 	}
+	detectDir, ok := a.DetectPath()
+	require.True(t, ok)
+	require.NoError(t, fs.MkdirAll(detectDir, 0755))
+
 	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
 
 	installs := MCPList(fs)
@@ -260,15 +262,15 @@ func TestMCPConfig_SurgicalMergeGolden(t *testing.T) {
 	data, err := json.MarshalIndent(existing, "", "  ")
 	require.NoError(t, err)
 
-	claudeDir := "/Users/test/Library/Application Support/Claude"
-	configPath := claudeDir + "/claude_desktop_config.json"
-	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
-	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
-
 	a := &Agent{
 		Name:      "claude-desktop",
 		MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
 	}
+	configPath, ok := a.MCPConfigPath()
+	require.True(t, ok)
+	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
+	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
+
 	require.NoError(t, InstallMCPConfig(fs, a, "/opt/homebrew/bin/neo4j-cli"))
 
 	raw, err := afero.ReadFile(fs, configPath)
@@ -335,3 +337,100 @@ type mockErr struct {
 func (e *mockErr) Error() string        { return e.msg }
 func (e *mockErr) Unwrap() error        { return e.err }
 func (e *mockErr) Is(target error) bool { return target == e.err }
+
+// TestWriteMCPConfig_CrossPlatform proves the surgical merge works on
+// darwin, windows and linux by exercising the currentGOOS seam. The actual
+// path resolution per platform is independently tested by
+// TestClaudeDesktopPathsPerPlatform; this test proves the merge logic itself
+// is portable.
+func TestWriteMCPConfig_CrossPlatform(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		goos string
+		env  map[string]string
+	}{
+		{
+			name: "darwin",
+			goos: "darwin",
+			env:  map[string]string{"HOME": "/Users/test", "APPDATA": ""},
+		},
+		{
+			name: "windows",
+			goos: "windows",
+			env: map[string]string{
+				"HOME":    filepath.FromSlash("C:/Users/test"),
+				"APPDATA": filepath.FromSlash("C:/Users/test/AppData/Roaming"),
+			},
+		},
+		{
+			name: "linux",
+			goos: "linux",
+			env:  map[string]string{"HOME": "/home/test", "APPDATA": ""},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setGOOSForTest(t, tc.goos)
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			t.Setenv("XDG_CONFIG_HOME", "")
+
+			fs := afero.NewMemMapFs()
+
+			// Realistic fixture with preferences, globalShortcut and a
+			// pre-existing mcpServers entry.
+			existing := map[string]any{
+				"globalShortcut": "Option+Space",
+				"preferences": map[string]any{
+					"theme":  "dark",
+					"locale": "en-US",
+				},
+				"mcpServers": map[string]any{
+					"neo4j-data-modeling": map[string]any{
+						"command": "/some/other/tool",
+						"args":    []any{"--port", "8080"},
+					},
+				},
+			}
+			data, err := json.MarshalIndent(existing, "", "  ")
+			require.NoError(t, err)
+
+			a := &Agent{
+				Name:      "claude-desktop",
+				MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
+			}
+			configPath, ok := a.MCPConfigPath()
+			require.True(t, ok, "MCPConfigPath must resolve for %s", tc.goos)
+			require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
+			require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
+
+			require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
+
+			raw, err := afero.ReadFile(fs, configPath)
+			require.NoError(t, err)
+
+			var result map[string]any
+			require.NoError(t, json.Unmarshal(raw, &result))
+
+			// Verify surgical merge: preferences, globalShortcut and
+			// pre-existing mcpServers all survive.
+			prefs, ok := result["preferences"].(map[string]any)
+			require.True(t, ok, "preferences must survive")
+			assert.Equal(t, "dark", prefs["theme"])
+			assert.Equal(t, "en-US", prefs["locale"])
+			assert.Equal(t, "Option+Space", result["globalShortcut"])
+
+			servers, ok := result["mcpServers"].(map[string]any)
+			require.True(t, ok)
+			_, ok = servers["neo4j-data-modeling"]
+			require.True(t, ok, "pre-existing mcpServers entry must survive")
+
+			entry, ok := servers["neo4j-cli"].(map[string]any)
+			require.True(t, ok, "neo4j-cli entry must be present")
+			assert.Equal(t, "/usr/local/bin/neo4j-cli", entry["command"])
+			args, ok := entry["args"].([]any)
+			require.True(t, ok)
+			assert.Equal(t, []any{"mcp", "serve"}, args)
+		})
+	}
+}
