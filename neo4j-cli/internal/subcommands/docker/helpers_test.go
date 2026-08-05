@@ -169,3 +169,16 @@ func (f *fakeDockerClient) ExecAs(ctx context.Context, name, user string, args [
 // interface so a refactor of the interface fails at compile time, not in
 // the next test that drives a leaf.
 var _ dockerClient = (*fakeDockerClient)(nil)
+
+// constantReader is a deterministic io.Reader used to seed the password-byte
+// generation seam (randSource) so tests can assert the exact base64 output.
+type constantReader struct {
+	b byte
+}
+
+func (c constantReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = c.b
+	}
+	return len(p), nil
+}

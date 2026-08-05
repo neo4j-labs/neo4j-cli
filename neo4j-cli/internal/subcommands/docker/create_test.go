@@ -30,19 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// constantReader is a deterministic io.Reader used to seed the password-byte
-// generation seam (randSource) so tests can assert the exact base64 output.
-type constantReader struct {
-	b byte
-}
-
-func (c constantReader) Read(p []byte) (int, error) {
-	for i := range p {
-		p[i] = c.b
-	}
-	return len(p), nil
-}
-
 // fakeListener is the in-memory net.Listener returned by the test
 // listenerFactory when a port is "free". Close is a no-op; the other
 // methods are unused because create.go only ever calls Close after Listen.
