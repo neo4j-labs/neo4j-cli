@@ -803,3 +803,52 @@ tasks:
       - 'make test, make fmt-check, make lint pass'
     source: review
     completed_at: null
+
+  - id: task-033
+    title: 'Replace placeholder .mcpb icon with the real Neo4j CLI glyph'
+    description: |
+      The .mcpb bundle currently ships a placeholder icon: a flat #008CC1 circle
+      generated programmatically in an earlier session (embedded at
+      neo4j-cli/internal/subcommands/mcp/icon.png, 2963 bytes, 512x512). It exists
+      only because Claude Desktop needs an icon.png present to render the extension
+      preview card — without one it shows "Couldn't load the extension preview".
+
+      The real asset is now committed alongside it as
+      neo4j-cli/internal/subcommands/mcp/icon.svg — the official Neo4j CLI glyph,
+      supplied by the repo owner (this resolves the provenance concern recorded in
+      REQ-F-038a, which only ruled out third-party logo mirrors). Two paths:
+        - #1A1B1D  the arch / bracket form
+        - #014063  the connected-nodes graph form
+      Note the viewBox is 86x79, i.e. NOT square, so a naive rasterisation to a
+      square canvas will stretch it. The glyph must be centred with proportional
+      padding, not scaled to fill.
+
+      Replace icon.png with a rasterisation of icon.svg. MCPB recommends 512x512
+      (minimum 256x256), PNG with transparency; the spec also supports an `icons`
+      array with size/theme variants if multiple sizes are wanted later.
+
+      IMPLEMENTATION CONSTRAINT — this must not add a build-time dependency. The
+      PNG has to be a committed binary asset (it is //go:embed-ed), NOT generated
+      during the build, because no rasteriser can be assumed present on a
+      contributor's machine or in CI. Attempts in-session confirmed the problem:
+      rsvg-convert, inkscape, magick/convert and cairosvg are all absent locally,
+      and macOS `qlmanage -t` produced a fully transparent 1024x1024 image
+      containing neither brand colour, so it is not a usable fallback. Rasterise
+      once with a real tool (rsvg-convert, Inkscape, Figma export, or an online
+      converter) and commit the result.
+
+      Verify the committed PNG actually contains the glyph before shipping it —
+      decode it and confirm both brand colours are present and the content bounding
+      box is centred with sane margins. The current placeholder passing the existing
+      "icon is included and >100 bytes" test is exactly why that assertion is too
+      weak on its own.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'icon.png is a rasterisation of the committed icon.svg glyph, not the flat placeholder circle'
+      - 'The PNG is 512x512 (or larger, min 256x256), RGBA with transparency, and the glyph is centred with proportional padding rather than stretched from the non-square 86x79 viewBox'
+      - 'A decode check confirms both brand colours (#1A1B1D and #014063) are present in the committed PNG'
+      - 'No build-time rasterisation dependency is introduced; the PNG stays a committed //go:embed asset'
+      - 'mcp bundle output still contains icon.png and the manifest still references it; make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null

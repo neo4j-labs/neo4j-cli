@@ -232,3 +232,6 @@ Files: ~neo4j-cli/aura/internal/subcommands/instance/list.go, ~neo4j-cli/aura/in
 
 ## REVIEW — 2026-08-05T13:55:00Z
 Added 2 review tasks (task-031..task-032) from PR #232 CI failures: CodeQL high-severity allocation-size-overflow in injectFlag, and Windows-only path portability in mcpconfig_test.
+
+## REVIEW — 2026-08-05T13:58:00Z
+Added 1 task (task-033): replace the placeholder .mcpb icon with the real Neo4j CLI glyph. Official SVG committed at neo4j-cli/internal/subcommands/mcp/icon.svg. No rasteriser available in-session (rsvg-convert/inkscape/magick/cairosvg absent; qlmanage produced a blank image), so rasterisation is deferred to the task.
