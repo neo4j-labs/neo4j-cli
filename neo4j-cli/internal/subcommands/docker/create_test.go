@@ -1854,3 +1854,52 @@ func TestCreate_Ephemeral_GeneratedPassword_ScrubbedFromRedactedCapture(t *testi
 	assert.Contains(t, redacted, "NEO4J_PASSWORD=***",
 		"redacted env blob must keep the key and show the placeholder; redacted: %q", redacted)
 }
+
+// TestCreate_ExplicitPassword_NotRegisteredAsSecret — CLI-228 REQ-F-006. Of the
+// two DOCKER container passwords, only the GENERATED one is registered with
+// clievents.RegisterSecretValue; an operator-supplied --password is deliberately
+// left out. This test pins that so a future widening is a conscious choice rather
+// than a silent regression. The scope is docker-local, not a CLI-wide rule —
+// desktop/dbms/create.go and desktop/connection/create.go DO register their
+// supplied passwords; that asymmetry is out of scope here.
+//
+// Why the exclusion (full rationale on generatePassword in password.go):
+// redaction of a registered value is a literal strings.ReplaceAll over the whole
+// captured text, and RegisterSecretValue only refuses values under 4 characters.
+// A supplied password of `neo4j` would therefore rewrite `neo4j://localhost:7687`,
+// `neo4j:enterprise` and `username: neo4j` to *** in every capture, mangling
+// exactly the diagnostics tee-on-failure exists to preserve. The trade is
+// acceptable because a supplied value is already known to whoever supplied it,
+// and clievents.RedactArgs already scrubs it at the argv/history/telemetry level
+// (`password` is in secretFlags) — this is only about the free-text pass.
+//
+// The literal must be collision-proof: knownSecrets is a process-global, additive
+// registry with no exported reset, so this negative assertion would break if any
+// earlier test in the package registered a SUBSTRING of it. Every registration in
+// this test binary comes from generatePassword — no other registering package is
+// even linked in — so every registered value is 22 base64url characters. The dots
+// below are outside the base64url alphabet, which makes the exclusion structural:
+// no substring of the literal can be a generatePassword output at all. `mysecret`
+// (TestCreate_ExplicitPassword_HonouredAndSurfaced) is deliberately avoided.
+func TestCreate_ExplicitPassword_NotRegisteredAsSecret(t *testing.T) {
+	const explicitPassword = "cli228.operator.supplied"
+
+	_, _, stdout, err := runCreate(t, "--name dev --password "+explicitPassword+" --format json")
+	require.NoError(t, err)
+
+	// Sanity: the run really did use the supplied password, so the assertion
+	// below is about a value that actually reached the render path. Without this,
+	// a regression that ignored --password entirely would pass vacuously.
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
+	require.Len(t, rows, 1)
+	require.Equal(t, explicitPassword, rows[0]["password"])
+
+	// The literal is asserted directly rather than through the captured stdout,
+	// which is the only way to isolate the registry: `"password":"<v>"` in the JSON
+	// capture is legitimately scrubbed by textJSONFieldRe whether or not the value
+	// is registered. The bare literal carries no key=value / JSON / URI /
+	// auth-header shape, so none of RedactText's regex passes can touch it.
+	assert.Equal(t, explicitPassword, clievents.RedactText(explicitPassword),
+		"an operator-supplied --password must NOT be registered as a known secret value")
+}
