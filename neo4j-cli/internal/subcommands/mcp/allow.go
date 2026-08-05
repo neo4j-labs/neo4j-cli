@@ -84,8 +84,15 @@ var writeArgs = []struct {
 // gatedAuraPaths are Aura subtrees gated in full, reads included: every
 // `aura agent` call bills for model tokens, and customer-managed keys can
 // render an instance permanently unreadable.
+//
+// `aura api` is here because it is a raw passthrough to any Aura endpoint,
+// including ones with no dedicated command. Its write-ness is resolved from
+// the HTTP method at runtime and it therefore carries no static `write`
+// annotation, so the write policy cannot see it — left ungated it would reach
+// instance create/delete and bypass every gate below.
 var gatedAuraPaths = [][]string{
 	{"aura", "agent"},
+	{"aura", "api"},
 	{"aura", "customer-managed-key"},
 }
 

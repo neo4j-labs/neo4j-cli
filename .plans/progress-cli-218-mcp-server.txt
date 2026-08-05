@@ -271,3 +271,8 @@ Two more review findings, both real and both fixed:
 2. [Medium conventions] serve.go was the only leaf without a colocated test file. Added serve_test.go covering gate-flag defaults (all safe), the not-write-annotated invariant (REQ-NF-006), and envBool's parsing.
 An existing test asserted the injected flag was FIRST — that assertion encoded the vulnerable ordering and was updated to assert LAST, with a comment explaining why.
 Files: ~server.go, ~server_test.go, +serve_test.go
+
+## REBASE ON MAIN — 2026-08-05T16:00:00Z
+Rebased 52 commits onto origin/main (which gained CLI-225, `aura api` raw passthrough). One conflict, in common/flags/flags.go: main refactored EnforceWriteGate to delegate to a new RequireWriteAccess, my side added IsWriteCommand. Resolved by keeping main's delegation AND routing its annotation check through IsWriteCommand, so the single-reader rule holds.
+The policy gate then caught a real hole: `aura api` is a raw passthrough to arbitrary Aura endpoints and carries NO static write annotation (main's own test says "write-ness is decided from the resolved method"), so the write policy cannot see it and the default classification was `allow` — which would have let an MCP client reach instance create/delete, bypassing every gated:allow-aura path. Moved to gatedAuraPaths and regenerated the golden. This is exactly the drift the whole-tree gate exists to catch.
+Files: ~common/flags/flags.go, ~mcp/allow.go, ~mcp/testdata/policy.golden

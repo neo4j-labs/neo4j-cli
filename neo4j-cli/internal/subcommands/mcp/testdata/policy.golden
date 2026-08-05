@@ -58,6 +58,7 @@ aura agent invoke	gated:allow-aura
 aura agent list	gated:allow-aura
 aura agent replace	gated:allow-aura
 aura agent update	gated:allow-aura
+aura api	gated:allow-aura
 aura customer-managed-key	gated:allow-aura
 aura customer-managed-key create	gated:allow-aura
 aura customer-managed-key delete	gated:allow-aura
