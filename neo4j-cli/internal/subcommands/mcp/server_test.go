@@ -370,7 +370,12 @@ func TestServer_NoPrintPasswordInjection(t *testing.T) {
 	argList, ok := args["args"].([]any)
 	require.True(t, ok)
 	require.Contains(t, argList, "--no-print-password")
-	require.Equal(t, "--no-print-password", argList[0], "--no-print-password must be the first arg")
+	// Injected flags go LAST, not first: pflag resolves repeated flags to the
+	// final occurrence, so appending is what lets our suppression override a
+	// caller-supplied --no-print-password=false (see
+	// TestShouldInjectNoPrintPassword_ExplicitFalseCannotBypass).
+	require.Equal(t, "--no-print-password", argList[len(argList)-1],
+		"--no-print-password must be the last arg so it wins under pflag")
 	require.Contains(t, argList, "--name")
 	require.Contains(t, argList, "test")
 }
@@ -541,4 +546,51 @@ func TestShouldInjectNoPrintPassword_WhitespaceVariants(t *testing.T) {
 		assert.False(t, shouldInjectNoPrintPassword(map[string]any{"command": cmd, "args": []any{}}),
 			"%q must not trigger injection", cmd)
 	}
+}
+
+// TestShouldInjectNoPrintPassword_ExplicitFalseCannotBypass guards the bypass
+// found by the security review: a caller passing --no-print-password=false
+// must not disable server-side suppression. injectFlag appends last and pflag
+// resolves repeated flags to the final occurrence, so the injected flag wins.
+// Asserted at the cobra layer, because that is where the value is resolved.
+func TestShouldInjectNoPrintPassword_ExplicitFalseCannotBypass(t *testing.T) {
+	for _, callerArgs := range [][]any{
+		{"--no-print-password=false"},
+		{"--no-print-password=0"},
+		{"--name", "x", "--no-print-password=false"},
+		{},
+	} {
+		raw, err := json.Marshal(map[string]any{"command": "docker create", "args": callerArgs})
+		require.NoError(t, err)
+		out := injectFlag(
+			&mcpsdk.CallToolRequest{Params: &mcpsdk.CallToolParamsRaw{Arguments: raw}},
+			shouldInjectNoPrintPassword, "--no-print-password")
+
+		var got map[string]any
+		require.NoError(t, json.Unmarshal(out.Params.Arguments, &got))
+		list, _ := got["args"].([]any)
+		strs := make([]string, 0, len(list))
+		for _, v := range list {
+			if s, ok := v.(string); ok {
+				strs = append(strs, s)
+			}
+		}
+
+		c := &cobra.Command{Use: "create", RunE: func(*cobra.Command, []string) error { return nil }}
+		c.Flags().Bool("no-print-password", false, "")
+		c.Flags().String("name", "", "")
+		c.SetArgs(strs)
+		require.NoError(t, c.Execute())
+		resolved, err := c.Flags().GetBool("no-print-password")
+		require.NoError(t, err)
+		assert.True(t, resolved,
+			"caller args %v must not disable password suppression (final args %v)", callerArgs, strs)
+	}
+
+	// An explicit --no-print-password=true is already enabling suppression,
+	// so no injection is needed.
+	assert.False(t, shouldInjectNoPrintPassword(map[string]any{
+		"command": "docker create",
+		"args":    []any{"--no-print-password=true"},
+	}))
 }

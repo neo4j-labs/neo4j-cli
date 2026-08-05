@@ -6,6 +6,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -171,10 +172,13 @@ func injectFlag(req *mcpsdk.CallToolRequest, predicate func(map[string]any) bool
 	// tail dropped. Let append grow the slice instead; it is capped at
 	// MaxRunArgs downstream and the growth cost is irrelevant at that size.
 	var newArgs []any
+	newArgs = append(newArgs, existing...)
+	// Injected flags go LAST: pflag resolves repeated flags to the final
+	// occurrence, so prepending would let a caller-supplied
+	// `--no-print-password=false` override our injected suppression.
 	for _, f := range flagItems {
 		newArgs = append(newArgs, f)
 	}
-	newArgs = append(newArgs, existing...)
 	args["args"] = newArgs
 
 	raw, err := json.Marshal(args)
@@ -207,8 +211,20 @@ func shouldInjectNoPrintPassword(args map[string]any) bool {
 		if !ok {
 			continue
 		}
-		if s == "--no-print-password" || strings.HasPrefix(s, "--no-print-password=") {
+		// Only skip injection when the caller already ENABLES suppression.
+		// An explicit --no-print-password=false must still inject, because
+		// injectFlag appends last and pflag resolves to the final
+		// occurrence — otherwise the caller could disable suppression and
+		// surface the generated password, which docker create does not
+		// pass to clievents.RegisterSecretValue.
+		if s == "--no-print-password" {
 			return false
+		}
+		if v, found := strings.CutPrefix(s, "--no-print-password="); found {
+			if enabled, err := strconv.ParseBool(v); err == nil && enabled {
+				return false
+			}
+			return true
 		}
 	}
 	return true

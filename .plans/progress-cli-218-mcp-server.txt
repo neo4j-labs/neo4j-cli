@@ -264,3 +264,10 @@ PR #232 security-review (golang-security skill) flagged 3 real issues, all fixed
 3. [Medium] tab-indented Example: fields in 6 leaves (bundle/serve/install/remove/list/check) — render.go TrimSpaces only the first line, so continuation tabs would render into the skill bundle at GA. De-indented; tools.go was already correct.
 Files: ~read_docs.go, ~read_docs_test.go, ~server.go, ~server_test.go, ~bundle.go, ~serve.go, ~install.go, ~remove.go, ~list.go, ~check.go
 Decisions: first de-indent attempt used a naive line filter that stripped tabs from the whole file (93 lines in serve.go) and was reverted; the second targets the Example raw-string span only (30 lines total, gofmt clean).
+
+## SECURITY + CONVENTIONS REVIEW ROUND 2 — 2026-08-05T15:40:00Z
+Two more review findings, both real and both fixed:
+1. [Medium security] --no-print-password=false bypass. shouldInjectNoPrintPassword treated ANY occurrence of the flag (including =false) as "already handled", so a caller could disable suppression and leak the docker create password. First attempt (only skip when enabling) was INSUFFICIENT: verified with a cobra test that pflag resolves repeated flags to the LAST occurrence, so a prepended injected flag loses to a caller's trailing =false. Real fix: injectFlag now APPENDS injected flags instead of prepending, so ours wins. Proven end to end at the cobra layer for =false, =0, and mid-args placement.
+2. [Medium conventions] serve.go was the only leaf without a colocated test file. Added serve_test.go covering gate-flag defaults (all safe), the not-write-annotated invariant (REQ-NF-006), and envBool's parsing.
+An existing test asserted the injected flag was FIRST — that assertion encoded the vulnerable ordering and was updated to assert LAST, with a comment explaining why.
+Files: ~server.go, ~server_test.go, +serve_test.go
