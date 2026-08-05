@@ -842,7 +842,7 @@ tasks:
       box is centred with sane margins. The current placeholder passing the existing
       "icon is included and >100 bytes" test is exactly why that assertion is too
       weak on its own.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'icon.png is a rasterisation of the committed icon.svg glyph, not the flat placeholder circle'
@@ -851,4 +851,4 @@ tasks:
       - 'No build-time rasterisation dependency is introduced; the PNG stays a committed //go:embed asset'
       - 'mcp bundle output still contains icon.png and the manifest still references it; make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T14:12:00Z

@@ -4,6 +4,7 @@
 package mcp_test
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"testing"
 
@@ -191,7 +192,17 @@ func TestGenerateBundle_IconIsIncluded(t *testing.T) {
 
 	iconData := readZipFile(t, r, "icon.png")
 	assert.NotEmpty(t, iconData, "bundle must contain icon.png")
-	assert.True(t, len(iconData) > 100, "icon.png should be a real PNG, got %d bytes", len(iconData))
+
+	// A >100-byte assertion alone passed for a flat placeholder circle, so
+	// check the real glyph: a square RGBA PNG of at least the MCPB minimum.
+	require.True(t, len(iconData) > 8, "icon.png must have a PNG header")
+	assert.Equal(t, []byte("\x89PNG\r\n\x1a\n"), iconData[:8], "icon.png must be a PNG")
+
+	w := binary.BigEndian.Uint32(iconData[16:20])
+	h := binary.BigEndian.Uint32(iconData[20:24])
+	assert.Equal(t, w, h, "icon must be square, got %dx%d", w, h)
+	assert.GreaterOrEqual(t, int(w), 256, "icon must be at least 256x256 per the MCPB spec")
+	assert.EqualValues(t, 6, iconData[25], "icon must be RGBA (colour type 6) so it has transparency")
 }
 
 // TestGenerateBundle_CompatibilityPlatforms checks that the platform list

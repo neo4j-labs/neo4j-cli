@@ -239,3 +239,8 @@ Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcom
 
 ## REVIEW — 2026-08-05T13:58:00Z
 Added 1 task (task-033): replace the placeholder .mcpb icon with the real Neo4j CLI glyph. Official SVG committed at neo4j-cli/internal/subcommands/mcp/icon.svg. No rasteriser available in-session (rsvg-convert/inkscape/magick/cairosvg absent; qlmanage produced a blank image), so rasterisation is deferred to the task.
+
+## TASK-033 — 2026-08-05T14:12:00Z
+Replaced the placeholder circle with the real Neo4j CLI glyph. Owner supplied a 3412x2594 PNG with a white background; converted to a 512x512 square RGBA icon — white keyed to transparent, glyph box-sampled and centred (margins L30/R30 T47/B47), aspect 1.082 vs the SVG's 1.089 so no stretch. Icon test strengthened to check PNG magic, squareness, >=256px and colour type 6, since the old ">100 bytes" assertion passed for the placeholder.
+Files: ~icon.png, ~manifest_test.go
+Decisions: converted in-repo with a pure-Python decoder (no rasteriser available; rsvg/inkscape/magick/cairosvg absent and qlmanage produced a blank image), so no build-time dependency was added — icon.png stays a committed //go:embed asset.
