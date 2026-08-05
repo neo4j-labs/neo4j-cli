@@ -735,3 +735,71 @@ tasks:
       - 'The InstanceType enum and create_core.go are unchanged; make test, make fmt-check, make lint pass'
     source: review
     completed_at: "2026-08-05T16:30:00Z"
+
+  - id: task-031
+    title: 'SECURITY: bound args length in injectFlag before allocation (CodeQL high)'
+    description: |
+      CodeQL flagged `go/allocation-size-overflow` (HIGH severity, blocks merge on
+      PR #232) at neo4j-cli/internal/subcommands/mcp/server.go:166. In `injectFlag`,
+      `existing, _ := args["args"].([]any)` is unmarshalled from
+      `req.Params.Arguments` — i.e. model/client-supplied JSON — and then
+      `make([]any, 0, len(existing)+len(flagItems))` uses that length directly as an
+      allocation capacity. A client sending a very large `args` array drives a
+      potentially overflowing size computation into an allocation.
+
+      This is genuinely reachable, not theoretical: `injectFlag` runs on the request
+      BEFORE the per-tool handlers apply their 64-item `args` cap, so the existing
+      cap does not protect this path. The gap is the ordering.
+
+      Fix by bounding the length before it reaches `make` — reject or truncate an
+      oversized `args` array inside `injectFlag`. The handlers' existing 64-item cap
+      is the obvious source of truth; share a single constant rather than
+      introducing a second magic number. Add a test proving a huge `args` array is
+      refused rather than allocated.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'injectFlag bounds the args length before it is used as a make() capacity; an oversized args array is rejected or truncated, not allocated'
+      - 'The bound is a single shared constant with the handlers 64-item cap, not a second magic number'
+      - 'A test asserts a huge args array is refused rather than allocated'
+      - 'gh api repos/neo4j-labs/neo4j-cli/code-scanning/alerts?pr=232 reports no open high-severity alerts afterwards'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-032
+    title: 'Fix Windows-only mcpconfig_test path portability (4 CI failures)'
+    description: |
+      `common/skill/mcpconfig_test.go` fails on windows-latest in CI with four
+      failures, while the full suite passes locally on macOS (4509 tests) — so only
+      CI catches this:
+        TestWriteMCPConfig_SurgicalMerge      (line 75,  "Should be true")
+        TestWriteMCPConfig_NewFileCreated     (line 123, open \Users\test\Library\Application Support\Claude\claude_desktop_config.json: file does not exist)
+        TestRemoveMCPConfig_RemovesEntry      (line 196, "neo4j-cli entry must be removed")
+        TestMCPConfig_SurgicalMergeGolden     (line 304, "Should be true")
+
+      Root cause: the test does `t.Setenv("HOME", "/Users/test")` and hardcodes the
+      literal macOS path "/Users/test/Library/Application Support/Claude", but the
+      `$APP_SUPPORT` token added by task-002 resolves to `%APPDATA%` on windows and
+      the XDG config dir on linux. The seeded fixture path and the path the
+      production code writes to therefore diverge on Windows, and the writes/reads
+      miss each other.
+
+      This is a TEST portability bug, NOT a production bug — the production
+      `$APP_SUPPORT` expansion is correct and must not change. Fix the test to derive
+      its expected path from the same expansion the production code uses (or set the
+      platform-appropriate env var and build the path per-GOOS) instead of
+      hardcoding a darwin path. task-002 added a `currentGOOS` seam for exactly this;
+      note also AGENTS.md's Windows CI guidance. Do NOT weaken or skip the tests on
+      Windows — they must actually exercise the surgical merge on all three
+      platforms.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'The test derives its config path from the same expansion the production code uses, rather than hardcoding a darwin path'
+      - 'All four tests actually exercise the surgical merge on darwin, windows and linux — not skipped or weakened on any platform'
+      - 'The production $APP_SUPPORT expansion is unchanged'
+      - 'A cross-platform check confirms the fix (e.g. GOOS-parameterised table cases via the currentGOOS seam)'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
