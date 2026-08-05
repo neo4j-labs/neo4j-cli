@@ -72,6 +72,7 @@ func TestListInstances(t *testing.T) {
 		  "cloud_provider": "gcp",
 		  "id": "2f49c2b3",
 		  "name": "Production",
+		  "organization_id": "` + testListOrgID + `",
 		  "project_id": "YOUR_TENANT_ID",
 		  "status": "running"
 		},
@@ -79,6 +80,7 @@ func TestListInstances(t *testing.T) {
 		  "cloud_provider": "aws",
 		  "id": "b51dc964",
 		  "name": "Instance01",
+		  "organization_id": "` + testListOrgID + `",
 		  "project_id": "YOUR_TENANT_ID",
 		  "status": "running"
 		},
@@ -86,6 +88,7 @@ func TestListInstances(t *testing.T) {
 		  "cloud_provider": "azure",
 		  "id": "432392ae",
 		  "name": "Recommendations",
+		  "organization_id": "` + testListOrgID + `",
 		  "project_id": "YOUR_TENANT_ID",
 		  "status": "running"
 		},
@@ -93,6 +96,7 @@ func TestListInstances(t *testing.T) {
 		  "cloud_provider": "gcp",
 		  "id": "524b7d8d",
 		  "name": "Northwind",
+		  "organization_id": "` + testListOrgID + `",
 		  "project_id": "YOUR_TENANT_ID",
 		  "status": "running"
 		}
@@ -144,6 +148,7 @@ func TestListInstancesWithProjectIdFlag(t *testing.T) {
 		  "cloud_provider": "gcp",
 		  "id": "2f49c2b3",
 		  "name": "Production",
+		  "organization_id": "` + testListOrgID + `",
 		  "project_id": "YOUR_TENANT_ID"
 		}
 	  ]

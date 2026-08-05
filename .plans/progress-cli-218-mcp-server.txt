@@ -225,3 +225,7 @@ Added 2 review tasks (task-029..task-030) from live Claude Desktop testing: Aura
 ## TASK-029 — 2026-08-05T13:07:04Z
 Added Aura scoping invariant to the instructions field in server.go: pair --organization-id and --project-id from the same org, and a not-found is a scoping error not an auth error. Added test assertions for both statements so guidance cannot be silently dropped. Instructions field grew from 944 B to 1189 B (under 1500 B ceiling). All gates pass.
 Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go, ~.plans/tasks-cli-218-mcp-server.yml
+
+## TASK-030 — 2026-08-05T16:30:00Z
+Injected `organization_id` into each Aura instance row in `aura instance list` output (zero extra API round-trips — orgID is already in scope from the handler). Added `organization` column to the merged list_targets table via the existing colDef descriptor slice. Updated all test data and assertions.
+Files: ~neo4j-cli/aura/internal/subcommands/instance/list.go, ~neo4j-cli/aura/internal/subcommands/instance/list_test.go, ~neo4j-cli/internal/subcommands/mcp/list_targets.go, ~neo4j-cli/internal/subcommands/mcp/list_targets_test.go, ~.plans/tasks-cli-218-mcp-server.yml

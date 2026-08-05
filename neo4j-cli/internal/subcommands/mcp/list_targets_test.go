@@ -101,7 +101,7 @@ func TestHandleListTargets_FourSources(t *testing.T) {
 		"docker":     `[{"name":"dev","status":"Up 5 minutes","edition":"enterprise","version":"5.20","bolt_port":"7687","http_port":"7474"}]`,
 		"desktop":    `[{"id":"d1","name":"local-db","connection_uri":"bolt://localhost:7687","status":"started","version":"5.20"}]`,
 		"credential": `[{"name":"my-creds","username":"neo4j","database_name":"neo4j","uri":"bolt://localhost:7687","default":true}]`,
-		"aura":       `[{"id":"a1","name":"aura-instance","status":"running","project_id":"proj-1","cloud_provider":"aws"}]`,
+		"aura":       `[{"id":"a1","name":"aura-instance","status":"running","project_id":"proj-1","cloud_provider":"aws","organization_id":"org-1"}]`,
 	}
 
 	exec := listTargetsExecutor(t, stubs)
@@ -128,12 +128,16 @@ func TestHandleListTargets_FourSources(t *testing.T) {
 	// No omission note when all sources succeed
 	assert.NotContains(t, text, "Sources not available")
 
+	// Aura shows the owning organization
+	assert.Contains(t, text, "org-1")
+
 	// Headers are snake_case
 	assert.Contains(t, text, "source")
 	assert.Contains(t, text, "name")
 	assert.Contains(t, text, "status")
 	assert.Contains(t, text, "version")
 	assert.Contains(t, text, "connection")
+	assert.Contains(t, text, "organization")
 
 	// Docker connection is constructed from bolt_port
 	assert.Contains(t, text, "bolt://localhost:7687")
@@ -263,7 +267,7 @@ func TestHandleListTargets_AuraRow(t *testing.T) {
 	ctx := context.Background()
 
 	stubs := map[string]string{
-		"aura": `[{"id":"inst-abc-123","name":"prod-instance","status":"running"}]`,
+		"aura": `[{"id":"inst-abc-123","name":"prod-instance","status":"running","organization_id":"org-1"}]`,
 	}
 
 	exec := listTargetsExecutor(t, stubs)
@@ -272,9 +276,10 @@ func TestHandleListTargets_AuraRow(t *testing.T) {
 	require.False(t, result.IsError)
 
 	tc := result.Content[0].(*mcpsdk.TextContent)
-	// Aura shows the instance ID as connection and the name
+	// Aura shows the instance ID as connection, the name, and the organization
 	assert.Contains(t, tc.Text, "prod-instance")
 	assert.Contains(t, tc.Text, "inst-abc-123")
+	assert.Contains(t, tc.Text, "org-1")
 }
 
 func TestHandleListTargets_TimeoutGuard(t *testing.T) {
@@ -352,7 +357,7 @@ func TestParseSourceOutput_Credential(t *testing.T) {
 }
 
 func TestParseSourceOutput_Aura(t *testing.T) {
-	stdout := `[{"id":"a1","name":"aura-instance","status":"running","project_id":"p1"}]`
+	stdout := `[{"id":"a1","name":"aura-instance","status":"running","project_id":"p1","organization_id":"org-1"}]`
 	rows, err := parseSourceOutput("aura", stdout)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
@@ -361,6 +366,7 @@ func TestParseSourceOutput_Aura(t *testing.T) {
 	assert.Equal(t, "running", rows[0].Status)
 	assert.Equal(t, "", rows[0].Version)
 	assert.Equal(t, "a1", rows[0].Connection)
+	assert.Equal(t, "org-1", rows[0].Organization)
 }
 
 func TestParseSourceOutput_EmptyArray(t *testing.T) {
@@ -390,6 +396,7 @@ func TestFormatTargetsTable_Headers(t *testing.T) {
 	assert.Contains(t, output, "status")
 	assert.Contains(t, output, "version")
 	assert.Contains(t, output, "connection")
+	assert.Contains(t, output, "organization")
 	assert.Contains(t, output, "c1")
 	assert.Contains(t, output, "docker")
 }

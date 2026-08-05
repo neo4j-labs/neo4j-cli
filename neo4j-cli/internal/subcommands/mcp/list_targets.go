@@ -43,11 +43,12 @@ var discoverySources = []sourceDef{
 // targetRow is a unified row in the discovery table. Every field is
 // snake_case per the repo OUTPUT casing rule (CLI-127).
 type targetRow struct {
-	Source     string `json:"source"`
-	Name       string `json:"name"`
-	Status     string `json:"status"`
-	Version    string `json:"version"`
-	Connection string `json:"connection"`
+	Source       string `json:"source"`
+	Name         string `json:"name"`
+	Status       string `json:"status"`
+	Version      string `json:"version"`
+	Connection   string `json:"connection"`
+	Organization string `json:"organization"`
 }
 
 // HandleListTargets implements the neo4j_cli_list_targets tool. It fans out
@@ -137,6 +138,7 @@ func parseSourceOutput(source, stdout string) ([]targetRow, error) {
 			row.Connection = stringField(item, "uri")
 		case "aura":
 			row.Connection = stringField(item, "id")
+			row.Organization = stringField(item, "organization_id")
 			if row.Name == "" {
 				row.Name = stringField(item, "id")
 			}
@@ -173,7 +175,8 @@ var targetColumns = []colDef{
 	{name: "name", width: 30},
 	{name: "status", width: 12},
 	{name: "version", width: 10},
-	{name: "connection", width: 0}, // unbounded last column
+	{name: "connection", width: 0},   // unbounded
+	{name: "organization", width: 0}, // unbounded last column
 }
 
 // unboundedSepWidth is the visual dash count in the separator line for
@@ -218,7 +221,7 @@ func formatTargetsTable(rows []targetRow) string {
 
 	// Data rows
 	for _, r := range rows {
-		vals := []string{r.Source, r.Name, r.Status, r.Version, r.Connection}
+		vals := []string{r.Source, r.Name, r.Status, r.Version, r.Connection, r.Organization}
 		var args []any
 		for i, c := range targetColumns {
 			if c.width > 0 {

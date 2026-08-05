@@ -724,7 +724,7 @@ tasks:
       `aura instance create`. The tee logs disprove it: no create was attempted
       that day at all, and the CLI consistently both accepts and sends "free-db".
       Do NOT change the InstanceType enum or create_core.go. That finding is void.
-    status: pending
+    status: completed
     dependencies:
       - task-029
     acceptance_criteria:
@@ -734,4 +734,4 @@ tasks:
       - 'Output field names are snake_case; no test performs a real Aura call or reads real credentials'
       - 'The InstanceType enum and create_core.go are unchanged; make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: "2026-08-05T16:30:00Z"
