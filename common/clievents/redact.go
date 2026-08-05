@@ -187,11 +187,13 @@ func RedactArgs(args []string) string {
 // formatted. It exists because the regex passes below are shape-based: they
 // catch `key=value`, JSON fields, URIs, and auth headers, but cannot catch a
 // secret that appears in a layout they don't model — most notably a value cell
-// in a horizontal box-drawing table (`aura instance create --format table`
-// prints the Aura-generated password in its own column, on a different line
-// from the "password" header, offset by dynamic column widths). Registering the
-// exact value lets RedactText scrub it by literal match in any format without
-// over-redacting unrelated output. See RegisterSecretValue.
+// in a horizontal box-drawing table or a TOON array row (`aura instance create
+// --format table` prints the Aura-generated password in its own column, on a
+// different line from the "password" header, offset by dynamic column widths;
+// `--format toon` likewise emits it as a bare comma-separated field on a row
+// beneath the shared `{…,password,…}` field list).
+// Registering the exact value lets RedactText scrub it by literal match in any
+// format without over-redacting unrelated output. See RegisterSecretValue.
 var (
 	knownSecretsMu sync.RWMutex
 	knownSecrets   []string
@@ -284,10 +286,14 @@ var textBearerRe = regexp.MustCompile(`(?i)((?:bearer|basic)\s+)\S+`)
 // Coverage limit: the regex passes are shape-based and fully cover key=value,
 // JSON fields, connection URIs, and auth headers. They do NOT model
 // table-formatted output (horizontal box-drawing tables put a value in a column
-// on a different line from its header, offset by dynamic widths), so a secret
-// printed only as a table cell is caught solely by the RegisterSecretValue
-// literal-match pass — callers that emit a runtime secret into a table must
-// register it (e.g. `aura instance create` registers the generated password).
+// on a different line from its header, offset by dynamic widths), nor TOON
+// array rows, which separate header from value the same way. A secret printed
+// only as a table cell or TOON row is therefore caught solely by the
+// RegisterSecretValue literal-match pass — callers that emit a runtime secret
+// into those formats must register it (e.g. `aura instance create` registers
+// the Aura-generated password; `docker create` and `docker load`'s
+// new-container path register the generated local container password via
+// docker's generatePassword helper).
 func RedactText(s string) string {
 	s = redactKnownSecrets(s)
 	s = textURIUserinfoRe.ReplaceAllString(s, "${1}"+redactedPlaceholder+"@")

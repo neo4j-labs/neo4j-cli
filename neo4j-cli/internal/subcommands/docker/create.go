@@ -5,11 +5,8 @@ package docker
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -51,11 +48,6 @@ const maxPortOffset = 100
 // in a fakeDockerClient (helpers_test.go) without touching the leaf code.
 var clientFactory = newClient
 
-// randSource is the injectable seam for crypto-grade random bytes used to
-// generate a default Neo4j password (REQ-F-015). Tests swap in a deterministic
-// reader so the rendered password is assertable.
-var randSource io.Reader = rand.Reader
-
 // listenerFactory is the injectable seam for the port-conflict pre-flight
 // (REQ-F-013). Production binds an ephemeral TCP listener on the requested
 // host port (closing immediately on success); tests swap in a fake that
@@ -63,11 +55,6 @@ var randSource io.Reader = rand.Reader
 var listenerFactory = func(port int) (net.Listener, error) {
 	return net.Listen("tcp", fmt.Sprintf(":%d", port))
 }
-
-// generatedPasswordBytes is the byte length consumed from randSource before
-// base64-URL-safe encoding without padding. 16 bytes → 22 base64 characters,
-// which is well above the entropy floor for a local Bolt password.
-const generatedPasswordBytes = 16
 
 // waitTimeout is the fixed budget for the post-`docker run` Bolt readiness
 // probe when --wait is passed (REQ-F-018). The contract pins this at 60s for
@@ -283,16 +270,14 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: name %q already in use; using %q\n", name, chosenName)
 			}
 
-			// Resolve password: honour --password verbatim, otherwise generate
-			// crypto/rand bytes and base64 URL-safe encode without padding
-			// (REQ-F-015). The seam lets tests assert determinism.
+			// Resolve password: honour --password verbatim, otherwise mint one
+			// (see generatePassword in password.go).
 			resolvedPassword := password
 			if resolvedPassword == "" {
-				buf := make([]byte, generatedPasswordBytes)
-				if _, err := io.ReadFull(randSource, buf); err != nil {
-					return fmt.Errorf("docker create: generate password: %w", err)
+				resolvedPassword, err = generatePassword()
+				if err != nil {
+					return err
 				}
-				resolvedPassword = base64.RawURLEncoding.EncodeToString(buf)
 			}
 
 			// Resolve image (REQ-F-011). Tag scheme verified against
