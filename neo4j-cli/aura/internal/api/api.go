@@ -60,61 +60,25 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		panic(fmt.Sprintf("method not set in requests %s", path))
 	}
 
-	warnW := config.WarnW
-	if warnW == nil {
-		warnW = os.Stderr
-	}
-
 	bodyBytes := marshalBody(config.PostBody)
-	var body io.Reader
-	if bodyBytes != nil {
-		body = bytes.NewReader(bodyBytes)
-	}
 
-	baseUrl := cfg.Aura.BaseUrl()
-	if err := urlcheck.ValidateRemoteURL(baseUrl); err != nil {
-		return responseBody, 0, clierr.NewUsageError("aura base-url rejected: %s", err.Error())
-	}
 	if config.Version == "" {
 		config.Version = AuraApiVersion1
 	}
-	versionPath := getVersionPath(config.Version)
 
-	u, err := url.ParseRequestURI(baseUrl)
-	if err != nil {
-		return responseBody, 0, clierr.NewUsageError("aura base-url is invalid: %s", err.Error())
-	}
-	u = u.JoinPath(versionPath)
-	u = u.JoinPath(path)
-
-	addQueryParams(u, config.QueryParams)
-
-	urlString := u.String()
-	req, err := http.NewRequest(method, urlString, body)
-
-	if err != nil {
-		panic(err)
-	}
-
-	var credential *credentials.AuraCredential
-	if active := cfg.Aura.ActiveCredential(); active != nil {
-		credential = active
-	} else {
-		credential, err = cfg.Credentials.Aura.GetDefault()
-		if err != nil {
-			return responseBody, 0, err
-		}
-	}
-
-	req.Header, err = getHeaders(credential, cfg, warnW)
+	req, credential, err := prepareRequest(cfg, &RawRequestConfig{
+		Method:      method,
+		VersionPath: getVersionPath(config.Version),
+		Path:        path,
+		Body:        bodyBytes,
+		QueryParams: queryValues(config.QueryParams),
+		WarnW:       config.WarnW,
+	})
 	if err != nil {
 		return responseBody, 0, err
 	}
 
 	debug := cfg.Aura.Debug()
-	if debug {
-		debugRequest(method, urlString, req.Header, bodyBytes)
-	}
 
 	start := time.Now()
 	res, err := client.Do(req)
@@ -156,6 +120,86 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	return responseBody, res.StatusCode, handleResponseError(res, credential, cfg)
 }
 
+// prepareRequest is the shared prologue for every Aura request entrypoint, so a
+// second entrypoint inherits identical auth and SSRF gating. RawRequestConfig
+// doubles as its input: MakeRequest fills one in after marshalling its body and
+// resolving its version enum. config.Headers are overlaid on the generated auth
+// headers before the debug emit, so the trace shows what is actually sent. The
+// returned credential is the one the request was signed with, needed to clear a
+// stale access token on a 401.
+func prepareRequest(cfg *clicfg.Config, config *RawRequestConfig) (*http.Request, *credentials.AuraCredential, error) {
+	baseUrl := cfg.Aura.BaseUrl()
+	if err := urlcheck.ValidateRemoteURL(baseUrl); err != nil {
+		return nil, nil, clierr.NewUsageError("aura base-url rejected: %s", err.Error())
+	}
+
+	u, err := url.ParseRequestURI(baseUrl)
+	if err != nil {
+		return nil, nil, clierr.NewUsageError("aura base-url is invalid: %s", err.Error())
+	}
+	if config.VersionPath != "" {
+		u = u.JoinPath(config.VersionPath)
+	}
+	u = u.JoinPath(config.Path)
+
+	addQueryParams(u, config.QueryParams)
+
+	var body io.Reader
+	if config.Body != nil {
+		body = bytes.NewReader(config.Body)
+	}
+
+	urlString := u.String()
+	// http.NewRequest only fails on a malformed method token or an unparsable
+	// URL, both already screened by the callers; it is returned rather than
+	// panicked on so no entrypoint inherits a panic on user-supplied input.
+	req, err := http.NewRequest(config.Method, urlString, body)
+	if err != nil {
+		return nil, nil, clierr.NewUsageError("aura request could not be built: %s", err.Error())
+	}
+
+	var credential *credentials.AuraCredential
+	if active := cfg.Aura.ActiveCredential(); active != nil {
+		credential = active
+	} else {
+		credential, err = cfg.Credentials.Aura.GetDefault()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	warnW := config.WarnW
+	if warnW == nil {
+		warnW = os.Stderr
+	}
+
+	req.Header, err = getHeaders(credential, cfg, warnW)
+	if err != nil {
+		return nil, nil, err
+	}
+	overlayHeaders(req.Header, config.Headers)
+
+	if cfg.Aura.Debug() {
+		debugRequest(config.Method, urlString, req.Header, config.Body)
+	}
+
+	return req, credential, nil
+}
+
+// overlayHeaders replaces, rather than appends to, each generated header the
+// caller also supplies, so an explicit Accept or Content-Type wins outright.
+// extra must hold at most one spelling of any given header name (as it does when
+// built through http.Header's Add/Set), since map iteration order would
+// otherwise decide which spelling survives.
+func overlayHeaders(header, extra http.Header) {
+	for name, values := range extra {
+		header.Del(name)
+		for _, value := range values {
+			header.Add(name, value)
+		}
+	}
+}
+
 func getVersionPath(version AuraApiVersion) string {
 	switch version {
 	case AuraApiVersion1:
@@ -182,14 +226,30 @@ func marshalBody(data map[string]any) []byte {
 	return jsonData
 }
 
-func addQueryParams(u *url.URL, params map[string]string) {
-	if params != nil {
-		q := u.Query()
-		for key, val := range params {
+func queryValues(params map[string]string) url.Values {
+	if len(params) == 0 {
+		return nil
+	}
+
+	values := make(url.Values, len(params))
+	for key, val := range params {
+		values.Add(key, val)
+	}
+	return values
+}
+
+func addQueryParams(u *url.URL, params url.Values) {
+	if len(params) == 0 {
+		return
+	}
+
+	q := u.Query()
+	for key, vals := range params {
+		for _, val := range vals {
 			q.Add(key, val)
 		}
-		u.RawQuery = q.Encode()
 	}
+	u.RawQuery = q.Encode()
 }
 
 // Checks status code is 2xx

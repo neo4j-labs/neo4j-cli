@@ -6,6 +6,7 @@ package clievents
 import (
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -20,6 +21,11 @@ import (
 // "p" is the `query` password shorthand (StringP("password","p")); it is the
 // only -p in the tree, so including it here fails closed — over-redaction in a
 // redaction context is acceptable.
+//
+// "header"/"H" is `aura api`'s repeatable `Name: value` header flag. The whole
+// value is scrubbed rather than just the header value, because the header NAME
+// is as likely to be the secret-bearing part (`-H 'Authorization: Bearer …'`)
+// and a name-based heuristic here would fail open.
 var secretFlags = []string{
 	"password",
 	"p",
@@ -28,6 +34,23 @@ var secretFlags = []string{
 	"instance-password",
 	"set-password",
 	"new-password",
+	"header",
+	"H",
+}
+
+// keyValueFlags are the flags whose values are `key=value` pairs, scrubbed
+// selectively by redactParamValue: only the value is replaced, and only when
+// the key looks secret-bearing, so non-secret pairs stay readable in history.
+//
+// "F"/"f" are `aura api`'s --field/--raw-field shorthands. "f" is also
+// `update --force`'s shorthand, which is harmless: redactParamValue leaves any
+// value without an `=` untouched.
+var keyValueFlags = []string{
+	"param",
+	"field",
+	"raw-field",
+	"F",
+	"f",
 }
 
 // redactedPlaceholder is what the secret value is replaced with in output.
@@ -60,10 +83,17 @@ var secretWords = []string{
 	"key",
 }
 
-// secretParamKeyParts are the substrings that mark a `--param` key secret. It
-// is an alias of the canonical vocabulary so the param heuristic and the
-// regex-based passes can never drift apart.
-var secretParamKeyParts = secretWords
+// secretParamKeyParts are the substrings that mark a `key=value` flag's key
+// secret. It extends the canonical vocabulary rather than aliasing it: the
+// words excluded from secretWords are excluded only because of regex hazards
+// (see above), and this matcher is a plain substring test over an argv key, so
+// it has no such hazard. `--field`/`--raw-field` carry arbitrary API keys
+// rather than a fixed schema, so failing closed on these matters more here.
+var secretParamKeyParts = append(slices.Clone(secretWords),
+	"auth",
+	"credential",
+	"passphrase",
+)
 
 // quotedAlternation joins the words into a regex alternation, QuoteMeta'ing
 // each so metacharacters in any future vocabulary entry stay literal.
@@ -76,23 +106,26 @@ func quotedAlternation(words []string) string {
 }
 
 // RedactArgs renders an argv slice as a single space-separated string with
-// the values of secret-bearing flags replaced by ***. It handles three argv
+// the values of secret-bearing flags replaced by ***. It handles four argv
 // shapes:
 //
 //	--flag value          -> --flag ***
 //	--flag=value          -> --flag=***
 //	-flag value           -> -flag ***   (defensive single-dash form)
+//	-Fvalue               -> -F***      (shorthand with attached value)
 //
 // A trailing secret flag with no following argument is left as-is — there is
 // no value to scrub. Positional arguments and non-secret flags are emitted
 // unchanged.
 //
-// For `--param key=value` (and `-param`, both shapes), a best-effort heuristic
+// For the `key=value` flags (`--param`, `--field`, `--raw-field`; also the
+// single-dash and shorthand spellings, both shapes), a best-effort heuristic
 // scrubs only the value when the base key (the part before any `:embed`
 // modifier and the first `=`) looks secret-bearing — see secretParamKeyParts.
-// Non-secret params (e.g. `--param limit=10`) pass through unchanged so the
-// history stays useful. This is a name-based heuristic: a secret stored under
-// an innocuous key name (e.g. `--param x=sk-live-...`) is NOT caught.
+// Non-secret pairs (e.g. `--param limit=10`, `--field name=my-db`) pass through
+// unchanged so the history stays useful. This is a name-based heuristic: a
+// secret stored under an innocuous key name (e.g. `--param x=sk-live-...`) is
+// NOT caught.
 //
 // This helper is the single source of truth for "what flag is sensitive" in
 // the CLI; telemetry, panic templates, and error formatting all funnel
@@ -119,8 +152,8 @@ func RedactArgs(args []string) string {
 			if _, sensitive := redactByFlag(name, ""); sensitive {
 				out = append(out, arg)
 				// A value-taking flag with no value must not swallow a following
-				// flag: for uri/param a flag-looking next token is not a value, so
-				// leaving it unconsumed lets the loop redact it (e.g.
+				// flag: for uri and key=value flags a flag-looking next token is
+				// not a value, so leaving it unconsumed lets the loop redact it (e.g.
 				// `--uri --password hunter2` -> `--uri --password ***`). Generic
 				// secret flags still consume unconditionally — the next token
 				// becomes ***, so a secret value starting with '-' stays redacted.
@@ -129,6 +162,17 @@ func RedactArgs(args []string) string {
 					out = append(out, red)
 					i++
 				}
+				continue
+			}
+		}
+
+		// Attached-shorthand form (-Hvalue), the dominant curl/gh idiom for the
+		// shorthands of the flags this file guards. It is tried last so an exact
+		// name match always wins — otherwise `-password s3cret` would be
+		// mis-split into `-p` + `assword`, leaving the real secret unconsumed.
+		if name, value, ok := splitAttachedShorthand(arg); ok {
+			if red, sensitive := redactByFlag(name, value); sensitive {
+				out = append(out, "-"+name+red)
 				continue
 			}
 		}
@@ -258,12 +302,12 @@ func RedactText(s string) string {
 
 // redactByFlag returns the scrubbed value for a known sensitive flag, and
 // whether the flag is sensitive at all. Precedence matches the prior branch
-// order: uri (userinfo) and param (key=value) before generic secret flags.
+// order: uri (userinfo) and key=value flags before generic secret flags.
 func redactByFlag(name, value string) (string, bool) {
 	switch {
 	case isURIFlag(name):
 		return redactURIUserinfo(value), true
-	case isParamFlag(name):
+	case isKeyValueFlag(name):
 		return redactParamValue(value), true
 	case isSecretFlag(name):
 		return redactedPlaceholder, true
@@ -277,13 +321,13 @@ func isURIFlag(name string) bool {
 	return name == "uri"
 }
 
-// isParamFlag reports whether name (without leading dashes) is the query
-// `--param` flag, whose values are bind parameters of the form key=value.
-func isParamFlag(name string) bool {
-	return name == "param"
+// isKeyValueFlag reports whether name (without leading dashes) is a flag whose
+// values are `key=value` pairs — see keyValueFlags.
+func isKeyValueFlag(name string) bool {
+	return slices.Contains(keyValueFlags, name)
 }
 
-// redactParamValue scrubs the value of a `--param key=value` token when the
+// redactParamValue scrubs the value of a `key=value` flag token when the
 // base key looks secret-bearing, preserving the key (e.g. `token=***`). A
 // value without `=` (malformed) is returned unchanged. The base key is the
 // part before the first `=` with any `:embed`-style modifier stripped, so
@@ -370,6 +414,21 @@ func splitFlagEq(arg string) (name, value string, ok bool) {
 	return stripped, arg[idx+1:], true
 }
 
+// splitAttachedShorthand splits a `-Xvalue` token whose X is a registered
+// single-character secret-bearing flag into that shorthand and the attached
+// value. ok is false for anything else, including a bare `-X` (no value) and
+// any double-dash token.
+func splitAttachedShorthand(arg string) (name, value string, ok bool) {
+	if len(arg) < 3 || arg[0] != '-' || arg[1] == '-' {
+		return "", "", false
+	}
+	short := arg[1:2]
+	if !isSecretFlag(short) && !isKeyValueFlag(short) {
+		return "", "", false
+	}
+	return short, arg[2:], true
+}
+
 // dashPrefix returns the leading dashes of arg ("--" or "-"); used to
 // preserve the original prefix shape when reconstructing a redacted token.
 func dashPrefix(arg string) string {
@@ -383,10 +442,5 @@ func dashPrefix(arg string) string {
 // isSecretFlag reports whether name (without leading dashes) is in the
 // secret-flag list.
 func isSecretFlag(name string) bool {
-	for _, s := range secretFlags {
-		if name == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(secretFlags, name)
 }

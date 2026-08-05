@@ -8,7 +8,7 @@
 // The helper is leaf-helper agnostic: callers wire their existing test
 // helper (AuraTestHelper, a per-package deleteHelper, …) through the
 // LeafGateCase.Run closure. The four scenarios drive (TTY × flag-state)
-// and assert the contract enforced by confirm.Require:
+// and assert the contract enforced by confirm.Require/RequireTyped:
 //
 //   - non-TTY without flags     → exit 2 with "pass both --yes and --force"; sink NOT invoked.
 //   - non-TTY with --yes --force → sink invoked; nil (or non-gate) error.
@@ -49,8 +49,9 @@ type LeafGateCase struct {
 	// "--yes --force".
 	BothFlagsArgs string
 
-	// ResourceLabel is the parent-command name interpolated into the prompt
-	// (e.g. "instance"); used to assert the TTY prompt mentions the resource.
+	// ResourceLabel is the prompt noun — the parent-command name, or the
+	// explicit type passed to confirm.RequireTyped (e.g. "instance"); used to
+	// assert the TTY prompt mentions the resource.
 	ResourceLabel string
 
 	// Run executes the leaf for one scenario and returns the result. The
@@ -71,7 +72,7 @@ type GateRunResult struct {
 }
 
 // AssertLeafGate replays the four canonical gating scenarios against c.Run
-// and asserts the contract enforced by confirm.Require. Each scenario runs
+// and asserts the contract enforced by confirm.Require/RequireTyped. Each scenario runs
 // as a t.Run subtest so failures point at the offending scenario.
 func AssertLeafGate(t *testing.T, c LeafGateCase) {
 	t.Helper()

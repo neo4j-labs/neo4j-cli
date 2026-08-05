@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -372,14 +373,7 @@ func TestEnforceWriteGate_GateMatrix(t *testing.T) {
 		{name: "rw=false + no agent + no TTY → gate fires", rw: false, agent: false, tty: false, wantErr: "this command writes; pass --rw to allow it"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			origAgent := detectAgent
-			origTTY := stdoutIsTerminal
-			detectAgent = func() bool { return tc.agent }
-			stdoutIsTerminal = func() bool { return tc.tty }
-			t.Cleanup(func() {
-				detectAgent = origAgent
-				stdoutIsTerminal = origTTY
-			})
+			setGateSeams(t, tc.agent, tc.tty)
 
 			cmd := &cobra.Command{
 				Use:         "leaf",
@@ -400,6 +394,70 @@ func TestEnforceWriteGate_GateMatrix(t *testing.T) {
 			assert.EqualError(t, err, tc.wantErr)
 		})
 	}
+}
+
+// setGateSeams points the detectAgent and stdoutIsTerminal seams at fixed
+// values for the duration of the test. Default seams in plain `go test` runs
+// are no-agent / no-TTY.
+func setGateSeams(t *testing.T, agent, tty bool) {
+	t.Helper()
+
+	origAgent := detectAgent
+	origTTY := stdoutIsTerminal
+	detectAgent = func() bool { return agent }
+	stdoutIsTerminal = func() bool { return tty }
+	t.Cleanup(func() {
+		detectAgent = origAgent
+		stdoutIsTerminal = origTTY
+	})
+}
+
+// TestRequireWriteAccess covers the precedence rules directly, without an
+// annotation.
+func TestRequireWriteAccess(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		rw      bool
+		agent   bool
+		tty     bool
+		wantErr string
+	}{
+		{name: "rw=true → allow", rw: true, agent: true, tty: false},
+		{name: "agent without rw → gate fires", agent: true, tty: true, wantErr: "this command writes; pass --rw to allow it"},
+		{name: "TTY without agent → allow", tty: true},
+		{name: "no agent, no TTY → gate fires", wantErr: "this command writes; pass --rw to allow it"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setGateSeams(t, tc.agent, tc.tty)
+
+			cmd := &cobra.Command{Use: "leaf"}
+			RegisterRwFlag(cmd)
+			cmd.Flags().AddFlagSet(cmd.PersistentFlags())
+			if tc.rw {
+				require.NoError(t, cmd.Flags().Set("rw", "true"))
+			}
+
+			err := RequireWriteAccess(cmd)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.EqualError(t, err, tc.wantErr)
+
+			var ce *clierr.CLIError
+			require.ErrorAs(t, err, &ce)
+			assert.Equal(t, 2, ce.Code)
+		})
+	}
+}
+
+// TestRequireWriteAccess_NoRwFlag covers the nil-flag path: cmd.Flag("rw")
+// returns nil when no ancestor registered the flag.
+func TestRequireWriteAccess_NoRwFlag(t *testing.T) {
+	setGateSeams(t, false, true)
+
+	require.NoError(t, RequireWriteAccess(&cobra.Command{Use: "leaf"}))
 }
 
 func TestRegisterRwFlagHelp(t *testing.T) {

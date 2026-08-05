@@ -4,10 +4,14 @@
 package output
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -136,6 +140,183 @@ func PrintBodyMaps(cmd *cobra.Command, cfg *clicfg.Config, items []ResponseData,
 			printTable(cmd, item, fields[i])
 		}
 	}
+}
+
+// rawRows adapts a decoded JSON array of objects to the ResponseData interface
+// printTable consumes, so a passthrough response needs no json-tagged output
+// struct of its own.
+type rawRows []map[string]any
+
+func (r rawRows) AsArray() []map[string]any { return r }
+
+// PrintPassthrough renders a raw HTTP response body in the format resolved by
+// ResolveOutput without imposing any envelope on it:
+//
+//   - json: the body byte-for-byte, with a single trailing newline, so `| jq`
+//     sees exactly what the server sent.
+//   - toon: the body decoded, control-stripped and re-encoded as TOON.
+//   - table: rows derived from the body shape — a `data` array of objects, a
+//     `data` object as a single row, a bare array of objects, or a bare object
+//     as a single row.
+//
+// An empty body writes nothing. Any shape it cannot render as a table or TOON —
+// a scalar, a null, an array of non-objects, or invalid JSON — falls back to the
+// body itself, so an unmodelled or non-JSON upstream response is still shown.
+// Unlike api.ParseBody / api.ParseRawBody it never panics on a body shape.
+func PrintPassthrough(cmd *cobra.Command, cfg *clicfg.Config, body []byte) {
+	if len(body) == 0 {
+		return
+	}
+	switch ResolveOutput(cmd, cfg) {
+	case "json":
+		writePassthrough(cmd, body)
+	case "toon":
+		printPassthroughToon(cmd, body)
+	default:
+		printPassthroughTable(cmd, body)
+	}
+}
+
+func writePassthrough(cmd *cobra.Command, b []byte) {
+	w := cmd.OutOrStdout()
+	_, _ = w.Write(b)
+	if !bytes.HasSuffix(b, []byte("\n")) {
+		_, _ = io.WriteString(w, "\n")
+	}
+}
+
+// writeUnrenderable writes a body the table and toon branches could not render.
+// Those formats resolve for a terminal or an agent harness, and only the json
+// branch's byte-for-byte contract forbids rewriting, so control bytes are
+// stripped here — an unparseable upstream body is attacker-influenced text.
+func writeUnrenderable(cmd *cobra.Command, body []byte) {
+	writePassthrough(cmd, []byte(StripControl(string(body))))
+}
+
+func printPassthroughToon(cmd *cobra.Command, body []byte) {
+	var v any
+	if err := json.Unmarshal(body, &v); err != nil {
+		writeUnrenderable(cmd, body)
+		return
+	}
+	toonBytes, err := toon.Marshal(stripControlDeep(v), toon.WithLengthMarkers(true))
+	if err != nil {
+		writeUnrenderable(cmd, body)
+		return
+	}
+	writePassthrough(cmd, toonBytes)
+}
+
+func printPassthroughTable(cmd *cobra.Command, body []byte) {
+	var v any
+	if err := json.Unmarshal(body, &v); err != nil {
+		writeUnrenderable(cmd, body)
+		return
+	}
+	// Strip before deriving columns: stripControlDeep rewrites map keys as well
+	// as string values, so the header cells and the lookup keys stay in sync.
+	rows, ok := passthroughRows(stripControlDeep(v))
+	if !ok {
+		writeUnrenderable(cmd, body)
+		return
+	}
+	fields := passthroughFields(rows)
+	// printTable reads ":" in a field as a nested-key path. Every other caller
+	// hand-writes its fields, but these are response keys, so a key carrying a
+	// colon would address a sub-key that does not exist and render an empty cell.
+	if len(fields) == 0 || slices.ContainsFunc(fields, func(f string) bool { return strings.Contains(f, ":") }) {
+		writeUnrenderable(cmd, body)
+		return
+	}
+	printTable(cmd, rawRows(rows), fields)
+}
+
+// passthroughRows maps a decoded response body to table rows. A `data` envelope
+// contributes its array of objects or its object as a single row, a bare array of
+// objects contributes itself, and any other object is a single row. Every other
+// shape reports false so the caller can fall back to the verbatim body.
+func passthroughRows(v any) ([]map[string]any, bool) {
+	switch val := v.(type) {
+	case map[string]any:
+		if rows, ok := objectArray(val["data"]); ok {
+			return rows, true
+		}
+		if inner, ok := dataEnvelope(val); ok {
+			if row, ok := inner.(map[string]any); ok {
+				return []map[string]any{row}, true
+			}
+			// `data` holding a scalar or null: a row of the envelope would just
+			// stringify it under a `data` column, so show the body instead.
+			return nil, false
+		}
+		return []map[string]any{val}, true
+	case []any:
+		return objectArray(val)
+	default:
+		return nil, false
+	}
+}
+
+// envelopeSiblings are the keys the Aura API pairs with `data` in a response
+// envelope. They are metadata about the payload, so the table drops them when it
+// unwraps `data`; `--format json` still shows the whole body.
+var envelopeSiblings = map[string]bool{"links": true, "errors": true}
+
+// dataEnvelope returns the value of `data` when every other key is an envelope
+// sibling. An object holding `data` alongside its own fields is not an envelope,
+// so it keeps rendering as itself rather than dropping those fields.
+func dataEnvelope(val map[string]any) (any, bool) {
+	inner, ok := val["data"]
+	if !ok {
+		return nil, false
+	}
+	for k := range val {
+		if k != "data" && !envelopeSiblings[k] {
+			return nil, false
+		}
+	}
+	return inner, true
+}
+
+// objectArray returns v as a slice of objects, reporting false unless v is an
+// array whose every element is a JSON object.
+func objectArray(v any) ([]map[string]any, bool) {
+	items, ok := v.([]any)
+	if !ok {
+		return nil, false
+	}
+	rows := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		row, ok := item.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		rows = append(rows, row)
+	}
+	return rows, true
+}
+
+// passthroughFields returns the union of the rows' keys, sorted within each row
+// and unioned in row order. encoding/json discards the response's own object key
+// order, so sorting is what makes the column order deterministic.
+func passthroughFields(rows []map[string]any) []string {
+	seen := make(map[string]bool)
+	fields := []string{}
+	for _, row := range rows {
+		keys := make([]string, 0, len(row))
+		for k := range row {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			fields = append(fields, k)
+		}
+	}
+	return fields
 }
 
 // printToon renders a single ResponseData as a TOON document.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -283,6 +284,211 @@ func TestResolveAndValidateOrgProject_TableDrivenResolutionOrder(t *testing.T) {
 	}
 }
 
+// buildCountingServer creates an httptest.Server that records every request it
+// receives, so a caller can assert a resolution path issues no HTTP call at all.
+// It answers with a parseable empty list so an unexpected call still reaches the
+// request-count assertion instead of panicking inside api.ParseBody.
+func buildCountingServer(t *testing.T, requests *atomic.Int64) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"data": []}`)) //nolint:errcheck
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// TestResolveOrgID_And_ResolveProjectID pins that each ID resolves on its own,
+// so an org-scoped call does not demand a project (and vice versa).
+func TestResolveOrgID_And_ResolveProjectID(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		args            []string
+		extraCfg        string
+		wantOrg         string
+		wantOrgErr      string
+		wantOrgCode     int
+		wantProject     string
+		wantProjectErr  string
+		wantProjectCode int
+	}{
+		{
+			name:            "org flag only",
+			args:            []string{"--organization-id", testOrgID},
+			wantOrg:         testOrgID,
+			wantProjectErr:  "no project specified",
+			wantProjectCode: 2,
+		},
+		{
+			name:        "project flag only",
+			args:        []string{"--project-id", testProjectID},
+			wantOrgErr:  "no organization specified",
+			wantOrgCode: 2,
+			wantProject: testProjectID,
+		},
+		{
+			name:        "both from default workspace",
+			extraCfg:    fmt.Sprintf(`, "default-workspace": "%s/%s"`, testOrgID, testProjectID),
+			wantOrg:     testOrgID,
+			wantProject: testProjectID,
+		},
+		{
+			name:            "malformed ids",
+			args:            []string{"--organization-id", "..", "--project-id", "a/b"},
+			wantOrgErr:      `invalid organization id ".."`,
+			wantOrgCode:     6,
+			wantProjectErr:  `invalid project id "a/b"`,
+			wantProjectCode: 6,
+		},
+		{
+			name:            "legacy default-tenant hint is org only",
+			extraCfg:        `, "default-tenant": "legacy-tenant-id"`,
+			wantOrgErr:      "no default workspace set",
+			wantOrgCode:     2,
+			wantProjectErr:  "no project specified",
+			wantProjectCode: 2,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int64
+			srv := buildCountingServer(t, &requests)
+			cfg := buildTestConfig(t, srv.URL, tc.extraCfg)
+			cmd := newTestCmd(t, tc.args)
+
+			gotOrg, orgErr := utils.ResolveOrgID(cmd, cfg)
+			assertResolved(t, tc.wantOrg, tc.wantOrgErr, tc.wantOrgCode, gotOrg, orgErr)
+
+			gotProject, projectErr := utils.ResolveProjectID(cmd, cfg)
+			assertResolved(t, tc.wantProject, tc.wantProjectErr, tc.wantProjectCode, gotProject, projectErr)
+
+			assert.Zero(t, requests.Load(), "single-ID resolution must not issue any HTTP request")
+		})
+	}
+}
+
+func assertResolved(t *testing.T, wantID, wantErrContain string, wantCode int, gotID string, err error) {
+	t.Helper()
+
+	if wantErrContain != "" {
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), wantErrContain)
+		var ce *clierr.CLIError
+		require.True(t, errors.As(err, &ce))
+		assert.Equal(t, wantCode, ce.Code)
+		return
+	}
+
+	require.NoError(t, err)
+	assert.Equal(t, wantID, gotID)
+}
+
+func TestResolveOrgProject(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		args           []string
+		extraCfg       string
+		wantOrg        string
+		wantProject    string
+		wantErrContain string
+		wantCode       int
+		wantSuggestion string
+	}{
+		{
+			name:        "ids from flags",
+			args:        []string{"--organization-id", testOrgID, "--project-id", testProjectID},
+			wantOrg:     testOrgID,
+			wantProject: testProjectID,
+		},
+		{
+			name:        "ids from default workspace",
+			extraCfg:    fmt.Sprintf(`, "default-workspace": "%s/%s"`, testOrgID, testProjectID),
+			wantOrg:     testOrgID,
+			wantProject: testProjectID,
+		},
+		{
+			name:        "flags take precedence over default workspace",
+			args:        []string{"--organization-id", testOrgID, "--project-id", testProjectID},
+			extraCfg:    `, "default-workspace": "other-org/other-proj"`,
+			wantOrg:     testOrgID,
+			wantProject: testProjectID,
+		},
+		{
+			name:           "missing organization",
+			args:           []string{"--project-id", testProjectID},
+			wantErrContain: "no organization specified",
+			wantCode:       2,
+			wantSuggestion: "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--organization-id'.",
+		},
+		{
+			name:           "missing project",
+			args:           []string{"--organization-id", testOrgID},
+			wantErrContain: "no project specified",
+			wantCode:       2,
+			wantSuggestion: "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.",
+		},
+		{
+			// Pairs with "missing project" above: swapping the two resolution
+			// calls inside ResolveOrgProject would flip this to exit 2
+			// "no project specified".
+			name:           "malformed organization id beats missing project",
+			args:           []string{"--organization-id", "../.."},
+			wantErrContain: `invalid organization id "../.."`,
+			wantCode:       6,
+		},
+		{
+			name:           "legacy default-tenant migration hint",
+			extraCfg:       `, "default-tenant": "legacy-tenant-id"`,
+			wantErrContain: "no default workspace set",
+			wantCode:       2,
+			wantSuggestion: "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting.",
+		},
+		{
+			name:           "traversal organization id is rejected",
+			args:           []string{"--organization-id", "../..", "--project-id", testProjectID},
+			wantErrContain: `invalid organization id "../.."`,
+			wantCode:       6,
+		},
+		{
+			name:           "traversal project id is rejected",
+			args:           []string{"--organization-id", testOrgID, "--project-id", "a/b"},
+			wantErrContain: `invalid project id "a/b"`,
+			wantCode:       6,
+		},
+		{
+			name:           "over-segmented default workspace is rejected",
+			extraCfg:       `, "default-workspace": "a/b/c"`,
+			wantErrContain: `invalid organization id "a/b"`,
+			wantCode:       6,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int64
+			srv := buildCountingServer(t, &requests)
+			cfg := buildTestConfig(t, srv.URL, tc.extraCfg)
+
+			cmd := newTestCmd(t, tc.args)
+
+			gotOrg, gotProject, err := utils.ResolveOrgProject(cmd, cfg)
+
+			if tc.wantErrContain != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrContain)
+				var ce *clierr.CLIError
+				require.True(t, errors.As(err, &ce))
+				assert.Equal(t, tc.wantCode, ce.Code)
+				assert.Equal(t, tc.wantSuggestion, ce.Suggestion)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantOrg, gotOrg)
+				assert.Equal(t, tc.wantProject, gotProject)
+			}
+
+			assert.Zero(t, requests.Load(), "ResolveOrgProject must not issue any HTTP request")
+		})
+	}
+}
+
 // buildResourceServer creates an httptest.Server that:
 //   - responds to /oauth/token with a dummy token
 //   - responds to resourcePath with a 200 body containing the given tenant_id
@@ -373,6 +579,9 @@ func TestValidateResourceID(t *testing.T) {
 		{name: "traversal", id: "../../../target", wantErr: true},
 		{name: "embedded slash", id: "a/b", wantErr: true},
 		{name: "embedded backslash", id: `a\b`, wantErr: true},
+		{name: "query separator", id: "x?admin=true", wantErr: true},
+		{name: "fragment separator", id: "x#frag", wantErr: true},
+		{name: "percent escape", id: "x%2e%2e", wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := utils.ValidateResourceID("instance", tc.id)

@@ -1,0 +1,426 @@
+feature: cli-225-aura-api-passthrough
+prd: ./prd-cli-225-aura-api-passthrough.md
+created_at: 2026-07-30T13:09:24Z
+updated_at: 2026-07-30T13:09:24Z
+
+tasks:
+  - id: task-001
+    title: 'Extract MakeRequest shared prologue into a reusable unexported helper'
+    description: |
+      Pull the shared setup of `api.MakeRequest` — base-URL parse plus
+      `urlcheck.ValidateRemoteURL`, the active-vs-default credential resolution at
+      `api.go:99-107`, `getHeaders`, and the `--debug` request emit — into an
+      unexported helper in `neo4j-cli/aura/internal/api/`. `MakeRequest` is
+      rewritten to call it, so a second entrypoint can reuse the exact same auth
+      and SSRF gating. This is a pure refactor with no observable behaviour
+      change; the existing suite is the safety net.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "A single unexported helper owns base-URL validation, credential resolution, header/token acquisition, and the debug request emit."
+      - "`MakeRequest` delegates to that helper and its signature and observable behaviour are unchanged."
+      - "`response_test.go`'s status-to-exit-code matrix and `stdout_invariance_debug_test.go` pass without modification."
+      - "`handleResponseError` is not modified."
+      - "`make test` passes."
+    completed_at: 2026-07-30T13:42:00Z
+
+  - id: task-002
+    title: 'Extract flags.RequireWriteAccess from EnforceWriteGate'
+    description: |
+      Move the write-gate precedence logic in `common/flags/flags.go:94-119`
+      (`--rw` set, agent harness detected, stdout is a TTY, otherwise reject) into
+      a new exported `flags.RequireWriteAccess(cmd) error`, and have
+      `EnforceWriteGate` delegate to it after its `write:true` annotation check.
+      This lets a command whose write-ness depends on a runtime flag value invoke
+      the same precedence rules without carrying a static annotation.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`flags.RequireWriteAccess(cmd)` applies the existing precedence: `--rw` allows, agent harness rejects, TTY allows, otherwise rejects."
+      - "`EnforceWriteGate` keeps its annotation short-circuit and delegates the rest to `RequireWriteAccess`."
+      - "Behaviour is unchanged for every existing `write:true` command; existing `--rw` gate tests pass untouched."
+      - "The rejection error remains `clierr.NewUsageError` with the message `this command writes; pass --rw to allow it` (exit 2)."
+      - "Table-driven tests cover `RequireWriteAccess` across all four precedence branches."
+    completed_at: 2026-07-30T14:05:00Z
+
+  - id: task-003
+    title: 'Add confirm.RequireTyped with an explicit resource-type override'
+    description: |
+      `confirm.Require` derives its prompt noun from `cmd.Parent().Name()`
+      (`common/confirm/confirm.go:72-82`), which produces wrong copy for a command
+      mounted directly on the aura root. Add
+      `confirm.RequireTyped(cmd, resourceType, resourceID string) error` carrying
+      the full gate logic, and reduce `Require` to a delegation that passes the
+      parent-derived type. No behaviour change for any current caller.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`RequireTyped` accepts an explicit resource type and applies the existing gate: both flags proceed, non-TTY without both errors, TTY prompts."
+      - "`Require` delegates to `RequireTyped` with the `cmd.Parent().Name()`-derived type and is otherwise unchanged."
+      - "Prompt and error copy for existing callers (e.g. `instance delete`) are byte-identical to before."
+      - "`ErrCancelled` is still returned on a declined TTY prompt, with `cancelled.` written to stderr."
+      - "Tests drive both branches via `confirm.SetStdinIsTerminal` and assert the custom noun appears in the prompt."
+    completed_at: 2026-07-30T14:35:00Z
+
+  - id: task-004
+    title: 'Export a non-validating utils.ResolveOrgProject helper'
+    description: |
+      Add an exported `utils.ResolveOrgProject(cmd, cfg) (orgID, projectID string,
+      err error)` to `neo4j-cli/aura/internal/subcommands/utils/resolve.go` that
+      applies the flag-then-default-workspace precedence already implemented in the
+      private `resolveIDs` (lines 69-98) plus `ValidateResourceID`, but performs
+      **no** API call. It must not reuse `ResolveAndValidateOrgProject`, which
+      spends an extra `GET /organizations/{org}/projects` round trip.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`ResolveOrgProject` returns the same IDs `ResolveAndValidateOrgProject` would for valid input, with no HTTP request issued."
+      - "It reuses the existing `resolveIDs` precedence rather than duplicating it, and validates both IDs via `ValidateResourceID`."
+      - "The existing usage errors for a missing organization or project (including the legacy `default-tenant` migration hint) are preserved."
+      - "`ResolveAndValidateOrgProject`'s observable behaviour and its callers are unchanged; it delegates resolution + ID validation to `ResolveOrgProject`."
+      - "Tests cover flag-supplied IDs, default-workspace IDs, and the missing-workspace error paths, asserting zero API calls."
+    completed_at: 2026-07-30T15:05:00Z
+
+  - id: task-005
+    title: 'Redact --header values and --field/--raw-field secret keys'
+    description: |
+      Harden `common/clievents/redact.go` for the new flags. Add `"header"` to the
+      `secretFlags` allow-list so an `-H 'Authorization: Bearer …'` value is never
+      written to telemetry, panic text, or on-disk history. Separately, generalise
+      `isParamFlag` (line 282) to also match `field` and `raw-field` so the
+      existing `redactParamValue` scrubs secret-looking keys selectively.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`RedactArgs` replaces any `--header`/`-H` value with `***`, in both space-separated and `=`-separated forms."
+      - "`RedactArgs` scrubs `--field password=hunter2` to `password=***` while leaving `--field name=my-db` untouched, and likewise for `--raw-field`."
+      - "The `--param` redaction behaviour is unchanged, and the kv-flag matcher is single-sourced rather than duplicated."
+      - "Table-driven tests in `common/clievents` cover header redaction plus secret and non-secret field keys."
+      - "`make test` passes."
+    completed_at: 2026-07-30T16:35:00Z
+
+  - id: task-006
+    title: 'Add MakeRawRequest: a non-panicking arbitrary-endpoint request path'
+    description: |
+      Create `neo4j-cli/aura/internal/api/raw.go` with `RawRequestConfig`
+      (`Method`, `VersionPath`, `Path`, `Body []byte`, `QueryParams url.Values`,
+      `Headers http.Header`), `RawResponse` (`StatusCode`, `Status`, `Proto`,
+      `Header`, `Body`), and `MakeRawRequest(cfg, *RawRequestConfig)
+      (*RawResponse, error)` built on the task-001 helper. It returns the body on
+      every status, never calls `handleResponseError`, skips the
+      2xx-embedded-errors trap, and never panics.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`RawResponse.Body` is populated for every status code, including 4xx and 5xx, and `VersionPath: \"\"` produces a URL with no version segment."
+      - "An arbitrary literal `VersionPath` (e.g. `v2beta1`, `v9alpha3`) is used verbatim with no enum lookup and no panic."
+      - "A 200 body containing `{\"data\":…,\"errors\":[…]}` is returned as a success — the `api.go:142-145` trap is not applied."
+      - "Transport and body-read failures return `clierr.NewUpstreamError` instead of panicking; a request body is sent verbatim including a top-level JSON array."
+      - "On HTTP 401 the stale access token is cleared via the existing `formatAuthorizationError` path."
+      - "User-supplied headers are overlaid on the generated auth headers, and `--debug` emits the `[aura-debug] >`/`<` lines through the `debugW` seam."
+    completed_at: 2026-07-30T15:55:00Z
+
+  - id: task-007
+    title: 'Add RawStatusError mapping every HTTP status to a clierr code'
+    description: |
+      Add `RawStatusError(*RawResponse) error` in `raw.go`. It returns nil for 2xx
+      and otherwise maps the status to the same `clierr` codes
+      `handleResponseError` uses, with `NewUpstreamError` as the fallback for
+      unmapped statuses such as 413, 415, and 422. It never parses a response
+      schema and never panics; the upstream body is folded into `ce.Message`,
+      `StripControl`ed and truncated to roughly 4 KB.
+    status: completed
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "Mapping matches `handleResponseError`: 400 to exit 6, 401/403 to 4, 404 to 3, 402/409 to 5, 429 to 7 carrying `Retry-After`, 5xx to 8."
+      - "413, 415, 422 and any other unmapped status return `NewUpstreamError` (exit 8) with no panic."
+      - "A 400 with an empty body, and one with a non-JSON body, both return a clean error rather than panicking."
+      - "The upstream body appears in `ce.Message`, control-stripped and truncated; 2xx (including 201/202/204) returns nil."
+      - "Table-driven tests cover every status the v2beta1 spec documents: 200/201/202/204 and 400/401/403/404/405/409/413/415/422/429/500."
+    completed_at: 2026-07-30T17:20:00Z
+
+  - id: task-008
+    title: 'Add output.PrintPassthrough for verbatim and derived rendering'
+    description: |
+      Add `PrintPassthrough(cmd, cfg, body []byte)` to `common/output/output.go`,
+      which must live there to reach the unexported `stripControlDeep` and
+      `printTable`. It branches on the existing `ResolveOutput`: `json` writes the
+      body byte-for-byte, `toon` converts with a verbatim fallback, and `table`
+      derives columns from the response shape. It must never route through
+      `api.ParseBody`/`ParseRawBody`, which panic on non-object/array JSON.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`json` writes the body byte-for-byte with one trailing newline — nothing reordered, reindented, or re-enveloped — and an empty body writes nothing."
+      - "`toon` unmarshals, applies `stripControlDeep`, marshals to TOON, and falls back to the verbatim body on any error."
+      - "`table` uses a `data` array of objects, a bare array of objects, or a bare object as one row, with columns being the union of keys in deterministic first-seen order."
+      - "A bare string, number, `null`, `[1,2,3]`, or invalid JSON falls back to verbatim output in every format and never panics."
+      - "Rows reach the existing `printTable` via a small unexported `AsArray()` implementation; no new json-tagged output struct is added."
+    completed_at: 2026-07-30T18:05:00Z
+
+  - id: task-009
+    title: 'Add endpoint parsing, validation, and org/project placeholder substitution'
+    description: |
+      Create `endpoint.go` in the new
+      `neo4j-cli/aura/internal/subcommands/api/` package. It splits the positional
+      endpoint into a literal version segment plus the remaining path, tolerates a
+      leading slash, peels off an inline query string for later merging, and
+      substitutes `{org_id}`/`{project_id}` (with `{org}`/`{project}` as aliases)
+      via `utils.ResolveOrgProject`. Validation must keep the request pinned to the
+      already-SSRF-gated base host.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "The first path segment is returned as the version path and the remainder as the path; a leading `/` is accepted; an inline `?query` is split off."
+      - "An empty endpoint, anything containing `://`, anything yielding a non-empty `url.Parse` Scheme or Host, and a leading `//` are all usage errors (exit 2)."
+      - "Any `.` or `..` path segment is a usage error, so `url.JoinPath` cannot retarget the request."
+      - "Placeholders are substituted only when present, so a placeholder-free path resolves with no workspace configured and issues no resolution error."
+      - "Substituted org and project values pass through `utils.ValidateResourceID`; both the snake_case and short alias tokens are supported."
+      - "Only the IDs the endpoint references are resolved, so an org-only path needs no project in scope; an unsupported `{...}` token is a usage error rather than being shipped upstream."
+    completed_at: 2026-07-30T18:55:00Z
+
+  - id: task-010
+    title: 'Add field, body, header parsing and HTTP method inference'
+    description: |
+      Create `params.go` in the new command package. It validates `--method`
+      against the allowlist `GET HEAD POST PUT PATCH DELETE OPTIONS`, infers `POST`
+      when a field or `--input` is present and no explicit method was given, parses
+      typed `--field` and string `--raw-field` pairs, reads `--input` bodies from a
+      file or stdin, and parses repeatable `--header` values. Fields route to query
+      params or a JSON body depending on the method.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`--method` is case-insensitive, upper-cased, and rejects off-allowlist values as usage errors; the default is `GET` and inference yields `POST` only when no explicit method was passed."
+      - "`--field` converts `true`, `false`, `null`, and integers to JSON literals, reads `@file` and `@-` (stdin), and treats anything else as a string; `--raw-field` always yields a string."
+      - "Fields become query parameters for GET, HEAD, and DELETE, and a JSON object request body for all other methods."
+      - "`--input` supplies the body verbatim from a file or `-`, supports a top-level JSON array, and combining it with `--field`/`--raw-field` is a usage error."
+      - "`--header` accepts repeatable `Name: value` pairs and rejects malformed names and CR/LF in values as usage errors."
+    completed_at: 2026-07-30T19:55:00Z
+
+  - id: task-011
+    title: 'Wire up and register the aura api command with its write and delete gates'
+    description: |
+      Create `api.go` defining `NewCmd(cfg)` for `Use: "api <endpoint>"` and
+      register it in `neo4j-cli/aura/aura.go`. Replicate the per-group
+      `--auth-url`/`--base-url` binds, `RegisterAuraCredentialFlag`, and
+      `RegisterOrgProjectFlags` that every other aura subtree has, since the aura
+      root only owns `--debug`. `RunE` composes tasks 006-010, calls
+      `flags.RequireWriteAccess` for non-GET/HEAD methods, then
+      `confirm.RequireTyped` for DELETE.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+      - task-010
+    acceptance_criteria:
+      - "`neo4j-cli aura api v1/instances` issues an authenticated GET and prints the response; `--base-url`, `--auth-url`, and `--credential` all take effect."
+      - "`--method POST` without `--rw` exits 2 with `this command writes; pass --rw to allow it` and issues no request, while a plain GET needs no `--rw`."
+      - "DELETE without `--yes --force` on a non-TTY exits 2 with no request; declining the TTY prompt exits 0 with `cancelled.` on stderr and no request; both flags issue the request. The prompt names the resource type `endpoint`."
+      - "`--include` prints the status line and control-stripped sorted headers before the body; `--silent` suppresses the body."
+      - "On a non-2xx status, stdout holds exactly one JSON document (`AssertOutIsValidJSON`) and the upstream body is surfaced via the error, not echoed to stdout."
+      - "The `Example` is flush-left with at least three `#`-headed `neo4j-cli` invocations, `--rw` on the writes and at least one `--format json`; `TestAllLeafCommands_HaveExamples` and the kebab-case input gate pass."
+      - "A package `main_test.go` seeds `commonoutput.IsAgent` to false so format assertions are stable under `CLAUDECODE`."
+      - "`RunE` sets `RawRequestConfig.WarnW` to `cmd.ErrOrStderr()` so a keyring-failure warning can never reach stdout and break the single-JSON-document invariant."
+      - "`RunE` checks `err != nil` before rendering any body: `MakeRawRequest` returns BOTH a response and an auth error on HTTP 401, so rendering first would print a body and swallow the auth failure."
+      - "A gate test walks the `api` command's flags and asserts every secret-bearing long name and shorthand (`--header`/`-H`, `--field`/`-F`, `--raw-field`/`-f`) is matched by `clievents.RedactArgs`, so renaming a shorthand cannot silently fail open."
+    completed_at: 2026-07-30T20:40:00Z
+
+  - id: task-013
+    title: 'Split the RawStatusError fallback so unmapped 4xx are not retryable'
+    description: |
+      REQ-F-027 sent every unmapped status to `NewUpstreamError`, which carries
+      `retryable: true`. That is wrong for permanent client errors: 413, 415, and
+      422 are all documented v2beta1 responses (422 covers "the database limit for
+      the Instance being reached"), and telling an agent harness to retry them
+      invites a retry loop. Split the fallback only — unmapped 4xx become
+      `clierr.NewValidationError` (exit 6, `retryable: false`); 5xx and every other
+      unmapped status keep `NewUpstreamError` (exit 8).
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "Unmapped 4xx (notably 413, 415, 422, plus e.g. 418/451) return exit 6 `validation_error` with `retryable: false` in the envelope."
+      - "Unmapped non-4xx (5xx, 3xx) still return exit 8 `upstream_error` with `retryable: true`."
+      - "Every status `handleResponseError` maps explicitly is unchanged, so 400 stays 6, 401/403 stay 4, 404 stays 3, 402/409 stay 5, 429 stays 7, and 405 stays 8 — parity with the existing path is preserved and `handleResponseError` is still untouched."
+      - "The upstream status line and body still reach `ce.Message`, scrubbed and truncated, on both fallback branches."
+      - "The task-007 status table is extended to assert the exit code AND the `retryable` envelope field for each fallback case; `make test`, `make fmt-check`, `make lint` pass."
+    completed_at: 2026-07-30T21:35:00Z
+
+  - id: task-014
+    title: 'Unwrap a data-object envelope into its own table row'
+    description: |
+      REQ-F-018 specified `data`-as-array and "a bare object is one row", but never
+      `data`-as-object, so `{"data":{...}}` currently renders as a single `DATA`
+      column holding the stringified object. That is the shape
+      `GET .../instances/{id}` returns, and every other aura command unwraps the
+      envelope. Treat a top-level object whose sole meaningful key is `data`
+      holding an object as one row of that INNER object.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "`{\"data\":{\"id\":\"abc\",\"name\":\"x\"}}` under `--format table` yields columns `ID` and `NAME`, not a single `DATA` column."
+      - "`{\"data\":[...]}`, bare arrays, bare objects, and every fallback shape from task-008 keep their existing behaviour — the task-008 tests pass unchanged."
+      - "`{\"data\":{...},\"links\":{...}}` and `{\"data\":{...},\"errors\":[...]}` still unwrap to the inner data object, since v2beta1 pairs `data` with those siblings."
+      - "A `data` key holding a scalar or null still falls back to the verbatim body rather than producing a nonsense row."
+      - "`--format json` and `--format toon` are untouched by this change; `make test`, `make fmt-check`, `make lint` pass."
+    completed_at: 2026-07-30T22:20:00Z
+
+  - id: task-015
+    title: 'Fix the Example endpoints to real v2beta1 paths (they would 404)'
+    description: |
+      `api.go`'s `Example` uses `v2beta1/instances/00000000/databases`, but
+      v2beta1 has NO flat `/instances/...` path — every databases operation is
+      scoped as `/organizations/{org_id}/projects/{project_id}/instances/{instance_id}/databases`
+      (verified against https://api.neo4j.io/v2beta1/spec.json). Four of the five
+      examples would 404. They ship in `--help` AND in
+      `bundle/references/aura.md`, so an agent reading the skill would build
+      failing commands for exactly the CLI-225 Multi-DB use case.
+    status: completed
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "Every v2beta1 endpoint in the `Example` and `Long` fields is a real path in https://api.neo4j.io/v2beta1/spec.json — the databases ones become `v2beta1/organizations/{org_id}/projects/{project_id}/instances/<instance-id>/databases[...]`."
+      - "The placeholder-substitution examples still demonstrate `{org_id}`/`{project_id}`, which the corrected scoped paths do naturally."
+      - "The `v1/instances` example is left as-is: v1 genuinely is flat."
+      - "`Example` still satisfies `TestAllLeafCommands_HaveExamples` — flush-left, >=2 `#`-headed `neo4j-cli` invocations, `--rw` on writes, >=1 `--format json` — and still notes that `--field` on a read path needs an explicit `--method GET`."
+      - "The bundle is regenerated so `bundle/references/aura.md` carries the corrected paths; `make test`, `make fmt-check`, `make lint` pass."
+    completed_at: 2026-07-30T23:05:00Z
+
+  - id: task-012
+    title: 'Regenerate the skill bundle and add README and changelog entries'
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated
+      bundle alongside the source, since a new command drifts
+      `bundle/references/aura.md`. Add a README section for `aura api` and a
+      changie entry. The changelog body describes only the observable user-facing
+      surface, never the internal `raw.go` mechanics.
+    status: completed
+    dependencies:
+      - task-011
+      - task-013
+      - task-014
+      - task-015
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/...` leaves a clean tree; `TestGenerator_RoundTrip` and `make generate-check` pass with the bundle committed."
+      - "Every endpoint shown in the README is a real path (v2beta1 ones verified against https://api.neo4j.io/v2beta1/spec.json), and the README notes that `--field` on a read path needs an explicit `--method GET` and that `--include` prints nothing on a non-2xx."
+      - "The README documents the endpoint-carries-the-version contract, the `{org_id}`/`{project_id}` placeholders, `--rw` on non-GET plus `--yes --force` on DELETE, and that `--format json` is verbatim so `| jq` works."
+      - "A `.changes/unreleased/` entry exists via `changie new --projects neo4j-cli --kind Minor`, describing only the new command, its flags, and its output behaviour."
+      - "All new `.go` files carry the Neo4j copyright header and `make license-check` passes."
+      - "`make test`, `make fmt-check`, and `make lint` all pass."
+    completed_at: 2026-07-30T23:55:00Z
+
+  - id: task-016
+    title: 'Fold the ?#% placeholder rule into ValidateResourceID and delete checkPlaceholderValue'
+    description: |
+      `checkPlaceholderValue` (endpoint.go:89-98) is a second ID-validation
+      function applied immediately after `utils.ResolveOrgID`/`ResolveProjectID`
+      have already run `ValidateResourceID`, emitting a byte-identical message
+      shape (`"invalid %s id %q"`) and the same clierr code. Two functions, one
+      concept, complementary character sets — a bespoke helper where a canonical
+      utility already exists. `?`, `#` and `%` are never valid in an Aura resource
+      id, so the rule belongs in `ValidateResourceID` (resolve.go:26). Pushing it
+      down deletes the helper and both call sites, and hardens the other ~10
+      `ValidateResourceID` call sites (instance, session, virtual-graph, snapshot)
+      for free, since every one of them also interpolates the id into a request
+      path. Net: -12 lines, -1 concept, +9 call sites protected.
+    status: completed
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`ValidateResourceID` rejects any id containing `?`, `#` or `%` in addition to its existing empty / `.` / `..` / slash / backslash rules."
+      - "`checkPlaceholderValue` and both of its call sites are deleted; endpoint.go no longer imports anything solely for it."
+      - "The existing `a..b`, uuid and short-hex cases in resolve_test.go remain green and unmodified, and the endpoint tests that pinned `?#%` rejection still pass (retargeted at the shared validator)."
+      - "A table case proves the hardening reaches at least one other caller (e.g. `instance get` rejecting an id containing `%`)."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: 2026-07-30T16:32:15Z
+
+  - id: task-017
+    title: 'Stop round-tripping --field type inference for query methods'
+    description: |
+      For GET/HEAD/DELETE every `--field` is parsed into a typed `any` (int64,
+      bool, nil) by `typedFieldValue` and then converted straight back to a string
+      by `fieldQueryValue` (params.go:124-128, 258-272). Parse then un-parse in the
+      same function, buying nothing and losing data on a command whose entire
+      promise is "send what I say": `--field x=0123` ships `x=123` and
+      `--field x=null` ships `x=` (empty). Typed inference is only meaningful when
+      building a JSON body. Split `typedFieldValue` at its real seam — `@file`/`@-`
+      resolution is shared, JSON-literal inference is body-only — and let the query
+      branch use the raw string. The command is unreleased so there is no
+      compatibility cost.
+    status: completed
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`--field x=0123` on a GET sends the query value `0123` verbatim, and `--field x=null` sends the literal string `null`, each pinned by a test."
+      - "`--field` on a POST still infers JSON literals for `true`/`false`/`null`/integers, and `--raw-field` still always sends a string — the task-010 body tests stay green."
+      - "`@file` and `@-` resolution still works on both the query and body paths, since it is the shared half of the seam."
+      - "`fieldQueryValue` is deleted, and the `--field` usage string no longer implies type inference applies on read paths."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: 2026-07-30T17:12:00Z
+
+  - id: task-018
+    title: 'Resolve the HTTP method once and drop builtRequest.method'
+    description: |
+      `runRequest` resolves `method` at api.go:89 for the gates, `buildRequest`
+      resolves it again at params.go:94, and `runRequest` then ignores its own
+      value and reads `built.method` at api.go:117. The doc comment defends this by
+      declaring `buildRequest` "idempotent" — a constraint invented to accommodate
+      the duplication. The gate-ordering rationale it protects is real and must be
+      preserved (a `--field key=@-` would otherwise drain the stdin that the
+      confirm prompt reads), but that only requires the method be resolved BEFORE
+      the gates, not resolved twice. Pass the already-resolved method into
+      `buildRequest(cmd, cfg, f, method)` and drop the field.
+    status: completed
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "The method is resolved exactly once per invocation; `buildRequest` accepts it as a parameter and `builtRequest` no longer carries a `method` field."
+      - "The idempotency claim and the three lines of comment defending it are gone."
+      - "Both gates still run before any payload read: the `--method DELETE --field x=@-` test proving the confirm prompt is not starved of stdin stays green."
+      - "Method validation still rejects off-allowlist values exactly once, with the same exit-2 usage error."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: 2026-07-30T17:58:00Z
+
+  - id: task-019
+    title: 'Use the canonical IsSuccessful predicate in RawStatusError'
+    description: |
+      `RawStatusError` open-codes `res.StatusCode >= 200 && res.StatusCode < 300`
+      at raw.go:139, while `IsSuccessful` — the canonical 2xx predicate — is
+      defined ~100 lines away in the same package at api.go:256. Same set,
+      duplicated rule.
+    status: completed
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`RawStatusError` calls `api.IsSuccessful` instead of open-coding the range check."
+      - "The 2xx rows of the status matrix (200/201/202/204) still return nil, and no other status changes code."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: 2026-07-30T18:34:00Z
+
+  - id: task-020
+    title: 'Pin the reordered org/project resolution error precedence'
+    description: |
+      Splitting `resolveIDs` into `ResolveOrgID`/`ResolveProjectID` reordered error
+      reporting: a malformed `--organization-id` combined with a missing project now
+      reports the malformed org (exit 6, validation) instead of "no project
+      specified" (exit 2, usage). The progress log acknowledges no test covered that
+      pair, and it still does not — so the ordering can silently drift back. This is
+      a shipped behaviour change with no coverage.
+    status: completed
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`TestResolveOrgProject` gains a case for a malformed `--organization-id` together with a missing project, asserting the malformed-org error and exit code 6."
+      - "A companion case pins that a valid org with a missing project still reports the exit-2 \"no project specified\" usage error."
+      - "Both cases assert zero HTTP requests, consistent with the rest of that table."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: 2026-07-30T19:12:00Z
