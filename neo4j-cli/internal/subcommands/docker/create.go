@@ -5,10 +5,8 @@ package docker
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -272,16 +270,16 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: name %q already in use; using %q\n", name, chosenName)
 			}
 
-			// Resolve password: honour --password verbatim, otherwise generate
-			// crypto/rand bytes and base64 URL-safe encode without padding
-			// (REQ-F-015). The seam lets tests assert determinism.
+			// Resolve password: honour --password verbatim, otherwise mint one
+			// (REQ-F-015). generatePassword (password.go) also registers the
+			// generated value for redaction — see its doc comment for why an
+			// operator-supplied --password is deliberately not registered.
 			resolvedPassword := password
 			if resolvedPassword == "" {
-				buf := make([]byte, generatedPasswordBytes)
-				if _, err := io.ReadFull(randSource, buf); err != nil {
-					return fmt.Errorf("docker create: generate password: %w", err)
+				resolvedPassword, err = generatePassword()
+				if err != nil {
+					return err
 				}
-				resolvedPassword = base64.RawURLEncoding.EncodeToString(buf)
 			}
 
 			// Resolve image (REQ-F-011). Tag scheme verified against
