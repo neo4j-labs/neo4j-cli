@@ -574,7 +574,7 @@ tasks:
       self-documenting at the leaf rather than requiring a remote list to stay in
       sync. Note: this touches the query command in neo4j-cli/query/, so run go
       generate and verify the bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-020
     acceptance_criteria:
@@ -583,7 +583,7 @@ tasks:
       - 'No bundle drift (or regenerated bundle committed with the change)'
       - 'make test, make fmt-check, make lint, make generate-check pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T08:47:42Z
 
   - id: task-025
     title: 'Delete RedactedArgs middle-man wrapper'

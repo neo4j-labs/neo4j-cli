@@ -19,6 +19,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "query [cypher]",
 		Short: "Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol",
+		// This leaf reads os.Stdin directly via stdinReader and would hang a
+		// stdio MCP server; the annotation lets the MCP executor detect it.
+		Annotations: map[string]string{"stdin-reader": "true"},
 		Long: "Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. " +
 			"Run a Cypher statement against a Neo4j database via the Bolt " +
 			"protocol. Cypher is taken from the positional argument, or from " +

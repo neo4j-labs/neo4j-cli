@@ -263,18 +263,13 @@ func editDistance(s, t string) int {
 	return prev[len(t)]
 }
 
-// isStdinLeaf reports whether the command is a known leaf that reads from
-// os.Stdin when no positional argument is given. Such commands would hang
-// under an MCP stdio transport because os.Stdin carries the protocol frames.
-// Only leaves explicitly caught here are protected pre-exec; the executor's
-// per-call SetIn(bytes.NewReader(nil)) is the general backstop for commands
-// that read cmd.InOrStdin().
+// isStdinLeaf reports whether the command reads from os.Stdin when no
+// positional argument is given — detected via the "stdin-reader" cobra
+// annotation. Such commands would hang under an MCP stdio transport because
+// os.Stdin carries the protocol frames. Only leaves annotated with
+// "stdin-reader"="true" are protected pre-exec; the executor's per-call
+// SetIn(bytes.NewReader(nil)) is the general backstop for commands that read
+// cmd.InOrStdin().
 func isStdinLeaf(cmd *cobra.Command) bool {
-	path := commandPath(cmd)
-	// query reads os.Stdin via readPositionalOrStdin (stdinReader var) when
-	// stdin is not a TTY and no positional was given.
-	if len(path) == 1 && path[0] == "query" {
-		return true
-	}
-	return false
+	return cmd.Annotations["stdin-reader"] == "true"
 }

@@ -106,6 +106,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - Adding/renaming ANY command also diffs `neo4j-cli/internal/subcommands/mcp/testdata/policy.golden` (its MCP policy). Decide whether the new policy is right, then `go test ./neo4j-cli/internal/subcommands/mcp -update`.
 - Adding an MCP tool MUST pass two gates in `tooldefs_gate_test.go`: a 4000-byte budget on serialized tool definitions and a naming check enforcing `^neo4j_cli_[a-z][a-z0-9]*(_[a-z0-9]+)*$`/`^[a-z][a-z0-9_]*$` for names and schema properties. Both read from `toolDefinitions()`.
 - **MCP stdio fd swap**: `ClaimStdio` swaps `os.Stdout`/`os.Stdin` so the SDK gets the JSON-RPC pipe via `IOTransport`, never `StdioTransport` (which reads the post-swap variables). Any future command that reads `os.Stdin` directly is a protocol hazard.
+- **stdin-reader annotation**: a command that reads `os.Stdin` directly (not `cmd.InOrStdin()`) MUST carry `Annotations["stdin-reader"]="true"` so the MCP executor's `isStdinLeaf` detects it pre-exec and refuses a no-arg call before it hangs the server. See `query` in `neo4j-cli/query/query.go`.
 - `description.txt` frontmatter: single paragraph, ≤1024 chars, third-person; name each credential subtree explicitly.
 
 ## Changie

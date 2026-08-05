@@ -198,3 +198,7 @@ Files: ~server.go, ~server_test.go
 ## TASK-023 — 2026-08-05T00:00:00Z
 Tightened shouldInjectFormat's HasPrefix check to exact equality (s == "--format" || strings.HasPrefix(s, "--format=")), removing implicit dependency on the flag catalog. shouldInjectNoPrintPassword already used precise matching (unchanged). Added two tests matching NoPrintPassword coverage: equals-form and prefix-collision. 255 mcp tests pass (was 253). All gates green.
 Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go
+
+## TASK-024 — 2026-08-05T08:47:42Z
+Replaced hard-coded command-name list in isStdinLeaf with a cobra annotation (Annotations["stdin-reader"]="true"). Added the annotation to the real query command in query/query.go with a comment explaining why (reads os.Stdin, would hang a stdio MCP server). Updated all test stubs (run_test.go, server_test.go) to carry the annotation. No bundle drift. 255 mcp tests pass, all gates green.
+Files: ~neo4j-cli/internal/subcommands/mcp/run.go, ~neo4j-cli/query/query.go, ~neo4j-cli/internal/subcommands/mcp/run_test.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt

@@ -96,9 +96,14 @@ func serverTestRootFactory(_ *clicfg.Config) *cobra.Command {
 	root.AddCommand(docker)
 
 	// query
-	query := &cobra.Command{Use: "query", Short: "Run Cypher queries", RunE: func(c *cobra.Command, _ []string) error {
-		return nil
-	}}
+	query := &cobra.Command{
+		Use:         "query",
+		Short:       "Run Cypher queries",
+		Annotations: map[string]string{"stdin-reader": "true"},
+		RunE: func(c *cobra.Command, _ []string) error {
+			return nil
+		},
+	}
 	root.AddCommand(query)
 
 	return root

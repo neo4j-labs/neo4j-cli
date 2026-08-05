@@ -70,7 +70,9 @@ func runTestRootFactory(cfg *clicfg.Config) *cobra.Command {
 
 	// query: reads os.Stdin when no positional given
 	query := &cobra.Command{
-		Use: "query", Short: "Run Cypher queries",
+		Use:         "query",
+		Short:       "Run Cypher queries",
+		Annotations: map[string]string{"stdin-reader": "true"},
 		RunE: func(c *cobra.Command, _ []string) error {
 			return errors.New("not implemented in test stub")
 		},
@@ -372,7 +374,10 @@ func TestKnownFlagNames(t *testing.T) {
 }
 
 func TestIsStdinLeaf(t *testing.T) {
-	query := &cobra.Command{Use: "query"}
+	query := &cobra.Command{
+		Use:         "query",
+		Annotations: map[string]string{"stdin-reader": "true"},
+	}
 	docker := &cobra.Command{Use: "docker"}
 
 	// Wrap in roots to give them proper paths
