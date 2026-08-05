@@ -425,6 +425,38 @@ func TestServer_NoPrintPasswordNotInjectedWhenNoCommand(t *testing.T) {
 	require.Same(t, req, modified, "injectFlag must not modify when no command specified")
 }
 
+// ----- Oversized args security tests -----
+
+func TestServer_InjectFlagTruncatesOversizedArgs(t *testing.T) {
+	// Build args array just over the cap. injectFlag must truncate to
+	// MaxRunArgs rather than allocating at the full attacker-supplied size.
+	hugeArgs := make([]any, MaxRunArgs+100)
+	for i := range hugeArgs {
+		hugeArgs[i] = "--flag"
+	}
+	raw, err := json.Marshal(map[string]any{
+		"command": "docker create",
+		"args":    hugeArgs,
+	})
+	require.NoError(t, err)
+
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: raw,
+		},
+	}
+	modified := injectFlag(req, shouldInjectNoPrintPassword, "--no-print-password")
+	require.NotSame(t, req, modified, "injectFlag must modify the request")
+
+	var result map[string]any
+	require.NoError(t, json.Unmarshal(modified.Params.Arguments, &result))
+	argList, ok := result["args"].([]any)
+	require.True(t, ok)
+	// Must be capped at MaxRunArgs + injected flag
+	require.LessOrEqual(t, len(argList), MaxRunArgs+1,
+		"injectFlag must not allocate beyond MaxRunArgs+1")
+}
+
 // ----- Credential store probe tests -----
 
 func TestCheckCredentialStore_KeyringUnavailable(t *testing.T) {

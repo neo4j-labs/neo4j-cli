@@ -756,7 +756,6 @@ tasks:
       is the obvious source of truth; share a single constant rather than
       introducing a second magic number. Add a test proving a huge `args` array is
       refused rather than allocated.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - 'injectFlag bounds the args length before it is used as a make() capacity; an oversized args array is rejected or truncated, not allocated'
@@ -765,7 +764,8 @@ tasks:
       - 'gh api repos/neo4j-labs/neo4j-cli/code-scanning/alerts?pr=232 reports no open high-severity alerts afterwards'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    status: completed
+    completed_at: 2026-08-05T17:00:00Z
 
   - id: task-032
     title: 'Fix Windows-only mcpconfig_test path portability (4 CI failures)'
