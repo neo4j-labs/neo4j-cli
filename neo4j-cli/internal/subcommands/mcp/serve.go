@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -143,6 +144,11 @@ func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 	if err != nil {
 		return clierr.NewFatalError("cannot claim stdio for MCP server: %s", err.Error())
 	}
+	// ClaimStdio points the os.Stdout variable at stderr, which would make the
+	// write gate's TTY probe read stderr and treat a shell-launched server as
+	// interactive — skipping the --rw requirement. An MCP caller is never
+	// interactive, so pin the probe off.
+	flags.ForceNonInteractive()
 	// restore is safe to call more than once; defer so even a panic or
 	// recover leaves the process usable after the serve command exits.
 	defer restore()

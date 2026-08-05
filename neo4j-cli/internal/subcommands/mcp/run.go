@@ -57,7 +57,13 @@ func resolveCommand(ctx context.Context, req *mcpsdk.CallToolRequest, exec *Exec
 
 	tokens := strings.Fields(command)
 	cmd, _, err := root.Find(tokens)
-	if err != nil || cmd == nil || !cmd.IsAvailableCommand() {
+	// Runnable() is load-bearing, not redundant with IsAvailableCommand():
+	// Find returns a non-runnable PARENT for a partial path ("config"), and
+	// parents report IsAvailableCommand()==true. Policy would then be
+	// classified against the parent while execArgs routes cobra to a child
+	// leaf, so `command:"config" args:["set","credential-storage",…]` would
+	// classify as allow and slip past the deny rule on `config set`.
+	if err != nil || cmd == nil || !cmd.IsAvailableCommand() || !cmd.Runnable() {
 		return &resolvedCommand{err: runError(fmt.Sprintf("Unknown command: %q", command))}
 	}
 

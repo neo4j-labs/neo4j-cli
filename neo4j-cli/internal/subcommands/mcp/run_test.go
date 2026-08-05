@@ -424,3 +424,47 @@ func TestParseRunArgs_NonStringArgs(t *testing.T) {
 	assert.Equal(t, "test", command)
 	assert.Empty(t, args, "non-string items must be skipped")
 }
+
+// TestResolveCommand_RejectsNonRunnableParent guards the High-severity policy
+// bypass found by the security review: Find returns a non-runnable PARENT for a
+// partial path, and parents report IsAvailableCommand()==true. Classification
+// would then run against the parent (allow) while execArgs routes cobra to a
+// child leaf, so `command:"config" args:["set","credential-storage",…]` slipped
+// past the deny rule on `config set`.
+func TestResolveCommand_RejectsNonRunnableParent(t *testing.T) {
+	root := &cobra.Command{Use: "neo4j-cli", SilenceErrors: true}
+	root.PersistentFlags().String("format", "", "")
+	root.PersistentFlags().Bool("rw", false, "")
+	parent := &cobra.Command{Use: "config"}
+	leaf := &cobra.Command{
+		Use:         "set",
+		Annotations: map[string]string{"write": "true"},
+		RunE:        func(*cobra.Command, []string) error { return nil },
+	}
+	parent.AddCommand(leaf)
+	root.AddCommand(parent)
+
+	// Sanity: cobra really does hand back the parent and call it available.
+	found, _, err := root.Find([]string{"config"})
+	require.NoError(t, err)
+	require.False(t, found.Runnable(), "parent must be non-runnable for this test to mean anything")
+	require.True(t, found.IsAvailableCommand(), "parents report available, which is why Runnable() is needed")
+
+	raw, err := json.Marshal(map[string]any{
+		"command": "config",
+		"args":    []any{"set", "credential-storage", "insecure"},
+	})
+	require.NoError(t, err)
+
+	r := resolveCommand(context.Background(),
+		&mcpsdk.CallToolRequest{Params: &mcpsdk.CallToolParamsRaw{Arguments: raw}},
+		nil, Gates{}, func(*clicfg.Config) *cobra.Command { return root })
+
+	require.NotNil(t, r.err, "a non-runnable parent path must be refused")
+	require.True(t, r.err.IsError, "the refusal must be a tool error")
+	require.NotEmpty(t, r.err.Content)
+	text, ok := r.err.Content[0].(*mcpsdk.TextContent)
+	require.True(t, ok)
+	assert.Contains(t, text.Text, "Unknown command",
+		"parent path must be rejected as unknown, not classified against the parent")
+}

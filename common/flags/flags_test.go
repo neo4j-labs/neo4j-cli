@@ -489,3 +489,27 @@ func TestRegisterRwFlagHelp(t *testing.T) {
 	assert.Equal(t, "false", flag.DefValue)
 	assert.Equal(t, "Allow write operations. Auto-applied in interactive terminals; required when running under an agent harness or non-interactive script.", flag.Usage)
 }
+
+// TestForceNonInteractive pins the TTY probe off, which the MCP server needs
+// because ClaimStdio redirects the os.Stdout variable to stderr — a
+// shell-launched server would otherwise look interactive and RequireWriteAccess
+// step 3 would let write-annotated commands run without --rw.
+func TestForceNonInteractive(t *testing.T) {
+	orig := stdoutIsTerminal
+	t.Cleanup(func() { stdoutIsTerminal = orig })
+
+	stdoutIsTerminal = func() bool { return true }
+	require.True(t, stdoutIsTerminal(), "precondition: probe reports interactive")
+
+	ForceNonInteractive()
+	assert.False(t, stdoutIsTerminal(), "probe must report non-interactive after ForceNonInteractive")
+
+	// A write-annotated command with no --rw must now be refused rather than
+	// waved through by the TTY branch.
+	cmd := &cobra.Command{Use: "w", Annotations: map[string]string{"write": "true"}}
+	cmd.Flags().Bool("rw", false, "")
+	origDetect := detectAgent
+	t.Cleanup(func() { detectAgent = origDetect })
+	detectAgent = func() bool { return false }
+	assert.Error(t, EnforceWriteGate(cmd), "write gate must fire once TTY detection is pinned off")
+}

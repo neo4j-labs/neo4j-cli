@@ -29,6 +29,19 @@ var stdoutIsTerminal = func() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
+// ForceNonInteractive pins TTY detection to false for the rest of the process.
+//
+// It exists for the MCP server, which redirects the os.Stdout variable to
+// stderr so a stray write cannot corrupt the JSON-RPC frame. That redirect also
+// makes stdoutIsTerminal read stderr's descriptor, so a developer running
+// `neo4j-cli mcp serve` from a shell would look interactive to the write gate —
+// silently satisfying RequireWriteAccess step 3 and letting write-annotated
+// commands run without --rw. A machine-driven caller is never interactive, so
+// the server pins this off at start-up.
+func ForceNonInteractive() {
+	stdoutIsTerminal = func() bool { return false }
+}
+
 // RegisterOutputFlag adds a persistent --format flag to cmd and installs a
 // PersistentPreRunE hook that validates the value and binds it to cfg.Global.
 func RegisterOutputFlag(cmd *cobra.Command, cfg *clicfg.Config) {
