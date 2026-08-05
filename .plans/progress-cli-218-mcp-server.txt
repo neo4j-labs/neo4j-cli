@@ -218,3 +218,6 @@ Extracted shared `resultRows[T asArrayRower]` generic type in `result_rows.go` e
 Files: +neo4j-cli/internal/subcommands/mcp/result_rows.go, ~install.go, ~check.go, ~list.go, ~remove.go
 Introduced colDef slice (name + width) driving the header, separator, and data-row rendering in formatTargetsTable. Adding a column is now one entry in targetColumns plus one field in the vals slice. Pure refactor, byte-identical output verified by standalone program. Reviewer noted comment accuracy; fixed.
 Files: ~neo4j-cli/internal/subcommands/mcp/list_targets.go, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt
+
+## REVIEW — 2026-08-05T12:40:00Z
+Added 2 review tasks (task-029..task-030) from live Claude Desktop testing: Aura org/project pairing invariant in the instructions field, and surfacing the owning org on list_targets Aura rows. A third reported finding (--type free-db vs free enum contradiction) was disproved by tee logs and deliberately NOT filed.

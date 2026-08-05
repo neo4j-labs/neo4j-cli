@@ -660,3 +660,78 @@ tasks:
       - 'make test, make fmt-check, make lint pass'
     source: review
     completed_at: 2026-08-05T10:45:00Z
+
+  - id: task-029
+    title: 'instructions field must state the Aura org/project pairing invariant'
+    description: |
+      Live Claude Desktop testing exposed a misdiagnosis loop. Verified from tee
+      logs (~/Library/Preferences/neo4j/cli/tee/2026-08-05T12-16-59Z_aura-instance-list.log
+      plus the two 12-17-1x siblings), the real errors were:
+        could not find project fbe8a2fc-... in organization 9f4683a0-...
+        The tenant you specified could not be found
+      The model had cross-paired a project ID belonging to one organization with a
+      DIFFERENT organization's ID, received a legitimate not-found, and concluded
+      the auth token was "clearing" / failing to refresh. It then looped —
+      retrying and switching workspaces across 5 workspaces x 2 orgs — burning
+      round trips on a problem that no retry could fix. There is nothing wrong
+      with Aura token refresh.
+
+      The fix belongs in the server `instructions` field (built in server.go, sent
+      once at initialize inside the cached prompt prefix, currently ~918 bytes).
+      It must state the invariant explicitly: an Aura project ID is only valid
+      within its own organization, so --organization-id and --project-id must
+      always be paired from the same org; and a not-found on either is a SCOPING
+      error, not an auth error, so retrying or re-authenticating will not help.
+      This is the cheapest available fix — instructions cost nothing per call.
+
+      Keep the addition tight. The instructions field is deliberately outside the
+      4000-byte tool-definition budget (task-014) but it is the one thing sent to
+      every client on every session, so it should not balloon; aim to stay well
+      under ~1500 bytes total.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'The instructions field states that an Aura project ID is only valid within its own organization and that --organization-id / --project-id must be paired from the same org'
+      - 'The instructions field states that a project/tenant not-found is a scoping error, not an auth error, and that retrying will not help'
+      - 'The instructions field stays under 1500 bytes total'
+      - 'A test asserts both statements are present so the guidance cannot be silently dropped'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-030
+    title: 'neo4j_cli_list_targets must surface the owning organization for Aura rows'
+    description: |
+      The root cause behind task-029's misdiagnosis: the merged target table does
+      not show which project belongs to which organization, so when more than one
+      org is in play the model has to GUESS org-to-project pairings — and guessed
+      wrong. Surfacing the relationship removes the guess entirely.
+
+      The Aura rows returned by neo4j_cli_list_targets should carry the owning
+      organization alongside the project/instance, so a subsequent
+      neo4j_cli_run("aura instance list", ...) call can scope correctly without
+      inference. Constraints inherited from earlier tasks:
+        - Respect the existing column-descriptor slice (targetColumns / colDef,
+          added by task-027) — add a column there, do not hand-code widths.
+        - Keep the per-source-failure-is-an-omission behaviour (REQ-F-008): a
+          user without Aura credentials must still get a useful table.
+        - Output field names stay snake_case per the repo OUTPUT casing rule.
+        - No test may perform a real Aura network call or read real credentials
+          (never afero.NewOsFs()).
+
+      NOTE for the implementer: the same live test also produced a CONFABULATED
+      bug report — a claimed "--type free-db vs free" enum contradiction in
+      `aura instance create`. The tee logs disprove it: no create was attempted
+      that day at all, and the CLI consistently both accepts and sends "free-db".
+      Do NOT change the InstanceType enum or create_core.go. That finding is void.
+    status: pending
+    dependencies:
+      - task-029
+    acceptance_criteria:
+      - 'Aura rows in list_targets output carry the owning organization alongside the project/instance'
+      - 'The new column is added via the existing targetColumns/colDef descriptor slice, not hand-coded widths'
+      - 'An unavailable or failing Aura source is still reported as an omission and does not fail the tool'
+      - 'Output field names are snake_case; no test performs a real Aura call or reads real credentials'
+      - 'The InstanceType enum and create_core.go are unchanged; make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
