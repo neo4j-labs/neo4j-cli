@@ -6,6 +6,7 @@ package docker
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/dataset"
 	"github.com/neo4j/cli/test/utils/testfs"
@@ -376,6 +378,53 @@ func TestLoad_NewContainer_NoPluginsEmitsEmptyArray(t *testing.T) {
 	server := strings.Join(fake.RunCalls[1], " ")
 	assert.NotContains(t, server, "NEO4J_PLUGINS")
 	assert.Contains(t, stdout, "movies")
+}
+
+// TestLoad_NewContainer_GeneratedPassword_ScrubbedFromRedactedCapture — CLI-228,
+// the second-site pin. `docker load`'s new-container path mints its password
+// inside LoadDumpIntoNewContainer and renders it in the result row, so it must
+// inherit the registration that generatePassword performs. The assertions are the
+// same pair as the create-side matrix: raw stdout STILL carries the password
+// (registration is additive — the rendered row is unchanged) and the redacted copy
+// does not.
+//
+// Scope caveat — like TestCreate_GeneratedPassword_ScrubbedFromRedactedCapture,
+// this pins a HELPER-LEVEL invariant ("the minted value is registered, therefore
+// RedactText can scrub it"), not a closed end-to-end leak; see that test's comment
+// for why no production path feeds successful stdout through RedactText.
+//
+// --format table is passed explicitly because default resolution is
+// environment-dependent (output.ResolveOutput: explicit flag > agent harness →
+// toon > TTY → table > json), so an implicit default would silently retarget the
+// assertion away from the box-drawing shape this is meant to cover.
+//
+// Unlike `docker create`, this leaf has no --password, --no-print-password or
+// --no-store-credential flags, so there is no supplied-password or suppression
+// path to cover here.
+//
+// Byte 0x06 is unused package-wide, so this test registers its own literal in the
+// process-global, additive knownSecrets registry (which has no exported reset) and
+// cannot be carried by another test's registration.
+func TestLoad_NewContainer_GeneratedPassword_ScrubbedFromRedactedCapture(t *testing.T) {
+	origRand := randSource
+	randSource = constantReader{b: 0x06}
+	defer func() { randSource = origRand }()
+	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x06}, generatedPasswordBytes))
+
+	fake := newFakeDockerClient() // Inspect default-misses → ErrNotFound → new path
+	deps := &loadDeps{resolveSpec: moviesSpec()}
+
+	_, stdout, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies --format table")
+	require.NoError(t, err)
+
+	require.Contains(t, stdout, expectedPassword,
+		"table stdout must still render the generated password verbatim; got: %q", stdout)
+
+	redacted := clievents.RedactText(stdout)
+	assert.NotContains(t, redacted, expectedPassword,
+		"table output must not survive redaction with the generated password intact; redacted: %q", redacted)
+	assert.Contains(t, redacted, "***",
+		"redacted output must show the placeholder where the password was; redacted: %q", redacted)
 }
 
 func TestParseNeo4jPluginsEnv(t *testing.T) {
