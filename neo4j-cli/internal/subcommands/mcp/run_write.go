@@ -27,7 +27,7 @@ import (
 func HandleRunWrite(ctx context.Context, req *mcpsdk.CallToolRequest, exec *Executor, gates Gates, newRoot RootFactory) (*mcpsdk.CallToolResult, error) {
 	// Layer 1: Process gate — the server was started without --rw.
 	if !gates.WriteAllowed {
-		return runError("Write operations are not allowed; restart the server with `neo4j-cli mcp serve --rw` to enable them"), nil
+		return runError("Write operations are not allowed. Enable the `allow_writes` setting in the Neo4j CLI extension configuration, or restart the server with `neo4j-cli mcp serve --rw`."), nil
 	}
 
 	r := resolveCommand(ctx, req, exec, gates, newRoot)
