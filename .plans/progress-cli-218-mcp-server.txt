@@ -248,3 +248,7 @@ Added 1 task (task-033): replace the placeholder .mcpb icon with the real Neo4j 
 Replaced the placeholder circle with the real Neo4j CLI glyph. Owner supplied a 3412x2594 PNG with a white background; converted to a 512x512 square RGBA icon — white keyed to transparent, glyph box-sampled and centred (margins L30/R30 T47/B47), aspect 1.082 vs the SVG's 1.089 so no stretch. Icon test strengthened to check PNG magic, squareness, >=256px and colour type 6, since the old ">100 bytes" assertion passed for the placeholder.
 Files: ~icon.png, ~manifest_test.go
 Decisions: converted in-repo with a pure-Python decoder (no rasteriser available; rsvg/inkscape/magick/cairosvg absent and qlmanage produced a blank image), so no build-time dependency was added — icon.png stays a committed //go:embed asset.
+
+## TASK-031 (follow-up) — 2026-08-05T14:35:00Z
+CodeQL still flagged go/allocation-size-overflow after the capacity-bounding fix: the non-oversized branch still passed len(existing) into the make capacity, so the taint path survived. Removed the capacity hint entirely and let append grow the slice — the allocation CodeQL objected to no longer exists. Behaviour unchanged (200/200 args preserved so resolveCommand still rejects); the hint was a micro-optimisation on a <=64-item slice.
+Files: ~server.go

@@ -163,17 +163,14 @@ func injectFlag(req *mcpsdk.CallToolRequest, predicate func(map[string]any) bool
 		return req
 	}
 	existing, _ := args["args"].([]any)
-	// args is client-supplied and reaches this make capacity before the
-	// handlers' MaxRunArgs cap in resolveCommand runs, so an unbounded
-	// length would feed an overflowing size computation into the
-	// allocation. Bound the CAPACITY only — truncating `existing` here
-	// would bring an oversized request back under the handlers' cap and
-	// silently execute it with the tail dropped.
-	capHint := len(existing) + len(flagItems)
-	if len(existing) > MaxRunArgs {
-		capHint = MaxRunArgs + len(flagItems)
-	}
-	newArgs := make([]any, 0, capHint)
+	// No capacity hint: `existing` is client-supplied and reaches this
+	// point before the handlers' MaxRunArgs cap in resolveCommand runs, so
+	// sizing an allocation from its length is an overflow risk. Truncating
+	// it here is not an option either — that would bring an oversized
+	// request back under the handlers' cap and silently execute it with the
+	// tail dropped. Let append grow the slice instead; it is capped at
+	// MaxRunArgs downstream and the growth cost is irrelevant at that size.
+	var newArgs []any
 	for _, f := range flagItems {
 		newArgs = append(newArgs, f)
 	}
