@@ -532,7 +532,7 @@ tasks:
       injectFlag(req, predicate, flagName) helper. A third injection site (the design
       notes --max-output-chars or another future default) should then add no new
       function.
-    status: pending
+    status: completed
     dependencies:
       - task-020
     acceptance_criteria:
@@ -541,7 +541,7 @@ tasks:
       - 'No behavior change: existing injection tests pass unchanged'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T08:28:31Z
 
   - id: task-023
     title: 'Precise --format / --no-print-password flag matching'

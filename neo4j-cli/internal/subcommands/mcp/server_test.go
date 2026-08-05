@@ -322,8 +322,8 @@ func TestServer_NoPrintPasswordInjection(t *testing.T) {
 			Arguments: json.RawMessage(`{"command":"docker create","args":["--name","test"]}`),
 		},
 	}
-	modified := injectNoPrintPassword(req)
-	require.NotSame(t, req, modified, "injectNoPrintPassword must modify docker create request")
+	modified := injectFlag(req, shouldInjectNoPrintPassword, "--no-print-password")
+	require.NotSame(t, req, modified, "injectFlag must modify docker create request")
 
 	var args map[string]any
 	require.NoError(t, json.Unmarshal(modified.Params.Arguments, &args))
@@ -341,8 +341,8 @@ func TestServer_NoPrintPasswordNotInjectedWhenPresent(t *testing.T) {
 			Arguments: json.RawMessage(`{"command":"docker create","args":["--no-print-password","--name","test"]}`),
 		},
 	}
-	modified := injectNoPrintPassword(req)
-	require.Same(t, req, modified, "injectNoPrintPassword must not modify when flag already present")
+	modified := injectFlag(req, shouldInjectNoPrintPassword, "--no-print-password")
+	require.Same(t, req, modified, "injectFlag must not modify when flag already present")
 }
 
 func TestServer_NoPrintPasswordNotInjectedForOtherCommands(t *testing.T) {
@@ -351,8 +351,8 @@ func TestServer_NoPrintPasswordNotInjectedForOtherCommands(t *testing.T) {
 			Arguments: json.RawMessage(`{"command":"docker list","args":[]}`),
 		},
 	}
-	modified := injectNoPrintPassword(req)
-	require.Same(t, req, modified, "injectNoPrintPassword must not modify non-docker-create commands")
+	modified := injectFlag(req, shouldInjectNoPrintPassword, "--no-print-password")
+	require.Same(t, req, modified, "injectFlag must not modify non-docker-create commands")
 }
 
 func TestServer_NoPrintPasswordNotInjectedForEmptyRequest(t *testing.T) {
@@ -361,8 +361,8 @@ func TestServer_NoPrintPasswordNotInjectedForEmptyRequest(t *testing.T) {
 			Arguments: json.RawMessage(`{}`),
 		},
 	}
-	modified := injectNoPrintPassword(req)
-	require.Same(t, req, modified, "injectNoPrintPassword must not modify empty request")
+	modified := injectFlag(req, shouldInjectNoPrintPassword, "--no-print-password")
+	require.Same(t, req, modified, "injectFlag must not modify empty request")
 }
 
 func TestServer_NoPrintPasswordNotInjectedWhenPresentWithEquals(t *testing.T) {
@@ -371,8 +371,8 @@ func TestServer_NoPrintPasswordNotInjectedWhenPresentWithEquals(t *testing.T) {
 			Arguments: json.RawMessage(`{"command":"docker create","args":["--no-print-password=true","--name","test"]}`),
 		},
 	}
-	modified := injectNoPrintPassword(req)
-	require.Same(t, req, modified, "injectNoPrintPassword must not modify when --no-print-password=value is present")
+	modified := injectFlag(req, shouldInjectNoPrintPassword, "--no-print-password")
+	require.Same(t, req, modified, "injectFlag must not modify when --no-print-password=value is present")
 }
 
 func TestServer_NoPrintPasswordNotInjectedWhenNoCommand(t *testing.T) {
@@ -381,8 +381,8 @@ func TestServer_NoPrintPasswordNotInjectedWhenNoCommand(t *testing.T) {
 			Arguments: json.RawMessage(`{"args":["--name","test"]}`),
 		},
 	}
-	modified := injectNoPrintPassword(req)
-	require.Same(t, req, modified, "injectNoPrintPassword must not modify when no command specified")
+	modified := injectFlag(req, shouldInjectNoPrintPassword, "--no-print-password")
+	require.Same(t, req, modified, "injectFlag must not modify when no command specified")
 }
 
 // ----- Credential store probe tests -----

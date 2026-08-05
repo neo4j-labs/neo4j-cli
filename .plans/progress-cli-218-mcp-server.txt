@@ -190,3 +190,7 @@ Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED wi
 ## TASK-021 — 2026-08-05T08:21:09Z
 Replaced shared package-level `hintTrue *bool` pointer with a `boolPtr(v bool) *bool` function, materialising a fresh pointer per tool definition so no two tools share annotation state. Pure refactor, no behavior change. Reviewer noted and fixed: used plain `func` instead of `var`-func, corrected British spelling in comment.
 Files: ~tooldefs.go
+
+## TASK-022 — 2026-08-05T08:28:31Z
+Collapsed injectFormat/injectNoPrintPassword/hasFormatFlag/hasNoPrintPasswordFlag into injectFlag(req, predicate, flagItems...) — a single generic helper that unmarshals Args, checks a caller-provided predicate, prepends flag items, and remarshals. injectFormat kept as a thin wrapper (adds the empty-format guard). shouldInjectFormat and shouldInjectNoPrintPassword are the two predicate implementations. No behavior change: 253 mcp tests pass.
+Files: ~server.go, ~server_test.go

@@ -107,7 +107,7 @@ func (s *serverState) handlerFor(name string) func(ctx context.Context, req *mcp
 	case "neo4j_cli_run_write":
 		return func(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
 			modifiedReq := injectFormat(req, s.defaultFormat)
-			modifiedReq = injectNoPrintPassword(modifiedReq)
+			modifiedReq = injectFlag(modifiedReq, shouldInjectNoPrintPassword, "--no-print-password")
 			return HandleRunWrite(ctx, modifiedReq, s.exec, s.gates, s.newRoot)
 		}
 	case "neo4j_cli_list_targets":
@@ -124,63 +124,30 @@ func (s *serverState) handlerFor(name string) func(ctx context.Context, req *mcp
 // a tool parameter (REQ-F-021): tool parameters are what the model chooses,
 // and output format is a server configuration that does not vary per call.
 func injectFormat(req *mcpsdk.CallToolRequest, format string) *mcpsdk.CallToolRequest {
-	if req == nil || req.Params == nil || req.Params.Arguments == nil || format == "" {
+	if format == "" {
 		return req
 	}
-	var args map[string]any
-	if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
-		return req
-	}
-	existing, _ := args["args"].([]any)
-	if hasFormatFlag(existing) {
-		return req
-	}
-	// Build --format <val> args preserving the model-supplied args after.
-	var newArgs []any
-	if len(existing) == 0 {
-		// "args" may be absent entirely (nil) or present with zero items.
-		// In either case, create the array rather than mutating nil so the
-		// remarshalled JSON carries the injected flag regardless.
-		newArgs = make([]any, 0, 4)
-	}
-	newArgs = append(newArgs, "--format", format)
-	newArgs = append(newArgs, existing...)
-	args["args"] = newArgs
-
-	raw, err := json.Marshal(args)
-	if err != nil {
-		return req
-	}
-	return &mcpsdk.CallToolRequest{
-		Params: &mcpsdk.CallToolParamsRaw{
-			Arguments: raw,
-		},
-	}
+	return injectFlag(req, shouldInjectFormat, "--format", format)
 }
 
-// hasFormatFlag checks whether args already contains a --format flag, in any
-// supported spelling (--format toon, --format=json).
-func hasFormatFlag(args []any) bool {
-	for _, a := range args {
+func shouldInjectFormat(args map[string]any) bool {
+	existing, _ := args["args"].([]any)
+	for _, a := range existing {
 		s, ok := a.(string)
 		if !ok {
 			continue
 		}
 		if strings.HasPrefix(s, "--format") {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
 
-// maxOutputChars stores the --max-output-chars value from serve for future
-// wiring into MapCommandResult's ResultOptions. Currently unused: handlers
-// use DefaultMaxOutputChars (8000) which matches the flag's default.
-
-// injectNoPrintPassword injects --no-print-password into the args array when
-// the command is "docker create" and the flag is not already present. Under MCP
-// a generated password must not enter the model context.
-func injectNoPrintPassword(req *mcpsdk.CallToolRequest) *mcpsdk.CallToolRequest {
+// injectFlag injects flag items into the request's args when the predicate
+// returns true. The predicate receives the unmarshalled Arguments map and
+// should return true when injection should proceed.
+func injectFlag(req *mcpsdk.CallToolRequest, predicate func(map[string]any) bool, flagItems ...string) *mcpsdk.CallToolRequest {
 	if req == nil || req.Params == nil || req.Params.Arguments == nil {
 		return req
 	}
@@ -188,18 +155,14 @@ func injectNoPrintPassword(req *mcpsdk.CallToolRequest) *mcpsdk.CallToolRequest 
 	if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 		return req
 	}
-	command, _ := args["command"].(string)
-	if command != "docker create" {
+	if !predicate(args) {
 		return req
 	}
 	existing, _ := args["args"].([]any)
-	if hasNoPrintPasswordFlag(existing) {
-		return req
+	newArgs := make([]any, 0, len(existing)+len(flagItems))
+	for _, f := range flagItems {
+		newArgs = append(newArgs, f)
 	}
-	// Prepend --no-print-password so docker create omits the password from its
-	// output without the model having to know about the flag.
-	newArgs := make([]any, 0, len(existing)+2)
-	newArgs = append(newArgs, "--no-print-password")
 	newArgs = append(newArgs, existing...)
 	args["args"] = newArgs
 
@@ -214,17 +177,24 @@ func injectNoPrintPassword(req *mcpsdk.CallToolRequest) *mcpsdk.CallToolRequest 
 	}
 }
 
-// hasNoPrintPasswordFlag reports whether args already contains
-// --no-print-password in any supported spelling.
-func hasNoPrintPasswordFlag(args []any) bool {
-	for _, a := range args {
+// maxOutputChars stores the --max-output-chars value from serve for future
+// wiring into MapCommandResult's ResultOptions. Currently unused: handlers
+// use DefaultMaxOutputChars (8000) which matches the flag's default.
+
+func shouldInjectNoPrintPassword(args map[string]any) bool {
+	command, _ := args["command"].(string)
+	if command != "docker create" {
+		return false
+	}
+	existing, _ := args["args"].([]any)
+	for _, a := range existing {
 		s, ok := a.(string)
 		if !ok {
 			continue
 		}
 		if s == "--no-print-password" || strings.HasPrefix(s, "--no-print-password=") {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
