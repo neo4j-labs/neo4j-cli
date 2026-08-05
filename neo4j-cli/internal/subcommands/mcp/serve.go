@@ -100,10 +100,22 @@ func addServeFlags(cmd *cobra.Command) {
 
 // serveRun is the implementation of the serve command. It reads flags, builds the
 // executor, claims stdio, creates the MCP server, and runs it until interrupted.
-// The --rw flag is the primary write gate; NEO4J_CLI_MCP_ALLOW_WRITES is an env
-// fallback so a .mcpb manifest can wire the settings-UI toggle through to the
-// server without a CLI flag (Claude Desktop spawns the binary with env vars, not
-// flags the user can edit).
+//
+// The gate flags (--rw, --allow-aura, --allow-credential-write) are the primary
+// controls. Each also has an env fallback (NEO4J_CLI_MCP_ALLOW_WRITES,
+// NEO4J_CLI_MCP_ALLOW_AURA, NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE) because a
+// .mcpb manifest wires its settings-UI toggles through env vars — Claude Desktop
+// spawns the binary with env, not with flags the user can edit.
+//
+// KNOWN LIMITATION: any process running as the same OS user (a dotfile, an npm
+// postinstall, a poisoned shell rc) can set those vars and thereby open a gate
+// for every later `mcp serve`, including one started deliberately without the
+// flag. Blast radius is bounded — Layer 3 (flags.EnforceWriteGate, now with TTY
+// detection pinned off below) still demands --rw in the model's own execArgs, so
+// an open Layer 1 alone does not permit a write. But the operator's start-up
+// intent is not authoritative while these vars are set. Audit them if the
+// read-only posture matters; a future hardening would bind them through
+// cfg.Global.GatedGetenv or require a manifest-only marker flag.
 func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 	writeAllowed, _ := strconv.ParseBool(cmd.Flag("rw").Value.String())
 	if !writeAllowed {
