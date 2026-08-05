@@ -688,7 +688,7 @@ tasks:
       4000-byte tool-definition budget (task-014) but it is the one thing sent to
       every client on every session, so it should not balloon; aim to stay well
       under ~1500 bytes total.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'The instructions field states that an Aura project ID is only valid within its own organization and that --organization-id / --project-id must be paired from the same org'
@@ -697,7 +697,7 @@ tasks:
       - 'A test asserts both statements are present so the guidance cannot be silently dropped'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: "2026-08-05T13:07:04Z"
 
   - id: task-030
     title: 'neo4j_cli_list_targets must surface the owning organization for Aura rows'

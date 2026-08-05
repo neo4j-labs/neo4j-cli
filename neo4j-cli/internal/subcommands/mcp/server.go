@@ -83,7 +83,11 @@ Rules:
 - Use neo4j_cli_read_docs to learn a command's flags before calling a run tool.
 - Never call neo4j_cli_run_write without user confirmation.
 - Start with neo4j_cli_list_targets to discover available databases.
-- Use neo4j_cli_list_commands to explore available commands.`
+- Use neo4j_cli_list_commands to explore available commands.
+
+Aura scoping:
+- Pair --organization-id and --project-id from the same org. A project ID is only valid within its own organization.
+- A project/tenant not-found is a scoping error, not an auth error. Retrying or re-authenticating will not help.`
 }
 
 // handlerFor returns the tool handler for the named tool, wrapping read-run

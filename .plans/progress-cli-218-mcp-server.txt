@@ -221,3 +221,7 @@ Files: ~neo4j-cli/internal/subcommands/mcp/list_targets.go, ~.plans/tasks-cli-21
 
 ## REVIEW — 2026-08-05T12:40:00Z
 Added 2 review tasks (task-029..task-030) from live Claude Desktop testing: Aura org/project pairing invariant in the instructions field, and surfacing the owning org on list_targets Aura rows. A third reported finding (--type free-db vs free enum contradiction) was disproved by tee logs and deliberately NOT filed.
+
+## TASK-029 — 2026-08-05T13:07:04Z
+Added Aura scoping invariant to the instructions field in server.go: pair --organization-id and --project-id from the same org, and a not-found is a scoping error not an auth error. Added test assertions for both statements so guidance cannot be silently dropped. Instructions field grew from 944 B to 1189 B (under 1500 B ceiling). All gates pass.
+Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go, ~.plans/tasks-cli-218-mcp-server.yml

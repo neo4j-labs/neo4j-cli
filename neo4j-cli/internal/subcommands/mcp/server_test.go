@@ -161,6 +161,11 @@ func TestServer_InstructionsPresent(t *testing.T) {
 	assert.Contains(t, text, "neo4j_cli_run_write")
 	assert.Contains(t, text, "neo4j_cli_list_targets")
 	assert.Contains(t, text, "neo4j_cli_list_commands")
+	// Must contain Aura scoping invariant
+	assert.Contains(t, text, "--organization-id")
+	assert.Contains(t, text, "--project-id")
+	assert.Contains(t, text, "scoping error")
+	assert.Contains(t, text, "not an auth error")
 }
 
 // TestServer_FormatInjectionToon proves the default format is injected when
