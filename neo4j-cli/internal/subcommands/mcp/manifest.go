@@ -19,7 +19,13 @@ type mcpbManifest struct {
 	Name            string                     `json:"name"`
 	DisplayName     string                     `json:"display_name"`
 	Description     string                     `json:"description"`
+	LongDescription string                     `json:"long_description,omitempty"`
 	Author          mcpbAuthor                 `json:"author"`
+	Homepage        string                     `json:"homepage,omitempty"`
+	Documentation   string                     `json:"documentation,omitempty"`
+	Support         string                     `json:"support,omitempty"`
+	License         string                     `json:"license,omitempty"`
+	Keywords        []string                   `json:"keywords,omitempty"`
 	Server          mcpbServer                 `json:"server"`
 	ToolsGenerated  bool                       `json:"tools_generated"`
 	Tools           []map[string]string        `json:"tools"`
@@ -42,6 +48,7 @@ type mcpbMCPConfig struct {
 
 type mcpbAuthor struct {
 	Name string `json:"name"`
+	URL  string `json:"url,omitempty"`
 }
 
 // mcpbConfigField describes one user_config field in the manifest. The Claude
@@ -126,7 +133,13 @@ func newManifest(binPath string) *mcpbManifest {
 		Name:            "neo4j-cli",
 		DisplayName:     "Neo4j CLI",
 		Description:     "Neo4j CLI connector — manage your Neo4j databases, run Cypher queries, and administer Aura instances through natural language.",
-		Author:          mcpbAuthor{Name: "Neo4j"},
+		LongDescription: "Expose the neo4j-cli command-line tool to MCP clients such as Claude Desktop. Discover local and cloud Neo4j databases, read the CLI's own documentation, and execute read-only or write commands — manage Docker containers, Neo4j Desktop instances, credentials, and Aura resources. All operations run locally on your machine.",
+		Author:          mcpbAuthor{Name: "Neo4j", URL: "https://neo4j.com"},
+		Homepage:        "https://neo4j.sh",
+		Documentation:   "https://github.com/neo4j-labs/neo4j-cli#neo4j-cli",
+		Support:         "https://github.com/neo4j-labs/neo4j-cli/issues",
+		License:         "Apache-2.0",
+		Keywords:        []string{"neo4j", "graph", "database", "cypher", "aura", "docker", "mcp"},
 		Server: mcpbServer{
 			Type:       "binary",
 			EntryPoint: binPath,
