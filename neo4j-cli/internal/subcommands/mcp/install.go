@@ -4,7 +4,6 @@
 package mcp
 
 import (
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,30 +18,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// installResult implements output.ResponseData for install/remove results.
+// installResult is the JSON shape emitted by mcp install and mcp remove.
 type installResult struct {
 	Agent       string `json:"agent"`
 	DisplayName string `json:"display_name"`
 	Method      string `json:"method"`
 }
 
-// installResults implements output.ResponseData for install/remove result lists.
-type installResults []installResult
-
-func (r installResults) AsArray() []map[string]any {
-	out := make([]map[string]any, 0, len(r))
-	for _, row := range r {
-		out = append(out, map[string]any{
-			"agent":        row.Agent,
-			"display_name": row.DisplayName,
-			"method":       row.Method,
-		})
+func (r installResult) asArrayRow() map[string]any {
+	return map[string]any{
+		"agent":        r.Agent,
+		"display_name": r.DisplayName,
+		"method":       r.Method,
 	}
-	return out
-}
-
-func (r installResults) MarshalJSON() ([]byte, error) {
-	return json.Marshal([]installResult(r))
 }
 
 func newInstallCmd(cfg *clicfg.Config) *cobra.Command {
@@ -112,7 +100,7 @@ func runInstallCmd(cfg *clicfg.Config, cmd *cobra.Command, agentFilter string, i
 		targets = detected
 	}
 
-	var rows installResults
+	var rows resultRows[installResult]
 	for _, a := range targets {
 		if err := runInstallOne(fs, a, useBundle); err != nil {
 			return err
@@ -141,7 +129,7 @@ func runInstallAndRender(fs afero.Fs, cfg *clicfg.Config, cmd *cobra.Command, a 
 	if useBundle {
 		method = "mcpb"
 	}
-	rows := installResults{{Agent: a.Name, DisplayName: a.DisplayName, Method: method}}
+	rows := resultRows[installResult]{{Agent: a.Name, DisplayName: a.DisplayName, Method: method}}
 	renderInstallResults(cmd, cfg, rows)
 	return nil
 }
@@ -196,7 +184,7 @@ func openFile(path string) error {
 	}
 }
 
-func renderInstallResults(cmd *cobra.Command, cfg *clicfg.Config, rows installResults) {
+func renderInstallResults(cmd *cobra.Command, cfg *clicfg.Config, rows resultRows[installResult]) {
 	if len(rows) == 0 && commonoutput.ResolveOutput(cmd, cfg) != "json" {
 		cmd.Printf("No agents to install into.\n")
 		return

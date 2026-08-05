@@ -651,7 +651,7 @@ tasks:
       pattern. Three near-identical ResponseData implementations. Extract a shared
       output-row helper type in the package that halves the boilerplate, and migrate
       the three call sites to it.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'A shared helper type or function underpins the AsArray/MarshalJSON pattern'
@@ -659,4 +659,4 @@ tasks:
       - 'Output is byte-identical to before (json/toon/table)'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T10:45:00Z

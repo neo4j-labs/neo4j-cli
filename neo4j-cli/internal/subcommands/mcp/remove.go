@@ -62,7 +62,7 @@ func runRemoveCmd(cfg *clicfg.Config, cmd *cobra.Command, agentFilter string) er
 		targets = skill.DetectMCPAgents(fs)
 	}
 
-	var rows installResults
+	var rows resultRows[installResult]
 	for _, a := range targets {
 		if err := removeFromOne(fs, a); err != nil {
 			return err
@@ -82,7 +82,7 @@ func removeFromOne(fs afero.Fs, a *skill.Agent) error {
 	return skill.RemoveMCPConfig(fs, a)
 }
 
-func renderRemoveResults(cmd *cobra.Command, cfg *clicfg.Config, rows installResults) {
+func renderRemoveResults(cmd *cobra.Command, cfg *clicfg.Config, rows resultRows[installResult]) {
 	if len(rows) == 0 {
 		// No agents to remove from — either none detected or none left. Not an
 		// error (idempotent), but a friendly note when table output.

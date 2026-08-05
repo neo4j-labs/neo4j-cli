@@ -4,8 +4,6 @@
 package mcp
 
 import (
-	"encoding/json"
-
 	"github.com/neo4j/cli/common/clicfg"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/common/skill"
@@ -21,25 +19,14 @@ type mcpListResultRow struct {
 	InstalledVersion string `json:"installed_version"`
 }
 
-// mcpListResults implements output.ResponseData for mcp list.
-type mcpListResults []mcpListResultRow
-
-func (r mcpListResults) AsArray() []map[string]any {
-	out := make([]map[string]any, 0, len(r))
-	for _, row := range r {
-		out = append(out, map[string]any{
-			"agent":             row.Agent,
-			"display_name":      row.DisplayName,
-			"detected":          boolStr(row.Detected),
-			"installed":         boolStr(row.Installed),
-			"installed_version": row.InstalledVersion,
-		})
+func (r mcpListResultRow) asArrayRow() map[string]any {
+	return map[string]any{
+		"agent":             r.Agent,
+		"display_name":      r.DisplayName,
+		"detected":          boolStr(r.Detected),
+		"installed":         boolStr(r.Installed),
+		"installed_version": r.InstalledVersion,
 	}
-	return out
-}
-
-func (r mcpListResults) MarshalJSON() ([]byte, error) {
-	return json.Marshal([]mcpListResultRow(r))
 }
 
 func boolStr(b bool) string {
@@ -78,7 +65,7 @@ func runListCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
 	fs := cfg.Aura.Fs()
 	installs := skill.MCPList(fs)
 
-	rows := make(mcpListResults, 0, len(installs))
+	rows := make(resultRows[mcpListResultRow], 0, len(installs))
 	for _, inst := range installs {
 		rows = append(rows, mcpListResultRow{
 			Agent:            inst.Agent.Name,

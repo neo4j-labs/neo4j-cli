@@ -212,5 +212,9 @@ Simplified argSpellings slice-range idiom: replaced the three-index slice expres
 Files: ~neo4j-cli/internal/subcommands/mcp/allow.go, ~.plans/tasks-cli-218-mcp-server.yml
 
 ## TASK-027 — 2026-08-05T09:13:00Z
+
+## TASK-028 — 2026-08-05T10:45:00Z
+Extracted shared `resultRows[T asArrayRower]` generic type in `result_rows.go` eliminating three identical `AsArray()` / `MarshalJSON()` implementations in check.go, install.go, and list.go. Each row struct now implements `asArrayRow() map[string]any`. Updated remove.go's `installResults` references. 255 mcp tests pass; all gates green.
+Files: +neo4j-cli/internal/subcommands/mcp/result_rows.go, ~install.go, ~check.go, ~list.go, ~remove.go
 Introduced colDef slice (name + width) driving the header, separator, and data-row rendering in formatTargetsTable. Adding a column is now one entry in targetColumns plus one field in the vals slice. Pure refactor, byte-identical output verified by standalone program. Reviewer noted comment accuracy; fixed.
 Files: ~neo4j-cli/internal/subcommands/mcp/list_targets.go, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt

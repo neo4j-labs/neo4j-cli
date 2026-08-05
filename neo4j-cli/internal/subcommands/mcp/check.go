@@ -4,7 +4,6 @@
 package mcp
 
 import (
-	"encoding/json"
 	"os"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -22,24 +21,13 @@ type mcpCheckResultRow struct {
 	Status           string `json:"status"`
 }
 
-// mcpCheckResults implements output.ResponseData for mcp check.
-type mcpCheckResults []mcpCheckResultRow
-
-func (r mcpCheckResults) AsArray() []map[string]any {
-	out := make([]map[string]any, 0, len(r))
-	for _, row := range r {
-		out = append(out, map[string]any{
-			"agent":             row.Agent,
-			"installed_version": row.InstalledVersion,
-			"current_version":   row.CurrentVersion,
-			"status":            row.Status,
-		})
+func (r mcpCheckResultRow) asArrayRow() map[string]any {
+	return map[string]any{
+		"agent":             r.Agent,
+		"installed_version": r.InstalledVersion,
+		"current_version":   r.CurrentVersion,
+		"status":            r.Status,
 	}
-	return out
-}
-
-func (r mcpCheckResults) MarshalJSON() ([]byte, error) {
-	return json.Marshal([]mcpCheckResultRow(r))
 }
 
 func newCheckCmd(cfg *clicfg.Config) *cobra.Command {
@@ -76,7 +64,7 @@ func runCheckCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
 	}
 
 	installs := skill.MCPList(fs)
-	var rows mcpCheckResults
+	var rows resultRows[mcpCheckResultRow]
 
 	for _, inst := range installs {
 		if !inst.Installed {
