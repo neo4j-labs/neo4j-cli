@@ -178,20 +178,20 @@ func TestGenerateBundle_ToolsMatchToolDefinitions(t *testing.T) {
 		"manifest tools must match toolDefinitions()")
 }
 
-// TestGenerateBundle_IconIsOmitted verifies that the generator omits the icon
-// field entirely rather than referencing a missing file (REQ-F-038a).
-func TestGenerateBundle_IconIsOmitted(t *testing.T) {
+// TestGenerateBundle_IconIsIncluded verifies that the generator includes an
+// icon.png in the bundle and references it in the manifest. Claude Desktop
+// needs the icon to render the extension preview card.
+func TestGenerateBundle_IconIsIncluded(t *testing.T) {
 	_, r := openTestBundle(t)
 	defer func() { _ = r.Close() }()
 
 	manifestData := readZipFile(t, r, "manifest.json")
-	assert.NotContains(t, string(manifestData), "icon",
-		"manifest must not reference an icon field")
+	assert.Contains(t, string(manifestData), `"icon": "icon.png"`,
+		"manifest must reference icon.png")
 
-	for _, f := range r.File {
-		assert.NotContains(t, f.Name, "icon",
-			"bundle must not contain icon files")
-	}
+	iconData := readZipFile(t, r, "icon.png")
+	assert.NotEmpty(t, iconData, "bundle must contain icon.png")
+	assert.True(t, len(iconData) > 100, "icon.png should be a real PNG, got %d bytes", len(iconData))
 }
 
 // TestGenerateBundle_CompatibilityPlatforms checks that the platform list

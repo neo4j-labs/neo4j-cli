@@ -5,10 +5,14 @@ package mcp
 
 import (
 	"archive/zip"
+	_ "embed"
 	"encoding/json"
 	"os"
 	"strings"
 )
+
+//go:embed icon.png
+var iconData []byte
 
 // mcpbManifest is the manifest.json schema for an .mcpb desktop extension.
 // JSON field names are the MCPB wire format; the repo's OUTPUT casing rule
@@ -26,6 +30,7 @@ type mcpbManifest struct {
 	Support         string                     `json:"support,omitempty"`
 	License         string                     `json:"license,omitempty"`
 	Keywords        []string                   `json:"keywords,omitempty"`
+	Icon            string                     `json:"icon,omitempty"`
 	Server          mcpbServer                 `json:"server"`
 	ToolsGenerated  bool                       `json:"tools_generated"`
 	Tools           []map[string]string        `json:"tools"`
@@ -98,6 +103,7 @@ func GenerateBundle(path string) error {
 	}{
 		{"manifest.json", manifestJSON},
 		{"README.md", []byte(readme)},
+		{"icon.png", iconData},
 	} {
 		w, err := zw.Create(entry.name)
 		if err != nil {
@@ -140,6 +146,7 @@ func newManifest(binPath string) *mcpbManifest {
 		Support:         "https://github.com/neo4j-labs/neo4j-cli/issues",
 		License:         "Apache-2.0",
 		Keywords:        []string{"neo4j", "graph", "database", "cypher", "aura", "docker", "mcp"},
+		Icon:            "icon.png",
 		Server: mcpbServer{
 			Type:       "binary",
 			EntryPoint: binPath,
