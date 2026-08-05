@@ -24,17 +24,22 @@ const generatedPasswordBytes = 16
 
 // generatePassword is the SINGLE place a Neo4j password is minted for a local
 // container: `docker create` (no --password) and LoadDumpIntoNewContainer
-// (`docker load`, and `aura instance load --stage docker`) both route through
-// it. Never re-inline randSource + base64 in a new leaf — the registration
-// below is the whole reason this funnel exists.
+// (`docker load`, and `aura instance load`, which stages through an ephemeral
+// container) both route through it. The funnel exists so the registration below
+// cannot be forgotten — a new leaf minting its own password would silently
+// reintroduce CLI-228.
 //
-// Registering the literal value is required because clievents.RedactText is
+// Registering the literal value matters because clievents.RedactText is
 // shape-based: it catches `NEO4J_PASSWORD=<v>` (the --ephemeral .env blob) and
 // `"password":"<v>"` (--format json), but NOT a value cell in a box-drawing
 // table (--format table) nor a TOON array row (--format toon, the agent-harness
 // default), both of which put the value on a different line from its header.
-// Without registration any capture of SUCCESSFUL output carries the password
-// verbatim.
+//
+// No current path feeds SUCCESSFUL stdout through RedactText: the tee buffer is
+// persisted only on failure, and --debug covers stderr plus env NAMES only. So
+// today this registration changes no observable output — it is prep for
+// consumers that DO capture successful stdout, notably CLI-218's `mcp serve`,
+// whose default format is toon.
 //
 // Only GENERATED passwords are registered. An operator-supplied --password is
 // deliberately left unregistered: redaction of a known value is a literal

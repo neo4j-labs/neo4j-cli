@@ -271,9 +271,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			}
 
 			// Resolve password: honour --password verbatim, otherwise mint one
-			// (REQ-F-015). generatePassword (password.go) also registers the
-			// generated value for redaction — see its doc comment for why an
-			// operator-supplied --password is deliberately not registered.
+			// (REQ-F-015; see generatePassword in password.go).
 			resolvedPassword := password
 			if resolvedPassword == "" {
 				resolvedPassword, err = generatePassword()
