@@ -51,6 +51,16 @@ func newServeCmd(cfg *clicfg.Config) *cobra.Command {
 // swap in a stub so the test does not depend on the real OS keyring.
 var probeKeyringFn = credentials.ProbeKeyringAvailability
 
+// envBool reads a boolean env var, returning false if unset or unparseable.
+func envBool(key string) bool {
+	if v, ok := os.LookupEnv(key); ok {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return false
+}
+
 // checkCredentialStore returns an actionable error when the credential storage
 // mode is "keyring" but the OS keyring daemon is unreachable. A locked or
 // unavailable keyring would hang on the first credential read during a tool
@@ -96,14 +106,16 @@ func addServeFlags(cmd *cobra.Command) {
 func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 	writeAllowed, _ := strconv.ParseBool(cmd.Flag("rw").Value.String())
 	if !writeAllowed {
-		if v, ok := os.LookupEnv("NEO4J_CLI_MCP_ALLOW_WRITES"); ok {
-			if b, err := strconv.ParseBool(v); err == nil {
-				writeAllowed = b
-			}
-		}
+		writeAllowed = envBool("NEO4J_CLI_MCP_ALLOW_WRITES")
 	}
 	allowAura, _ := strconv.ParseBool(cmd.Flag(AllowAuraFlag).Value.String())
+	if !allowAura {
+		allowAura = envBool("NEO4J_CLI_MCP_ALLOW_AURA")
+	}
 	allowCredWrite, _ := strconv.ParseBool(cmd.Flag(AllowCredentialWriteFlag).Value.String())
+	if !allowCredWrite {
+		allowCredWrite = envBool("NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE")
+	}
 	defaultFormat := cmd.Flag("format").Value.String()
 	maxOutputChars, _ := strconv.Atoi(cmd.Flag("max-output-chars").Value.String())
 

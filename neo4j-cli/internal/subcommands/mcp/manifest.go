@@ -154,8 +154,10 @@ func newManifest(binPath string) *mcpbManifest {
 				Command: "${user_config.neo4j_cli_path}",
 				Args:    []string{"mcp", "serve"},
 				Env: map[string]string{
-					"NEO4J_CLI_FLAG_MCP_SERVER":  "1",
-					"NEO4J_CLI_MCP_ALLOW_WRITES": "${user_config.allow_writes}",
+					"NEO4J_CLI_FLAG_MCP_SERVER":            "1",
+					"NEO4J_CLI_MCP_ALLOW_WRITES":           "${user_config.allow_writes}",
+					"NEO4J_CLI_MCP_ALLOW_AURA":             "${user_config.allow_aura}",
+					"NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE": "${user_config.allow_credential_write}",
 				},
 			},
 		},
@@ -173,6 +175,18 @@ func newManifest(binPath string) *mcpbManifest {
 				Default:     false,
 				Title:       "Allow writes",
 				Description: "Let the assistant modify your databases. Off by default.",
+			},
+			"allow_aura": {
+				Type:        "boolean",
+				Default:     false,
+				Title:       "Allow Aura provisioning",
+				Description: "Let the assistant create, modify and delete Aura instances. Off by default.",
+			},
+			"allow_credential_write": {
+				Type:        "boolean",
+				Default:     false,
+				Title:       "Allow credential management",
+				Description: "Let the assistant add and remove stored credentials. Off by default.",
 			},
 			"neo4j_credential": {
 				Type:        "string",
