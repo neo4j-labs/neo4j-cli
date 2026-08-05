@@ -492,7 +492,7 @@ tasks:
       reach the other. Extract a shared helper that returns the resolved
       *cobra.Command and execArgs so the two handlers only implement the
       policy-specific check in between. This makes silent divergence harder.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'A shared helper (e.g. resolveCommandAndExec) contains the common tree-building, path-resolution, stdin-leaf-check, flag-validation, and exec-args-assembly logic'
@@ -500,7 +500,7 @@ tasks:
       - 'No behavior change: existing run and run_write tests pass unchanged'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T08:06:51Z
 
   - id: task-021
     title: 'Replace shared hintTrue *bool with per-definition boolPtr (blocking)'

@@ -181,3 +181,8 @@ Five-tool surface holds. Progressive disclosure (list_targets -> list_commands -
 
 ## REVIEW — 2026-08-05T06:30:00Z
 Added 9 review tasks (task-020..task-028) from the hone end-of-feature audit: 2 blocking (resolveCommandAndExec extraction, hintTrue shared *bool), 7 non-blocking (injectFlag collapse, precise flag matching, isStdinLeaf annotation, RedactedArgs deletion, argSpellings simplification, column-descriptor table, shared AsArray boilerplate).
+
+## TASK-020 — 2026-08-05T08:06:51Z
+Extracted `resolveCommand` helper shared by HandleRun and HandleRunWrite, eliminating ~65 lines of duplicate tree-building/path-resolution/flag-validation/stdin-catch logic. Pure refactor, no behavior change.
+Files: ~run.go, ~run_write.go
+Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED without committing.

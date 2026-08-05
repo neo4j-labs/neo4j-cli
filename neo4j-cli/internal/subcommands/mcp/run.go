@@ -19,25 +19,33 @@ import (
 // MaxRunArgs is the maximum number of args the neo4j_cli_run tool accepts.
 const MaxRunArgs = 64
 
-// HandleRun handles the neo4j_cli_run MCP tool call. It resolves the command
-// through the cobra tree built by newRoot, validates flags before execution,
-// checks policy and write classification, then dispatches through the executor
-// and maps the result through MapCommandResult.
-//
-// newRoot must build a tree with the same flag configuration the server started
-// with so flag-gated commands can be resolved (callers should mirror
-// storedRootFactory and storedFlagStates).
-func HandleRun(ctx context.Context, req *mcpsdk.CallToolRequest, exec *Executor, gates Gates, newRoot RootFactory) (*mcpsdk.CallToolResult, error) {
+// resolvedCommand is the result of resolving a tool call request into a cobra
+// command and execution args. err is non-nil when a pre-exec check (unknown
+// command, args cap, policy gate, flag validation, stdin leaf) fails.
+type resolvedCommand struct {
+	cmd      *cobra.Command
+	args     []string // user-supplied args (for policy checks)
+	execArgs []string // full arg list for the executor: tokens + args
+	command  string   // original command string (for error messages)
+	err      *mcpsdk.CallToolResult
+}
+
+// resolveCommand extracts command and args from a CallToolRequest, builds a
+// fresh config and cobra tree, resolves and validates the command path, runs
+// the policy gate, rejects --debug, validates flags, and assembles execArgs.
+// The caller is responsible for the policy-specific classification check,
+// --rw rejection (HandleRun only), the stdin-leaf check (must run after
+// classify), execution, and result mapping.
+func resolveCommand(ctx context.Context, req *mcpsdk.CallToolRequest, exec *Executor, gates Gates, newRoot RootFactory) *resolvedCommand {
 	command, args := parseRunArgs(req)
 	if command == "" {
-		return runError("Missing required argument: command"), nil
+		return &resolvedCommand{err: runError("Missing required argument: command")}
 	}
 
 	if len(args) > MaxRunArgs {
-		return runError(fmt.Sprintf("args exceeds maximum of %d items", MaxRunArgs)), nil
+		return &resolvedCommand{err: runError(fmt.Sprintf("args exceeds maximum of %d items", MaxRunArgs))}
 	}
 
-	// Build tree with stored flag states so flag-gated commands are resolvable.
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion, clicfg.GlobalScope)
 	defer cfg.Events.Flush()
 	for name, enabled := range storedFlagStates {
@@ -47,64 +55,74 @@ func HandleRun(ctx context.Context, req *mcpsdk.CallToolRequest, exec *Executor,
 	}
 	root := newRoot(cfg)
 
-	// Resolve command path through the cobra tree.
 	tokens := strings.Fields(command)
 	cmd, _, err := root.Find(tokens)
 	if err != nil || cmd == nil || !cmd.IsAvailableCommand() {
-		return runError(fmt.Sprintf("Unknown command: %q", command)), nil
+		return &resolvedCommand{err: runError(fmt.Sprintf("Unknown command: %q", command))}
 	}
 
-	// Verify the resolved path exactly matches the requested command.
 	resolvedPath := strings.Join(commandPath(cmd), " ")
 	if resolvedPath != command {
-		return runError(fmt.Sprintf("Unknown command: %q", command)), nil
+		return &resolvedCommand{err: runError(fmt.Sprintf("Unknown command: %q", command))}
 	}
 
-	// Policy check: refuse deny-classified paths and closed gates.
 	if err := Check(cmd, args, gates); err != nil {
-		return runError(err.Error()), nil
-	}
-
-	// Refuse write-classified commands -- write intent must route through
-	// neo4j_cli_run_write so annotations stay honest and the write gate in
-	// flags.EnforceWriteGate is the authoritative arbiter.
-	policy, _ := Classify(cmd, args)
-	if policy == PolicyWrite {
-		return runError(fmt.Sprintf("%q is a write command; use neo4j_cli_run_write instead", command)), nil
-	}
-
-	// Reject --rw in args: write intent must route through neo4j_cli_run_write
-	// so annotations stay honest.
-	if containsFlag(args, "rw") {
-		return runError("--rw is not accepted by neo4j_cli_run; use neo4j_cli_run_write instead"), nil
+		return &resolvedCommand{err: runError(err.Error())}
 	}
 
 	// Reject --debug in args: its traces go to package-global debugW seams
 	// whose setters are test-only, making them unreliable under MCP.
 	if containsFlag(args, "debug") {
-		return runError("--debug is not accepted by neo4j_cli_run"), nil
+		return &resolvedCommand{err: runError("--debug is not accepted")}
 	}
 
-	// Validate flag long-names against the resolved leaf before execution.
-	// This is cheaper than executing and teaches the model valid flags.
 	if err := validateRunFlags(cmd, args); err != nil {
-		return runError(err.Error()), nil
+		return &resolvedCommand{err: runError(err.Error())}
 	}
 
-	// Catch stdin-reading leaves with no positional argument before exec.
-	// query with no args falls through to io.ReadAll(os.Stdin) which would
-	// consume the protocol stream and hang the server. The executor's
-	// per-call SetIn backstop covers cmd.InOrStdin() readers; os.Stdin
-	// direct readers are caught here.
-	if len(args) == 0 && isStdinLeaf(cmd) {
-		return runError(fmt.Sprintf("%q requires a positional argument; pass the query as the first item in args", command)), nil
-	}
-
-	// Build the full execution args: command path tokens + user-supplied args.
 	execArgs := append(tokens, args...)
-	result := exec.Execute(ctx, execArgs)
+	return &resolvedCommand{
+		cmd:      cmd,
+		args:     args,
+		execArgs: execArgs,
+		command:  command,
+	}
+}
 
-	return MapCommandResult(result, ResultOptions{Args: execArgs}), nil
+// HandleRun handles the neo4j_cli_run MCP tool call. It resolves the command
+// through the cobra tree built by newRoot, checks write classification and
+// rejects --rw/--debug, then dispatches through the executor and maps the
+// result through MapCommandResult.
+//
+// newRoot must build a tree with the same flag configuration the server started
+// with so flag-gated commands can be resolved (callers should mirror
+// storedRootFactory and storedFlagStates).
+func HandleRun(ctx context.Context, req *mcpsdk.CallToolRequest, exec *Executor, gates Gates, newRoot RootFactory) (*mcpsdk.CallToolResult, error) {
+	r := resolveCommand(ctx, req, exec, gates, newRoot)
+	if r.err != nil {
+		return r.err, nil
+	}
+
+	// Refuse write-classified commands -- write intent must route through
+	// neo4j_cli_run_write so annotations stay honest and the write gate in
+	// flags.EnforceWriteGate is the authoritative arbiter.
+	policy, _ := Classify(r.cmd, r.args)
+	if policy == PolicyWrite {
+		return runError(fmt.Sprintf("%q is a write command; use neo4j_cli_run_write instead", r.command)), nil
+	}
+
+	// Reject --rw in args: write intent must route through neo4j_cli_run_write
+	// so annotations stay honest.
+	if containsFlag(r.args, "rw") {
+		return runError("--rw is not accepted by neo4j_cli_run; use neo4j_cli_run_write instead"), nil
+	}
+
+	if len(r.args) == 0 && isStdinLeaf(r.cmd) {
+		return runError(fmt.Sprintf("%q requires a positional argument; pass the query as the first item in args", r.command)), nil
+	}
+
+	result := exec.Execute(ctx, r.execArgs)
+	return MapCommandResult(result, ResultOptions{Args: r.execArgs}), nil
 }
 
 // parseRunArgs extracts command and args from a raw CallToolRequest arguments
