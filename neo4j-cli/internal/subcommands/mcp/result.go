@@ -154,10 +154,3 @@ func truncate(s string, max int, _, hint string) string {
 	}
 	return out
 }
-
-// RedactedArgs returns the redacted string representation of args. Exported
-// so tool handlers can include it in structured content or diagnostics
-// without reimplementing the secret-flag allowlist.
-func RedactedArgs(args []string) string {
-	return clievents.RedactArgs(args)
-}

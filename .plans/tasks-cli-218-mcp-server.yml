@@ -596,7 +596,7 @@ tasks:
       zero callers that benefit from avoiding the import. Delete it and inline any
       caller to clievents.RedactArgs directly. If an external package turns out to
       need it, restore it then — but verify there is no such caller first.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'RedactedArgs wrapper is deleted from result.go'
@@ -604,7 +604,7 @@ tasks:
       - 'No external package needed it (verified by build)'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: "2026-08-05T08:56:25Z"
 
   - id: task-026
     title: 'Simplify argSpellings slice-range idiom'
