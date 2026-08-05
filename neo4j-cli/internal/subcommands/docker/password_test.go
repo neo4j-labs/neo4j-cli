@@ -4,8 +4,6 @@
 package docker
 
 import (
-	"bytes"
-	"encoding/base64"
 	"errors"
 	"testing"
 
@@ -25,14 +23,10 @@ type errReader struct{}
 func (errReader) Read([]byte) (int, error) { return 0, errRandSource }
 
 func TestGeneratePassword_RegistersSecretValueForRedaction(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0x01}
-	defer func() { randSource = origRand }()
+	expected := stubRandSource(t)
 
 	pw, err := generatePassword()
 	require.NoError(t, err)
-
-	expected := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x01}, generatedPasswordBytes))
 	require.Equal(t, expected, pw)
 
 	assert.Equal(t, "***", clievents.RedactText(pw), "minted password must be registered so RedactText scrubs it")
@@ -48,9 +42,7 @@ func TestGeneratePassword_RegistersSecretValueForRedaction(t *testing.T) {
 }
 
 func TestGeneratePassword_RandSourceError_Wrapped(t *testing.T) {
-	origRand := randSource
-	randSource = errReader{}
-	defer func() { randSource = origRand }()
+	setRandSource(t, errReader{})
 
 	pw, err := generatePassword()
 	require.Error(t, err)

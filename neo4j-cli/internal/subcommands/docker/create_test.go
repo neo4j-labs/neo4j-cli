@@ -6,7 +6,6 @@ package docker
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -160,11 +159,7 @@ func containsPair(argv []string, flag, value string) bool {
 }
 
 func TestCreate_HappyPath_StoresCredentialAndSetsExpectedArgs(t *testing.T) {
-	// Use a deterministic randSource so the generated password is assertable.
-	origRand := randSource
-	randSource = constantReader{b: 0xAB}
-	defer func() { randSource = origRand }()
-	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xAB}, generatedPasswordBytes))
+	expectedPassword := stubRandSource(t)
 
 	fake, cfg, _, err := runCreate(t, "--name dev")
 	require.NoError(t, err)
@@ -293,11 +288,7 @@ func TestCreate_ExplicitPassword_HonouredAndSurfaced(t *testing.T) {
 }
 
 func TestCreate_GeneratedPassword_UsesRandSourceAndBase64URLEncoding(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0x10}
-	defer func() { randSource = origRand }()
-
-	expected := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x10}, generatedPasswordBytes))
+	expected := stubRandSource(t)
 	// Sanity: no padding, length matches 16 bytes → 22 characters.
 	require.NotContains(t, expected, "=")
 	require.Len(t, expected, 22)
@@ -316,9 +307,7 @@ func TestCreate_GeneratedPassword_UsesRandSourceAndBase64URLEncoding(t *testing.
 }
 
 func TestCreate_FormatJson_RendersDocumentedFields(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0x42}
-	defer func() { randSource = origRand }()
+	stubRandSource(t)
 
 	_, _, stdout, err := runCreate(t, "--name dev --bolt-port 7688 --http-port 7475 --format json")
 	require.NoError(t, err)
@@ -878,10 +867,7 @@ func runCreateForEphemeral(t *testing.T, args string) (*fakeDockerClient, *clicf
 }
 
 func TestCreate_Ephemeral_HappyPath_EmitsEnvBlobAndSkipsCredential(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0xCD}
-	defer func() { randSource = origRand }()
-	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xCD}, generatedPasswordBytes))
+	expectedPassword := stubRandSource(t)
 
 	fake, cfg, _, stdout, _, err := runCreateForEphemeral(t, "--name tmp --ephemeral")
 	require.NoError(t, err)
@@ -909,10 +895,7 @@ func TestCreate_Ephemeral_HappyPath_EmitsEnvBlobAndSkipsCredential(t *testing.T)
 }
 
 func TestCreate_Ephemeral_EnvOutFile_WritesFileAndStaysSilent(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0xEF}
-	defer func() { randSource = origRand }()
-	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xEF}, generatedPasswordBytes))
+	expectedPassword := stubRandSource(t)
 
 	envPath := "/tmp/n.env"
 	fake, cfg, fs, stdout, stderr, err := runCreateForEphemeral(t,
@@ -1609,10 +1592,7 @@ func TestCreate_VersionValidation(t *testing.T) {
 // flows into docker (via the NEO4J_AUTH env passthrough) and into the persisted
 // dbms credential — only the rendering surface is suppressed.
 func TestCreate_NoPrintPassword_OmitsPasswordFromOutput(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0x55}
-	defer func() { randSource = origRand }()
-	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x55}, generatedPasswordBytes))
+	expectedPassword := stubRandSource(t)
 
 	tests := []struct {
 		name string
@@ -1639,10 +1619,7 @@ func TestCreate_NoPrintPassword_OmitsPasswordFromOutput(t *testing.T) {
 // generated password verbatim. Without this assertion the redaction test
 // above could pass even if the password field were globally dropped.
 func TestCreate_NoPrintPassword_DefaultStillRendersPassword(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0x66}
-	defer func() { randSource = origRand }()
-	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x66}, generatedPasswordBytes))
+	expectedPassword := stubRandSource(t)
 
 	_, _, stdout, err := runCreate(t, "--name dev --format json")
 	require.NoError(t, err)
@@ -1660,10 +1637,7 @@ func TestCreate_NoPrintPassword_DefaultStillRendersPassword(t *testing.T) {
 // so `neo4j-cli credential dbms get <name>` recovers it. This is the
 // documented recovery contract.
 func TestCreate_NoPrintPassword_StoresCredentialForRecovery(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0x77}
-	defer func() { randSource = origRand }()
-	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x77}, generatedPasswordBytes))
+	expectedPassword := stubRandSource(t)
 
 	_, cfg, stdout, err := runCreate(t, "--name dev --no-print-password --format json")
 	require.NoError(t, err)
@@ -1735,10 +1709,7 @@ func TestCreate_NoPrintPassword_Ephemeral_Errors(t *testing.T) {
 // future stderr line that accidentally interpolates the password breaks
 // the test.
 func TestCreate_NoPrintPassword_StdoutAndStderrFreeOfPassword(t *testing.T) {
-	origRand := randSource
-	randSource = constantReader{b: 0x88}
-	defer func() { randSource = origRand }()
-	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x88}, generatedPasswordBytes))
+	expectedPassword := stubRandSource(t)
 
 	_, _, stdout, stderr, err := runCreateWithOccupiedPortsAndStderr(t,
 		"--name dev --no-print-password --format json")
