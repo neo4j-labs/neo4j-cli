@@ -45,13 +45,13 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 			"(agent directory exists), installed (neo4j-cli entry in config), " +
 			"and installed_version (the binary path from the config entry, if any).",
 		Example: `# List MCP agents and their install state (table)
-	neo4j-cli mcp list
+neo4j-cli mcp list
 
-	# List as JSON (machine-readable)
-	neo4j-cli mcp list --format json
+# List as JSON (machine-readable)
+neo4j-cli mcp list --format json
 
-	# List in toon format
-	neo4j-cli mcp list --format toon`,
+# List in toon format
+neo4j-cli mcp list --format toon`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

@@ -521,3 +521,24 @@ func TestCheckCredentialStore_InsecureModeSkipsProbe(t *testing.T) {
 	err = checkCredentialStore(cfg)
 	require.NoError(t, err, "insecure mode must skip probe")
 }
+
+// TestShouldInjectNoPrintPassword_WhitespaceVariants guards the suppression
+// bypass found by the security review: resolveCommand normalises the command
+// with strings.Fields, so exact equality here let "docker  create" execute
+// normally while skipping --no-print-password injection, leaking the generated
+// password into the tool result.
+func TestShouldInjectNoPrintPassword_WhitespaceVariants(t *testing.T) {
+	for _, cmd := range []string{
+		"docker create",
+		"docker  create",
+		"docker\tcreate",
+		"  docker create  ",
+	} {
+		assert.True(t, shouldInjectNoPrintPassword(map[string]any{"command": cmd, "args": []any{}}),
+			"%q must trigger --no-print-password injection", cmd)
+	}
+	for _, cmd := range []string{"docker createx", "docker", "dockercreate", ""} {
+		assert.False(t, shouldInjectNoPrintPassword(map[string]any{"command": cmd, "args": []any{}}),
+			"%q must not trigger injection", cmd)
+	}
+}

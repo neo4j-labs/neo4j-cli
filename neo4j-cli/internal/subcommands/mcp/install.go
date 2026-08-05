@@ -52,13 +52,13 @@ func newInstallCmd(cfg *clicfg.Config) *cobra.Command {
 			"to install into every detected MCP-capable agent. " +
 			"\n\nSupported agents: " + strings.Join(skill.MCPAgentNames(), ", "),
 		Example: `# Install neo4j-cli into every detected MCP agent
-	neo4j-cli mcp install --rw
+neo4j-cli mcp install --rw
 
-	# Install into Claude Desktop by generating a .mcpb bundle and opening it
-	neo4j-cli mcp install --agent claude-desktop --bundle --rw
+# Install into Claude Desktop by generating a .mcpb bundle and opening it
+neo4j-cli mcp install --agent claude-desktop --bundle --rw
 
-	# Install into a single agent and emit the result as JSON
-	neo4j-cli mcp install --agent claude-desktop --format json --rw`,
+# Install into a single agent and emit the result as JSON
+neo4j-cli mcp install --agent claude-desktop --format json --rw`,
 		Args:        cobra.NoArgs,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {

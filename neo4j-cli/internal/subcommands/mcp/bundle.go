@@ -30,10 +30,10 @@ func newBundleCmd(cfg *clicfg.Config) *cobra.Command {
 			"manifest.json and README.md — no binary is included. The manifest embeds " +
 			"the absolute path of this binary so the connector points at the generating CLI.",
 		Example: `# Generate an .mcpb bundle for this machine's neo4j-cli
-	neo4j-cli mcp bundle --out ~/Desktop/neo4j-cli.mcpb --rw
+neo4j-cli mcp bundle --out ~/Desktop/neo4j-cli.mcpb --rw
 
-	# Generate the bundle and inspect the output path as JSON
-	neo4j-cli mcp bundle --out /tmp/neo4j-cli.mcpb --format json --rw`,
+# Generate the bundle and inspect the output path as JSON
+neo4j-cli mcp bundle --out /tmp/neo4j-cli.mcpb --format json --rw`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := GenerateBundle(outPath); err != nil {

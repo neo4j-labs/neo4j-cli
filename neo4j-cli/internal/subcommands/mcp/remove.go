@@ -26,13 +26,13 @@ func newRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 			"Idempotent: re-running on an already-removed entry exits zero. " +
 			"\n\nSupported agents: " + strings.Join(skill.MCPAgentNames(), ", "),
 		Example: `# Remove neo4j-cli from every detected MCP agent
-	neo4j-cli mcp remove --rw
+neo4j-cli mcp remove --rw
 
-	# Remove from a single agent
-	neo4j-cli mcp remove --agent claude-desktop --rw
+# Remove from a single agent
+neo4j-cli mcp remove --agent claude-desktop --rw
 
-	# Remove and emit the result as JSON
-	neo4j-cli mcp remove --agent claude-desktop --format json --rw`,
+# Remove and emit the result as JSON
+neo4j-cli mcp remove --agent claude-desktop --format json --rw`,
 		Args:        cobra.NoArgs,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {

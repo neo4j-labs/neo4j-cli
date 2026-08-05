@@ -194,7 +194,11 @@ func injectFlag(req *mcpsdk.CallToolRequest, predicate func(map[string]any) bool
 
 func shouldInjectNoPrintPassword(args map[string]any) bool {
 	command, _ := args["command"].(string)
-	if command != "docker create" {
+	// Normalise whitespace the same way resolveCommand's strings.Fields does.
+	// Exact equality here would let "docker  create" skip password
+	// suppression while still resolving and executing as `docker create`,
+	// leaking the generated password into the tool result.
+	if strings.Join(strings.Fields(command), " ") != "docker create" {
 		return false
 	}
 	existing, _ := args["args"].([]any)

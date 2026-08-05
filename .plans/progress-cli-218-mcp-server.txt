@@ -256,3 +256,11 @@ Files: ~server.go
 ## WINDOWS CI FIXES — 2026-08-05T14:45:00Z
 Two more windows-only test failures, both POSIX-path assumptions written earlier this session: bundle_test.go compared a JSON-encoded path against a raw path (JSON escapes backslashes, so the substring never matched), and manifest_test.go used `entryPoint[0] == '/'` for an absolute-path check, false for C:\ drive letters. Fixed by decoding the JSON before comparing, and by using filepath.IsAbs. Grepped the mcp and skill test files for other leading-slash path assumptions — none remain.
 Files: ~bundle_test.go, ~manifest_test.go
+
+## SECURITY REVIEW FIXES — 2026-08-05T15:10:00Z
+PR #232 security-review (golang-security skill) flagged 3 real issues, all fixed and regression-tested:
+1. [Medium] read_docs.go panic — strings.Fields on a whitespace-only `command` returns no tokens; tokens[0] panicked, and HandleReadDocs is not recover()-wrapped, so a request with command=" " crashed the serve process. Reproduced, then guarded. Test: TestHandleReadDocs_WhitespaceOnlyCommand.
+2. [Low] server.go suppression bypass — shouldInjectNoPrintPassword used exact equality while resolveCommand normalises via strings.Fields, so "docker  create" skipped --no-print-password yet still executed, leaking the generated password into the tool result. Now normalises before comparing. Test: TestShouldInjectNoPrintPassword_WhitespaceVariants (covers double-space, tab, surrounding whitespace, plus negative cases).
+3. [Medium] tab-indented Example: fields in 6 leaves (bundle/serve/install/remove/list/check) — render.go TrimSpaces only the first line, so continuation tabs would render into the skill bundle at GA. De-indented; tools.go was already correct.
+Files: ~read_docs.go, ~read_docs_test.go, ~server.go, ~server_test.go, ~bundle.go, ~serve.go, ~install.go, ~remove.go, ~list.go, ~check.go
+Decisions: first de-indent attempt used a naive line filter that stripped tabs from the whole file (93 lines in serve.go) and was reverted; the second targets the Example raw-string span only (30 lines total, gofmt clean).

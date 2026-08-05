@@ -23,16 +23,16 @@ func newServeCmd(cfg *clicfg.Config) *cobra.Command {
 			"Once the server is running, an MCP client connects to discover and interact with " +
 			"Neo4j databases through the five neo4j_cli_* tools.",
 		Example: `# Start the MCP server with read-only access (default)
-	neo4j-cli mcp serve
+neo4j-cli mcp serve
 
-	# Start the MCP server with write access allowed
-	neo4j-cli mcp serve --rw
+# Start the MCP server with write access allowed
+neo4j-cli mcp serve --rw
 
-	# Start the MCP server with JSON output format for executed commands
-	neo4j-cli mcp serve --format json
+# Start the MCP server with JSON output format for executed commands
+neo4j-cli mcp serve --format json
 
-	# Start the MCP server with Aura provisioning allowed
-	neo4j-cli mcp serve --allow-aura`,
+# Start the MCP server with Aura provisioning allowed
+neo4j-cli mcp serve --allow-aura`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return serveRun(cfg, cmd)
 		},

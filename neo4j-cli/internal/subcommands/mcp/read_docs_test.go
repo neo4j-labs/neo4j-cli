@@ -309,3 +309,19 @@ func TestHandleReadDocs_UsesEmbeddedBundle(t *testing.T) {
 	require.NotNil(t, result)
 	require.False(t, result.IsError, "query tree must resolve from the embedded bundle")
 }
+
+// TestHandleReadDocs_WhitespaceOnlyCommand guards the panic found by the
+// security review: strings.Fields on a whitespace-only command returns no
+// tokens, and this handler is not recover()-wrapped, so indexing tokens[0]
+// would crash the serve process.
+func TestHandleReadDocs_WhitespaceOnlyCommand(t *testing.T) {
+	for _, cmd := range []string{"   ", "\t", " \t "} {
+		raw, err := json.Marshal(map[string]any{"command": cmd})
+		require.NoError(t, err)
+		res, err := HandleReadDocs(context.Background(),
+			&mcpsdk.CallToolRequest{Params: &mcpsdk.CallToolParamsRaw{Arguments: raw}})
+		require.NoError(t, err, "must not error at the protocol level for %q", cmd)
+		require.NotNil(t, res)
+		assert.True(t, res.IsError, "whitespace-only command %q must be a tool error", cmd)
+	}
+}

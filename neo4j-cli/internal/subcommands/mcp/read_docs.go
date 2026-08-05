@@ -39,6 +39,16 @@ func HandleReadDocs(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.C
 	}
 
 	tokens := strings.Fields(command)
+	// A whitespace-only command yields no tokens; indexing would panic, and
+	// this handler is not recover()-wrapped so it would take the server down.
+	if len(tokens) == 0 {
+		return &mcpsdk.CallToolResult{
+			IsError: true,
+			Content: []mcpsdk.Content{
+				&mcpsdk.TextContent{Text: "Missing required argument: command"},
+			},
+		}, nil
+	}
 	refPath := "references/" + tokens[0] + ".md"
 
 	data, err := fs.ReadFile(skill.Bundle, refPath)
