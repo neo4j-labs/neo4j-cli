@@ -340,7 +340,8 @@ func argSpellings(arg string) []string {
 	if key, value, found := strings.Cut(arg, "="); found {
 		parts = append(parts, key, value)
 	}
-	for _, part := range parts[:len(parts):len(parts)] {
+	initialLen := len(parts)
+	for _, part := range parts[:initialLen] {
 		if i := strings.LastIndex(part, "."); i >= 0 {
 			parts = append(parts, part[i+1:])
 		}

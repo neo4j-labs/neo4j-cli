@@ -614,14 +614,14 @@ tasks:
       touching the function needs to understand. Simplify to a clearer form: a
       separate loop variable, or inline the dot-split into the loop, so the
       three-index slice expression is gone without changing behavior.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'The three-index slice expression parts[:len(parts):len(parts)] is gone from argSpellings'
       - 'Behavior is unchanged: allow_test.go passes'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T10:15:00Z
 
   - id: task-027
     title: 'formatTargetsTable column-descriptor slice'

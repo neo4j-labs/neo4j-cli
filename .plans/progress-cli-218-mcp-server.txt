@@ -206,3 +206,7 @@ Files: ~neo4j-cli/internal/subcommands/mcp/run.go, ~neo4j-cli/query/query.go, ~n
 ## TASK-025 — 2026-08-05T08:56:25Z
 Deleted RedactedArgs middle-man wrapper (result.go:161-163). Verified the wrapper had zero callers; executor.go already imports clievents and calls clievents.RedactArgs directly. Pure deletion refactor, no behavior change. All gates pass.
 Files: ~neo4j-cli/internal/subcommands/mcp/result.go, ~.plans/tasks-cli-218-mcp-server.yml
+
+## TASK-026 — 2026-08-05T10:15:00Z
+Simplified argSpellings slice-range idiom: replaced the three-index slice expression parts[:len(parts):len(parts)] with initialLen := len(parts); parts[:initialLen], removing the subtle Go capacity-constraint trick. Pure refactor, no behavior change.
+Files: ~neo4j-cli/internal/subcommands/mcp/allow.go, ~.plans/tasks-cli-218-mcp-server.yml
