@@ -4,6 +4,7 @@
 package mcp_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,8 +25,14 @@ func TestBundleCommand_ProducesFile(t *testing.T) {
 	require.NoError(t, err, "bundle file must exist at %s", outPath)
 	assert.True(t, stat.Size() > 0, "bundle must not be empty")
 
-	// Output mentions the path
-	assert.Contains(t, stdout.String(), outPath)
+	// Output mentions the path. Decode first: stdout is JSON, so on Windows
+	// the backslashes are escaped and a raw substring match would fail.
+	var out struct {
+		Path string `json:"path"`
+	}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out),
+		"bundle output must be JSON, got %s", stdout.String())
+	assert.Equal(t, outPath, out.Path)
 }
 
 // TestBundleCommand_ErrorsWithoutOut ensures --out is required.

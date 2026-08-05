@@ -6,6 +6,7 @@ package mcp_test
 import (
 	"encoding/binary"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -74,9 +75,11 @@ func TestGenerateBundle_ServerCommandUsesUserConfigVar(t *testing.T) {
 	assert.Equal(t, "${user_config.neo4j_cli_path}", command,
 		"mcp_config.command should reference the user_config variable so the settings UI controls it")
 
-	// entry_point is the absolute path from os.Executable()
+	// entry_point is the absolute path from os.Executable(). Use
+	// filepath.IsAbs rather than a leading-slash check so this holds for
+	// Windows drive-letter paths (C:\...).
 	entryPoint, _ := server["entry_point"].(string)
-	assert.True(t, len(entryPoint) > 0 && entryPoint[0] == '/',
+	assert.True(t, filepath.IsAbs(entryPoint),
 		"entry_point should be an absolute path, got %q", entryPoint)
 
 	args, _ := mcpCfg["args"].([]any)

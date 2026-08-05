@@ -252,3 +252,7 @@ Decisions: converted in-repo with a pure-Python decoder (no rasteriser available
 ## TASK-031 (follow-up) — 2026-08-05T14:35:00Z
 CodeQL still flagged go/allocation-size-overflow after the capacity-bounding fix: the non-oversized branch still passed len(existing) into the make capacity, so the taint path survived. Removed the capacity hint entirely and let append grow the slice — the allocation CodeQL objected to no longer exists. Behaviour unchanged (200/200 args preserved so resolveCommand still rejects); the hint was a micro-optimisation on a <=64-item slice.
 Files: ~server.go
+
+## WINDOWS CI FIXES — 2026-08-05T14:45:00Z
+Two more windows-only test failures, both POSIX-path assumptions written earlier this session: bundle_test.go compared a JSON-encoded path against a raw path (JSON escapes backslashes, so the substring never matched), and manifest_test.go used `entryPoint[0] == '/'` for an absolute-path check, false for C:\ drive letters. Fixed by decoding the JSON before comparing, and by using filepath.IsAbs. Grepped the mcp and skill test files for other leading-slash path assumptions — none remain.
+Files: ~bundle_test.go, ~manifest_test.go
