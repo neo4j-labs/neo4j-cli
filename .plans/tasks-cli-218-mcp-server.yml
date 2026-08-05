@@ -477,3 +477,186 @@ tasks:
       - 'VERIFIED: all three write gates confirmed - (a) run_write without server --rw: refuses with hint, (b) run on write command: points at run_write, (c) run_write with --rw on write command: passes all gates, fails on bad flag with did-you-mean confirming authoritative EnforceWriteGate was the last step'
       - 'Five-tool curation holds. No tool should be removed. The progressive-disclosure surface converges in 3 RTs for the dataset task, under the 4-RT budget. The 3253 B tool definition size (under 4000 B ceiling) and 918 B instructions field leave headroom. Per-call response tokens (~1394 for optimal path) vs total with fixed costs (~2552) suggests the 2k REQ-NF-002 bar should be clarified as per-call response tokens (met) or total session including cached artifacts (slightly over, only for the first task).'
     completed_at: 2026-08-05T05:00:00Z
+
+  - id: task-020
+    title: 'Extract resolveCommandAndExec helper from run/run_write (blocking)'
+    description: |
+      HandleRun (run.go:30-108) and HandleRunWrite (run_write.go:30-102) share ~65
+      lines of nearly identical logic: parse command/args, build a fresh config with
+      stored flag states and a root tree, resolve the command path via root.Find,
+      verify the resolved path matches, check stdin-leaf emptiness, validate flags
+      against the leaf, append tokens+args into execArgs, and call exec.Execute().
+      This is a Duplicated Code smell (Fowler) and the strongest code-judo opportunity
+      in the branch. The divergence hazard is real: a fix or feature added to one
+      path (e.g. a new isStdinLeaf entry or a new validateRunFlags rule) may not
+      reach the other. Extract a shared helper that returns the resolved
+      *cobra.Command and execArgs so the two handlers only implement the
+      policy-specific check in between. This makes silent divergence harder.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'A shared helper (e.g. resolveCommandAndExec) contains the common tree-building, path-resolution, stdin-leaf-check, flag-validation, and exec-args-assembly logic'
+      - 'HandleRun and HandleRunWrite call the helper and only contain their policy-specific divergence (which Check gate, which policies are accepted, --rw rejection vs acceptance, the wrong-tool redirect message)'
+      - 'No behavior change: existing run and run_write tests pass unchanged'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-021
+    title: 'Replace shared hintTrue *bool with per-definition boolPtr (blocking)'
+    description: |
+      hintTrue in tooldefs.go:28 is a shared *bool pointer whose value is loaded into
+      every tool definition's DestructiveHint/OpenWorldHint annotations. If any code
+      ever mutates *hintTrue, every tool inheriting those hints sees the mutation — a
+      surprising shared-mutable-state hazard. Replace with a simple
+      func boolPtr(v bool) *bool { return &v } and materialise a fresh pointer per
+      definition so no tool shares annotation state.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'No package-level shared *bool pointer for hint values; each tool definition materialises its own via boolPtr or equivalent'
+      - 'Tool annotations are byte-identical to before (mcp tools --format json unchanged)'
+      - 'The token-budget and naming gates still pass'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-022
+    title: 'Collapse injectFormat/injectNoPrintPassword into a single injectFlag helper'
+    description: |
+      server.go:126-159 (injectFormat) and server.go:183-215 (injectNoPrintPassword)
+      share the same structure: unmarshal req.Params.Arguments, check for an existing
+      flag, prepend the flag, marshal, return a new request. Every future injection
+      site duplicates the JSON-unmarshal-mutate-remarshal cycle. Collapse the two
+      injectors (and their has*Flag predicates) into a single generic
+      injectFlag(req, predicate, flagName) helper. A third injection site (the design
+      notes --max-output-chars or another future default) should then add no new
+      function.
+    status: pending
+    dependencies:
+      - task-020
+    acceptance_criteria:
+      - 'A single injectFlag helper replaces injectFormat and injectNoPrintPassword'
+      - 'The hasFormatFlag/hasNoPrintPasswordFlag predicates are collapsed or generalised'
+      - 'No behavior change: existing injection tests pass unchanged'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-023
+    title: 'Precise --format / --no-print-password flag matching'
+    description: |
+      server.go:163-174 checks strings.HasPrefix(s, "--format"), which would match a
+      hypothetical --formatting flag (none exists today, but the check depends on
+      current flag inventory). Similarly hasNoPrintPasswordFlag at line 225. Use
+      precise equality: s == "--format" || strings.HasPrefix(s, "--format="), and the
+      same for --no-print-password. This removes the implicit dependency on the flag
+      catalog and is cleaner.
+    status: pending
+    dependencies:
+      - task-022
+    acceptance_criteria:
+      - 'Flag-existence checks use exact equality (--flag or --flag=...) not a loose HasPrefix'
+      - 'No behavior change for existing flags; existing tests pass'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-024
+    title: 'isStdinLeaf as a cobra annotation, not a hard-coded list'
+    description: |
+      run.go:254-262 checks only "query" against a hard-coded list. If any future leaf
+      follows the same os.Stdin-direct-reading pattern it will silently hang the MCP
+      server because nothing forces the author to update isStdinLeaf. The comment at
+      run.go:253 acknowledges this. A stronger approach is a cobra annotation
+      (Annotations["stdin-reader"]="true") on the leaf, so the check becomes generic:
+      cmd.Annotations["stdin-reader"] == "true". This makes the hazard
+      self-documenting at the leaf rather than requiring a remote list to stay in
+      sync. Note: this touches the query command in neo4j-cli/query/, so run go
+      generate and verify the bundle.
+    status: pending
+    dependencies:
+      - task-020
+    acceptance_criteria:
+      - 'isStdinLeaf (or its replacement) checks a cobra annotation, not a hard-coded command-name list'
+      - 'The query leaf carries the annotation and is still caught'
+      - 'No bundle drift (or regenerated bundle committed with the change)'
+      - 'make test, make fmt-check, make lint, make generate-check pass'
+    source: review
+    completed_at: null
+
+  - id: task-025
+    title: 'Delete RedactedArgs middle-man wrapper'
+    description: |
+      result.go:161-163 defines func RedactedArgs(args []string) string { return
+      clievents.RedactArgs(args) } — a Middle Man smell (Fowler). It exists so tool
+      handlers do not import clievents directly, but the only consumers are in the
+      same package which already imports clievents through executor.go, and
+      MapCommandResult already calls clievents.RedactArgs internally. The wrapper has
+      zero callers that benefit from avoiding the import. Delete it and inline any
+      caller to clievents.RedactArgs directly. If an external package turns out to
+      need it, restore it then — but verify there is no such caller first.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'RedactedArgs wrapper is deleted from result.go'
+      - 'Any caller is inlined to clievents.RedactArgs directly'
+      - 'No external package needed it (verified by build)'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-026
+    title: 'Simplify argSpellings slice-range idiom'
+    description: |
+      allow.go:337-349 uses parts[:len(parts):len(parts)] to prevent an append on the
+      next line from mutating parts' backing array — a subtle Go slice idiom anyone
+      touching the function needs to understand. Simplify to a clearer form: a
+      separate loop variable, or inline the dot-split into the loop, so the
+      three-index slice expression is gone without changing behavior.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'The three-index slice expression parts[:len(parts):len(parts)] is gone from argSpellings'
+      - 'Behavior is unchanged: allow_test.go passes'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-027
+    title: 'formatTargetsTable column-descriptor slice'
+    description: |
+      list_targets.go:164-186 renders a fixed-width table with hand-coded column
+      widths and a manually computed separator (strings.Repeat("-", 10+30+12+10+40+8)).
+      Adding a column means updating the format string, the separator calculation, and
+      the truncateField calls in lockstep — a brittle maintenance point. Introduce a
+      column-descriptor slice (name + width) so the header, separator, and data rows
+      are generated from the same source, and adding a column is one addition to the
+      slice.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'A column-descriptor slice drives the header, separator, and data-row rendering'
+      - 'The rendered table is byte-identical to before'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null
+
+  - id: task-028
+    title: 'Shared AsArray boilerplate across check/list/install'
+    description: |
+      install.go:22-46 defines installResult/installResults with AsArray()/MarshalJSON().
+      check.go:17-43 defines mcpCheckResultRow/mcpCheckResults with the same structural
+      pattern. list.go:16-50 defines mcpListResultRow/mcpListResults with the same
+      pattern. Three near-identical ResponseData implementations. Extract a shared
+      output-row helper type in the package that halves the boilerplate, and migrate
+      the three call sites to it.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'A shared helper type or function underpins the AsArray/MarshalJSON pattern'
+      - 'install, check, and list use it instead of three separate implementations'
+      - 'Output is byte-identical to before (json/toon/table)'
+      - 'make test, make fmt-check, make lint pass'
+    source: review
+    completed_at: null

@@ -178,3 +178,6 @@ Five-tool surface holds. Progressive disclosure (list_targets -> list_commands -
 ### Limitations
 - Full Claude Desktop end-to-end test REQUIRES THE HUMAN: the model's thinking tokens per tool turn, the quality of its choices (does it reach for list_targets first?), and whether read_docs(…) is sufficient to avoid flag guessing are only measurable in a live chat turn.
 - Docker load not executed to completion (would create containers); gate-pass verification used a write-classified command that correctly failed on flag validation, confirming gates are open and functional.
+
+## REVIEW — 2026-08-05T06:30:00Z
+Added 9 review tasks (task-020..task-028) from the hone end-of-feature audit: 2 blocking (resolveCommandAndExec extraction, hintTrue shared *bool), 7 non-blocking (injectFlag collapse, precise flag matching, isStdinLeaf annotation, RedactedArgs deletion, argSpellings simplification, column-descriptor table, shared AsArray boilerplate).
