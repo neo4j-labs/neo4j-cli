@@ -210,3 +210,7 @@ Files: ~neo4j-cli/internal/subcommands/mcp/result.go, ~.plans/tasks-cli-218-mcp-
 ## TASK-026 — 2026-08-05T10:15:00Z
 Simplified argSpellings slice-range idiom: replaced the three-index slice expression parts[:len(parts):len(parts)] with initialLen := len(parts); parts[:initialLen], removing the subtle Go capacity-constraint trick. Pure refactor, no behavior change.
 Files: ~neo4j-cli/internal/subcommands/mcp/allow.go, ~.plans/tasks-cli-218-mcp-server.yml
+
+## TASK-027 — 2026-08-05T09:13:00Z
+Introduced colDef slice (name + width) driving the header, separator, and data-row rendering in formatTargetsTable. Adding a column is now one entry in targetColumns plus one field in the vals slice. Pure refactor, byte-identical output verified by standalone program. Reviewer noted comment accuracy; fixed.
+Files: ~neo4j-cli/internal/subcommands/mcp/list_targets.go, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt

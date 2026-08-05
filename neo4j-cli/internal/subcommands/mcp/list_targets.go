@@ -158,29 +158,76 @@ func stringField(m map[string]any, key string) string {
 	return s
 }
 
-// formatTargetsTable renders target rows as a go-pretty table with snake_case
-// headers that match the STRUCT column set the OUTPUT rule demands. An empty
-// slice produces a header-only table.
+// colDef defines a table column: name (header) and format width. width 0
+// means unbounded (%s format, no truncation).
+type colDef struct {
+	name  string
+	width int
+}
+
+// targetColumns is the column layout for the discovery table. The header,
+// separator, and data-row rendering derive from this slice. When adding a
+// column, also update the vals slice in the data-row loop below.
+var targetColumns = []colDef{
+	{name: "source", width: 10},
+	{name: "name", width: 30},
+	{name: "status", width: 12},
+	{name: "version", width: 10},
+	{name: "connection", width: 0}, // unbounded last column
+}
+
+// unboundedSepWidth is the visual dash count in the separator line for
+// unbounded (width==0) columns.
+const unboundedSepWidth = 40
+
+// formatTargetsTable renders target rows as a fixed-width table driven by
+// targetColumns. An empty slice produces no output.
 func formatTargetsTable(rows []targetRow) string {
 	if len(rows) == 0 {
 		return ""
 	}
 
-	// Column widths: source (10), name (30), status (12), version (10),
-	// connection (40). Total ~102 chars. Fixed width keeps output
-	// deterministic and avoids alignment jitter from model context.
-	var b strings.Builder
-	fmt.Fprintf(&b, "%-10s  %-30s  %-12s  %-10s  %s\n",
-		"source", "name", "status", "version", "connection")
-	b.WriteString(strings.Repeat("-", 10+30+12+10+40+8) + "\n")
+	// Build format string and separator dash count from the column slice.
+	var fmtB strings.Builder
+	sepWidth := 0
+	for i, c := range targetColumns {
+		if c.width > 0 {
+			fmt.Fprintf(&fmtB, "%%-%ds", c.width)
+			sepWidth += c.width
+		} else {
+			fmtB.WriteString("%s")
+			sepWidth += unboundedSepWidth
+		}
+		if i < len(targetColumns)-1 {
+			fmtB.WriteString("  ")
+			sepWidth += 2
+		}
+	}
+	fmtB.WriteString("\n")
+	rowFmt := fmtB.String()
 
+	var b strings.Builder
+
+	// Header row
+	var hdr []any
+	for _, c := range targetColumns {
+		hdr = append(hdr, c.name)
+	}
+	fmt.Fprintf(&b, rowFmt, hdr...)
+	b.WriteString(strings.Repeat("-", sepWidth) + "\n")
+
+	// Data rows
 	for _, r := range rows {
-		fmt.Fprintf(&b, "%-10s  %-30s  %-12s  %-10s  %s\n",
-			truncateField(r.Source, 10),
-			truncateField(r.Name, 30),
-			truncateField(r.Status, 12),
-			truncateField(r.Version, 10),
-			r.Connection)
+		vals := []string{r.Source, r.Name, r.Status, r.Version, r.Connection}
+		var args []any
+		for i, c := range targetColumns {
+			if c.width > 0 {
+				args = append(args, truncateField(vals[i], c.width))
+			} else {
+				args = append(args, vals[i])
+			}
+		}
+		fmt.Fprintf(&b, rowFmt, args...)
 	}
 	return b.String()
 }

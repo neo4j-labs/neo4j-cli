@@ -633,14 +633,14 @@ tasks:
       column-descriptor slice (name + width) so the header, separator, and data rows
       are generated from the same source, and adding a column is one addition to the
       slice.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'A column-descriptor slice drives the header, separator, and data-row rendering'
       - 'The rendered table is byte-identical to before'
       - 'make test, make fmt-check, make lint pass'
     source: review
-    completed_at: null
+    completed_at: 2026-08-05T09:13:00Z
 
   - id: task-028
     title: 'Shared AsArray boilerplate across check/list/install'
