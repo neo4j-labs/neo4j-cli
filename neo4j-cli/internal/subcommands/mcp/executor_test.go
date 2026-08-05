@@ -62,7 +62,7 @@ func TestMCPGroup_NilRootFactoryIsRefused(t *testing.T) {
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
 	cmd := mcp.NewCmd(cfg, nil)
-	cmd.SetArgs([]string{"tools"})
+	cmd.SetArgs([]string{"tool"})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 

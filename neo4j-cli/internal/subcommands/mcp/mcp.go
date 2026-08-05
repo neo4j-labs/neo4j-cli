@@ -50,7 +50,7 @@ func NewCmd(cfg *clicfg.Config, newRoot RootFactory) *cobra.Command {
 		return nil
 	}
 
-	cmd.AddCommand(newToolsCmd(cfg))
+	cmd.AddCommand(newToolCmd(cfg))
 	cmd.AddCommand(newServeCmd(cfg))
 	cmd.AddCommand(newBundleCmd(cfg))
 	cmd.AddCommand(newInstallCmd(cfg))

@@ -73,7 +73,7 @@ func TestToolRows_MarshalJSON_EmitsSnakeCaseArray(t *testing.T) {
 }
 
 // An empty manifest must render as `[]`, never `null`: a null body would make
-// `mcp tools --format json` undecodable as an array.
+// `mcp tool --format json` undecodable as an array.
 func TestToolRows_EmptyMarshalsAsArray(t *testing.T) {
 	data, err := json.Marshal(toolRows(nil))
 	require.NoError(t, err)

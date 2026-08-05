@@ -19,7 +19,7 @@ var requiredToolFields = []string{
 }
 
 func TestTools_JSONManifest(t *testing.T) {
-	stdout, stderr, err := runApp(t, true, "mcp", "tools", "--format", "json")
+	stdout, stderr, err := runApp(t, true, "mcp", "tool", "--format", "json")
 	require.NoError(t, err, "stderr=%s", stderr.String())
 
 	// The JSON array must never be `null`, which would not decode as a list.
@@ -45,7 +45,7 @@ func TestTools_JSONManifest(t *testing.T) {
 // TestTools_TableRendersSnakeCaseHeaders pins the rendered column set, which is
 // the part of the table view that exists independently of any tool definition.
 func TestTools_TableRendersSnakeCaseHeaders(t *testing.T) {
-	stdout, stderr, err := runApp(t, true, "mcp", "tools", "--format", "table")
+	stdout, stderr, err := runApp(t, true, "mcp", "tool", "--format", "table")
 	require.NoError(t, err, "stderr=%s", stderr.String())
 
 	// go-pretty upper-cases header cells, so match the snake_case shape only.
@@ -56,13 +56,13 @@ func TestTools_TableRendersSnakeCaseHeaders(t *testing.T) {
 }
 
 func TestTools_ToonRenders(t *testing.T) {
-	stdout, stderr, err := runApp(t, true, "mcp", "tools", "--format", "toon")
+	stdout, stderr, err := runApp(t, true, "mcp", "tool", "--format", "toon")
 	require.NoError(t, err, "stderr=%s", stderr.String())
 	assert.NotContains(t, stdout.String(), "readOnlyHint")
 }
 
 func TestTools_RejectsPositionalArgs(t *testing.T) {
-	_, _, err := runApp(t, true, "mcp", "tools", "extra")
+	_, _, err := runApp(t, true, "mcp", "tool", "extra")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown command")
 }

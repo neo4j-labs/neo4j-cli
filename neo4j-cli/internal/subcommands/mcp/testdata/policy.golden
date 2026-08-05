@@ -181,7 +181,7 @@ mcp install	deny
 mcp list	deny
 mcp remove	deny
 mcp serve	deny
-mcp tools	deny
+mcp tool	deny
 query	allow
 query :embed	allow
 query :schema	allow

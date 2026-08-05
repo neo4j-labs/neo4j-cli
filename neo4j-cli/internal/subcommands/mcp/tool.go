@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newToolsCmd(cfg *clicfg.Config) *cobra.Command {
+func newToolCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "tools",
+		Use:   "tool",
 		Short: "List the MCP tools the server registers",
 		Long: "List the MCP tools the server registers, without starting a transport, so you can " +
 			"inspect the surface an MCP client will see before installing the connector. " +
@@ -20,10 +20,10 @@ func newToolsCmd(cfg *clicfg.Config) *cobra.Command {
 			"open_world_hint behaviour hints clients use to decide whether a call needs " +
 			"confirmation.",
 		Example: `# List the registered MCP tools
-neo4j-cli mcp tools
+neo4j-cli mcp tool
 
 # Inspect the full tool manifest, including descriptions and hints
-neo4j-cli mcp tools --format json`,
+neo4j-cli mcp tool --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			commonoutput.PrintBodyMap(cmd, cfg, toolRows(toolDefinitions()),

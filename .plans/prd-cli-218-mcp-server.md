@@ -53,7 +53,7 @@ Two conclusions drive the design: **`agent-context` can never be a tool result**
 #### Command group
 
 - **REQ-F-001**: Add `neo4j-cli mcp` under `neo4j-cli/internal/subcommands/mcp/`, following the one-file-per-leaf layout: parent `mcp.go` (≤80 lines, `NewCmd(...)` + `AddCommand` per leaf) and one file per leaf.
-- **REQ-F-002**: Leaves: `serve`, `tools`, `install`, `remove`, `list`, `check`, `bundle`. Every runnable leaf has a colocated `<action>_test.go`; shared helpers in `mcp_helpers_test.go`.
+- **REQ-F-002**: Leaves: `serve`, `tool`, `install`, `remove`, `list`, `check`, `bundle`. Every runnable leaf has a colocated `<action>_test.go`; shared helpers in `mcp_helpers_test.go`.
 - **REQ-F-003**: The entire group is gated on `flag.mcp-server` (default `false`). When disabled the group is not registered on the root command, so `neo4j-cli --help`, `agent-context`, and the generated skill bundle are unchanged. **`flag.mcp-server` is the single gate for all MCP surface** — when it is on, every leaf including `serve` is listed normally in `mcp --help`. No leaf carries an additional `Hidden: true`.
 - **REQ-F-004**: `flag.mcp-server` is added to the `clicfg.Registry` map in `common/clicfg/flags.go` with `Default: false`, `Owner`, `Gates`, `IntroducedIn`, `RemovalCondition`. It is the **first** production entry in that map (currently `map[string]Flag{}`).
 - **REQ-F-005**: Overrides come free from the existing machinery — `NEO4J_CLI_FLAG_MCP_SERVER=1` (via `FlagNameToEnv`, bound per Registry entry in `clicfg.go:228`) and `neo4j-cli config set flag.mcp-server true`. `config get` and `config set` already resolve Registry keys (`clicfg.go:618` `ResolveConfigKey` → `config/get.go:67`, `config/set.go` `FlagScope`), so no new plumbing. `config list` deliberately does **not** enumerate flag keys — `clicfg.Config.Printable` walks only `Global`/`Aura` `ValidConfigKeys`, and a pre-existing test asserts the absence (`config/get_test.go:107`). Nor does tab-completion advertise them (`validGetArgs`). Both are correct per `.agents/feature-flags.md` ("unknown/removed keys are silent at runtime"): experimental flags stay unadvertised. Do not add plumbing to change this.
@@ -80,7 +80,7 @@ Two conclusions drive the design: **`agent-context` can never be a tool result**
 - **REQ-F-014**: `neo4j_cli_run` accepts only commands classified non-write. A write-annotated command returns a `usage_error` naming `neo4j_cli_run_write`. `neo4j_cli_run_write` accepts only write-classified commands and requires the write gate (REQ-F-020).
 - **REQ-F-015**: A literal `--rw` in `args` is rejected with a `usage_error` pointing at `neo4j_cli_run_write`, so the policy layer cannot be bypassed. `--debug` in `args` is likewise rejected (its traces write to package-global `debugW` seams whose only setters are test-named).
 - **REQ-F-016**: Flag long-names in `args` are validated against the resolved leaf's `agentcontext.Flag` list before execution, returning `usage_error` with a did-you-mean suggestion — cheaper than an exec and it teaches the model.
-- **REQ-F-017**: `mcp tools` prints the registered tool manifest (`--format json|table|toon`) without starting a transport, so the surface is inspectable and gate-testable.
+- **REQ-F-017**: `mcp tool` prints the registered tool manifest (`--format json|table|toon`) without starting a transport, so the surface is inspectable and gate-testable.
 
 #### Execution model
 
@@ -143,7 +143,7 @@ Two conclusions drive the design: **`agent-context` can never be a tool result**
 
 ### Non-Functional Requirements
 
-- **REQ-NF-001**: Serialized tool definitions stay under a byte ceiling enforced by a golden test on `mcp tools --format json` — **4000 B (~1.1k tokens)**, ~1.8× headroom over the design's ~1.1k. Any future tool addition must argue past this gate.
+- **REQ-NF-001**: Serialized tool definitions stay under a byte ceiling enforced by a golden test on `mcp tool --format json` — **4000 B (~1.1k tokens)**, ~1.8× headroom over the design's ~1.1k. Any future tool addition must argue past this gate.
 - **REQ-NF-002**: The "load a dataset into a local Neo4j" task converges in **≤4 round trips and ≤2k tokens** from a cold session, and in 1 round trip when the command is already known.
 - **REQ-NF-003**: SDK is `github.com/modelcontextprotocol/go-sdk` pinned to **v1.4.1 stable** — not v1.7.0-pre.1. This binary is signed, notarized and shipped through five channels; the design needs no 2026-07-28 spec feature and never emits `notifications/tools/list_changed` (whose own spec caveat is prompt-cache invalidation). Verify the transitive set stays pure Go before committing, since GoReleaser cross-builds linux/windows/darwin × amd64/arm64. **Verified 2026-08-04**: pure Go — adds `google/jsonschema-go` v0.4.2, `segmentio/encoding` v0.5.4, `segmentio/asm` v1.1.3 (Go SIMD assembly with pure-Go fallbacks, *not* cgo) and `yosida95/uritemplate/v3` v3.0.2; zero `CgoFiles` in the `./neo4j-cli` dep graph and `CGO_ENABLED=0 go build ./...` green on all six release targets. The SDK also forces six `golang.org/x` MVS upgrades (`mod`, `net`, `sync`, `term`, `text`, `tools` — the last to v0.41.0), all gates green with them.
 
@@ -196,7 +196,7 @@ Two conclusions drive the design: **`agent-context` can never be a tool result**
 
 - [ ] `flag.mcp-server` exists in `clicfg.Registry` with `Default: false`; `neo4j-cli config set flag.mcp-server true` and `NEO4J_CLI_FLAG_MCP_SERVER=1` both enable the group.
 - [ ] With the flag off: `neo4j-cli --help` shows no `mcp` group, `agent-context` output is unchanged, and `make generate-check` reports no bundle drift.
-- [ ] With the flag on: `neo4j-cli mcp tools --format json` lists exactly the five `neo4j_cli_*` tools with correct annotations.
+- [ ] With the flag on: `neo4j-cli mcp tool --format json` lists exactly the five `neo4j_cli_*` tools with correct annotations.
 - [ ] Golden test fails if serialized tool definitions exceed 4000 B.
 - [ ] Gate test walks the live cobra tree and fails on any command path not classified by the policy table.
 - [ ] Gate test asserts every registered tool name matches `^neo4j_cli_[a-z0-9_]+$` and every schema property `^[a-z][a-z0-9_]*$`.

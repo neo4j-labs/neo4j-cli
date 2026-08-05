@@ -68,7 +68,7 @@ func TestClassify_LiveTreePaths(t *testing.T) {
 
 		{path: "update", want: mcp.PolicyDeny},
 		{path: "update check", want: mcp.PolicyDeny},
-		{path: "mcp tools", want: mcp.PolicyDeny},
+		{path: "mcp tool", want: mcp.PolicyDeny},
 		{path: "history clear", want: mcp.PolicyDeny},
 		// The keyring→plaintext downgrade must stay denied in every
 		// spelling an argument parser could plausibly accept, not just the

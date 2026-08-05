@@ -18,7 +18,7 @@ func TestMCPGroup_AbsentWhenFlagDisabled(t *testing.T) {
 	root := newAppCmd(t, false)
 	assert.Nil(t, findSubcommand(root, "mcp"), "mcp must not be registered with flag.mcp-server off")
 
-	_, _, err := runApp(t, false, "mcp", "tools")
+	_, _, err := runApp(t, false, "mcp", "tool")
 	require.Error(t, err, "invoking mcp with the flag off must fail")
 	assert.Contains(t, err.Error(), `unknown command "mcp"`)
 }
@@ -32,7 +32,7 @@ func TestMCPGroup_PresentWhenFlagEnabled(t *testing.T) {
 	assert.NotEmpty(t, group.Short)
 	assert.NotEmpty(t, group.Long)
 
-	tools := findSubcommand(group, "tools")
+	tools := findSubcommand(group, "tool")
 	require.NotNil(t, tools, "the tools leaf must be registered")
 	assert.False(t, tools.Hidden)
 
@@ -77,7 +77,7 @@ func TestMCPGroup_AgentContextReflectsFlag(t *testing.T) {
 			group, ok := envelope.Commands["mcp"]
 			assert.Equal(t, tc.enabled, ok, "commands.mcp presence must track the flag")
 			if tc.enabled {
-				assert.Contains(t, group.Subcommands, "tools")
+				assert.Contains(t, group.Subcommands, "tool")
 			}
 		})
 	}

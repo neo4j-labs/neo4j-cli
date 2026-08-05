@@ -65,7 +65,7 @@ func ensureToolDefinitions(srcCfg *clicfg.Config) {
 }
 
 // toolDefinitions returns the tool definitions the server registers, in the
-// order tools are advertised to clients. Both `mcp tools` and the server read
+// order tools are advertised to clients. Both `mcp tool` and the server read
 // them from here, so the printed surface cannot drift from the registered one.
 func toolDefinitions() []*mcpsdk.Tool {
 	return []*mcpsdk.Tool{

@@ -25,7 +25,7 @@ func TestToolDefinitions_Budget(t *testing.T) {
 	require.NoError(t, err)
 
 	size := len(data)
-	t.Logf("tool-definition surface (mcp tools --format json): %d bytes", size)
+	t.Logf("tool-definition surface (mcp tool --format json): %d bytes", size)
 
 	assert.LessOrEqual(t, size, toolBudgetCeiling,
 		"Tool definitions (%d bytes) exceed the %d-byte budget (~1.1k tokens). "+
