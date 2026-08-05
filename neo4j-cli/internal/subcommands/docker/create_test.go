@@ -1767,8 +1767,10 @@ func TestCreate_NoPrintPassword_StdoutAndStderrFreeOfPassword(t *testing.T) {
 // primary pin. For every format `docker create` can render, the generated
 // password must be gone after a pass through clievents.RedactText. Each subtest
 // asserts both halves of the contract: raw stdout STILL carries the password
-// (this fix leaves human-facing output byte-identical) and the redacted copy
-// does not.
+// (registration is additive — the rendered row is unchanged) and the redacted
+// copy does not. Note the fix is not output-neutral everywhere: it also unified
+// the randSource-failure message on `docker: generate password:` (REQ-F-005),
+// which is stderr on a path unreachable unless crypto/rand fails.
 //
 // Scope caveat — this pins a HELPER-LEVEL invariant ("the minted value is
 // registered, therefore RedactText can scrub it"), NOT a closed end-to-end leak.
