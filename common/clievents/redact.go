@@ -189,7 +189,9 @@ func RedactArgs(args []string) string {
 // secret that appears in a layout they don't model — most notably a value cell
 // in a horizontal box-drawing table or a TOON array row (`aura instance create
 // --format table` prints the Aura-generated password in its own column, on a
-// different line from the "password" header, offset by dynamic column widths).
+// different line from the "password" header, offset by dynamic column widths;
+// `--format toon` likewise emits it as a bare comma-separated field on a row
+// beneath the shared `{…,password,…}` field list).
 // Registering the exact value lets RedactText scrub it by literal match in any
 // format without over-redacting unrelated output. See RegisterSecretValue.
 var (

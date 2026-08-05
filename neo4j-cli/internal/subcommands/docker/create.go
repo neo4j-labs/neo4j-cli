@@ -271,7 +271,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			}
 
 			// Resolve password: honour --password verbatim, otherwise mint one
-			// (REQ-F-015; see generatePassword in password.go).
+			// (see generatePassword in password.go).
 			resolvedPassword := password
 			if resolvedPassword == "" {
 				resolvedPassword, err = generatePassword()

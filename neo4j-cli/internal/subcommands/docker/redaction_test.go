@@ -40,10 +40,9 @@ func assertRedactionScrubs(t *testing.T, raw, pw string) string {
 // unreachable unless crypto/rand fails.
 //
 // Scope caveat — this pins a HELPER-LEVEL invariant ("the minted value is
-// registered, therefore RedactText can scrub it"), NOT a closed end-to-end leak.
-// The test calls RedactText itself; no production path currently feeds
-// SUCCESSFUL stdout through it (the tee buffer is persisted only when the
-// command fails, and --debug covers stderr plus env NAMES only).
+// registered, therefore RedactText can scrub it"), NOT a closed end-to-end leak:
+// the test calls RedactText itself, and no production path yet feeds successful
+// stdout through it (see generatePassword in password.go).
 //
 // --format is passed explicitly in every subtest because the default resolution
 // is environment-dependent (output.ResolveOutput: explicit flag > agent harness
@@ -87,9 +86,9 @@ func TestCreate_GeneratedPassword_ScrubbedFromRedactedCapture(t *testing.T) {
 // textAssignmentRe, which matches on the `PASSWORD=` substring, so the assertion
 // holds whether or not the value is registered. It is a regression guard for the
 // blob path — it would catch a future reshaping that moves the value off its key
-// — not a pin of CLI-228. The same helper-level caveat as the format-matrix test
-// above applies: it calls RedactText itself rather than exercising a live
-// capture surface.
+// — not a pin of CLI-228. The same helper-level caveat applies: it calls
+// RedactText itself rather than exercising a live capture surface (see
+// generatePassword in password.go).
 func TestCreate_Ephemeral_GeneratedPassword_ScrubbedFromRedactedCapture(t *testing.T) {
 	expectedPassword := stubRandSource(t)
 
@@ -107,31 +106,16 @@ func TestCreate_Ephemeral_GeneratedPassword_ScrubbedFromRedactedCapture(t *testi
 		"redacted env blob must keep the key and show the placeholder; redacted: %q", redacted)
 }
 
-// TestCreate_ExplicitPassword_NotRegisteredAsSecret — CLI-228 REQ-F-006. Of the
-// two DOCKER container passwords, only the GENERATED one is registered with
-// clievents.RegisterSecretValue; an operator-supplied --password is deliberately
-// left out. This test pins that so a future widening is a conscious choice rather
-// than a silent regression. The scope is docker-local, not a CLI-wide rule —
-// desktop/dbms/create.go and desktop/connection/create.go DO register their
-// supplied passwords; that asymmetry is out of scope here.
+// TestCreate_ExplicitPassword_NotRegisteredAsSecret — CLI-228 REQ-F-006. In the
+// docker leaves an operator-supplied --password is deliberately NOT registered
+// with clievents.RegisterSecretValue; the rationale and the deliberate asymmetry
+// with the desktop leaves live on generatePassword in password.go. This test pins
+// the behaviour so a future widening is a conscious choice rather than a silent
+// regression.
 //
-// Why the exclusion (full rationale on generatePassword in password.go):
-// redaction of a registered value is a literal strings.ReplaceAll over the whole
-// captured text, and RegisterSecretValue only refuses values under 4 characters.
-// A supplied password of `neo4j` would therefore rewrite `neo4j://localhost:7687`,
-// `neo4j:enterprise` and `username: neo4j` to *** in every capture, mangling
-// exactly the diagnostics tee-on-failure exists to preserve. The trade is
-// acceptable because a supplied value is already known to whoever supplied it,
-// and clievents.RedactArgs already scrubs it at the argv/history/telemetry level
-// (`password` is in secretFlags) — this is only about the free-text pass.
-//
-// The literal must be collision-proof: knownSecrets is a process-global, additive
-// registry with no exported reset, so this negative assertion would break if any
-// earlier test in the package registered a SUBSTRING of it. Every registration in
-// this test binary comes from generatePassword — no other registering package is
-// even linked in — so every registered value is 22 base64url characters. The dots
-// below are outside the base64url alphabet, which makes the exclusion structural:
-// no substring of the literal can be a generatePassword output at all. `mysecret`
+// The literal must be collision-proof (see stubRandSource in helpers_test.go for
+// why): the dots below are outside the base64url alphabet generatePassword emits
+// from, so no minted password can ever be a substring of it. `mysecret`
 // (TestCreate_ExplicitPassword_HonouredAndSurfaced) is deliberately avoided.
 func TestCreate_ExplicitPassword_NotRegisteredAsSecret(t *testing.T) {
 	const explicitPassword = "cli228.operator.supplied"
@@ -161,10 +145,10 @@ func TestCreate_ExplicitPassword_NotRegisteredAsSecret(t *testing.T) {
 // inside LoadDumpIntoNewContainer and renders it in the result row, so it must
 // inherit the registration that generatePassword performs.
 //
-// Scope caveat — like TestCreate_GeneratedPassword_ScrubbedFromRedactedCapture,
-// this pins a HELPER-LEVEL invariant ("the minted value is registered, therefore
-// RedactText can scrub it"), not a closed end-to-end leak; see that test's comment
-// for why no production path feeds successful stdout through RedactText.
+// Scope caveat — like the create-side pins above, this exercises a HELPER-LEVEL
+// invariant ("the minted value is registered, therefore RedactText can scrub
+// it"), not a closed end-to-end leak; see generatePassword in password.go for
+// why no production path feeds successful stdout through RedactText.
 //
 // --format table is passed explicitly because default resolution is
 // environment-dependent (output.ResolveOutput: explicit flag > agent harness →

@@ -13,8 +13,8 @@ import (
 )
 
 // randSource is the injectable seam for crypto-grade random bytes used to
-// generate a default Neo4j password (REQ-F-015). Tests swap in a deterministic
-// reader so the rendered password is assertable.
+// generate a default Neo4j password. Tests swap in a deterministic reader so the
+// rendered password is assertable.
 var randSource io.Reader = rand.Reader
 
 // generatedPasswordBytes is the byte length consumed from randSource before
@@ -35,11 +35,9 @@ const generatedPasswordBytes = 16
 // table (--format table) nor a TOON array row (--format toon, the agent-harness
 // default), both of which put the value on a different line from its header.
 //
-// No current path feeds SUCCESSFUL stdout through RedactText: the tee buffer is
-// persisted only on failure, and --debug covers stderr plus env NAMES only. So
-// today this registration changes no observable output — it is prep for
-// consumers that DO capture successful stdout, notably CLI-218's `mcp serve`,
-// whose default format is toon.
+// No current path feeds SUCCESSFUL stdout through RedactText (the tee buffer is
+// persisted only on failure), so this is prep for consumers that do — notably
+// CLI-218's `mcp serve`, whose default format is toon.
 //
 // In the docker leaves only GENERATED passwords are registered — an
 // operator-supplied --password is deliberately left unregistered: redaction of a
