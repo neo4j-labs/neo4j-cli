@@ -427,10 +427,14 @@ func TestServer_NoPrintPasswordNotInjectedWhenNoCommand(t *testing.T) {
 
 // ----- Oversized args security tests -----
 
-func TestServer_InjectFlagTruncatesOversizedArgs(t *testing.T) {
-	// Build args array just over the cap. injectFlag must truncate to
-	// MaxRunArgs rather than allocating at the full attacker-supplied size.
-	hugeArgs := make([]any, MaxRunArgs+100)
+// TestServer_InjectFlagPreservesOversizedArgsForRejection asserts that
+// injectFlag bounds only its allocation capacity and does NOT truncate the
+// caller's args. Truncating would bring an oversized request back under the
+// handlers' MaxRunArgs cap, so it would execute with the tail silently dropped
+// instead of being rejected.
+func TestServer_InjectFlagPreservesOversizedArgsForRejection(t *testing.T) {
+	const over = 100
+	hugeArgs := make([]any, MaxRunArgs+over)
 	for i := range hugeArgs {
 		hugeArgs[i] = "--flag"
 	}
@@ -452,9 +456,11 @@ func TestServer_InjectFlagTruncatesOversizedArgs(t *testing.T) {
 	require.NoError(t, json.Unmarshal(modified.Params.Arguments, &result))
 	argList, ok := result["args"].([]any)
 	require.True(t, ok)
-	// Must be capped at MaxRunArgs + injected flag
-	require.LessOrEqual(t, len(argList), MaxRunArgs+1,
-		"injectFlag must not allocate beyond MaxRunArgs+1")
+
+	require.Equal(t, MaxRunArgs+over+1, len(argList),
+		"injectFlag must preserve every caller arg so the handlers' cap still rejects the request")
+	require.Greater(t, len(argList)-1, MaxRunArgs,
+		"the surviving user args must still exceed MaxRunArgs so resolveCommand rejects rather than silently truncating")
 }
 
 // ----- Credential store probe tests -----

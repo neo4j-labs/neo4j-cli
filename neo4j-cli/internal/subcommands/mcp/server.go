@@ -164,12 +164,16 @@ func injectFlag(req *mcpsdk.CallToolRequest, predicate func(map[string]any) bool
 	}
 	existing, _ := args["args"].([]any)
 	// args is client-supplied and reaches this make capacity before the
-	// handlers' 64-item cap in resolveCommand runs. Bound to MaxRunArgs
-	// to prevent an allocation-size overflow from a malicious request.
+	// handlers' MaxRunArgs cap in resolveCommand runs, so an unbounded
+	// length would feed an overflowing size computation into the
+	// allocation. Bound the CAPACITY only — truncating `existing` here
+	// would bring an oversized request back under the handlers' cap and
+	// silently execute it with the tail dropped.
+	capHint := len(existing) + len(flagItems)
 	if len(existing) > MaxRunArgs {
-		existing = existing[:MaxRunArgs]
+		capHint = MaxRunArgs + len(flagItems)
 	}
-	newArgs := make([]any, 0, len(existing)+len(flagItems))
+	newArgs := make([]any, 0, capHint)
 	for _, f := range flagItems {
 		newArgs = append(newArgs, f)
 	}
