@@ -90,6 +90,12 @@ func TestGenerateBundle_ServerCommandUsesUserConfigVar(t *testing.T) {
 	require.True(t, ok, "mcp_config.env must be present")
 	assert.Equal(t, "1", env["NEO4J_CLI_FLAG_MCP_SERVER"],
 		"env must set NEO4J_CLI_FLAG_MCP_SERVER=1 so the flag is on in the spawned process")
+
+	// env must set the manifest marker so the gate env-var fallback works when
+	// spawned through the manifest. Without it, a shell or dotfile cannot open
+	// gates via env vars alone.
+	assert.Equal(t, "1", env["NEO4J_CLI_MCP_MANIFEST"],
+		"env must set NEO4J_CLI_MCP_MANIFEST=1 to unlock gate env-var fallback")
 }
 
 // TestGenerateBundle_NoPasswordInUserConfig enforces REQ-F-039: user_config

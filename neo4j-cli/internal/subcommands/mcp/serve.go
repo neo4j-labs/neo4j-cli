@@ -52,6 +52,16 @@ neo4j-cli mcp serve --allow-aura`,
 // swap in a stub so the test does not depend on the real OS keyring.
 var probeKeyringFn = credentials.ProbeKeyringAvailability
 
+// envManifestMarker is the env key that unlocks the gate env-var fallback.
+// Set unconditionally in the .mcpb manifest's Env block so Claude Desktop
+// settings-UI toggles work. Without it, only CLI flags grant capability.
+const envManifestMarker = "NEO4J_CLI_MCP_MANIFEST"
+
+// Gate env-var names. Read in serveRun when the manifest marker is present.
+const envMCPAllowWrites = "NEO4J_CLI_MCP_ALLOW_WRITES"
+const envMCPAllowAura = "NEO4J_CLI_MCP_ALLOW_AURA"
+const envMCPAllowCredentialWrite = "NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE"
+
 // envBool reads a boolean env var, returning false if unset or unparseable.
 func envBool(key string) bool {
 	if v, ok := os.LookupEnv(key); ok {
@@ -98,50 +108,64 @@ func addServeFlags(cmd *cobra.Command) {
 		"Maximum characters of output to return in tool results")
 }
 
-// serveRun is the implementation of the serve command. It reads flags, builds the
-// executor, claims stdio, creates the MCP server, and runs it until interrupted.
+// resolveGates reads gate flags and applies the manifest-gated env fallback.
 //
 // The gate flags (--rw, --allow-aura, --allow-credential-write) are the primary
-// controls. Each also has an env fallback (NEO4J_CLI_MCP_ALLOW_WRITES,
-// NEO4J_CLI_MCP_ALLOW_AURA, NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE) because a
-// .mcpb manifest wires its settings-UI toggles through env vars — Claude Desktop
-// spawns the binary with env, not with flags the user can edit.
-//
-// KNOWN LIMITATION: any process running as the same OS user (a dotfile, an npm
-// postinstall, a poisoned shell rc) can set those vars and thereby open a gate
-// for every later `mcp serve`, including one started deliberately without the
-// flag. The operator's start-up intent is not authoritative while they are set.
-//
-// Layer 3 (flags.EnforceWriteGate) limits this for write-ANNOTATED commands: it
-// still demands --rw in the model's own execArgs. It does NOT cover a leaf that
-// carries no annotation because its write-ness is resolved at runtime —
-// `aura api` is the live example, which is why gated policies are refused by
-// neo4j_cli_run and reachable only through neo4j_cli_run_write. Do not restate
-// the Layer 3 guarantee without that carve-out.
-//
-// Audit these vars if the read-only posture matters; a future hardening would
-// bind them through cfg.Global.GatedGetenv or require a manifest-only marker.
-func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
-	writeAllowed, _ := strconv.ParseBool(cmd.Flag("rw").Value.String())
-	if !writeAllowed {
-		writeAllowed = envBool("NEO4J_CLI_MCP_ALLOW_WRITES")
+// controls. Each also has an env fallback guarded by manifestMarker: the env
+// var is only consulted when the flag is false AND the marker is present.
+func resolveGates(writeFlag, auraFlag, credFlag string, manifestMarker bool) Gates {
+	writeAllowed, _ := strconv.ParseBool(writeFlag)
+	if !writeAllowed && manifestMarker {
+		writeAllowed = envBool(envMCPAllowWrites)
 	}
-	allowAura, _ := strconv.ParseBool(cmd.Flag(AllowAuraFlag).Value.String())
-	if !allowAura {
-		allowAura = envBool("NEO4J_CLI_MCP_ALLOW_AURA")
+	allowAura, _ := strconv.ParseBool(auraFlag)
+	if !allowAura && manifestMarker {
+		allowAura = envBool(envMCPAllowAura)
 	}
-	allowCredWrite, _ := strconv.ParseBool(cmd.Flag(AllowCredentialWriteFlag).Value.String())
-	if !allowCredWrite {
-		allowCredWrite = envBool("NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE")
+	allowCredWrite, _ := strconv.ParseBool(credFlag)
+	if !allowCredWrite && manifestMarker {
+		allowCredWrite = envBool(envMCPAllowCredentialWrite)
 	}
-	defaultFormat := cmd.Flag("format").Value.String()
-	maxOutputChars, _ := strconv.Atoi(cmd.Flag("max-output-chars").Value.String())
-
-	gates := Gates{
+	return Gates{
 		AllowAura:            allowAura,
 		AllowCredentialWrite: allowCredWrite,
 		WriteAllowed:         writeAllowed,
 	}
+}
+
+// serveRun is the implementation of the serve command.
+//
+// The gate flags (--rw, --allow-aura, --allow-credential-write) are the primary
+// controls. Each has a manifest-gated env fallback (see resolveGates).
+//
+// KNOWN LIMITATION: the env fallback is gated behind NEO4J_CLI_MCP_MANIFEST=1,
+// which the .mcpb manifest's Env block sets unconditionally so Claude Desktop's
+// settings-UI toggles keep working. This stops ACCIDENTAL leakage: a stale gate
+// var left in a shell rc or inherited environment is ignored, because a hand-run
+// `mcp serve` carries no marker. It does NOT stop a deliberate attacker running
+// as the same OS user (a dotfile, an npm postinstall, a poisoned shell rc), who
+// can set the marker alongside the gate vars. Only flag-only gating would close
+// that, and it would break the Desktop UI. The operator's start-up intent is not
+// authoritative while both marker and gate var are set.
+//
+// Layer 3 (flags.EnforceWriteGate) limits this for write-ANNOTATED commands:
+// it still demands --rw in the model's own execArgs. It does NOT cover a leaf
+// that carries no annotation because its write-ness is resolved at runtime —
+// `aura api` is the live example, which is why gated policies are refused by
+// neo4j_cli_run and reachable only through neo4j_cli_run_write. Do not restate
+// the Layer 3 guarantee without that carve-out.
+//
+// Audit these vars if the read-only posture matters.
+func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
+	manifestMarker := envBool(envManifestMarker)
+	gates := resolveGates(
+		cmd.Flag("rw").Value.String(),
+		cmd.Flag(AllowAuraFlag).Value.String(),
+		cmd.Flag(AllowCredentialWriteFlag).Value.String(),
+		manifestMarker,
+	)
+	defaultFormat := cmd.Flag("format").Value.String()
+	maxOutputChars, _ := strconv.Atoi(cmd.Flag("max-output-chars").Value.String())
 
 	if err := checkCredentialStore(cfg); err != nil {
 		return err

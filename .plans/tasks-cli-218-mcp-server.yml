@@ -997,7 +997,7 @@ tasks:
         any manifest golden/test assertions — check and update.
       - Correct the serve.go KNOWN LIMITATION comment to describe the new
         behaviour rather than the old unconditional env read.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'The three MCP gate env vars are ignored when the manifest marker env var is absent; only --rw/--allow-aura/--allow-credential-write flags grant capability in that case'
@@ -1008,3 +1008,4 @@ tasks:
       - 'serve.go KNOWN LIMITATION comment describes the marker behaviour and states plainly that it does not stop a deliberate same-UID attacker'
       - 'make test, make fmt-check, make lint pass; no skill-bundle or policy.golden drift'
     source: review
+    completed_at: 2026-08-06T12:34:35Z

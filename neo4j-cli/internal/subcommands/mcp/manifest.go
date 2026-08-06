@@ -155,6 +155,7 @@ func newManifest(binPath string) *mcpbManifest {
 				Args:    []string{"mcp", "serve"},
 				Env: map[string]string{
 					"NEO4J_CLI_FLAG_MCP_SERVER":            "1",
+					"NEO4J_CLI_MCP_MANIFEST":               "1",
 					"NEO4J_CLI_MCP_ALLOW_WRITES":           "${user_config.allow_writes}",
 					"NEO4J_CLI_MCP_ALLOW_AURA":             "${user_config.allow_aura}",
 					"NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE": "${user_config.allow_credential_write}",
