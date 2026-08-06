@@ -931,3 +931,80 @@ tasks:
       - 'Existing mcpconfig tests pass unmodified; if a test had to change, the behaviour change is called out explicitly and justified'
       - 'make test, make fmt-check, make lint pass'
     source: review
+  - id: task-036
+    title: 'Gate MCP env-var overrides behind an MCP-scoped manifest marker'
+    description: |
+      The three MCP gate env vars (`NEO4J_CLI_MCP_ALLOW_WRITES`,
+      `NEO4J_CLI_MCP_ALLOW_AURA`, `NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE`) are
+      currently read by a bare `envBool` (local `os.LookupEnv` helper in
+      serve.go), so any same-UID process — a dotfile, a poisoned shell rc, an
+      `npm postinstall` — can open a gate for every later `mcp serve`, including
+      one the operator deliberately started WITHOUT the flag. The PR's
+      security-review check flags this as Medium, and it is the outlier in this
+      repo: no other env var can grant capability directly.
+
+      WHAT THE CODEBASE DOES (researched — follow this, do not invent):
+      - `common/flags/flags.go` `RequireWriteAccess` — the repo's own primary
+        write gate — reads ONLY `cmd.Flag("rw")`. No env fallback at all.
+      - Credential env reads go through the single chokepoint
+        `(*clicfg.Config).GatedGetenv`, itself behind the `accept-env-vars`
+        opt-in. AGENTS.md is explicit: "use it, don't reintroduce a local
+        `gatedGetenv`". `serve.go`'s `envBool` is exactly that forbidden local
+        re-implementation.
+      - `NEO4J_CLI_FLAG_*` vars only control command VISIBILITY; every write
+        inside a revealed subtree still needs `--rw`.
+      - `NEO4J_CLI_NO_QUIPS` / `NO_UPDATE_NAG` are cosmetic suppression only.
+
+      So the convention is: an env var never opens a security gate on its own.
+
+      WHY NOT JUST DELETE THE ENV FALLBACK: it exists for a real reason. A
+      `.mcpb` manifest wires Claude Desktop's settings-UI toggles through `env`
+      (see manifest.go `mcpbMCPConfig.Env`), because Desktop spawns the binary
+      and the user cannot edit argv. Flag-only would break that UI outright, and
+      Desktop is the whole point of the bundle.
+
+      WHY NOT REUSE `accept-env-vars`: it would work mechanically (it is already
+      bound to `NEO4J_CLI_ACCEPT_ENV_VARS` in `bindEnvironmentVariables`, so the
+      ordering is fine), but it is NOT MCP-scoped — enabling it also switches on
+      credential reads from `NEO4J_URI`/`NEO4J_USERNAME`/`NEO4J_PASSWORD`/
+      `NEO4J_AURA_CLIENT_*`/embed provider keys across ~14 `GatedGetenv` call
+      sites. That smuggles a silent credential-behaviour expansion into a
+      security fix. Rejected for that reason.
+
+      IMPLEMENT: the "manifest-only marker" option that serve.go's own KNOWN
+      LIMITATION comment already names. Add one static env key to the generated
+      manifest (name it following repo convention, e.g.
+      `NEO4J_CLI_MCP_MANIFEST=1` — mirror how `NEO4J_CLI_FLAG_MCP_SERVER: "1"`
+      is already set unconditionally in manifest.go's Env map). The three gate
+      env vars are honoured ONLY when that marker is present; otherwise they are
+      ignored entirely and only the CLI flags count. Desktop keeps working
+      because its manifest supplies the marker; a shell or dotfile does not.
+
+      Be honest about the limit in the comment you leave: this stops ACCIDENTAL
+      leakage (stale dotfile, inherited env) but NOT a deliberate same-UID
+      attacker, who can set the marker too. Do not claim it closes that hole.
+      Flag-only is the only thing that would, and it breaks Desktop.
+
+      SCOPE NOTES:
+      - `mcp install` (the JSON-config path in `common/skill/mcpconfig.go`
+        `InstallMCPConfig`) writes NO `env` block — only `command` + `args`. Its
+        users pass gates as `--rw`/`--allow-*` flags, so they are unaffected.
+        Verify the marker does not regress that path.
+      - `envBool` has existing tests in `serve_test.go` (using
+        `NEO4J_CLI_MCP_TEST_ENVBOOL`). Update or replace them to cover the new
+        marker semantics: gate var honoured with marker, ignored without.
+      - Adding/changing the manifest shape may diff the `mcp bundle` output and
+        any manifest golden/test assertions — check and update.
+      - Correct the serve.go KNOWN LIMITATION comment to describe the new
+        behaviour rather than the old unconditional env read.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'The three MCP gate env vars are ignored when the manifest marker env var is absent; only --rw/--allow-aura/--allow-credential-write flags grant capability in that case'
+      - 'With the marker present, all three gate env vars are honoured exactly as before (Claude Desktop settings-UI toggles keep working end to end)'
+      - 'The generated .mcpb manifest sets the marker as a static env key alongside NEO4J_CLI_FLAG_MCP_SERVER'
+      - 'The local envBool helper no longer performs an ungated capability-granting env read; tests cover both marker-present and marker-absent paths'
+      - 'mcp install (JSON config path) is unaffected — it writes no env block and its flag-based gating still works'
+      - 'serve.go KNOWN LIMITATION comment describes the marker behaviour and states plainly that it does not stop a deliberate same-UID attacker'
+      - 'make test, make fmt-check, make lint pass; no skill-bundle or policy.golden drift'
+    source: review

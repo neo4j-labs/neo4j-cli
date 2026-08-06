@@ -301,3 +301,6 @@ Added 2 review tasks (task-034..task-035).
 Extracted duplicated read-file + unmarshal + mcpServers navigation from four functions into shared readMCPConfig/readMCPConfigServerEntry helpers. Removed unused "os" import.
 Files: ~common/skill/mcpconfig.go
 Decisions:
+
+## REVIEW — 2026-08-06T12:17:18Z
+Added 1 review task (task-036).
