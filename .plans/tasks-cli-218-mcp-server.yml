@@ -921,7 +921,8 @@ tasks:
       under ~15 lines total), so keep the change tight — this is a readability
       cleanup, not a redesign of the config layer. Do not change the on-disk config
       format, the public API of the package, or any call site outside this file.
-    status: pending
+    status: completed
+    completed_at: 2026-08-06T13:10:00Z
     dependencies: []
     acceptance_criteria:
       - 'The read-file + unmarshal + mcpServers-navigation logic exists in one helper, and isMCPInstalled / readMCPCommandPath / writeMCPEntry / removeMCPEntry all route through it'

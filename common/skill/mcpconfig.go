@@ -5,7 +5,6 @@ package skill
 
 import (
 	"encoding/json"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/afero"
@@ -44,50 +43,15 @@ func MCPList(fs afero.Fs) []AgentInstall {
 // agent's MCP config file. An absent, unparseable, or inaccessible file is
 // treated as not installed (no error).
 func isMCPInstalled(fs afero.Fs, a *Agent) (bool, error) {
-	configPath, ok := a.MCPConfigPath()
-	if !ok {
-		return false, nil
-	}
-	data, err := afero.ReadFile(fs, configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, nil // unreadable -> not installed
-	}
-	var cfg map[string]any
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return false, nil
-	}
-	servers, _ := cfg["mcpServers"].(map[string]any)
-	if servers == nil {
-		return false, nil
-	}
-	_, exists := servers["neo4j-cli"]
-	return exists, nil
+	_, found := readMCPConfigServerEntry(fs, a)
+	return found, nil
 }
 
 // readMCPCommandPath reads the command path from the neo4j-cli entry in the
 // agent's MCP config file. Returns "" when the entry is absent or broken.
 func readMCPCommandPath(fs afero.Fs, a *Agent) string {
-	configPath, ok := a.MCPConfigPath()
-	if !ok {
-		return ""
-	}
-	data, err := afero.ReadFile(fs, configPath)
-	if err != nil {
-		return ""
-	}
-	var cfg map[string]any
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return ""
-	}
-	servers, _ := cfg["mcpServers"].(map[string]any)
-	if servers == nil {
-		return ""
-	}
-	entry, _ := servers["neo4j-cli"].(map[string]any)
-	if entry == nil {
+	entry, found := readMCPConfigServerEntry(fs, a)
+	if !found {
 		return ""
 	}
 	cmd, _ := entry["command"].(string)
@@ -125,12 +89,7 @@ func RemoveMCPConfig(fs afero.Fs, a *Agent) error {
 // writeMCPEntry surgically merges an entry under mcpServers. Reads the
 // existing file (if any), sets only the named key, and writes atomically.
 func writeMCPEntry(fs afero.Fs, path, serverName string, entry map[string]any) error {
-	var cfg map[string]any
-
-	data, err := afero.ReadFile(fs, path)
-	if err == nil {
-		_ = json.Unmarshal(data, &cfg)
-	}
+	cfg := readMCPConfig(fs, path)
 	if cfg == nil {
 		cfg = map[string]any{}
 	}
@@ -149,17 +108,9 @@ func writeMCPEntry(fs afero.Fs, path, serverName string, entry map[string]any) e
 // file is absent it is a no-op (idempotent). An empty mcpServers is preserved
 // (its removal is cosmetic).
 func removeMCPEntry(fs afero.Fs, path, serverName string) error {
-	data, err := afero.ReadFile(fs, path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return nil // unreadable -> nothing to remove
-	}
-
-	var cfg map[string]any
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil // unparseable -> nothing to remove
+	cfg := readMCPConfig(fs, path)
+	if cfg == nil {
+		return nil
 	}
 
 	servers, _ := cfg["mcpServers"].(map[string]any)
@@ -173,6 +124,44 @@ func removeMCPEntry(fs afero.Fs, path, serverName string) error {
 	delete(servers, serverName)
 
 	return writeFileAtomically(fs, path, cfg)
+}
+
+// readMCPConfig reads and decodes the MCP config file. Returns nil on error —
+// callers decide how to handle a nil return (start fresh or abort).
+func readMCPConfig(fs afero.Fs, path string) map[string]any {
+	data, err := afero.ReadFile(fs, path)
+	if err != nil {
+		return nil
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil
+	}
+	return cfg
+}
+
+// readMCPConfigServerEntry reads the agent's MCP config and extracts the
+// neo4j-cli server entry under mcpServers. Returns found=false when the
+// entry, config file, or MCP capability is absent or the config is
+// unparseable — error-free so readers can treat absence as "not installed".
+func readMCPConfigServerEntry(fs afero.Fs, a *Agent) (entry map[string]any, found bool) {
+	configPath, ok := a.MCPConfigPath()
+	if !ok {
+		return nil, false
+	}
+	cfg := readMCPConfig(fs, configPath)
+	if cfg == nil {
+		return nil, false
+	}
+	servers, _ := cfg["mcpServers"].(map[string]any)
+	if servers == nil {
+		return nil, false
+	}
+	entry, exists := servers["neo4j-cli"].(map[string]any)
+	if !exists {
+		return nil, false
+	}
+	return entry, true
 }
 
 // writeFileAtomically marshals data to path via temp-file + rename in the
