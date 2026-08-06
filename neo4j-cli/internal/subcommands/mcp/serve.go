@@ -110,12 +110,17 @@ func addServeFlags(cmd *cobra.Command) {
 // KNOWN LIMITATION: any process running as the same OS user (a dotfile, an npm
 // postinstall, a poisoned shell rc) can set those vars and thereby open a gate
 // for every later `mcp serve`, including one started deliberately without the
-// flag. Blast radius is bounded — Layer 3 (flags.EnforceWriteGate, now with TTY
-// detection pinned off below) still demands --rw in the model's own execArgs, so
-// an open Layer 1 alone does not permit a write. But the operator's start-up
-// intent is not authoritative while these vars are set. Audit them if the
-// read-only posture matters; a future hardening would bind them through
-// cfg.Global.GatedGetenv or require a manifest-only marker flag.
+// flag. The operator's start-up intent is not authoritative while they are set.
+//
+// Layer 3 (flags.EnforceWriteGate) limits this for write-ANNOTATED commands: it
+// still demands --rw in the model's own execArgs. It does NOT cover a leaf that
+// carries no annotation because its write-ness is resolved at runtime —
+// `aura api` is the live example, which is why gated policies are refused by
+// neo4j_cli_run and reachable only through neo4j_cli_run_write. Do not restate
+// the Layer 3 guarantee without that carve-out.
+//
+// Audit these vars if the read-only posture matters; a future hardening would
+// bind them through cfg.Global.GatedGetenv or require a manifest-only marker.
 func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 	writeAllowed, _ := strconv.ParseBool(cmd.Flag("rw").Value.String())
 	if !writeAllowed {

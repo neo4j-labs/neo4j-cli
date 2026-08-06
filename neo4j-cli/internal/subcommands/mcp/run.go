@@ -112,9 +112,27 @@ func HandleRun(ctx context.Context, req *mcpsdk.CallToolRequest, exec *Executor,
 	// Refuse write-classified commands -- write intent must route through
 	// neo4j_cli_run_write so annotations stay honest and the write gate in
 	// flags.EnforceWriteGate is the authoritative arbiter.
+	//
+	// Gated policies are refused here too, and that is not redundant: a gated
+	// leaf need not be write-annotated. `aura api` is a raw HTTP passthrough
+	// whose write-ness is resolved from the method at runtime, so it carries
+	// no annotation, classifies gated rather than write, and would otherwise
+	// be reachable through this tool -- which advertises readOnlyHint -- as a
+	// DELETE. Anything gated is destructive enough to require the explicit
+	// write tool.
+	//
+	// This deliberately over-refuses: `aura agent list/get` and
+	// `aura customer-managed-key list/get` are reads, but their subtrees are
+	// gated in full (see gatedAuraPaths), so they route through
+	// neo4j_cli_run_write too. Splitting reads out would need the table to
+	// distinguish read from write inside a gated subtree -- precisely the
+	// distinction `aura api` cannot express -- so the conservative side wins.
 	policy, _ := Classify(r.cmd, r.args)
-	if policy == PolicyWrite {
+	switch policy {
+	case PolicyWrite:
 		return runError(fmt.Sprintf("%q is a write command; use neo4j_cli_run_write instead", r.command)), nil
+	case PolicyGatedAura, PolicyGatedCredentialWrite:
+		return runError(fmt.Sprintf("%q is gated and may mutate state; use neo4j_cli_run_write instead", r.command)), nil
 	}
 
 	// Reject --rw in args: write intent must route through neo4j_cli_run_write

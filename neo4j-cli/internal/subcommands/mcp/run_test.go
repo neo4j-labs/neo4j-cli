@@ -108,6 +108,38 @@ func runTestRootFactory(cfg *clicfg.Config) *cobra.Command {
 	})
 	root.AddCommand(config)
 
+	// aura: `api` is the raw HTTP passthrough whose write-ness is resolved from
+	// the method at runtime, so it deliberately carries NO write annotation and
+	// classifies gated rather than write. `instance list` is a plain read that
+	// must stay reachable through neo4j_cli_run.
+	aura := &cobra.Command{Use: "aura", Short: "Manage Aura"}
+	aura.AddCommand(&cobra.Command{
+		Use: "api", Short: "Call the Aura API directly", RunE: func(c *cobra.Command, _ []string) error {
+			_, _ = c.OutOrStdout().Write([]byte("{}\n"))
+			return nil
+		},
+	})
+	instance := &cobra.Command{Use: "instance", Short: "Manage Aura instances"}
+	instance.AddCommand(&cobra.Command{
+		Use: "list", Short: "List Aura instances", RunE: func(c *cobra.Command, _ []string) error {
+			_, _ = c.OutOrStdout().Write([]byte("instance1\n"))
+			return nil
+		},
+	})
+	aura.AddCommand(instance)
+	root.AddCommand(aura)
+
+	// credential: a write-annotated leaf under the `credential` tree escalates
+	// from write to PolicyGatedCredentialWrite via writeGatedPaths.
+	credential := &cobra.Command{Use: "credential", Short: "Manage credentials"}
+	credential.AddCommand(&cobra.Command{
+		Use:         "add",
+		Short:       "Add a credential",
+		Annotations: map[string]string{"write": "true"},
+		RunE:        func(c *cobra.Command, _ []string) error { return nil },
+	})
+	root.AddCommand(credential)
+
 	return root
 }
 
@@ -159,6 +191,64 @@ func TestHandleRun_WriteCommandRefused(t *testing.T) {
 	tc := result.Content[0].(*mcpsdk.TextContent)
 	assert.Contains(t, tc.Text, "is a write command")
 	assert.Contains(t, tc.Text, "neo4j_cli_run_write")
+}
+
+// `aura api` carries no write annotation (its write-ness is the HTTP method, a
+// runtime value), so it classifies gated rather than write. neo4j_cli_run
+// advertises readOnlyHint, so it must refuse gated commands too or a DELETE
+// reaches through it.
+func TestHandleRun_GatedCommandRefused(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tt := range []struct {
+		name    string
+		command string
+		args    string
+	}{
+		{name: "aura api is gated, not write-annotated", command: "aura api", args: `,"args":["DELETE","/instances/abc"]`},
+		{name: "credential add escalates write to gated", command: "credential add"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			exec := setupRunTest(t)
+			// Gates are open: the refusal is the tool's own read/write split,
+			// not the --allow-* gate, so it must fire regardless.
+			gates := Gates{AllowAura: true, AllowCredentialWrite: true, WriteAllowed: true}
+
+			req := &mcpsdk.CallToolRequest{
+				Params: &mcpsdk.CallToolParamsRaw{
+					Arguments: json.RawMessage(`{"command":"` + tt.command + `"` + tt.args + `}`),
+				},
+			}
+			result, err := HandleRun(ctx, req, exec, gates, runTestRootFactory)
+			require.NoError(t, err)
+			require.True(t, result.IsError)
+			tc := result.Content[0].(*mcpsdk.TextContent)
+			// Assert the gated message specifically: "is a write command" would
+			// also mention neo4j_cli_run_write, and `aura api` must not reach
+			// that branch at all (it carries no write annotation).
+			assert.Contains(t, tc.Text, "is gated and may mutate state")
+			assert.Contains(t, tc.Text, "neo4j_cli_run_write")
+		})
+	}
+}
+
+// The gated refusal must not swallow plain Aura reads: `aura instance list` is
+// PolicyAllow and stays reachable through the read-only tool.
+func TestHandleRun_AuraReadStillAllowed(t *testing.T) {
+	ctx := context.Background()
+	exec := setupRunTest(t)
+	gates := Gates{}
+
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"command":"aura instance list"}`),
+		},
+	}
+	result, err := HandleRun(ctx, req, exec, gates, runTestRootFactory)
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	tc := result.Content[0].(*mcpsdk.TextContent)
+	assert.Contains(t, tc.Text, "instance1")
 }
 
 func TestHandleRun_RejectsRwInArgs(t *testing.T) {
