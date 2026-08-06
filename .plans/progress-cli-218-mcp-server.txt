@@ -288,5 +288,11 @@ Files: ~AGENTS.md, ~common/flags/flags.go, ~common/flags/flags_test.go, ~mcp/run
 Conventions-review finding: `tools` violated the repo's singular-noun rule for command names. Renamed the leaf to `tool` (files tools.go/tools_test.go -> tool.go/tool_test.go, newToolsCmd -> newToolCmd) and updated every invocation, the Example lines, the PRD and the policy golden. Deliberately NOT renamed: the MCPB manifest's `Tools []map[string]string \`json:"tools"\`` (spec wire format) and the unrelated uv `.local/share/uv/tools` install path. Safe to rename because nothing has shipped — the group is flag-gated and unreleased.
 Files: >tools.go=>tool.go, >tools_test.go=>tool_test.go, ~mcp.go, ~tooldefs.go, ~tooldefs_gate_test.go, ~mcp_test.go, ~executor_test.go, ~allow_test.go, ~tooldefs_test.go, ~testdata/policy.golden, ~.plans/prd-cli-218-mcp-server.md
 
+## TASK-034 — 2026-08-06T10:25:00Z
+Removed tracked .DS_Store from git index and working tree, added .DS_Store to .gitignore. No other tracked .DS_Store files exist.
+Files: ~.gitignore, ~.plans/tasks-cli-218-mcp-server.yml
+Decisions:
+- gitignore pattern `.DS_Store` (no leading slash) matches at any depth, covering the previously-tracked path and all future occurrences.
+
 ## REVIEW — 2026-08-06T10:13:21Z
 Added 2 review tasks (task-034..task-035).

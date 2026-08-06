@@ -876,7 +876,8 @@ tasks:
 
       Check whether other `.DS_Store` files are tracked elsewhere in the repo while
       you are here, and remove those too if present.
-    status: pending
+    status: completed
+    completed_at: 2026-08-06T10:25:00Z
     dependencies: []
     acceptance_criteria:
       - '`git ls-files | grep -i "\.DS_Store"` returns no results'
