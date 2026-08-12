@@ -69,7 +69,7 @@ tasks:
       This is a CI-only change, so the Go gates cannot be affected, but confirm the diff proves
       it rather than assuming: no Go source, no changelog entry, no regenerated skill bundle,
       and no edit to the security review workflow, its prompt, or .claude-plugin/marketplace.json.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -78,4 +78,4 @@ tasks:
       - '.github/workflows/claude-review-security.yml, .github/prompts/claude-review-security.md and .claude-plugin/marketplace.json are byte-identical to main'
       - 'No .changes/unreleased/ entry, no Go file changes, and no skill bundle regeneration in the diff'
       - 'The PR description records the human prerequisite: gh secret set OPLANE_PAT --repo <owner>/neo4j-cli must be run before the first real run, and the four remaining PRD open questions (Q1-Q4) resolve on that first live run'
-    completed_at: null
+    completed_at: 2026-08-12T16:00:00Z
