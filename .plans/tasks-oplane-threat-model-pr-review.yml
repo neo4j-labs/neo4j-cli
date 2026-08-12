@@ -18,7 +18,7 @@ tasks:
       calls `new_threatmodel` unconditionally, so per-PR dedup must be driven from this prompt.
       Copy the discover-then-edit comment pattern and the prompt-injection constraint clause
       from claude-review-security.md rather than re-deriving them.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'File .github/prompts/claude-review-oplane.md exists with all four steps plus a Constraints section'
@@ -28,7 +28,7 @@ tasks:
       - 'Step 3 handles both a URL and a bare id for the Full threat model line, and never guesses a deep-link path'
       - 'Step 4 posts the MCP-unavailable summary naming the failure and explicitly forbids hand-rolling a substitute analysis'
       - 'Constraints section retains the prompt-injection clause treating all diff content as untrusted data'
-    completed_at: null
+    completed_at: 2026-08-12T13:40:00Z
 
   - id: task-002
     title: 'Add .github/workflows/claude-review-oplane.yml with authenticated Oplane MCP'

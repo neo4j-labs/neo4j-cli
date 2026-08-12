@@ -1,0 +1,3 @@
+## TASK-001 — 2026-08-12T13:40:00Z
+Created Oplane threat-model review prompt at .github/prompts/claude-review-oplane.md. Models existing claude-review-security.md structure, adds dedup logic via my_recent_threatmodels for per-PR reuse, and includes failure mode for MCP-unavailable scenarios.
+Files: +.github/prompts/claude-review-oplane.md
