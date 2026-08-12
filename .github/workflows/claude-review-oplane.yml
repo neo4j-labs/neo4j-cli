@@ -82,8 +82,12 @@ jobs:
           # this plugin is consumed straight from its GitHub marketplace.
           # Upstream changes reach CI without review — accepted because the
           # check is advisory and the plugin repo is first-party to Oplane.
+          #
+          # The .git suffix is REQUIRED: the action validates marketplace URLs
+          # against /^https:\/\/[...]+\.git$/ and throws "Invalid marketplace
+          # URL format" without it, before any plugin install happens.
           plugin_marketplaces: |
-            https://github.com/oplane/oplane-plugin
+            https://github.com/oplane/oplane-plugin.git
           plugins: |
             oplane@oplane-plugins
 
