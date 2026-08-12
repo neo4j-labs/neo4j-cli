@@ -74,6 +74,23 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
+          # TEMPORARY — REVERT BEFORE MERGE.
+          #
+          # Anthropic's token-exchange API refuses to mint the GitHub App token
+          # when the workflow file differs from the copy on the default branch
+          # (error_code workflow_not_found_on_default_branch), so a PR that edits
+          # this workflow can never exercise its own change. Supplying
+          # github_token short-circuits setupGitHubToken before that exchange,
+          # which is the only way to prove the marketplace fix from inside its
+          # own PR.
+          #
+          # Do NOT keep this. It makes the action post as github-actions[bot]
+          # instead of claude[bot], and the summary lookup in
+          # .github/prompts/claude-review-oplane.md matches on
+          # `.user.login == "claude[bot]"` — so with this set, each push appends
+          # a new summary comment instead of editing the previous one.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
           additional_permissions: |
             actions: read
 
