@@ -41,7 +41,7 @@ tasks:
       `oplane` so it overrides the plugin bundled unauthenticated entry of the same name; the
       JSON key is `type` (not `transport`) with value `http`; and claude-code-action v1 has no
       `mcp_config` input, so the config goes through `claude_args: --mcp-config`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -57,7 +57,7 @@ tasks:
       - 'A YAML comment records that OPLANE_PAT is Oskar Hane personal token, that no Oplane service account exists yet, and that rotation or deprovisioning breaks CI reviews (REQ-F-027)'
       - 'All uses: entries are SHA-pinned with trailing # vN comments matching the two existing review workflows'
       - 'No verdict file, no Enforce verdict step anywhere in the workflow'
-    completed_at: null
+    completed_at: 2026-08-12T15:55:00Z
 
   - id: task-003
     title: 'Validate workflow with actionlint and verify no-touch invariants'

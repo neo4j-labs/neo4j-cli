@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-08-12T13:40:00Z
 Created Oplane threat-model review prompt at .github/prompts/claude-review-oplane.md. Models existing claude-review-security.md structure, adds dedup logic via my_recent_threatmodels for per-PR reuse, and includes failure mode for MCP-unavailable scenarios.
 Files: +.github/prompts/claude-review-oplane.md
+
+## TASK-002 — 2026-08-12T15:55:00Z
+Created .github/workflows/claude-review-oplane.yml with authenticated Oplane MCP configuration. Includes concurrency group with cancel-in-progress (deviation from repo convention documented), same-repo gate, PAT ownership and secret-in-argv trade-off comments, and no verdict/enforce step.
+Files: +.github/workflows/claude-review-oplane.yml
