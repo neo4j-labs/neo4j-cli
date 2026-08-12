@@ -1,0 +1,33 @@
+## TASK-001 — 2026-08-12T13:40:00Z
+Created Oplane threat-model review prompt at .github/prompts/claude-review-oplane.md. Models existing claude-review-security.md structure, adds dedup logic via my_recent_threatmodels for per-PR reuse, and includes failure mode for MCP-unavailable scenarios.
+Files: +.github/prompts/claude-review-oplane.md
+
+## TASK-002 — 2026-08-12T15:55:00Z
+Created .github/workflows/claude-review-oplane.yml with authenticated Oplane MCP configuration. Includes concurrency group with cancel-in-progress (deviation from repo convention documented), same-repo gate, PAT ownership and secret-in-argv trade-off comments, and no verdict/enforce step.
+Files: +.github/workflows/claude-review-oplane.yml
+
+## TASK-003 — 2026-08-12T16:00:00Z
+Validated workflow with actionlint (zero findings), confirmed change set scoped to .github/ only, verified untouched files byte-identical to main, confirmed no Go/skill/changelog changes. All Go gates (make test, make fmt-check, make lint) pass cleanly.
+Files: ~.plans/tasks-oplane-threat-model-pr-review.yml, ~.plans/progress-oplane-threat-model-pr-review.txt
+
+## TASK-003 fix — 2026-08-12T16:05:00Z
+Fixed two issues found by hone-reviewer: (1) unbalanced jq parentheses in the discover-then-edit filter that would prevent PATCH dedup, and (2) replaced unexpandable ${{ }} template expressions in the prompt body with shell-variable references to context the workflow already provides.
+Files: ~.github/prompts/claude-review-oplane.md
+
+## PR DESCRIPTION NOTES
+
+### Human prerequisite (must run before first real workflow run)
+```
+gh secret set OPLANE_PAT --repo neo4j-cli/neo4j-cli
+```
+Create a PAT at https://gravity.oplane.io and set it as a repo secret. Without it the workflow runs but posts "MCP unavailable" on every PR.
+
+### Open questions resolved on first live run
+
+1. **`mcp__oplane__*` wildcard in `--allowed-tools`** — documented for `--disallowed-tools`; support in `--allowed-tools` inferred. If the wildcard is rejected at runtime, list all six tools explicitly per REQ-F-016.
+
+2. **`new_threatmodel` return shape** — not verifiable locally (no Oplane MCP in authoring session). The prompt tolerates both a URL and a bare id. If the shape differs, update Step 3's `Full threat model:` line handling.
+
+3. **`my_recent_threatmodels` metadata** — not verifiable locally. Does it expose `pull_request_url` or a searchable title field? If not, REQ-F-021's reuse step will never find an existing model and every push creates a duplicate. Fallback: narrow the trigger from `[opened, synchronize, reopened, ready_for_review]` to `[opened, reopened, ready_for_review]`.
+
+4. **`fetch-depth: 0` necessity** — chosen defensively. If the first run shows the skill only uses `gh pr diff`, reduce to `1` to match the other reviews.
