@@ -10,6 +10,10 @@ Files: +.github/workflows/claude-review-oplane.yml
 Validated workflow with actionlint (zero findings), confirmed change set scoped to .github/ only, verified untouched files byte-identical to main, confirmed no Go/skill/changelog changes. All Go gates (make test, make fmt-check, make lint) pass cleanly.
 Files: ~.plans/tasks-oplane-threat-model-pr-review.yml, ~.plans/progress-oplane-threat-model-pr-review.txt
 
+## TASK-003 fix — 2026-08-12T16:05:00Z
+Fixed two issues found by hone-reviewer: (1) unbalanced jq parentheses in the discover-then-edit filter that would prevent PATCH dedup, and (2) replaced unexpandable ${{ }} template expressions in the prompt body with shell-variable references to context the workflow already provides.
+Files: ~.github/prompts/claude-review-oplane.md
+
 ## PR DESCRIPTION NOTES
 
 ### Human prerequisite (must run before first real workflow run)

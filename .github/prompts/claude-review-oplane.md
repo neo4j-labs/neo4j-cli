@@ -5,8 +5,8 @@ You are performing an automated Oplane threat-model review of a pull request. Be
 Your FIRST action is to invoke the Oplane threat-model analysis via the `Skill` tool with skill name `oplane:analyze-pr`. If the namespaced form does not resolve, fall back to bare `analyze-pr`.
 
 Pass the following context as `$ARGUMENTS`:
-- `REPO: ${{ github.repository }}`
-- `PR NUMBER: ${{ github.event.pull_request.number }}`
+- REPO: (use the REPO value from the context line at the top of this prompt)
+- PR NUMBER: (use the PR NUMBER value from the context line at the top of this prompt)
 - PR title (`gh pr view ${PR_NUMBER} --json title --jq .title`)
 - PR description / body (`gh pr view ${PR_NUMBER} --json body --jq .body`)
 
@@ -16,7 +16,7 @@ The skill owns the analysis flow — verifying the MCP connection, identifying t
 
 The `analyze-pr` skill calls `new_threatmodel` unconditionally and has no dedup step of its own. Before creating anything, check for an existing model bound to this PR:
 
-1. Call `my_recent_threatmodels` and look for a model already associated with this PR — match on `pull_request_url` (the PR's HTML URL at `${{ github.event.pull_request.html_url }}`), or on a title containing `<${{ github.repository }}>#${{ github.event.pull_request.number }}`.
+1. Call `my_recent_threatmodels` and look for a model already associated with this PR — match on `pull_request_url` (the PR's HTML URL at `https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}`), or on a title containing `<${GITHUB_REPOSITORY}>#${PR_NUMBER}`.
 
 2. **If found** (reuse path):
    - Call `add_threatmodel_comment` describing what changed since the last push (the current diff).
@@ -24,7 +24,7 @@ The `analyze-pr` skill calls `new_threatmodel` unconditionally and has no dedup 
    - Do **not** call `new_threatmodel`.
 
 3. **If not found** (new model path):
-   - Call `new_threatmodel` with `pull_request_url` set to the PR's HTML URL (`${{ github.event.pull_request.html_url }}`) and `<${{ github.repository }}>#${{ github.event.pull_request.number }}` in the title, so subsequent pushes can find it.
+   - Call `new_threatmodel` with `pull_request_url` set to the PR's HTML URL (`https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}`) and `<${GITHUB_REPOSITORY}>#${PR_NUMBER}` in the title, so subsequent pushes can find it.
 
 4. If the existing model cannot be updated for any reason (e.g. the MCP tool fails), fall back to creating a new one rather than failing the run — a duplicate threat model is better than no model at all.
 
@@ -36,7 +36,7 @@ Use the discover-then-edit pattern so the PR ends up with exactly one Oplane thr
    ```
    gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
      --jq 'map(select(.user.login == "claude[bot]"
-                       and (.body | contains("**Oplane threat model:**")))
+                       and (.body | contains("**Oplane threat model:**"))))
              | sort_by(.created_at)
              | last
              | .id // empty'
