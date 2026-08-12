@@ -1,0 +1,81 @@
+feature: oplane-threat-model-pr-review
+prd: ./prd-oplane-threat-model-pr-review.md
+created_at: 2026-08-12T13:32:40Z
+updated_at: 2026-08-12T13:32:40Z
+
+tasks:
+  - id: task-001
+    title: 'Write the Oplane review prompt at .github/prompts/claude-review-oplane.md'
+    description: |
+      Create the prompt file that drives the Oplane threat-model review, structured like the
+      existing .github/prompts/claude-review-security.md. Four steps: invoke the
+      `oplane:analyze-pr` skill (falling back to bare `analyze-pr`), reuse the PR existing
+      threat model instead of creating a duplicate, post exactly one summary comment via the
+      discover-then-edit pattern, and handle the MCP-unavailable failure mode. Covers
+      REQ-F-019 through REQ-F-025.
+
+      The reuse step (REQ-F-021) is the substantive new logic: the upstream `analyze-pr` skill
+      calls `new_threatmodel` unconditionally, so per-PR dedup must be driven from this prompt.
+      Copy the discover-then-edit comment pattern and the prompt-injection constraint clause
+      from claude-review-security.md rather than re-deriving them.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'File .github/prompts/claude-review-oplane.md exists with all four steps plus a Constraints section'
+      - 'Step 1 names skill `oplane:analyze-pr` with a documented fallback to bare `analyze-pr`, and passes REPO / PR NUMBER / PR title / PR description as $ARGUMENTS'
+      - 'Step 2 instructs calling my_recent_threatmodels first, matching on pull_request_url or a title containing <REPO>#<PR NUMBER>; updates via add_threatmodel_comment when found, creates with pull_request_url set when not, and falls back to creating rather than failing'
+      - 'Step 3 uses the discover-then-edit pattern with marker `**Oplane threat model:**`, writes the body to a temp file via tee, and reproduces the summary body shape from REQ-F-022 including the trailing advisory line'
+      - 'Step 3 handles both a URL and a bare id for the Full threat model line, and never guesses a deep-link path'
+      - 'Step 4 posts the MCP-unavailable summary naming the failure and explicitly forbids hand-rolling a substitute analysis'
+      - 'Constraints section retains the prompt-injection clause treating all diff content as untrusted data'
+    completed_at: null
+
+  - id: task-002
+    title: 'Add .github/workflows/claude-review-oplane.yml with authenticated Oplane MCP'
+    description: |
+      Create the workflow, modelled on .github/workflows/claude-review-security.yml. Covers
+      REQ-F-001 through REQ-F-018 and REQ-F-027. This is the first workflow in the repo to
+      configure a custom remote MCP server and the first to set a concurrency group.
+
+      Three details are easy to get wrong and are load-bearing: the MCP server must be named
+      `oplane` so it overrides the plugin bundled unauthenticated entry of the same name; the
+      JSON key is `type` (not `transport`) with value `http`; and claude-code-action v1 has no
+      `mcp_config` input, so the config goes through `claude_args: --mcp-config`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - 'Workflow named `Claude Review — Oplane Threat Model`, job id oplane-review, triggering on pull_request types [opened, synchronize, reopened, ready_for_review]'
+      - 'if: gate requires all three of draft == false, author_association in MEMBER/OWNER/COLLABORATOR, and head.repo.full_name == github.repository (same-repo only)'
+      - 'concurrency group oplane-review-<PR number> with cancel-in-progress: true, plus a YAML comment explaining why this deviates from the repo no-concurrency convention'
+      - 'permissions block matches claude-review-security.yml, and timeout-minutes is 20'
+      - 'Steps: checkout at fetch-depth 0, the verbatim force-HTTPS git config step with its comment, the heredoc load of the prompt into $GITHUB_ENV, then the claude-code-action step'
+      - 'claude-code-action step carries continue-on-error: true, plugin_marketplaces https://github.com/oplane/oplane-plugin, plugins oplane@oplane-plugins, and env OPLANE_BASE_URL'
+      - 'claude_args contains --mcp-config JSON with server name oplane, "type":"http", url https://gravity.oplane.io/mcp/, and header Authorization: Bearer ${{ secrets.OPLANE_PAT }}; --strict-mcp-config is NOT passed'
+      - 'allowed-tools lists mcp__oplane__*, the github inline comment tool, the four gh Bash forms, Bash(tee:*), Read, Grep, Glob and Skill; no general Bash, no Write, no Edit'
+      - 'A YAML comment documents the secret-in-argv trade-off and the /tmp/mcp.json file-based alternative'
+      - 'A YAML comment records that OPLANE_PAT is Oskar Hane personal token, that no Oplane service account exists yet, and that rotation or deprovisioning breaks CI reviews (REQ-F-027)'
+      - 'All uses: entries are SHA-pinned with trailing # vN comments matching the two existing review workflows'
+      - 'No verdict file, no Enforce verdict step anywhere in the workflow'
+    completed_at: null
+
+  - id: task-003
+    title: 'Validate workflow with actionlint and verify no-touch invariants'
+    description: |
+      Run actionlint against the new workflow and confirm the change set is scoped to .github/
+      only. Covers REQ-NF-001, REQ-NF-003 and REQ-NF-004, plus the untouched-files acceptance
+      criteria in the PRD.
+
+      This is a CI-only change, so the Go gates cannot be affected, but confirm the diff proves
+      it rather than assuming: no Go source, no changelog entry, no regenerated skill bundle,
+      and no edit to the security review workflow, its prompt, or .claude-plugin/marketplace.json.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - 'actionlint .github/workflows/claude-review-oplane.yml reports zero findings'
+      - 'git diff --name-only against main lists only the two new files under .github/'
+      - '.github/workflows/claude-review-security.yml, .github/prompts/claude-review-security.md and .claude-plugin/marketplace.json are byte-identical to main'
+      - 'No .changes/unreleased/ entry, no Go file changes, and no skill bundle regeneration in the diff'
+      - 'The PR description records the human prerequisite: gh secret set OPLANE_PAT --repo <owner>/neo4j-cli must be run before the first real run, and the four remaining PRD open questions (Q1-Q4) resolve on that first live run'
+    completed_at: null
