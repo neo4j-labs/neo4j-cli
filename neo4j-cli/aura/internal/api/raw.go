@@ -174,6 +174,16 @@ func RawStatusError(res *RawResponse) error {
 	return clierr.NewUpstreamError("%s", detail)
 }
 
+// scrubbedBodyTrunc renders an upstream response body for embedding in an
+// error message: RedactText + StripControl, bounded twice. The generous outer
+// cut avoids costly regex passes on multi-megabyte error pages, and keeps
+// redaction safe — a secret split by it is dropped by the final one. Returns
+// "" when the body has no printable content.
+func scrubbedBodyTrunc(body []byte) string {
+	raw := strings.TrimSpace(scrub(truncateBytes(string(body), rawErrorBodyLimit*16)))
+	return truncateBytes(raw, rawErrorBodyLimit)
+}
+
 // rawErrorDetail renders the status line and the upstream body as one message
 // line. Both halves pass through scrub (RedactText then StripControl) because
 // both are upstream-controlled: the reason phrase is not filtered by net/http,
@@ -184,15 +194,11 @@ func rawErrorDetail(res *RawResponse) string {
 		status = strings.TrimSpace(fmt.Sprintf("%d %s", res.StatusCode, http.StatusText(res.StatusCode)))
 	}
 
-	// Pre-bound before scrubbing so a multi-megabyte error page doesn't pay for
-	// several regex passes to produce a few KB of message. The generous outer
-	// limit keeps redaction safe: a secret split by the outer cut is dropped by
-	// the final one.
-	body := strings.TrimSpace(scrub(truncateBytes(string(res.Body), rawErrorBodyLimit*16)))
+	body := scrubbedBodyTrunc(res.Body)
 	if body == "" {
 		return fmt.Sprintf("aura api request failed with status %s", status)
 	}
-	return fmt.Sprintf("aura api request failed with status %s: %s", status, truncateBytes(body, rawErrorBodyLimit))
+	return fmt.Sprintf("aura api request failed with status %s: %s", status, body)
 }
 
 // truncateBytes cuts s to at most limit bytes without splitting a UTF-8 rune,

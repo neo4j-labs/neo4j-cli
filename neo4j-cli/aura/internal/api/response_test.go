@@ -5,10 +5,10 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -20,90 +20,83 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestHandleResponseError_RedactsSecretArgs verifies that every panic site in
-// handleResponseError that interpolates os.Args[1:] runs the value through
-// clievents.RedactArgs first, so secrets like --client-secret / --password /
-// --api-key / --instance-password never leak into the panic message.
-func TestHandleResponseError_RedactsSecretArgs(t *testing.T) {
+// TestHandleResponseError_RedactsBodySecrets asserts a secret echoed back by
+// the API in the response body does not survive into the error message, which
+// is persisted by the tee-on-failure path. The secret now arrives in the body
+// rather than os.Args; every status that reaches upstreamDetail must run the
+// body through scrubbedBodyTrunc (RedactText + StripControl).
+func TestHandleResponseError_RedactsBodySecrets(t *testing.T) {
 	const secret = "S3CR3T-VALUE-DO-NOT-LOG"
 
 	for _, tc := range []struct {
-		name           string
-		statusCode     int
-		body           string
-		args           []string
-		wantContains   []string // substrings that MUST appear in the recovered panic
-		wantFlagInArgs string   // flag name that must appear in the redacted args portion
+		name       string
+		statusCode int
+		body       string
 	}{
 		{
-			name:           "415 unsupported media type with --client-secret",
-			statusCode:     http.StatusUnsupportedMediaType,
-			body:           ``,
-			args:           []string{"credential", "add", "--name", "x", "--client-id", "id", "--client-secret", secret},
-			wantContains:   []string{"unexpected error", "--client-secret", "***"},
-			wantFlagInArgs: "--client-secret",
+			name:       "415 unsupported media type with secret in body",
+			statusCode: http.StatusUnsupportedMediaType,
+			body:       `{"password":"` + secret + `"}`,
 		},
 		{
-			name:           "307 permanent redirect with --instance-password",
-			statusCode:     http.StatusPermanentRedirect,
-			body:           ``,
-			args:           []string{"dataapi", "graphql", "create", "--instance-password", secret},
-			wantContains:   []string{"unexpected error", "--instance-password", "***"},
-			wantFlagInArgs: "--instance-password",
+			name:       "308 permanent redirect with secret in body",
+			statusCode: http.StatusPermanentRedirect,
+			body:       `{"password":"` + secret + `"}`,
 		},
 		{
-			name:           "400 bad request with malformed body and --api-key",
-			statusCode:     http.StatusBadRequest,
-			body:           `}}{not-json{{`,
-			args:           []string{"embed", "add", "--api-key", secret},
-			wantContains:   []string{"unexpected error", "--api-key", "***"},
-			wantFlagInArgs: "--api-key",
+			name:       "400 bad request with body containing secret",
+			statusCode: http.StatusBadRequest,
+			body:       `{"password":"` + secret + `"}`,
 		},
 		{
-			name:           "default branch (unknown 599) with --client-secret",
-			statusCode:     599,
-			body:           `irrelevant`,
-			args:           []string{"credential", "add", "--client-secret", secret},
-			wantContains:   []string{"unexpected status code", "--client-secret", "***"},
-			wantFlagInArgs: "--client-secret",
+			name:       "599 unknown status with secret in body",
+			statusCode: 599,
+			body:       `{"password":"` + secret + `"}`,
+		},
+		{
+			name:       "413 payload too large with secret in body",
+			statusCode: http.StatusRequestEntityTooLarge,
+			body:       `{"password":"` + secret + `"}`,
+		},
+		{
+			name:       "422 unprocessable entity with secret in body",
+			statusCode: http.StatusUnprocessableEntity,
+			body:       `{"password":"` + secret + `"}`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			origArgs := os.Args
-			t.Cleanup(func() { os.Args = origArgs })
-			// Mimic os.Args layout: index 0 is the binary name; index 1+ is what RedactArgs sees.
-			os.Args = append([]string{"neo4j-cli"}, tc.args...)
-
 			res := &http.Response{
 				StatusCode: tc.statusCode,
 				Body:       io.NopCloser(strings.NewReader(tc.body)),
+				Header:     http.Header{},
 			}
 
-			defer func() {
-				r := recover()
-				require.NotNil(t, r, "expected handleResponseError to panic for status %d", tc.statusCode)
-
-				var msg string
-				switch v := r.(type) {
-				case error:
-					msg = v.Error()
-				case string:
-					msg = v
-				default:
-					t.Fatalf("unexpected panic value type: %T", r)
-				}
-
-				for _, want := range tc.wantContains {
-					assert.Contains(t, msg, want, "panic message should contain %q", want)
-				}
-				assert.NotContains(t, msg, secret, "panic message must NOT contain the raw secret value")
-			}()
-
-			// nil credential / nil cfg are unused on the panic paths we exercise.
-			_ = handleResponseError(res, nil, nil)
-			t.Fatalf("expected panic for status %d, none occurred", tc.statusCode)
+			err := handleResponseError(res, nil, nil)
+			require.Error(t, err)
+			assert.NotContains(t, err.Error(), secret)
+			assert.Contains(t, err.Error(), "***")
 		})
 	}
+}
+
+// errReader implements io.Reader, always returning an error.
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
+// TestHandleResponseError_ReadAllFailure verifies that a body read failure
+// returns an upstream error (8) instead of panicking.
+func TestHandleResponseError_ReadAllFailure(t *testing.T) {
+	res := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(errReader{}),
+		Header:     http.Header{},
+	}
+	err := handleResponseError(res, nil, nil)
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 8, ce.Code, "body read failure should map to exit 8 (upstream)")
 }
 
 // TestHandleResponseError_ExitCodeMapping locks the HTTP-status to typed-error
@@ -134,9 +127,13 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 		statusCode         int
 		body               string
 		header             http.Header
+		requestPath        string // when set, attaches a Request with this URL path
 		wantCode           int
 		wantMsgContain     string // optional substring check on the rendered message
+		wantMsgOmit        string // optional substring that must NOT appear in the message
 		wantSuggestion     string // optional Suggestion field check (errors.As)
+		wantResourceType   string // optional ResourceType check
+		wantResourceID     string // optional ResourceID check
 		assertNoSuggestion bool   // when set, assert Suggestion == "" even though wantSuggestion is empty
 		usesAuthCfg        bool   // 401/403-no-server-error paths call ClearAccessToken
 	}{
@@ -199,11 +196,10 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			assertNoSuggestion: true,
 		},
 		{
-			name:           "402 with malformed body -> fatal (1) with report-issue message",
-			statusCode:     http.StatusPaymentRequired,
-			body:           `<<<not-json>>>`,
-			wantCode:       1,
-			wantMsgContain: "unexpected error [status 402]",
+			name:       "402 with malformed body -> conflict (5)",
+			statusCode: http.StatusPaymentRequired,
+			body:       `<<<not-json>>>`,
+			wantCode:   5,
 		},
 		{
 			name:           "429 too many requests -> rate_limited (7) with Retry-After",
@@ -233,18 +229,201 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			wantCode:   8,
 		},
 		{
-			name:           "404 with malformed body -> fatal (1) with report-issue message",
-			statusCode:     http.StatusNotFound,
-			body:           `<<<not-json>>>`,
-			wantCode:       1,
-			wantMsgContain: "unexpected error [status 404]",
+			name:       "404 with malformed body -> not_found (3)",
+			statusCode: http.StatusNotFound,
+			body:       `<<<not-json>>>`,
+			wantCode:   3,
 		},
 		{
-			name:           "502 with malformed body -> fatal (1) with report-issue message",
-			statusCode:     http.StatusBadGateway,
+			name:       "502 with malformed body -> upstream (8)",
+			statusCode: http.StatusBadGateway,
+			body:       `<<<not-json>>>`,
+			wantCode:   8,
+		},
+		{
+			name:       "308 permanent redirect -> upstream (8)",
+			statusCode: http.StatusPermanentRedirect,
+			body:       `{}`,
+			wantCode:   8,
+		},
+		{
+			name:       "307 temporary redirect (default arm) -> upstream (8)",
+			statusCode: http.StatusTemporaryRedirect,
+			body:       `{}`,
+			wantCode:   8,
+		},
+		{
+			name:       "413 payload too large -> validation (6)",
+			statusCode: http.StatusRequestEntityTooLarge,
+			body:       `{}`,
+			wantCode:   6,
+		},
+		{
+			name:       "422 unprocessable entity -> validation (6)",
+			statusCode: http.StatusUnprocessableEntity,
+			body:       `{}`,
+			wantCode:   6,
+		},
+		{
+			name:       "408 request timeout (unmapped 4xx) -> validation (6)",
+			statusCode: http.StatusRequestTimeout,
+			body:       `{}`,
+			wantCode:   6,
+		},
+		// ---------- Group A: additional status and malformed-body entries ----------
+		{
+			name:       "400 bad request with malformed body -> validation (6)",
+			statusCode: http.StatusBadRequest,
+			body:       `<<<not-json>>>`,
+			wantCode:   6,
+		},
+		{
+			name:           "403 forbidden with malformed body -> auth (4) with authSuggestion",
+			statusCode:     http.StatusForbidden,
 			body:           `<<<not-json>>>`,
-			wantCode:       1,
-			wantMsgContain: "unexpected error [status 502]",
+			wantCode:       4,
+			wantSuggestion: authSuggestion,
+		},
+		{
+			name:       "413 payload too large with parseable errors[] -> validation (6)",
+			statusCode: http.StatusRequestEntityTooLarge,
+			body:       `{"errors":[{"message":"payload too large"}]}`,
+			wantCode:   6,
+		},
+		{
+			name:       "415 unsupported media type with schema-less body -> validation (6)",
+			statusCode: http.StatusUnsupportedMediaType,
+			body:       `{}`,
+			wantCode:   6,
+		},
+		{
+			name:           "422 unprocessable entity with parseable errors[] -> validation (6) surfacing message",
+			statusCode:     http.StatusUnprocessableEntity,
+			body:           `{"errors":[{"message":"database limit reached for this instance"}]}`,
+			wantCode:       6,
+			wantMsgContain: "database limit reached for this instance",
+		},
+		{
+			name:       "422 unprocessable entity with schema-less plain-text body -> validation (6)",
+			statusCode: http.StatusUnprocessableEntity,
+			body:       `plain text error body`,
+			wantCode:   6,
+		},
+		{
+			name:       "405 method not allowed with malformed body -> upstream (8)",
+			statusCode: http.StatusMethodNotAllowed,
+			body:       `<<<not-json>>>`,
+			wantCode:   8,
+		},
+		{
+			name:       "409 conflict with malformed body -> conflict (5)",
+			statusCode: http.StatusConflict,
+			body:       `<<<not-json>>>`,
+			wantCode:   5,
+		},
+		{
+			name:       "599 unknown status -> upstream (8)",
+			statusCode: 599,
+			body:       `{}`,
+			wantCode:   8,
+		},
+		{
+			name:       "451 unavailable for legal reasons (unmapped 4xx) -> validation (6)",
+			statusCode: 451,
+			body:       `{}`,
+			wantCode:   6,
+		},
+		// ---------- Group B: empty-errors bodies proving REQ-F-004 ----------
+		// Both '{}' and '{"errors":[]}' parse as valid JSON leaving an empty
+		// Errors slice, so errorMessages returns nil and the message falls back
+		// to upstreamDetail rather than rendering the empty "[\n\t\n]".
+		{
+			name:           "400 empty json body -> validation (6) with raw body fallback",
+			statusCode:     http.StatusBadRequest,
+			body:           `{}`,
+			wantCode:       6,
+			wantMsgContain: "upstream error [status 400]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "400 empty errors[] body -> validation (6) with raw body fallback",
+			statusCode:     http.StatusBadRequest,
+			body:           `{"errors":[]}`,
+			wantCode:       6,
+			wantMsgContain: "upstream error [status 400]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "402 empty json body -> conflict (5) with raw body fallback",
+			statusCode:     http.StatusPaymentRequired,
+			body:           `{}`,
+			wantCode:       5,
+			wantMsgContain: "upstream error [status 402]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "402 empty errors[] body -> conflict (5) with raw body fallback",
+			statusCode:     http.StatusPaymentRequired,
+			body:           `{"errors":[]}`,
+			wantCode:       5,
+			wantMsgContain: "upstream error [status 402]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:             "404 empty json body -> not_found (3) with resource tags and raw body",
+			statusCode:       http.StatusNotFound,
+			body:             `{}`,
+			requestPath:      "/v1/instances/inst-1",
+			wantCode:         3,
+			wantMsgContain:   "upstream error [status 404]",
+			wantMsgOmit:      "[\n\t\n]",
+			wantResourceType: "instance",
+			wantResourceID:   "inst-1",
+			wantSuggestion:   "Run 'neo4j-cli aura instance list' to see available instances.",
+		},
+		{
+			name:             "404 empty errors[] body -> not_found (3) with resource tags and raw body",
+			statusCode:       http.StatusNotFound,
+			body:             `{"errors":[]}`,
+			requestPath:      "/v1/instances/inst-1",
+			wantCode:         3,
+			wantMsgContain:   "upstream error [status 404]",
+			wantMsgOmit:      "[\n\t\n]",
+			wantResourceType: "instance",
+			wantResourceID:   "inst-1",
+			wantSuggestion:   "Run 'neo4j-cli aura instance list' to see available instances.",
+		},
+		{
+			name:           "409 empty json body -> conflict (5) with raw body fallback",
+			statusCode:     http.StatusConflict,
+			body:           `{}`,
+			wantCode:       5,
+			wantMsgContain: "upstream error [status 409]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "409 empty errors[] body -> conflict (5) with raw body fallback",
+			statusCode:     http.StatusConflict,
+			body:           `{"errors":[]}`,
+			wantCode:       5,
+			wantMsgContain: "upstream error [status 409]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "500 empty json body -> upstream (8) with raw body fallback",
+			statusCode:     http.StatusInternalServerError,
+			body:           `{}`,
+			wantCode:       8,
+			wantMsgContain: "upstream error [status 500]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "500 empty errors[] body -> upstream (8) with raw body fallback",
+			statusCode:     http.StatusInternalServerError,
+			body:           `{"errors":[]}`,
+			wantCode:       8,
+			wantMsgContain: "upstream error [status 500]",
+			wantMsgOmit:    "[\n\t\n]",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -255,6 +434,9 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			}
 			if res.Header == nil {
 				res.Header = http.Header{}
+			}
+			if tc.requestPath != "" {
+				res.Request = &http.Request{URL: &url.URL{Path: tc.requestPath}}
 			}
 
 			var cfg *clicfg.Config
@@ -280,6 +462,18 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 
 			if tc.assertNoSuggestion {
 				assert.Equal(t, "", ce.Suggestion, "Suggestion should be empty for status %d", tc.statusCode)
+			}
+
+			if tc.wantMsgOmit != "" {
+				assert.NotContains(t, ce.Error(), tc.wantMsgOmit)
+			}
+
+			if tc.wantResourceType != "" {
+				assert.Equal(t, tc.wantResourceType, ce.ResourceType, "ResourceType mismatch for status %d", tc.statusCode)
+			}
+
+			if tc.wantResourceID != "" {
+				assert.Equal(t, tc.wantResourceID, ce.ResourceID, "ResourceID mismatch for status %d", tc.statusCode)
 			}
 
 			// 429 also asserts the Retry-After landed on the struct field.
@@ -486,5 +680,80 @@ func TestSuggestionForPaymentRequired(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, suggestionForPaymentRequired(tc.resp))
 		})
+	}
+}
+
+// TestHandleResponseError_NoPanic asserts the panic-freedom and closed-enum
+// invariants across a broad status x body-shape matrix. It does NOT lock
+// specific status-to-code mappings — that is
+// TestHandleResponseError_ExitCodeMapping's job. Do not extend this test into
+// a per-status mapping table; add cases there instead.
+func TestHandleResponseError_NoPanic(t *testing.T) {
+	authFs, err := testfs.GetTestFs("{}", `{"aura":{"default-credential":"x","credentials":[{"name":"x","client-id":"id","client-secret":"secret"}]}}`)
+	require.NoError(t, err)
+	authCfg := clicfg.NewConfig(authFs, "test", clicfg.AuraScope)
+	authCred, err := authCfg.Credentials.Aura.GetDefault()
+	require.NoError(t, err)
+
+	statuses := []int{
+		http.StatusPermanentRedirect,     // 308
+		http.StatusBadRequest,            // 400
+		http.StatusUnauthorized,          // 401
+		http.StatusPaymentRequired,       // 402
+		http.StatusForbidden,             // 403
+		http.StatusNotFound,              // 404
+		http.StatusMethodNotAllowed,      // 405
+		http.StatusConflict,              // 409
+		http.StatusRequestEntityTooLarge, // 413
+		http.StatusUnsupportedMediaType,  // 415
+		http.StatusUnprocessableEntity,   // 422
+		http.StatusTooManyRequests,       // 429
+		http.StatusInternalServerError,   // 500
+		http.StatusBadGateway,            // 502
+		http.StatusServiceUnavailable,    // 503
+		http.StatusGatewayTimeout,        // 504
+		// Unmapped samples from outside the handled set
+		302, 408, 418, 451, 507, 599,
+	}
+
+	bodyShapes := []struct {
+		name string
+		data string
+	}{
+		{name: "empty body", data: ""},
+		{name: "plain text", data: "plain text error body"},
+		{name: "html page", data: "<html><body>Internal Server Error</body></html>"},
+		{name: "valid errors envelope", data: `{"errors":[{"message":"upstream error"}]}`},
+	}
+
+	for _, status := range statuses {
+		for _, shape := range bodyShapes {
+			name := fmt.Sprintf("status_%d_%s", status, shape.name)
+			t.Run(name, func(t *testing.T) {
+				res := &http.Response{
+					StatusCode: status,
+					Body:       io.NopCloser(strings.NewReader(shape.data)),
+					Header:     http.Header{},
+				}
+
+				var cfg *clicfg.Config
+				var cred *credentials.AuraCredential
+				if status == http.StatusUnauthorized || status == http.StatusForbidden {
+					cfg = authCfg
+					cred = authCred
+				}
+
+				var err error
+				assert.NotPanics(t, func() {
+					err = handleResponseError(res, cred, cfg)
+				}, "handleResponseError panicked for status %d with %s", status, shape.name)
+
+				require.Error(t, err, "handleResponseError returned nil error for status %d with %s", status, shape.name)
+				var ce *clierr.CLIError
+				require.True(t, errors.As(err, &ce), "errors.As should extract *CLIError; got %T: %v", err, err)
+				_, ok := clierr.Codes[ce.Code]
+				assert.True(t, ok, "CLIError.Code %d not in clierr.Codes for status %d with %s", ce.Code, status, shape.name)
+			})
+		}
 	}
 }

@@ -1,0 +1,41 @@
+## TASK-001 — 2026-08-13T10:49:32Z
+Extracted body-rendering half of rawErrorDetail into package-private scrubbedBodyTrunc helper. Pure refactor; rawErrorDetail output unchanged. All raw_status_test.go regression tests pass unedited.
+Files: ~neo4j-cli/aura/internal/api/raw.go
+Decisions: Omitted PRD sketch's second strings.TrimSpace around inner truncateBytes to preserve byte-identical output.
+
+## TASK-002 — 2026-08-13T11:00:34Z
+Rewrite of handleResponseError to be panic-free with class-based status fallback. Added upstreamDetail and errorMessages helpers. Deleted reportIssueFatal and extractEmbeddedErrors. Updated redaction test from panic-based (os.Args manipulation) to body-based (secret in response body). Retargeted 3 exit-code entries (402/404/502 malformed from exit 1 to typed codes). Added 307/413/422/408 to exit code mapping table. Added ReadAll failure test. All gates pass.
+Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go, ~neo4j-cli/aura/internal/api/api.go
+
+## TASK-003 — 2026-08-13T11:12:00Z
+Extended the exit-code mapping table with 20 new entries. Group A adds previously-panicking/unmodelled statuses (400/403/405/409 malformed, 413/415/422 parseable+schema-less, 599, 451) with typed exit codes. Group B adds empty-errors bodies `{}`/`{"errors":[]}` for 400/402/404/409/500 proving REQ-F-004 fallback. Added 4 new struct fields (requestPath, wantMsgOmit, wantResourceType, wantResourceID) and their assertion wiring. All gates pass (test, lint, fmt-check).
+Files: ~neo4j-cli/aura/internal/api/response_test.go, ~.plans/tasks-cli-227-aura-status-code-panics.yml
+
+## TASK-005 — 2026-08-13T11:20:15Z
+Added 4 e2e scenarios (422/415/413 → 6, 307 → 8) to exitcodes_test.go with wantStderrOmits assertions, proving previously-panicking statuses now exit non-zero without bug-report message. Verified empirically: Go's http.Client surfaces a Location-less 307 to the caller.
+Files: ~test/e2e/exitcodes/exitcodes_test.go
+Decisions: 307 confirmed surface-able via http.Client without Location header; Go's response handling returns the status unchanged, matching the PRD assumption.
+
+## TASK-004 — 2026-08-13T11:25:00Z
+Added TestHandleResponseError_NoPanic invariant matrix: 22 statuses x 4 body shapes = 88 subtests asserting no panic, non-nil error, Code in clierr.Codes. Auth fixture for 401/403 paths. Negative control confirmed: intentional panic triggers NotPanics failure. Reviewer flagged 307->308 comment typo (fixed).
+Files: ~neo4j-cli/aura/internal/api/response_test.go, ~.plans/tasks-cli-227-aura-status-code-panics.yml
+
+## TASK-006 — 2026-08-13T11:45:00Z
+Created changie entry. Fixed 307/308 naming (permanent vs temporary). Corrected TASK-003 progress-log misattribution. Ran all gates: make test PASS, make fmt-check PASS, make lint PASS, e2e exitcodes PASS, TestErrorCodesInSyncWithClierr PASS. Phase 2 hone-reviewer: LGTM.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260813-113500.yaml, ~neo4j-cli/aura/internal/api/response_test.go, ~test/e2e/exitcodes/exitcodes_test.go
+
+## REVIEW — 2026-08-13T12:19:20Z
+Added 1 review task (task-007).
+
+## TASK-007 — 2026-08-13T12:52:09Z
+Shipped the cross-path contract test only; the shared status->code table was attempted twice and abandoned (both attempts recorded in the task YAML, revert 1b3319ae). Duplication remains but is now guarded.
+Files: +neo4j-cli/aura/internal/api/exitcode_contract_test.go
+Decisions: Per-arm variance (withField, decorations, 403 ServerError first-try, 401/429 signatures) means factoring out only the code/constructor leaves every arm needing its own body — same reasoning the audit used to reject table-driving the switch.
+
+## REVIEW — 2026-08-13T13:53:17Z
+Added 1 review task (task-008).
+
+## TASK-008 — 2026-08-13T13:59:06Z
+Added CI step to build job in test.yml running e2e_exitcodes suite on all 3 OSes (no guard), with comment block. Added one-line note to AGENTS.md Testing Framework section.
+Files: ~.github/workflows/test.yml, ~AGENTS.md
+Decisions: No OS guard (suite handles darwin/linux/windows via GOOS switch). No Makefile target (mirrors existing tagged suites pattern).

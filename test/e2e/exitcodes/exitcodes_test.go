@@ -13,10 +13,15 @@
 //	3 not_found        (HTTP 404)
 //	4 auth_error       (HTTP 401)
 //	5 conflict         (HTTP 409, and HTTP 402 quota-exceeded)
-//	6 validation_error (HTTP 400)
+//	6 validation_error (HTTP 400, 413, 415, 422)
 //	7 rate_limited     (HTTP 429 with Retry-After: 30 → exit 7 AND message
 //	                    body contains "30")
-//	8 upstream_error   (HTTP 503)
+//	8 upstream_error   (HTTP 503, 307, and other unmodelled/unexpected statuses)
+//
+// Previously-unhandled HTTP statuses (413, 415, 422, 307, …) now produce a
+// non-zero exit code via the production handleResponseError, carrying the
+// upstream body rather than panicking into main.go's "please report an issue"
+// message. See CLI-227.
 //
 // Plus two zero-exit paths: happy GET → 0; bare `neo4j-cli` with no
 // subcommand prints help → 0.
@@ -285,7 +290,11 @@ type scenario struct {
 	// optional substring assertion on stderr (covers REQ-F-004 7→message
 	// body contains the Retry-After value).
 	wantStderrContains string
-	skipServer         bool // for --bad-flag / no-arg help / --version
+	// optional substring that must be ABSENT from combined output. Guards
+	// against main.go's recoverPanic path emitting "please report an issue"
+	// for statuses that previously reached the panic-default arm.
+	wantStderrOmits string
+	skipServer      bool // for --bad-flag / no-arg help / --version
 	// JSON envelope assertions: when wantJSONCode is non-empty the test
 	// parses the JSON envelope out of stdout and asserts these fields.
 	wantJSONCode         string
@@ -387,6 +396,46 @@ func TestExitCodes(t *testing.T) {
 			wantExit:           5,
 			wantStderrContains: "quota",
 		},
+		// 422, 415, 413 and 307 exited 0 before CLI-227 (main.go's recoverPanic
+		// caught the panic in handleResponseError but did not set a non-zero
+		// exit code). Each now produces the expected exit code and does NOT
+		// surface the "please report an issue" message.
+		{
+			name:            "unprocessable_422_exit_6",
+			args:            append([]string{"aura", "instance", "list"}, scopeFlags...),
+			status:          422,
+			body:            "schema-less body",
+			wantExit:        6,
+			wantStderrOmits: "please report an issue",
+		},
+		{
+			name:            "unsupported_media_415_exit_6",
+			args:            append([]string{"aura", "instance", "list"}, scopeFlags...),
+			status:          415,
+			body:            "",
+			wantExit:        6,
+			wantStderrOmits: "please report an issue",
+		},
+		{
+			name:            "payload_too_large_413_exit_6",
+			args:            append([]string{"aura", "instance", "list"}, scopeFlags...),
+			status:          413,
+			body:            "",
+			wantExit:        6,
+			wantStderrOmits: "please report an issue",
+		},
+		// 307 without a Location header: Go's http.Client cannot follow the
+		// redirect so the raw 307 reaches handleResponseError, which returns it as
+		// upstream_error (exit 8). If the client behaviour changes, this scenario
+		// will fail — see the 307 discussion in PRD CLI-227's REQ-F-010.
+		{
+			name:            "temporary_redirect_307_exit_8",
+			args:            append([]string{"aura", "instance", "list"}, scopeFlags...),
+			status:          307,
+			body:            "",
+			wantExit:        8,
+			wantStderrOmits: "please report an issue",
+		},
 		{
 			name:       "no_subcommand_help_exit_0",
 			args:       []string{},
@@ -447,6 +496,13 @@ func TestExitCodes(t *testing.T) {
 				if !strings.Contains(combined, tc.wantStderrContains) {
 					t.Fatalf("%s: combined output does not contain %q\nstdout:\n%s\nstderr:\n%s",
 						tc.name, tc.wantStderrContains, stdout, stderr)
+				}
+			}
+			if tc.wantStderrOmits != "" {
+				combined := stdout + stderr
+				if strings.Contains(combined, tc.wantStderrOmits) {
+					t.Fatalf("%s: combined output should NOT contain %q\nstdout:\n%s\nstderr:\n%s",
+						tc.name, tc.wantStderrOmits, stdout, stderr)
 				}
 			}
 			if tc.wantJSONCode != "" {

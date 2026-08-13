@@ -1,0 +1,377 @@
+feature: cli-227-aura-status-code-panics
+prd: ./prd-cli-227-aura-status-code-panics.md
+created_at: 2026-08-13T10:39:19Z
+updated_at: 2026-08-13T10:39:19Z
+
+tasks:
+  - id: task-001
+    title: 'Extract scrubbedBodyTrunc helper in raw.go'
+    description: |
+      In `neo4j-cli/aura/internal/api/raw.go`, split the body-rendering half out of
+      `rawErrorDetail` (lines 181-196) into a package-private `scrubbedBodyTrunc(body []byte) string`
+      so `response.go` can reuse it verbatim in later tasks. It applies `scrub` (RedactText +
+      StripControl) between two `truncateBytes` bounds — outer `rawErrorBodyLimit*16`, inner
+      `rawErrorBodyLimit` — and returns "" when the body has no printable content.
+
+      Pure refactor, no behaviour change. `rawErrorDetail` must keep producing byte-identical
+      output; the existing `raw_status_test.go` assertions (10KB and 500KB truncation, multibyte
+      UTF-8 boundary, C0 control stripping, body redaction) are the regression guard and must pass
+      untouched. Do not modify `truncateBytes` (line 200) or the `rawErrorBodyLimit` const
+      (line 117). Carry the doc comment from the PRD, including the note that the generous outer
+      cut keeps redaction safe because a secret split by it is dropped by the final cut.
+      (REQ-F-001)
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - '`scrubbedBodyTrunc` exists in `raw.go` and is called by `rawErrorDetail`'
+      - '`truncateBytes` and `rawErrorBodyLimit` are unchanged'
+      - '`go test ./neo4j-cli/aura/internal/api/... -run RawStatus` passes with zero edits to `raw_status_test.go`'
+      - 'The new function carries a doc comment explaining the double bound and its redaction rationale'
+    completed_at: '2026-08-13T10:49:32Z'
+
+  - id: task-002
+    title: 'Make handleResponseError panic-free with class-based status fallback'
+    description: |
+      The core change. In `neo4j-cli/aura/internal/api/response.go`, rewrite `handleResponseError`
+      (line 79) so every status returns a typed `*clierr.CLIError` and no arm panics.
+
+      Add two helpers: `upstreamDetail(statusCode int, resBody []byte) string`, which renders
+      `upstream error [status N]: <body>` via `scrubbedBodyTrunc` (or `... with no response body`
+      when empty); and `errorMessages(resBody []byte, withField bool) []string`, which returns nil
+      when the body either failed to parse OR parsed to an empty `errors[]` — any valid JSON object
+      unmarshals into `ErrorResponse`, and rendering that as the empty bracketed `[\n\t\n]` tells
+      the user nothing. `withField` selects the 400 branch shape (`<field>: <message>` prefix).
+
+      Apply the PRD REQ-F-003 status table. Branches that yield at least one message keep their
+      current output byte-for-byte, including `formatBracketedMessages`, the 400 field prefix and
+      help suggestion, `WithResource` + `suggestionForResource` on 404, `suggestionForPaymentRequired`
+      on 402, `authSuggestion` on 401/403, and the 429 Retry-After message plus `RetryAfter` field.
+      Only the fallback arms and the missing statuses change: 400 -> 6, 403 -> 4 (with
+      `authSuggestion`), 402/409 -> 5, 404 -> 3 (still tagged with resource type/id from the request
+      URL), 405 and 5xx -> 8, 413/415/422 -> 6, 307 and other 3xx -> 8, unmodelled 4xx -> 6,
+      everything else -> 8. The `io.ReadAll` failure at line 83 returns an upstream error (8)
+      instead of panicking.
+
+      Give 413/415/422 a named `case` even though it equals the unmodelled-4xx fallback, purely so a
+      doc comment can name the spec operations that return them, and record the spec-audit result
+      there (GDSError and InvokeAgentError are 2xx-only; BillingErrorResponse covers two endpoints
+      the CLI has no commands for) so it is not re-litigated. The `default:` arm splits on class and
+      should mirror the comment at `raw.go:167-174` about unmodelled transient 4xx (408, 425) being
+      reported as permanent because class is the only available signal.
+
+      Delete `reportIssueFatal` (lines 70-77) — it has callers only inside this function. Keep the
+      `os` and `clievents` imports; `formatAuthorizationError` still uses both. Leave
+      `formatAuthorizationError` alone: it always appends a clear-token message so its slice is
+      never empty, and it already avoids panicking. Leave `extractEmbeddedErrors` (line 41) alone
+      too — on the 2xx path an empty `errors[]` means the happy path, the opposite of what it means
+      here.
+
+      IMPORTANT: this task must also update the two existing tests that pin the old panic behaviour,
+      or the tree goes red between commits. Rewrite `TestHandleResponseError_RedactsSecretArgs`
+      (`response_test.go:27-107`) as `TestHandleResponseError_RedactsBodySecrets`: drop the
+      `os.Args` save/restore and the `defer recover()` machinery, put the secret in the response
+      BODY instead, keep the 415/307/400-malformed/599 statuses plus 413 and 422, and assert the
+      returned error message contains `***` and not the raw secret. Model it on
+      `TestRawStatusError_BodyRedacted` (`raw_status_test.go:189`). Then retarget three
+      `TestHandleResponseError_ExitCodeMapping` entries and drop their now-wrong
+      `wantMsgContain: "unexpected error [status N]"`: 402-malformed 1 -> 5, 404-malformed 1 -> 3,
+      502-malformed 1 -> 8. (REQ-F-002, REQ-F-003, REQ-F-004, REQ-F-005, REQ-F-006, REQ-F-007,
+      REQ-NF-001, REQ-NF-002)
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - '`grep -n panic neo4j-cli/aura/internal/api/response.go` returns exactly two hits, both in `ParseBody` / `ParseRawBody`'
+      - '`reportIssueFatal` no longer exists; the `os` and `clievents` imports are retained'
+      - 'No `resBody` or `string(resBody)` reaches a format string without passing through `scrubbedBodyTrunc`'
+      - 'No test asserts a panic from `handleResponseError`; `TestHandleResponseError_RedactsBodySecrets` passes'
+      - '`TestHandleResponseError_NotFound_TagsResource`, `TestParseResourceFromRequest`, `TestSuggestionForResource` and `TestSuggestionForPaymentRequired` pass with zero edits'
+      - '`make test` passes — the tree is green at this commit, not just at the end of the feature'
+    completed_at: '2026-08-13T11:00:34Z'
+
+  - id: task-003
+    title: 'Extend the exit-code mapping table with new statuses and empty-errors bodies'
+    description: |
+      Additive test work on `TestHandleResponseError_ExitCodeMapping` (`response_test.go:113`),
+      building on the three entries task-002 retargeted.
+
+      Add the previously-panicking and previously-unmodelled statuses: 400 malformed -> 6;
+      403 malformed -> 4 asserting `wantSuggestion` equals `authSuggestion`; 307 -> 8;
+      413 with an empty schema-less body -> 6; 413 with a parseable `errors[]` -> 6; 415
+      schema-less -> 6; 422 with a parseable `errors[]` -> 6 asserting the upstream message text is
+      actually surfaced; 422 with a schema-less plain-text body -> 6; 405 malformed -> 8; 409
+      malformed -> 5; unmodelled 599 -> 8; unmodelled 451 -> 6. The 413/415/422 schema-less cases
+      are load-bearing — that is the shape the spec actually documents.
+
+      Then add the empty-`errors[]` cases proving REQ-F-004: for each of 400, 402, 404, 409 and a
+      5xx, one entry with body `{}` and one with `{"errors":[]}`, asserting the status-class exit
+      code and that the message carries the raw body rather than an empty bracket pair. The 404
+      variants must still assert `ResourceType`, `ResourceID` and `Suggestion` are populated, since
+      those come from the request URL and survive an uninformative body. If the table grows
+      unwieldy, splitting the status matrix into a concern-named `response_status_test.go` is
+      acceptable and precedented per AGENTS.md. (REQ-F-004, REQ-F-008)
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - 'The table covers 307, 413, 415, 422, unmodelled 4xx (451), unmodelled 5xx (599), and a malformed-body variant for each of 400/402/403/404/405/409/5xx'
+      - 'Empty-errors bodies (`{}` and `{"errors":[]}`) on 400/402/404/409/5xx return the status-class exit code'
+      - 'No empty-errors case renders the empty bracketed message; each carries the raw body instead'
+      - 'The 404 empty-errors cases still assert ResourceType, ResourceID and Suggestion'
+      - 'The 422 parseable case asserts the upstream message text reaches the error, not just the exit code'
+    completed_at: '2026-08-13T11:12:00Z'
+
+  - id: task-004
+    title: 'Add TestHandleResponseError_NoPanic invariant matrix'
+    description: |
+      Add `TestHandleResponseError_NoPanic` to the internal `package api` test file. Cross every
+      status from the REQ-F-003 table plus unmapped samples (302, 408, 418, 451, 507, 599) with a
+      handful of body shapes — empty string, plain text, an HTML error page, and a valid
+      `{"errors":[...]}` envelope — and for each combination assert three things: no panic, a
+      non-nil error, and that `errors.As` extracts a `*clierr.CLIError` whose `Code` is a key in
+      `clierr.Codes`.
+
+      This is the invariant CLI-227 is actually about, expressed independently of any specific
+      status mapping, so it fails loudly if someone reintroduces a `panic` arm or invents an
+      out-of-enum code. Keep it in the internal test package — it calls the unexported
+      `handleResponseError`, unlike the external `package api_test` in `api_test.go`. Pass nil
+      credential and nil cfg; the 401/403 fixture is only needed for paths that reach
+      `ClearAccessToken`, so exclude 401 or supply the `newAuthFixture` helper for it. (REQ-F-009)
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - '`TestHandleResponseError_NoPanic` exists and passes across the full status x body-shape matrix'
+      - 'It asserts no panic, a non-nil error, and a `Code` present in `clierr.Codes` for every combination'
+      - 'It covers unmapped statuses (302, 408, 418, 451, 507, 599) in addition to the modelled ones'
+      - 'It lives in the internal `package api` test file, not the external `api_test` package'
+    completed_at: '2026-08-13T11:25:00Z'
+
+  - id: task-005
+    title: 'Add process-level e2e exit-code scenarios for 422/415/413/307'
+    description: |
+      The exit-0 symptom lives in `main.go`s recover, so no unit test can observe it. Extend
+      `test/e2e/exitcodes/exitcodes_test.go` (build tag `e2e_exitcodes`) with four scenarios that
+      drive the built binary against the existing fixture server: `unprocessable_422_exit_6`
+      (status 422, schema-less body), `unsupported_media_415_exit_6` (empty body),
+      `payload_too_large_413_exit_6` (empty body), and `permanent_redirect_307_exit_8` (empty body).
+
+      Reuse the existing `fixtureServer`, `runCLI` and `scopeFlags` helpers and add the entries to
+      the `scenarios` slice around line 313 — do not build a parallel harness. Each scenario must
+      also assert the phrase `please report an issue` is ABSENT from stderr; the `scenario` struct
+      (line 278) has `wantStderrContains` but no negative form, so add a `wantStderrOmits` field and
+      wire it into the assertion block. Update the package doc comment (lines 6-30), which currently
+      enumerates the exit codes by their original triggers only.
+
+      Note on 307: `fixtureServer` writes no `Location` header, so Go's `http.Client` is expected to
+      surface the 307 to the caller rather than following it. Verify that empirically while
+      implementing. If the client behaves otherwise, assert on the observed status instead of
+      forcing 307 through, and record what you found in a comment — the unit-level 307 case from
+      task-003 is unaffected either way because it builds an `*http.Response` directly.
+
+      This suite is not wired into CI or the Makefile, so it will not run under `make test`. Run it
+      explicitly with `go test -tags=e2e_exitcodes ./test/e2e/exitcodes/...` and report the result;
+      wiring it into CI is out of scope. (REQ-F-010)
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - '`go test -tags=e2e_exitcodes ./test/e2e/exitcodes/...` passes with 422, 415 and 413 exiting 6'
+      - 'The 307 scenario passes, or documents in a comment why the observed status differs and asserts that instead'
+      - 'Every new scenario asserts `please report an issue` is absent from stderr via a `wantStderrOmits` field'
+      - 'The new scenarios reuse `fixtureServer` / `runCLI` / `scopeFlags` — no parallel harness'
+      - 'The package doc comment reflects the added status coverage'
+    completed_at: 2026-08-13T11:20:15Z
+
+  - id: task-006
+    title: 'Add changie entry and run the final gates'
+    description: |
+      Add a user-facing changelog entry, then run the full gate set.
+
+      Non-interactive: `changie new --projects neo4j-cli --kind Patch --body '<body>'`. The body must
+      describe ONLY the observable effect — no mention of `handleResponseError`, panics, or helper
+      extraction. Something to the effect of: Aura commands now report the API own error message and
+      a non-zero exit code for HTTP 307, 413, 415, 422 and other previously unhandled statuses,
+      instead of a "please report an issue" message with a success exit code; and a 4xx or 5xx whose
+      body is empty or not JSON now keeps its status-class exit code rather than reporting a generic
+      internal failure. Verify both claims against the golden strings in `response_test.go` and the
+      e2e suite before writing them — do not assert an effect you have not seen. If changie is
+      unavailable, hand-author `.changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` with
+      `project` / `kind` / `body` / `time` keys, single-quoted body, RFC3339 time.
+
+      Then confirm no incidental regressions: `make test`, `make fmt-check`, `make lint` must all
+      pass. No skill-bundle regeneration is expected (no cobra Short/Long/Example, flag surface, or
+      ValidFormatValues change) and `clierr.Codes` is untouched so `agent-context` needs no edit —
+      if either gate disagrees, stop and report rather than regenerating blindly. Also re-verify
+      REQ-F-006 holds at the final commit: `grep -n panic neo4j-cli/aura/internal/api/response.go`
+      returns only the two `ParseBody` / `ParseRawBody` hits. (REQ-F-011, REQ-NF-003, REQ-NF-004,
+      REQ-NF-005)
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - 'A changie entry exists under `.changes/unreleased/` naming only the observable effect'
+      - 'Both claims in the entry are verified against actual test golden strings, not inferred'
+      - '`make test`, `make fmt-check` and `make lint` all pass'
+      - '`make generate-check` reports no drift, and `TestErrorCodesInSyncWithClierr` passes unedited'
+      - '`grep -n panic neo4j-cli/aura/internal/api/response.go` returns exactly the two out-of-scope hits'
+    completed_at: '2026-08-13T11:45:00Z'
+
+  - id: task-007
+    title: 'Single-source the status→exit-code contract shared by both error paths'
+    description: |
+      From the end-of-feature audit, its one "worth doing before the branch lands" finding.
+
+      Two near-parallel status→exit-code mappings now exist: `handleResponseError`
+      (`neo4j-cli/aura/internal/api/response.go`, the structured path behind ~55 shipped commands)
+      and `RawStatusError` (`neo4j-cli/aura/internal/api/raw.go`, the schema-less path behind the
+      `aura api` passthrough). They deliberately diverge on message rendering — RawStatusError always
+      emits `aura api request failed with status ...` while handleResponseError keeps the structured
+      `ErrorResponse` parse — but they MUST agree on exit codes, because the same upstream status
+      reaching a user by two different command paths must not produce two different exit codes.
+
+      I verified empirically that all 22 statuses agree today (302, 307, 308, 400, 402, 403, 404, 405,
+      408, 409, 413, 415, 418, 422, 429, 451, 500, 502, 503, 504, 507, 599 — identical codes on both
+      paths). So nothing is broken. The problem is structural: the mapping is written out twice, in two
+      files, with separate callers and no shared reference. A future change to one that forgets the
+      other diverges silently, and no test would catch it.
+
+      The audit offered a cross-checking test or a shared table; the shared table was chosen, because
+      it removes the duplication at its source rather than merely detecting it later.
+
+      Extract a single package-private function — suggested `exitCodeForStatus(status int) int` — that
+      is the one place the status→clierr-code contract is written. Have both call sites consult it to
+      pick their exit code, then keep constructing their own messages exactly as they do now.
+
+      Constraints that MUST hold, in rough order of risk:
+
+      1. Zero behaviour change on either path. Every one of the 22 statuses above must still produce
+         the same exit code, the same message text, and the same decorations (`WithResource`,
+         `WithSuggestion`, `RetryAfter`) as it does at HEAD. The full existing suite is the guard —
+         `TestHandleResponseError_ExitCodeMapping` (~36 entries), `TestHandleResponseError_NoPanic`
+         (88 subtests), `TestRawStatusError_StatusMatrix` (23 entries) — and it must pass with ZERO
+         test edits. If you find yourself editing an existing assertion, stop: you have changed
+         behaviour, not structure.
+      2. Preserve the deliberate 405 divergence. 405 is a 4xx that maps to upstream_error (8), NOT
+         the 4xx-class validation_error (6). It is documented at `raw.go:154-157` with a cross-
+         reference. Carry that comment (or an equivalent) onto the shared function so the next reader
+         does not "fix" it.
+      3. Preserve the class-based fallback split: unmodelled 4xx → 6, everything else (3xx, 5xx,
+         unknown) → 8, with the existing note that unmodelled transient 4xx (408, 425) are reported as
+         permanent because status class is the only available signal.
+      4. Do NOT unify message rendering, and do NOT touch `formatAuthorizationError`, `errorMessages`,
+         `upstreamDetail`, `rawErrorDetail`, or `scrubbedBodyTrunc`. The divergence in message text is
+         intentional and out of scope.
+      5. 401 keeps routing through `formatAuthorizationError` (which has a `ClearAccessToken` side
+         effect) and 429 keeps reading the `Retry-After` header — neither is a plain code lookup, so
+         decide deliberately whether they consult the shared function at all, and say which you chose
+         and why. A shared table that only covers the plain cases is acceptable if the exceptions are
+         explicit; a table that pretends to cover everything and then gets bypassed is not.
+
+      Add a test that locks the contract itself: assert that for a broad status list both
+      `handleResponseError` and `RawStatusError` yield the same `*clierr.CLIError.Code`. Even with the
+      shared table this is worth having — it pins the property a future refactor could break by
+      reintroducing a local mapping in one path.
+
+      OUTCOME — the shared-table half was attempted TWICE and abandoned; only the contract test
+      shipped. Both attempts are recorded here so a third is not started from scratch.
+
+      Attempt 1 (`func(int) int` returning an exit code) did not de-duplicate: it was wired into only
+      the two `default:` fallback arms, leaving all 11 explicit arms in `handleResponseError` and all 6
+      in `RawStatusError` with their own hardcoded constructors. It also replaced the readable
+      `status >= 400 && status < 500` predicate with `if code := exitCodeForStatus(s); code == 6`
+      (comparing an exit code against a literal to re-derive "is 4xx"), and silently deleted
+      `RawStatusError`'s explicit 405 case along with its load-bearing divergence comment.
+
+      Attempt 2 (`func(int) (int, func(string, ...any) *clierr.CLIError)` returning the constructor)
+      was worse. `case http.Status` count in response.go went UP, 11 to 18. Nine of its ten call sites
+      discarded the exit code as `_,`, so the first return value was dead. In `RawStatusError` five
+      separate case arms plus both branches of the trailing if/else all reduced to the identical
+      statement `return newErr("%s", detail)` — a tautological conditional and four redundant arms the
+      compiler cannot flag. Reverted in 1b3319ae.
+
+      Root cause, for anyone reconsidering this: the status→code mapping is NOT the only thing that
+      varies per arm. `withField` (400 only), the decorations (400's static suggestion, 404's
+      WithResource + dynamic suggestion, 402's re-parse for the quota suggestion), 403's ServerError
+      first-try, 401/403's side-effecting formatAuthorizationError, and 429's different constructor
+      signature all vary too. Factoring out only the code/constructor leaves every arm needing its
+      own body anyway, so the "shared" function adds a layer without removing a decision. The audit
+      itself reached the same conclusion about table-driving the switch (its finding #1) — that
+      reasoning applies to this extraction too.
+
+      What shipped instead is the audit's alternative: `TestExitCodeForStatus_CrossPathConsistency`
+      pins the property directly across 20 statuses. Verified to have teeth — changing `RawStatusError`'s
+      404 arm in isolation fails it with `Code mismatch: handleResponseError=3, RawStatusError=5`.
+      That is the drift protection the finding actually asked for; the duplication remains, guarded.
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - 'NOT MET (abandoned, see OUTCOME): one function is the sole place the mapping is written'
+      - 'NOT MET (abandoned, see OUTCOME): both paths derive their exit code from that function'
+      - 'MET: a contract test asserts both paths produce identical exit codes across 20 statuses'
+      - 'MET: the contract test provably fails when one path''s mapping is changed in isolation'
+      - 'MET: zero edits to existing suites; message text, decorations and RetryAfter unchanged'
+      - 'MET: `make test`, `make fmt-check`, `make lint` all pass'
+    completed_at: '2026-08-13T12:51:14Z'
+
+  - id: task-008
+    title: 'Wire the e2e_exitcodes suite into CI'
+    description: |
+      `test/e2e/exitcodes/` is gated behind the `e2e_exitcodes` build tag and appears in neither
+      `make test` nor any CI workflow (`grep -rn 'tags=' .github/workflows/*.yml` lists smoke,
+      keyring_smoke, e2e_seams and e2e_desktop — not this one). It is therefore the only proof that
+      previously-panicking Aura statuses now exit non-zero rather than 0, and it runs only when a
+      developer invokes it by hand. Every one of the 20 checks on PR #239 is green and NONE of them
+      exercises the behaviour that PR fixes: a future change reintroducing a panic in
+      `handleResponseError` would keep the whole check wall green.
+
+      Add one step to the existing `build` job in `.github/workflows/test.yml`, mirroring the
+      `e2e_desktop` step at line 439 exactly:
+
+        - name: Exit-code e2e (built binary vs fixture server, e2e_exitcodes)
+          shell: bash
+          run: go test -tags=e2e_exitcodes -count=1 -timeout=180s ./test/e2e/exitcodes/...
+
+      Place it immediately after the `Desktop e2e` step so the two build-tagged e2e suites sit
+      together, and precede it with a comment block in the same house style as its neighbours (the
+      `Docker smoke tests` block at ~line 49 and the `Desktop e2e` block at ~line 425 are the
+      models): state what the suite covers, why it is tagged out of `make test`, and why no
+      `if: matrix.os` guard is needed.
+
+      Established facts — do not re-derive, but do sanity-check if cheap:
+      - The suite is cross-platform safe already. `configHomeFor` and `configDirFor` switch
+        explicitly on darwin/linux/windows and `t.Skipf` on anything else; `buildBinary` appends
+        `.exe` on Windows. So unlike the docker smoke step (ubuntu-only, needs a real daemon) this
+        needs NO `if: matrix.os == 'ubuntu-latest'` guard and should run on all three runners.
+      - No external dependencies: an in-process `httptest` fixture plus a binary the harness builds
+        itself in `buildBinary`. No docker, no dbus, no network.
+      - Measured 4.2s wall on macOS with `-count=1`. `-timeout=180s` is copied from the
+        `e2e_desktop` step, whose comment gives the reason: headroom for the Windows runner's slower
+        go-build path. This suite also compiles the binary in-process, so the same reasoning applies.
+
+      Do NOT add a Makefile target. The four existing tagged suites are all invoked directly by
+      workflow `run:` lines and none has one; adding one here would break that pattern for no gain.
+
+      Also add a one-line note to AGENTS.md recording that this suite exists and is not part of
+      `make test`. AGENTS.md documents `-tags=smoke` (line ~182) and `-tags=e2e_desktop` (line ~162)
+      but never mentions `e2e_exitcodes`, which is how it stayed invisible. Keep it terse and put it
+      where a future reader would look for it.
+
+      Scope note: this is a pre-existing CI gap, not part of the CLI-227 panic fix. It is being added
+      to PR #239 at the user's explicit request so the fix ships with its own automated proof.
+      Adding a workflow change will restart all 20 checks on that PR — expected.
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - 'A single step in the `build` job of `.github/workflows/test.yml` runs `go test -tags=e2e_exitcodes -count=1 -timeout=180s ./test/e2e/exitcodes/...`'
+      - 'The step has NO `if: matrix.os` guard, so it runs on ubuntu, windows and macos'
+      - 'It is preceded by a comment block matching the house style of the adjacent Docker-smoke and Desktop-e2e blocks'
+      - 'No Makefile target is added and no Go file is modified'
+      - 'AGENTS.md gains one terse line noting the suite and that it is outside `make test`'
+      - 'The workflow YAML parses, and `go test -tags=e2e_exitcodes -count=1 ./test/e2e/exitcodes/...` passes locally'
+    completed_at: '2026-08-13T13:59:06Z'

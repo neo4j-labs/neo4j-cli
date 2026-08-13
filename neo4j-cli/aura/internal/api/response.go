@@ -32,27 +32,6 @@ func formatBracketedMessages(messages []string) string {
 	return fmt.Sprintf("[\n\t%s\n]", strings.Join(messages, ",\n\t"))
 }
 
-// extractEmbeddedErrors decodes a 2xx response body into the shared
-// ErrorResponse shape and returns each Error.Message verbatim. Returns nil
-// when the body cannot be parsed as an ErrorResponse or when Errors is empty
-// so callers can treat the absence of embedded errors as the happy path.
-// Matches the 404 branch (no `field:` prefix) because the 2xx-with-errors
-// shape is the single-resource SingleValueResponseData get path.
-func extractEmbeddedErrors(body []byte) []string {
-	var errorResponse ErrorResponse
-	if err := json.Unmarshal(body, &errorResponse); err != nil {
-		return nil
-	}
-	if len(errorResponse.Errors) == 0 {
-		return nil
-	}
-	messages := make([]string, 0, len(errorResponse.Errors))
-	for _, e := range errorResponse.Errors {
-		messages = append(messages, e.Message)
-	}
-	return messages
-}
-
 type ErrorResponse struct {
 	Errors []Error `json:"errors"`
 }
@@ -67,137 +46,124 @@ type ServerError struct {
 	Error string `json:"error"`
 }
 
-// reportIssueFatal is the canonical "unexpected status, please report an
-// issue" fatal error used by every handleResponseError site that hits a status
-// code or unmarshal failure the CLI never expects. Single-sources the message
-// text, redacted-args, and issues-URL contract so the ~nine identical sites
-// stay in lock-step.
-func reportIssueFatal(statusCode int) error {
-	return clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in %s", statusCode, clievents.RedactArgs(os.Args[1:]), clierr.IssuesURL)
+// upstreamDetail describes a response whose body did not match ErrorResponse —
+// the normal case on v2beta1, where every documented 4xx/5xx except two billing
+// 400s declares a description with no content schema. The body always goes
+// through scrubbedBodyTrunc: the panic this replaced interpolated resBody raw,
+// so a secret echoed back by the API could reach stdout.
+func upstreamDetail(statusCode int, resBody []byte) string {
+	if body := scrubbedBodyTrunc(resBody); body != "" {
+		return fmt.Sprintf("upstream error [status %d]: %s", statusCode, body)
+	}
+	return fmt.Sprintf("upstream error [status %d] with no response body", statusCode)
+}
+
+// errorMessages extracts the upstream messages, returning nil when the body
+// did not parse OR parsed to an empty errors[] — any valid JSON object
+// unmarshals into ErrorResponse, and rendering that as "[\n\t\n]" tells the
+// user nothing. Both cases fall back to the raw body via upstreamDetail.
+// withField prefixes "<field>: " (the 400 branch's shape); others pass false.
+func errorMessages(resBody []byte, withField bool) []string {
+	var errorResponse ErrorResponse
+	if err := json.Unmarshal(resBody, &errorResponse); err != nil {
+		return nil
+	}
+	if len(errorResponse.Errors) == 0 {
+		return nil
+	}
+	messages := make([]string, 0, len(errorResponse.Errors))
+	for _, e := range errorResponse.Errors {
+		if withField && e.Field != "" {
+			messages = append(messages, fmt.Sprintf("%s: %s", e.Field, e.Message))
+		} else {
+			messages = append(messages, e.Message)
+		}
+	}
+	return messages
 }
 
 func handleResponseError(res *http.Response, credential *credentials.AuraCredential, cfg *clicfg.Config) error {
 	resBody, err := io.ReadAll(res.Body)
-
 	if err != nil {
-		panic(clierr.NewFatalError("unexpected error reading response body. %w", err))
+		return clierr.NewUpstreamError("%s", upstreamDetail(res.StatusCode, nil))
 	}
 
 	switch statusCode := res.StatusCode; statusCode {
 	// redirection messages
 	case http.StatusPermanentRedirect:
-		panic(reportIssueFatal(statusCode))
+		return clierr.NewUpstreamError("%s", upstreamDetail(statusCode, resBody))
 	// client error responses
 	case http.StatusBadRequest:
-		var errorResponse ErrorResponse
-
-		err = json.Unmarshal(resBody, &errorResponse)
-		if err != nil {
-			panic(reportIssueFatal(statusCode))
+		if msgs := errorMessages(resBody, true); msgs != nil {
+			return clierr.NewValidationError("%s", formatBracketedMessages(msgs)).WithSuggestion("See 'neo4j-cli aura <cmd> --help' for valid flags and values.")
 		}
-
-		messages := []string{}
-		for _, e := range errorResponse.Errors {
-			message := e.Message
-			if e.Field != "" {
-				message = fmt.Sprintf("%s: %s", e.Field, e.Message)
-			}
-			messages = append(messages, message)
-		}
-
-		return clierr.NewValidationError("%s", formatBracketedMessages(messages)).WithSuggestion("See 'neo4j-cli aura <cmd> --help' for valid flags and values.")
+		return clierr.NewValidationError("%s", upstreamDetail(statusCode, resBody))
 	case http.StatusUnauthorized:
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
 	case http.StatusForbidden:
-		// Requested endpoint is forbidden
 		var serverError ServerError
-		err := json.Unmarshal(resBody, &serverError)
-		if err != nil {
-			panic(reportIssueFatal(statusCode))
-		}
-		if serverError.Error != "" {
+		if err := json.Unmarshal(resBody, &serverError); err == nil && serverError.Error != "" {
 			return clierr.NewAuthError("%s", serverError.Error).WithSuggestion(authSuggestion)
 		}
-
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
 	case http.StatusNotFound:
-		var errorResponse ErrorResponse
-
-		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return reportIssueFatal(statusCode)
-		}
-
-		messages := []string{}
-		for _, e := range errorResponse.Errors {
-			messages = append(messages, e.Message)
-		}
-
+		msgs := errorMessages(resBody, false)
 		resourceType, resourceID := parseResourceFromRequest(res.Request)
-		return clierr.NewNotFoundError("%s", formatBracketedMessages(messages)).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
+		if msgs != nil {
+			return clierr.NewNotFoundError("%s", formatBracketedMessages(msgs)).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
+		}
+		return clierr.NewNotFoundError("%s", upstreamDetail(statusCode, resBody)).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
 	case http.StatusMethodNotAllowed:
-		var errorResponse ErrorResponse
-
-		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return reportIssueFatal(statusCode)
+		if msgs := errorMessages(resBody, false); msgs != nil {
+			return clierr.NewUpstreamError("%s", formatBracketedMessages(msgs))
 		}
-
-		messages := []string{}
-		for _, e := range errorResponse.Errors {
-			messages = append(messages, e.Message)
-		}
-
-		return clierr.NewUpstreamError("%s", formatBracketedMessages(messages))
+		return clierr.NewUpstreamError("%s", upstreamDetail(statusCode, resBody))
 	case http.StatusPaymentRequired:
-		var errorResponse ErrorResponse
-
-		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return reportIssueFatal(statusCode)
+		if msgs := errorMessages(resBody, false); msgs != nil {
+			var eResp ErrorResponse
+			_ = json.Unmarshal(resBody, &eResp) // safe: errorMessages confirmed parseable
+			ce := clierr.NewConflictError("%s", formatBracketedMessages(msgs))
+			if s := suggestionForPaymentRequired(eResp); s != "" {
+				ce = ce.WithSuggestion(s)
+			}
+			return ce
 		}
-
-		messages := []string{}
-		for _, e := range errorResponse.Errors {
-			messages = append(messages, e.Message)
-		}
-
-		cliErr := clierr.NewConflictError("%s", formatBracketedMessages(messages))
-		if s := suggestionForPaymentRequired(errorResponse); s != "" {
-			cliErr = cliErr.WithSuggestion(s)
-		}
-		return cliErr
+		return clierr.NewConflictError("%s", upstreamDetail(statusCode, resBody))
 	case http.StatusConflict:
-		var errorResponse ErrorResponse
-
-		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return reportIssueFatal(statusCode)
+		if msgs := errorMessages(resBody, false); msgs != nil {
+			return clierr.NewConflictError("%s", formatBracketedMessages(msgs))
 		}
-
-		messages := []string{}
-		for _, e := range errorResponse.Errors {
-			messages = append(messages, e.Message)
+		return clierr.NewConflictError("%s", upstreamDetail(statusCode, resBody))
+	// 413, 415, 422 are documented on POST .../graph-analytics/sessions,
+	// POST .../instances/{instance_id}/databases, and
+	// POST .../instances/{instance_id}/databases/{database_id}/restore.
+	// GDSError and InvokeAgentError appear only on 2xx responses; BillingErrorResponse
+	// covers two billing endpoints the CLI has no commands for —
+	// the raw-body fallback is the primary path.
+	case http.StatusRequestEntityTooLarge, http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity:
+		if msgs := errorMessages(resBody, false); msgs != nil {
+			return clierr.NewValidationError("%s", formatBracketedMessages(msgs))
 		}
-
-		return clierr.NewConflictError("%s", formatBracketedMessages(messages))
-	case http.StatusUnsupportedMediaType:
-		panic(reportIssueFatal(statusCode))
+		return clierr.NewValidationError("%s", upstreamDetail(statusCode, resBody))
 	case http.StatusTooManyRequests:
 		retryAfter := res.Header.Get("Retry-After")
 		return clierr.NewRateLimitError(retryAfter, "server rate limit exceeded, suggested cool-off period is %s seconds before rerunning the command", retryAfter).WithSuggestion(fmt.Sprintf("Retry after %s seconds.", retryAfter))
 	// server error responses
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-		var errorResponse ErrorResponse
-
-		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return reportIssueFatal(statusCode)
+		if msgs := errorMessages(resBody, false); msgs != nil {
+			return clierr.NewUpstreamError("%s", formatBracketedMessages(msgs))
 		}
-
-		messages := []string{}
-		for _, e := range errorResponse.Errors {
-			messages = append(messages, e.Message)
-		}
-
-		return clierr.NewUpstreamError("%s", formatBracketedMessages(messages))
+		return clierr.NewUpstreamError("%s", upstreamDetail(statusCode, resBody))
 	default:
-		panic(clierr.NewFatalError("unexpected status code %d and body %s running CLI with args %s, please report an issue in %s", statusCode, resBody, clievents.RedactArgs(os.Args[1:]), clierr.IssuesURL))
+		if statusCode >= 400 && statusCode < 500 {
+			// Unmapped client errors (408, 425, …): treated as permanent, so an
+			// agent harness must not read them as retryable and loop. The class is
+			// the only available signal here, so transient 4xx the spec never
+			// documents are reported as permanent too.
+			return clierr.NewValidationError("%s", upstreamDetail(statusCode, resBody))
+		}
+		// 5xx plus every other unmapped status (3xx, …).
+		return clierr.NewUpstreamError("%s", upstreamDetail(statusCode, resBody))
 	}
 }
 
