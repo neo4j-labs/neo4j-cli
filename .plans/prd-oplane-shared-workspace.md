@@ -237,8 +237,8 @@ hold, `new_threatmodel` fails and the existing Step 4 path posts the
 "⚠️ Oplane MCP unavailable" comment — visible, non-blocking, no silent
 degradation. No new failure mode is introduced by this change.
 
-**Known wrinkle when smoke-testing from the PR itself.** Recorded in commit
-e241c447: Anthropic's token exchange refuses to mint a GitHub App token when the
+**Known wrinkle when smoke-testing from the PR itself.** Anthropic's token
+exchange refuses to mint a GitHub App token when the
 workflow file on the PR branch differs from the copy on `main`
 (`workflow_not_found_on_default_branch`). A temporary
 `github_token: ${{ secrets.GITHUB_TOKEN }}` override was used previously to work

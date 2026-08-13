@@ -30,6 +30,6 @@ Decisions: Stale-fallback comment placed as a YAML comment *before* claude_args 
 Added 1 review task (task-008).
 
 ## TASK-008 — 2026-08-13T15:10:47Z
-Attempted the argv fix twice (file-based --mcp-config); both variants left MCP unauthenticated and were reverted. Blocked upstream: claude-code-action discards file paths in mergeMcpConfigs. Workflow is functionally identical to 8ce3c9ba; only comments changed.
+Attempted the argv fix twice (file-based --mcp-config); both variants left MCP unauthenticated and were reverted. Blocked upstream: claude-code-action discards file paths in mergeMcpConfigs. Workflow left functionally unchanged; only comments differ.
 Files: ~.github/workflows/claude-review-oplane.yml
-Decisions: OPLANE_REQ-00178024 stays open; fix belongs upstream, not here. github_token override reverted (61ebba77 chain) — branch is merge-clean.
+Decisions: OPLANE_REQ-00178024 stays open; fix belongs upstream, not here. github_token override reverted — branch is merge-clean.

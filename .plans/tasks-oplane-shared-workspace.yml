@@ -199,7 +199,7 @@ tasks:
       (PRs #232, #238, #233, #237) all carry `"workspace_type": "personal"`. So ANY result in
       workspace 4 proves the change took effect.
 
-      Known wrinkle when smoke-testing from this PR itself (recorded in commit e241c447):
+      Known wrinkle when smoke-testing from this PR itself:
       Anthropic's token exchange refuses to mint a GitHub App token when the workflow file on
       the PR branch differs from `main` (`workflow_not_found_on_default_branch`). A temporary
       `github_token: ${{ secrets.GITHUB_TOKEN }}` override works around it but MUST be
@@ -242,38 +242,28 @@ tasks:
       YAML level, then pass `--mcp-config "<path>"` instead of inline JSON. The secret then
       lives in a 0600 file scoped to the job (wiped at job end) rather than in argv.
 
-      CRITICAL — DO NOT REPEAT THE FAILED ATTEMPT. A prior attempt (commit df1ff24a, reverted
-      in 4dc2f3c8) used a QUOTED heredoc to keep `${OPLANE_PAT}` an unexpanded literal on
+      CRITICAL — DO NOT REPEAT THE FAILED ATTEMPT. A prior attempt used a QUOTED heredoc to keep `${OPLANE_PAT}` an unexpanded literal on
       disk, on the assumption — inherited from the predecessor PRD's REQ-F-018 — that Claude
-      Code expands `${VAR}` when reading `.mcp.json`. IT DOES NOT. Verified by CI run
-      31710779629: the Oplane MCP server received a literal `${OPLANE_PAT}`, never reached an
+      Code expands `${VAR}` when reading `.mcp.json`. IT DOES NOT. Verified by a live CI run:
+      the Oplane MCP server received a literal `${OPLANE_PAT}`, never reached an
       authenticated state, exposed only OAuth stubs (`authenticate`,
       `complete_authentication`) instead of the operational tools, and the run posted
       "⚠️ Oplane MCP unavailable". Use an UNQUOTED heredoc delimiter so GitHub's `${{ }}`
       interpolation writes the real token into the file.
 
-      OUTCOME — ATTEMPTED AND ABANDONED. Do not retry as written. The file-based approach
-      cannot work with `anthropics/claude-code-action` at its current pin. Both variants were
-      implemented and live-tested on this branch; both left the Oplane MCP server
-      unauthenticated (only `authenticate`/`complete_authentication` stubs, no operational
-      tools), and both were reverted:
+      OUTCOME — ATTEMPTED AND ABANDONED. Do not retry as written. Two file-based variants
+      were implemented and live-tested; both left the MCP server unauthenticated (only OAuth
+      stubs, no operational tools) and both were reverted:
 
-        df1ff24a (reverted 4dc2f3c8) — quoted heredoc + `${OPLANE_PAT}` placeholder. Claude
-          Code does NOT expand `${VAR}` when reading `.mcp.json`, so the server received a
-          literal placeholder. Disproves predecessor PRD REQ-F-018's premise.
-        71777a5c + 71106029 (reverted 61ebba77) — real secret written to a 0600 file under
-          $RUNNER_TEMP, path passed to `--mcp-config`. Dropped by the action: it always
-          prepends its built-in GitHub servers as INLINE JSON, and `mergeMcpConfigs`
-          (base-action/src/parse-sdk-options.ts) cannot read a file path at parse time — its
-          own comment says "we don't have access to the file system here" — so the inline
-          config wins and the file path is discarded.
+        1. Quoted heredoc + `${OPLANE_PAT}` placeholder — Claude Code does NOT expand
+           `${VAR}` when reading `.mcp.json`. Disproves predecessor PRD REQ-F-018's premise.
+        2. Real secret in a 0600 file, path passed to `--mcp-config` — the action always
+           prepends its built-in servers as inline JSON, and `mergeMcpConfigs` cannot read a
+           file path at parse time, so the path is discarded.
 
-      Inline JSON is therefore the ONLY shape that registers this server, and the argv
-      exposure is structural until upstream teaches `mergeMcpConfigs` to read file paths.
-      The reasoning is recorded in a comment above `claude_args` in the workflow so it is
-      visible at the point of temptation. OPLANE_REQ-00178024 stays open and correctly
-      un-closed; the right next move is an upstream issue against claude-code-action, not
-      another local attempt.
+      Inline JSON is the only shape that registers this server; the argv exposure is
+      structural until upstream changes. Next move is an upstream issue against
+      claude-code-action, not another local attempt.
 
       VERIFICATION IS MANDATORY AND MUST BE A LIVE RUN. Every official example in
       `docs/configuration.md` configures a **stdio** server, where the secret goes in an
