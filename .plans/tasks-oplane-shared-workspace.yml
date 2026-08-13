@@ -264,10 +264,9 @@ tasks:
       run that MCP connected and the threat model was updated (NOT that it merely "looks
       unchanged" — an unchanged model is also what total failure looks like; read the PR
       comment for the MCP-unavailable warning), then revert the override before merge.
-    status: completed
+    status: pending
     dependencies: []
     source: review
-    completed_at: 2026-08-13T14:54:10Z
     acceptance_criteria:
       - 'No `OPLANE_PAT` reference remains inside `claude_args`; `--mcp-config` receives a file path'
       - 'The config file is written under `$RUNNER_TEMP` with `umask 077` and an UNQUOTED heredoc so the secret is interpolated by GitHub'

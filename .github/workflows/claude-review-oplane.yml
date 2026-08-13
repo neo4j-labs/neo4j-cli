@@ -76,19 +76,6 @@ jobs:
             echo 'PROMPT_EOF'
           } >> "$GITHUB_ENV"
 
-      - name: Write Oplane MCP config (keep PAT out of argv)
-        # AGENTS.md: "Secrets via process env, NEVER argv". A 0600 file
-        # under $RUNNER_TEMP is narrower exposure than /proc/<pid>/cmdline.
-        # UNQUOTED heredoc -- GitHub's ${{ }} writes the real PAT at YAML
-        # level. Prior attempt: quoted heredoc + ${OPLANE_PAT} (df1ff24a,
-        # reverted 4dc2f3c8) -- Claude Code does NOT expand ${VAR} reading
-        # .mcp.json. Residual risk: reduced but not zero.
-        run: |
-          umask 077
-          cat > "${{ runner.temp }}/oplane-mcp.json" << MCP_EOF
-          {"mcpServers":{"oplane":{"type":"http","url":"https://gravity.oplane.io/mcp/","headers":{"Authorization":"Bearer ${{ secrets.OPLANE_PAT }}"}}}}
-          MCP_EOF
-
       - name: Run Claude Code (Oplane threat-model review)
         id: claude
         continue-on-error: true # advisory check: neither findings nor integration
@@ -159,9 +146,12 @@ jobs:
           # GitHub MCP servers, so mcp__github_inline_comment__* remains
           # available. --strict-mcp-config is deliberately NOT passed.
           #
-          # Config is read from a file (see "Write Oplane MCP config" step
-          # above) -- AGENTS.md requires secrets via process env, NEVER argv.
-          # Residual risk: 0600 temp file, not zero exposure.
+          # Secret-in-argv trade-off: ${{ secrets.OPLANE_PAT }} interpolates
+          # into the action's process arguments via claude_args. GitHub masks
+          # registered secrets in logs. If this proves unacceptable, the
+          # file-based alternative is: write /tmp/mcp.json in a prior step
+          # using ${OPLANE_PAT} shell-env expansion (Claude Code expands
+          # ${VAR} inside .mcp.json) and pass --mcp-config /tmp/mcp.json.
           #
           # OPLANE_PAT is a personal PAT belonging to Oskar Hane (no Oplane
           # service account exists yet). Threat models are created in the
@@ -175,6 +165,7 @@ jobs:
           # but the predecessor PRD's REQ-F-016 fallback enumerates six names
           # without it. Adopting that fallback silently breaks dedup.
           claude_args: >-
-            --mcp-config "${{ runner.temp }}/oplane-mcp.json"
+            --mcp-config
+            '{"mcpServers":{"oplane":{"type":"http","url":"https://gravity.oplane.io/mcp/","headers":{"Authorization":"Bearer ${{ secrets.OPLANE_PAT }}"}}}}'
             --allowed-tools
             "mcp__oplane__*,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(tee:*),Read,Grep,Glob,Skill"
