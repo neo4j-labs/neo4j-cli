@@ -16,3 +16,7 @@ Files: ~.github/prompts/claude-review-oplane.md
 ## TASK-002 — 2026-08-13T14:11:00Z
 Corrected stale OPLANE_PAT comment: replaced "All threat models are therefore created under his Gravity account" with accurate statement about shared workspace routing. Rotation, deprovisioning, visible-failure, and service-account-migration warnings retained verbatim.
 Files: ~.github/workflows/claude-review-oplane.yml
+
+## TASK-005 — 2026-08-13T12:51:29Z
+Reworded Step 1's closing sentence to distinguish the upstream skill's identity-scoped `my_recent_threatmodels` connectivity probe from our workspace-scoped `list_threatmodels` dedup lookup in Step 2. Probe-to-Step-4 linkage preserved.
+Files: ~.github/prompts/claude-review-oplane.md

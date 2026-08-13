@@ -142,14 +142,14 @@ tasks:
       Reword so the two calls are plainly distinct: the skill's connectivity probe (upstream,
       identity-scoped, unchanged) versus our workspace-scoped dedup lookup in Step 2. Keep the
       Step 4 linkage. (REQ-F-012)
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
       - 'Step 1 distinguishes the skill''s connectivity probe from our Step 2 dedup lookup'
       - 'The sentence still attributes `my_recent_threatmodels` to the skill, not to our prompt'
       - 'The hard-stop / Step 4 linkage is preserved'
-    completed_at: null
+    completed_at: 2026-08-13T12:51:29Z
 
   - id: task-006
     title: 'Verify the no-change surface and annotate the stale tool-allowlist fallback'

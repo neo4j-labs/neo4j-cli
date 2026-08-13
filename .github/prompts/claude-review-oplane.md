@@ -10,7 +10,7 @@ Pass the following context as `$ARGUMENTS`:
 - PR title (`gh pr view ${PR_NUMBER} --json title --jq .title`)
 - PR description / body (`gh pr view ${PR_NUMBER} --json body --jq .body`)
 
-The skill owns the analysis flow — verifying the MCP connection, identifying the threat model, deriving requirements, and assessing implementation state. Do not re-derive its scope here. The skill's own step 1 verifies the MCP connection via `my_recent_threatmodels` and hard-stops on failure, which feeds into Step 4 below.
+The skill owns the analysis flow — verifying the MCP connection, identifying the threat model, deriving requirements, and assessing implementation state. Do not re-derive its scope here. The skill's own step 1 verifies the MCP connection via `my_recent_threatmodels` (identity-scoped, upstream, unchanged — not to be confused with our workspace-scoped `list_threatmodels` dedup lookup in Step 2) and hard-stops on failure, which feeds into Step 4 below.
 
 ## Step 2 — Reuse the PR's existing threat model
 
