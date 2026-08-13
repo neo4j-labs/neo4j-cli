@@ -26,3 +26,8 @@ Files: +.changes/unreleased/neo4j-cli-Patch-20260813-113500.yaml, ~neo4j-cli/aur
 
 ## REVIEW — 2026-08-13T12:19:20Z
 Added 1 review task (task-007).
+
+## TASK-007 — 2026-08-13T12:52:09Z
+Shipped the cross-path contract test only; the shared status->code table was attempted twice and abandoned (both attempts recorded in the task YAML, revert 1b3319ae). Duplication remains but is now guarded.
+Files: +neo4j-cli/aura/internal/api/exitcode_contract_test.go
+Decisions: Per-arm variance (withField, decorations, 403 ServerError first-try, 401/429 signatures) means factoring out only the code/constructor leaves every arm needing its own body — same reasoning the audit used to reject table-driving the switch.

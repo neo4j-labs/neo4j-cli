@@ -275,14 +275,45 @@ tasks:
       `handleResponseError` and `RawStatusError` yield the same `*clierr.CLIError.Code`. Even with the
       shared table this is worth having — it pins the property a future refactor could break by
       reintroducing a local mapping in one path.
-    status: pending
+
+      OUTCOME — the shared-table half was attempted TWICE and abandoned; only the contract test
+      shipped. Both attempts are recorded here so a third is not started from scratch.
+
+      Attempt 1 (`func(int) int` returning an exit code) did not de-duplicate: it was wired into only
+      the two `default:` fallback arms, leaving all 11 explicit arms in `handleResponseError` and all 6
+      in `RawStatusError` with their own hardcoded constructors. It also replaced the readable
+      `status >= 400 && status < 500` predicate with `if code := exitCodeForStatus(s); code == 6`
+      (comparing an exit code against a literal to re-derive "is 4xx"), and silently deleted
+      `RawStatusError`'s explicit 405 case along with its load-bearing divergence comment.
+
+      Attempt 2 (`func(int) (int, func(string, ...any) *clierr.CLIError)` returning the constructor)
+      was worse. `case http.Status` count in response.go went UP, 11 to 18. Nine of its ten call sites
+      discarded the exit code as `_,`, so the first return value was dead. In `RawStatusError` five
+      separate case arms plus both branches of the trailing if/else all reduced to the identical
+      statement `return newErr("%s", detail)` — a tautological conditional and four redundant arms the
+      compiler cannot flag. Reverted in 1b3319ae.
+
+      Root cause, for anyone reconsidering this: the status→code mapping is NOT the only thing that
+      varies per arm. `withField` (400 only), the decorations (400's static suggestion, 404's
+      WithResource + dynamic suggestion, 402's re-parse for the quota suggestion), 403's ServerError
+      first-try, 401/403's side-effecting formatAuthorizationError, and 429's different constructor
+      signature all vary too. Factoring out only the code/constructor leaves every arm needing its
+      own body anyway, so the "shared" function adds a layer without removing a decision. The audit
+      itself reached the same conclusion about table-driving the switch (its finding #1) — that
+      reasoning applies to this extraction too.
+
+      What shipped instead is the audit's alternative: `TestExitCodeForStatus_CrossPathConsistency`
+      pins the property directly across 20 statuses. Verified to have teeth — changing `RawStatusError`'s
+      404 arm in isolation fails it with `Code mismatch: handleResponseError=3, RawStatusError=5`.
+      That is the drift protection the finding actually asked for; the duplication remains, guarded.
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
-      - 'One package-private function is the sole place the status→exit-code mapping is written; neither `handleResponseError` nor `RawStatusError` contains its own copy'
-      - 'All 22 verified statuses produce identical exit codes on both paths, asserted by a new contract test'
-      - 'The existing suites pass with ZERO edits: TestHandleResponseError_ExitCodeMapping, TestHandleResponseError_NoPanic, TestRawStatusError_StatusMatrix'
-      - 'The 405→upstream(8) divergence and the unmodelled-4xx-is-permanent rationale are documented on the shared function'
-      - 'Message text, WithResource/WithSuggestion decorations and RetryAfter are byte-identical to HEAD on both paths'
-      - '`make test`, `make fmt-check`, `make lint` all pass'
-    completed_at: null
+      - 'NOT MET (abandoned, see OUTCOME): one function is the sole place the mapping is written'
+      - 'NOT MET (abandoned, see OUTCOME): both paths derive their exit code from that function'
+      - 'MET: a contract test asserts both paths produce identical exit codes across 20 statuses'
+      - 'MET: the contract test provably fails when one path''s mapping is changed in isolation'
+      - 'MET: zero edits to existing suites; message text, decorations and RetryAfter unchanged'
+      - 'MET: `make test`, `make fmt-check`, `make lint` all pass'
+    completed_at: '2026-08-13T12:51:14Z'
