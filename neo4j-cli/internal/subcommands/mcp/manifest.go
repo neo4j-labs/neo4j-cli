@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-//go:embed icon.png
+//go:embed assets/icon.png
 var iconData []byte
 
 // mcpbManifest is the manifest.json schema for an .mcpb desktop extension.

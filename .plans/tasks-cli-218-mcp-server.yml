@@ -1049,7 +1049,8 @@ tasks:
         at the `icon.png` entry. It should pass unchanged; verify rather than assume.
       - No changelog entry: the whole `mcp` group is unreleased and already covered
         by its existing `.changes/unreleased/` entry.
-    status: pending
+    status: completed
+    completed_at: 2026-08-13T08:00:31Z
     dependencies: []
     acceptance_criteria:
       - 'neo4j-cli/internal/subcommands/mcp/icon.svg no longer exists in the repo'

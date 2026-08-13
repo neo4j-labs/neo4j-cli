@@ -312,3 +312,7 @@ Decisions: rejected reusing accept-env-vars (not MCP-scoped; would silently enab
 
 ## REVIEW — 2026-08-13T07:55:23Z
 Added 3 review tasks (task-037..task-039).
+
+## TASK-037 — 2026-08-13T08:00:31Z
+Moved icon.png into assets/ subdirectory, deleted dead icon.svg, updated //go:embed directive to assets/icon.png. Bundle-internal names stay "icon.png".
+Files: ~neo4j-cli/internal/subcommands/mcp/manifest.go, -neo4j-cli/internal/subcommands/mcp/icon.svg, +neo4j-cli/internal/subcommands/mcp/assets/icon.png
