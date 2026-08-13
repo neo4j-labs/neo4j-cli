@@ -174,10 +174,13 @@ func parseRunArgs(req *mcpsdk.CallToolRequest) (command string, args []string) {
 
 // runError builds an isError CallToolResult with a plain text message.
 func runError(msg string) *mcpsdk.CallToolResult {
+	// Several callers interpolate the model-supplied command/args into msg, so
+	// sanitize here rather than at each call site: a stray --password=... in
+	// the command string would otherwise be echoed back into model context.
 	return &mcpsdk.CallToolResult{
 		IsError: true,
 		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: msg},
+			&mcpsdk.TextContent{Text: sanitize(msg)},
 		},
 	}
 }

@@ -325,3 +325,21 @@ func TestHandleReadDocs_WhitespaceOnlyCommand(t *testing.T) {
 		assert.True(t, res.IsError, "whitespace-only command %q must be a tool error", cmd)
 	}
 }
+
+// TestHandleReadDocs_RedactsSecretInEchoedCommand pins REQ-F-031 for this
+// handler: the error path echoes the model-supplied command back, so a
+// credential-shaped value in it must not reach model context verbatim.
+func TestHandleReadDocs_RedactsSecretInEchoedCommand(t *testing.T) {
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"command":"nonexistent --password=hunter2"}`),
+		},
+	}
+	result, err := HandleReadDocs(context.Background(), req)
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+
+	text := result.Content[0].(*mcpsdk.TextContent).Text
+	assert.NotContains(t, text, "hunter2", "secret must not survive into the tool result")
+	assert.Contains(t, text, "***")
+}

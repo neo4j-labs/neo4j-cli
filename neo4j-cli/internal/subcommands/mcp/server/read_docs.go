@@ -30,48 +30,41 @@ const MaxReadDocsMaxChars = 20000
 func HandleReadDocs(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
 	command, offset, maxChars := parseReadDocsArgs(req)
 	if command == "" {
-		return &mcpsdk.CallToolResult{
-			IsError: true,
-			Content: []mcpsdk.Content{
-				&mcpsdk.TextContent{Text: "Missing required argument: command"},
-			},
-		}, nil
+		return readDocsError("Missing required argument: command"), nil
 	}
 
 	tokens := strings.Fields(command)
 	// A whitespace-only command yields no tokens; indexing would panic, and
 	// this handler is not recover()-wrapped so it would take the server down.
 	if len(tokens) == 0 {
-		return &mcpsdk.CallToolResult{
-			IsError: true,
-			Content: []mcpsdk.Content{
-				&mcpsdk.TextContent{Text: "Missing required argument: command"},
-			},
-		}, nil
+		return readDocsError("Missing required argument: command"), nil
 	}
 	refPath := "references/" + tokens[0] + ".md"
 
 	data, err := fs.ReadFile(skill.Bundle, refPath)
 	if err != nil {
-		return &mcpsdk.CallToolResult{
-			IsError: true,
-			Content: []mcpsdk.Content{
-				&mcpsdk.TextContent{Text: fmt.Sprintf("No documentation found for %q", command)},
-			},
-		}, nil
+		return readDocsError(fmt.Sprintf("No documentation found for %q", command)), nil
 	}
 
 	section := extractSection(string(data), command)
 	if section == "" {
-		return &mcpsdk.CallToolResult{
-			IsError: true,
-			Content: []mcpsdk.Content{
-				&mcpsdk.TextContent{Text: fmt.Sprintf("No documentation section found for %q", command)},
-			},
-		}, nil
+		return readDocsError(fmt.Sprintf("No documentation section found for %q", command)), nil
 	}
 
 	return paginateSection(section, offset, maxChars), nil
+}
+
+// readDocsError builds an isError CallToolResult. Callers interpolate the
+// model-supplied command into msg, so sanitize here rather than at each call
+// site: a stray --password=... in the command string would otherwise be echoed
+// back into model context.
+func readDocsError(msg string) *mcpsdk.CallToolResult {
+	return &mcpsdk.CallToolResult{
+		IsError: true,
+		Content: []mcpsdk.Content{
+			&mcpsdk.TextContent{Text: sanitize(msg)},
+		},
+	}
 }
 
 // parseReadDocsArgs extracts command, offset, and max_chars from a raw

@@ -558,3 +558,15 @@ func TestResolveCommand_RejectsNonRunnableParent(t *testing.T) {
 	assert.Contains(t, text.Text, "Unknown command",
 		"parent path must be rejected as unknown, not classified against the parent")
 }
+
+// TestRunError_RedactsSecrets pins REQ-F-031 for runError: several call sites
+// interpolate the model-supplied command into the message, so a credential in
+// it must be redacted before the string reaches model context.
+func TestRunError_RedactsSecrets(t *testing.T) {
+	result := runError(`Unknown command: "query --password=hunter2"`)
+	require.True(t, result.IsError)
+
+	text := result.Content[0].(*mcpsdk.TextContent).Text
+	assert.NotContains(t, text, "hunter2")
+	assert.Contains(t, text, "***")
+}
