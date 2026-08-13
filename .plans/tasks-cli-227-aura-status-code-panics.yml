@@ -138,7 +138,8 @@ tasks:
       `handleResponseError`, unlike the external `package api_test` in `api_test.go`. Pass nil
       credential and nil cfg; the 401/403 fixture is only needed for paths that reach
       `ClearAccessToken`, so exclude 401 or supply the `newAuthFixture` helper for it. (REQ-F-009)
-    status: pending
+    status: completed
+    completed_at: '2026-08-13T11:25:00Z'
     dependencies:
       - task-002
     acceptance_criteria:

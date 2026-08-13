@@ -5,6 +5,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -673,5 +674,80 @@ func TestSuggestionForPaymentRequired(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, suggestionForPaymentRequired(tc.resp))
 		})
+	}
+}
+
+// TestHandleResponseError_NoPanic asserts the panic-freedom and closed-enum
+// invariants across a broad status x body-shape matrix. It does NOT lock
+// specific status-to-code mappings — that is
+// TestHandleResponseError_ExitCodeMapping's job. Do not extend this test into
+// a per-status mapping table; add cases there instead.
+func TestHandleResponseError_NoPanic(t *testing.T) {
+	authFs, err := testfs.GetTestFs("{}", `{"aura":{"default-credential":"x","credentials":[{"name":"x","client-id":"id","client-secret":"secret"}]}}`)
+	require.NoError(t, err)
+	authCfg := clicfg.NewConfig(authFs, "test", clicfg.AuraScope)
+	authCred, err := authCfg.Credentials.Aura.GetDefault()
+	require.NoError(t, err)
+
+	statuses := []int{
+		http.StatusPermanentRedirect,     // 308
+		http.StatusBadRequest,            // 400
+		http.StatusUnauthorized,          // 401
+		http.StatusPaymentRequired,       // 402
+		http.StatusForbidden,             // 403
+		http.StatusNotFound,              // 404
+		http.StatusMethodNotAllowed,      // 405
+		http.StatusConflict,              // 409
+		http.StatusRequestEntityTooLarge, // 413
+		http.StatusUnsupportedMediaType,  // 415
+		http.StatusUnprocessableEntity,   // 422
+		http.StatusTooManyRequests,       // 429
+		http.StatusInternalServerError,   // 500
+		http.StatusBadGateway,            // 502
+		http.StatusServiceUnavailable,    // 503
+		http.StatusGatewayTimeout,        // 504
+		// Unmapped samples from outside the handled set
+		302, 408, 418, 451, 507, 599,
+	}
+
+	bodyShapes := []struct {
+		name string
+		data string
+	}{
+		{name: "empty body", data: ""},
+		{name: "plain text", data: "plain text error body"},
+		{name: "html page", data: "<html><body>Internal Server Error</body></html>"},
+		{name: "valid errors envelope", data: `{"errors":[{"message":"upstream error"}]}`},
+	}
+
+	for _, status := range statuses {
+		for _, shape := range bodyShapes {
+			name := fmt.Sprintf("status_%d_%s", status, shape.name)
+			t.Run(name, func(t *testing.T) {
+				res := &http.Response{
+					StatusCode: status,
+					Body:       io.NopCloser(strings.NewReader(shape.data)),
+					Header:     http.Header{},
+				}
+
+				var cfg *clicfg.Config
+				var cred *credentials.AuraCredential
+				if status == http.StatusUnauthorized || status == http.StatusForbidden {
+					cfg = authCfg
+					cred = authCred
+				}
+
+				var err error
+				assert.NotPanics(t, func() {
+					err = handleResponseError(res, cred, cfg)
+				}, "handleResponseError panicked for status %d with %s", status, shape.name)
+
+				require.Error(t, err, "handleResponseError returned nil error for status %d with %s", status, shape.name)
+				var ce *clierr.CLIError
+				require.True(t, errors.As(err, &ce), "errors.As should extract *CLIError; got %T: %v", err, err)
+				_, ok := clierr.Codes[ce.Code]
+				assert.True(t, ok, "CLIError.Code %d not in clierr.Codes for status %d with %s", ce.Code, status, shape.name)
+			})
+		}
 	}
 }
