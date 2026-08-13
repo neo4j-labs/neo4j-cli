@@ -1,7 +1,7 @@
 feature: cli-229-dead-setfortest-calls
 prd: ./prd-cli-229-dead-setfortest-calls.md
 created_at: 2026-08-13T07:57:26Z
-updated_at: 2026-08-13T08:15:00Z
+updated_at: 2026-08-13T08:30:00Z
 
 tasks:
   - id: task-001
@@ -68,7 +68,7 @@ tasks:
 
       Leave line 31 (the `helper.SetConfigValue` example) alone — explicitly out of scope.
       (REQ-F-005, REQ-F-006, REQ-F-007)
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'Line ~40 describes `flag.aura-beta` as retired in CLI-154 and references config-migration v1'
@@ -76,7 +76,7 @@ tasks:
       - 'The "Unknown / removed keys" section documents the `SetForTest` panic'
       - 'Line 31 is unchanged'
       - 'No file under `common/configmigrate/`, `.plans/archive/`, `CHANGELOG.md`, or `.changes/` is modified'
-    completed_at: null
+    completed_at: 2026-08-13T08:30:00Z
 
   - id: task-004
     title: 'Run final gates and confirm no changelog or bundle drift'

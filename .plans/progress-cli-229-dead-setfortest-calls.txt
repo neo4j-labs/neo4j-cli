@@ -6,3 +6,8 @@ Decisions: clicfg.go:226 was outside the PRD's stated file list but its `flag.au
 ## TASK-002 — 2026-08-13T08:15:00Z
 Added Registry precondition panic to SetForTest and new test covering both the registered and unregistered key paths.
 Files: ~common/clicfg/flags.go, ~common/clicfg/flags_test.go
+
+## TASK-003 — 2026-08-13T08:30:00Z
+Corrected three stale spots in .agents/feature-flags.md: dropped flag.aura-beta from naming examples, rewrote migrating section in past tense (retired CLI-154, stripped by config-migration v1), added SetForTest panic note under Unknown/removed keys.
+Files: ~.agents/feature-flags.md
+Decisions: none
