@@ -317,3 +317,61 @@ tasks:
       - 'MET: zero edits to existing suites; message text, decorations and RetryAfter unchanged'
       - 'MET: `make test`, `make fmt-check`, `make lint` all pass'
     completed_at: '2026-08-13T12:51:14Z'
+
+  - id: task-008
+    title: 'Wire the e2e_exitcodes suite into CI'
+    description: |
+      `test/e2e/exitcodes/` is gated behind the `e2e_exitcodes` build tag and appears in neither
+      `make test` nor any CI workflow (`grep -rn 'tags=' .github/workflows/*.yml` lists smoke,
+      keyring_smoke, e2e_seams and e2e_desktop — not this one). It is therefore the only proof that
+      previously-panicking Aura statuses now exit non-zero rather than 0, and it runs only when a
+      developer invokes it by hand. Every one of the 20 checks on PR #239 is green and NONE of them
+      exercises the behaviour that PR fixes: a future change reintroducing a panic in
+      `handleResponseError` would keep the whole check wall green.
+
+      Add one step to the existing `build` job in `.github/workflows/test.yml`, mirroring the
+      `e2e_desktop` step at line 439 exactly:
+
+        - name: Exit-code e2e (built binary vs fixture server, e2e_exitcodes)
+          shell: bash
+          run: go test -tags=e2e_exitcodes -count=1 -timeout=180s ./test/e2e/exitcodes/...
+
+      Place it immediately after the `Desktop e2e` step so the two build-tagged e2e suites sit
+      together, and precede it with a comment block in the same house style as its neighbours (the
+      `Docker smoke tests` block at ~line 49 and the `Desktop e2e` block at ~line 425 are the
+      models): state what the suite covers, why it is tagged out of `make test`, and why no
+      `if: matrix.os` guard is needed.
+
+      Established facts — do not re-derive, but do sanity-check if cheap:
+      - The suite is cross-platform safe already. `configHomeFor` and `configDirFor` switch
+        explicitly on darwin/linux/windows and `t.Skipf` on anything else; `buildBinary` appends
+        `.exe` on Windows. So unlike the docker smoke step (ubuntu-only, needs a real daemon) this
+        needs NO `if: matrix.os == 'ubuntu-latest'` guard and should run on all three runners.
+      - No external dependencies: an in-process `httptest` fixture plus a binary the harness builds
+        itself in `buildBinary`. No docker, no dbus, no network.
+      - Measured 4.2s wall on macOS with `-count=1`. `-timeout=180s` is copied from the
+        `e2e_desktop` step, whose comment gives the reason: headroom for the Windows runner's slower
+        go-build path. This suite also compiles the binary in-process, so the same reasoning applies.
+
+      Do NOT add a Makefile target. The four existing tagged suites are all invoked directly by
+      workflow `run:` lines and none has one; adding one here would break that pattern for no gain.
+
+      Also add a one-line note to AGENTS.md recording that this suite exists and is not part of
+      `make test`. AGENTS.md documents `-tags=smoke` (line ~182) and `-tags=e2e_desktop` (line ~162)
+      but never mentions `e2e_exitcodes`, which is how it stayed invisible. Keep it terse and put it
+      where a future reader would look for it.
+
+      Scope note: this is a pre-existing CI gap, not part of the CLI-227 panic fix. It is being added
+      to PR #239 at the user's explicit request so the fix ships with its own automated proof.
+      Adding a workflow change will restart all 20 checks on that PR — expected.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - 'A single step in the `build` job of `.github/workflows/test.yml` runs `go test -tags=e2e_exitcodes -count=1 -timeout=180s ./test/e2e/exitcodes/...`'
+      - 'The step has NO `if: matrix.os` guard, so it runs on ubuntu, windows and macos'
+      - 'It is preceded by a comment block matching the house style of the adjacent Docker-smoke and Desktop-e2e blocks'
+      - 'No Makefile target is added and no Go file is modified'
+      - 'AGENTS.md gains one terse line noting the suite and that it is outside `make test`'
+      - 'The workflow YAML parses, and `go test -tags=e2e_exitcodes -count=1 ./test/e2e/exitcodes/...` passes locally'
+    completed_at: null
