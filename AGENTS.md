@@ -48,6 +48,7 @@ TESTING FRAMEWORKS: [Go testing, testify, afero in-memory FS]. See [`.agents/tes
 - **Never `afero.NewOsFs()` in query-package tests** — dev machine has real creds at `~/Library/Preferences/neo4j/cli/credentials.json`. Use `testfs.GetTestFs(...)` (empty creds); for dotenv walk-up write `.env` into memFs + `t.Chdir(tmp)`.
 - `afero.MemMapFs` quirks: no symlink support; `OpenFile` auto-creates missing parent dirs (unlike `OsFs`). Symlink + missing-dir error paths must use `OsFs` + `t.TempDir()`.
 - An EXTERNAL test pkg (e.g. `package api_test`) can import a parent that depends on its package-under-test (`api_test` importing `neo4j-cli/aura`, which imports `aura/internal/api`) — no cycle, external test pkgs compile separately. Lets you drive a full aura command end-to-end while still calling the api pkg's `*_test.go`-only seam (`SetDebugWriterForTest`). Mount the aura tree under a stub `neo4j-cli` root with `cobra.EnableTraverseRunHooks=true`, `--format`/`ComposeRootPersistentPreRunE` on the root (mirrors `app.go`).
+- Exit-code e2e suite (`test/e2e/exitcodes/`, build tag `e2e_exitcodes`) is outside `make test`; invoke directly with `go test -tags=e2e_exitcodes -count=1 ./test/e2e/exitcodes/...`
 
 ## Architecture
 

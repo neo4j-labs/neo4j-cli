@@ -34,3 +34,8 @@ Decisions: Per-arm variance (withField, decorations, 403 ServerError first-try, 
 
 ## REVIEW — 2026-08-13T13:53:17Z
 Added 1 review task (task-008).
+
+## TASK-008 — 2026-08-13T13:59:06Z
+Added CI step to build job in test.yml running e2e_exitcodes suite on all 3 OSes (no guard), with comment block. Added one-line note to AGENTS.md Testing Framework section.
+Files: ~.github/workflows/test.yml, ~AGENTS.md
+Decisions: No OS guard (suite handles darwin/linux/windows via GOOS switch). No Makefile target (mirrors existing tagged suites pattern).

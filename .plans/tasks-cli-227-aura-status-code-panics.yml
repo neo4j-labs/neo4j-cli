@@ -364,7 +364,7 @@ tasks:
       Scope note: this is a pre-existing CI gap, not part of the CLI-227 panic fix. It is being added
       to PR #239 at the user's explicit request so the fix ships with its own automated proof.
       Adding a workflow change will restart all 20 checks on that PR — expected.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -374,4 +374,4 @@ tasks:
       - 'No Makefile target is added and no Go file is modified'
       - 'AGENTS.md gains one terse line noting the suite and that it is outside `make test`'
       - 'The workflow YAML parses, and `go test -tags=e2e_exitcodes -count=1 ./test/e2e/exitcodes/...` passes locally'
-    completed_at: null
+    completed_at: '2026-08-13T13:59:06Z'

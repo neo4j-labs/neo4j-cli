@@ -439,3 +439,20 @@ jobs:
             - name: Desktop e2e (CLI + relate-shaped fixture, e2e_desktop)
               shell: bash
               run: go test -tags=e2e_desktop -count=1 -timeout=180s ./test/e2e/desktop/...
+
+            # Exit-code e2e: assert the built binary's process exit code for
+            # every HTTP status in the Aura API's exit-code contract (3-8,
+            # plus 0/2), using an in-process httptest fixture server. This is
+            # the only coverage that observes the exit code the process
+            # actually returns: a panic reaching main.go's recover prints a
+            # diagnostic but leaves the exit code 0, which no unit test can
+            # see.
+            #
+            # Gated behind `//go:build e2e_exitcodes` so `make test` never
+            # compiles this suite (it builds a separate binary in-process
+            # and would add ~4s to every local test run). No OS guard needed:
+            # the suite explicitly switches on GOOS and t.Skips on anything
+            # outside darwin/linux/windows.
+            - name: Exit-code e2e (built binary vs fixture server, e2e_exitcodes)
+              shell: bash
+              run: go test -tags=e2e_exitcodes -count=1 -timeout=180s ./test/e2e/exitcodes/...
