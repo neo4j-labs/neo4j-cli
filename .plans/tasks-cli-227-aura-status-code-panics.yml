@@ -173,7 +173,7 @@ tasks:
       This suite is not wired into CI or the Makefile, so it will not run under `make test`. Run it
       explicitly with `go test -tags=e2e_exitcodes ./test/e2e/exitcodes/...` and report the result;
       wiring it into CI is out of scope. (REQ-F-010)
-    status: in_progress
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -182,7 +182,7 @@ tasks:
       - 'Every new scenario asserts `please report an issue` is absent from stderr via a `wantStderrOmits` field'
       - 'The new scenarios reuse `fixtureServer` / `runCLI` / `scopeFlags` — no parallel harness'
       - 'The package doc comment reflects the added status coverage'
-    completed_at: null
+    completed_at: 2026-08-13T11:20:15Z
 
   - id: task-006
     title: 'Add changie entry and run the final gates'
