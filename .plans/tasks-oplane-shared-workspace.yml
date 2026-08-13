@@ -56,7 +56,7 @@ tasks:
       one. This comment is load-bearing documentation satisfying REQ-F-027 of the
       predecessor PRD (`.plans/archive/prd-oplane-threat-model-pr-review.md`). Trim the
       false clause, not the warning. (REQ-F-005)
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -64,7 +64,7 @@ tasks:
       - 'It states that models go to the workspace named by `OPLANE_WORKSPACE_ID` and that the PAT supplies identity/write access only'
       - 'The rotation, deprovisioning, visible-failure, and service-account-migration warnings all survive verbatim'
       - 'No YAML key or value changes — the diff is comment-only'
-    completed_at: null
+    completed_at: 2026-08-13T14:11:00Z
 
   - id: task-003
     title: 'Swap Step 2 dedup from my_recent_threatmodels to workspace-scoped list_threatmodels'

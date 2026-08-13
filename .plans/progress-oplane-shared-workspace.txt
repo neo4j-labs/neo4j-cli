@@ -12,3 +12,7 @@ Decisions: Title marker is `[<owner/repo>#<PR_NUMBER>]` (square brackets, no spa
 ## TASK-004 — 2026-08-13T12:45:24Z
 Added `workspace_id` to item 3's new_threatmodel args, fixed item 3 title marker to `[<owner/repo>#<PR_NUMBER>]`, added preamble covering skill-initiated creates. Kept `pull_request_url`.
 Files: ~.github/prompts/claude-review-oplane.md
+
+## TASK-002 — 2026-08-13T14:11:00Z
+Corrected stale OPLANE_PAT comment: replaced "All threat models are therefore created under his Gravity account" with accurate statement about shared workspace routing. Rotation, deprovisioning, visible-failure, and service-account-migration warnings retained verbatim.
+Files: ~.github/workflows/claude-review-oplane.yml

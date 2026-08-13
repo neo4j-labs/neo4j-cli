@@ -123,8 +123,9 @@ jobs:
           # ${VAR} inside .mcp.json) and pass --mcp-config /tmp/mcp.json.
           #
           # OPLANE_PAT is a personal PAT belonging to Oskar Hane (no Oplane
-          # service account exists yet). All threat models are therefore
-          # created under his Gravity account. CI reviews stop working if the
+          # service account exists yet). Threat models are created in the
+          # shared workspace named by OPLANE_WORKSPACE_ID; the PAT supplies
+          # identity and write access only. CI reviews stop working if the
           # token is rotated or the account is deprovisioned — the failure is
           # visible (the MCP-unavailable path posts a warning comment) rather
           # than silent. Migrate to a service account when Oplane offers one.
