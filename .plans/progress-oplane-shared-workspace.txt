@@ -1,0 +1,35 @@
+# Progress: oplane-shared-workspace
+
+## TASK-001 — 2026-08-13T12:37:18Z
+Added top-level `env:` block with `OPLANE_WORKSPACE_ID` constant and threaded it into the `prompt:` input. Comment block marks the single copy-and-edit point with workspace info and UUID discovery guidance.
+Files: ~.github/workflows/claude-review-oplane.yml
+
+## TASK-003 — 2026-08-13T12:41:09Z
+Swapped Step 2 dedup lookup from `my_recent_threatmodels` (identity-scoped) to `list_threatmodels` with `workspace_id` (workspace-scoped). Dropped the `pull_request_url` match arm (not returned by `list_threatmodels`). Corrected title marker from angle-bracket `<${GITHUB_REPOSITORY}>#${PR_NUMBER}` to the literal bracket form `[<owner/repo>#<PR_NUMBER>]` that models actually produce. Added rationale explaining why identity-scoped lookup fails for shared workspace.
+Files: ~.github/prompts/claude-review-oplane.md
+Decisions: Title marker is `[<owner/repo>#<PR_NUMBER>]` (square brackets, no space) — matches what real models use; item 3's copy deferred to task-004.
+
+## TASK-004 — 2026-08-13T12:45:24Z
+Added `workspace_id` to item 3's new_threatmodel args, fixed item 3 title marker to `[<owner/repo>#<PR_NUMBER>]`, added preamble covering skill-initiated creates. Kept `pull_request_url`.
+Files: ~.github/prompts/claude-review-oplane.md
+
+## TASK-002 — 2026-08-13T14:11:00Z
+Corrected stale OPLANE_PAT comment: replaced "All threat models are therefore created under his Gravity account" with accurate statement about shared workspace routing. Rotation, deprovisioning, visible-failure, and service-account-migration warnings retained verbatim.
+Files: ~.github/workflows/claude-review-oplane.yml
+
+## TASK-005 — 2026-08-13T12:51:29Z
+Reworded Step 1's closing sentence to distinguish the upstream skill's identity-scoped `my_recent_threatmodels` connectivity probe from our workspace-scoped `list_threatmodels` dedup lookup in Step 2. Probe-to-Step-4 linkage preserved.
+Files: ~.github/prompts/claude-review-oplane.md
+
+## TASK-006 — 2026-08-13T13:44:15Z
+Static verification of the full diff: actionlint clean, prompt Steps 3/4 byte-identical, diff scoped to .github/ and .plans/ only, no extra files (changes/unreleased/, skill bundle). Annotated the REQ-F-016 stale-tool-fallback hazard in a YAML comment above claude_args. task-007 remains pending as post-merge live verification.
+Files: ~.github/workflows/claude-review-oplane.yml
+Decisions: Stale-fallback comment placed as a YAML comment *before* claude_args (not inside the `>-` block scalar, where YAML treats `#` as literal content).
+
+## REVIEW — 2026-08-13T14:50:23Z
+Added 1 review task (task-008).
+
+## TASK-008 — 2026-08-13T15:10:47Z
+Attempted the argv fix twice (file-based --mcp-config); both variants left MCP unauthenticated and were reverted. Blocked upstream: claude-code-action discards file paths in mergeMcpConfigs. Workflow left functionally unchanged; only comments differ.
+Files: ~.github/workflows/claude-review-oplane.yml
+Decisions: OPLANE_REQ-00178024 stays open; fix belongs upstream, not here. github_token override reverted — branch is merge-clean.

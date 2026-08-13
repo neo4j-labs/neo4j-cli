@@ -4,6 +4,19 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
+# ── env ──────────────────────────────────────────────────────────────────
+# Copying this workflow? Change OPLANE_WORKSPACE_ID below — that is the one
+# value you need. It routes threat models to the shared org workspace:
+#   workspace: neo4j-labs/neo4j-cli
+#   Gravity:   https://gravity.oplane.io/org/neo4j/workspaces/4
+#
+# To find the UUID for a different workspace, use the Oplane MCP tool
+# `search_workspaces` with `name_pattern: "<org>/<repo>"`, or browse the
+# workspace page in Gravity — the UUID is in the URL, NOT derivable from
+# the `/workspaces/N` numerical id you start from.
+env:
+  OPLANE_WORKSPACE_ID: 6a246538-76d1-4857-830e-2aad4681d044
+
 jobs:
   oplane-review:
     # Skip drafts; restrict to org members/owners/collaborators. Outside
@@ -94,6 +107,7 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
+            OPLANE WORKSPACE ID: ${{ env.OPLANE_WORKSPACE_ID }}
 
             ${{ env.PROMPT }}
 
@@ -101,19 +115,27 @@ jobs:
           # GitHub MCP servers, so mcp__github_inline_comment__* remains
           # available. --strict-mcp-config is deliberately NOT passed.
           #
-          # Secret-in-argv trade-off: ${{ secrets.OPLANE_PAT }} interpolates
-          # into the action's process arguments via claude_args. GitHub masks
-          # registered secrets in logs. If this proves unacceptable, the
-          # file-based alternative is: write /tmp/mcp.json in a prior step
-          # using ${OPLANE_PAT} shell-env expansion (Claude Code expands
-          # ${VAR} inside .mcp.json) and pass --mcp-config /tmp/mcp.json.
+          # KNOWN GAP: the PAT interpolates into argv, so it is readable via
+          # /proc/<pid>/cmdline (GitHub masks logs, not /proc). Contradicts the
+          # AGENTS.md "secrets via env, never argv" rule.
+          #
+          # Passing --mcp-config a FILE PATH does not fix it — the action always
+          # prepends its built-in servers as inline JSON, and mergeMcpConfigs
+          # cannot read a file at parse time, so the path is discarded and this
+          # server never registers. Inline JSON is the only shape that works.
+          # Revisit if upstream teaches mergeMcpConfigs to read file paths.
           #
           # OPLANE_PAT is a personal PAT belonging to Oskar Hane (no Oplane
-          # service account exists yet). All threat models are therefore
-          # created under his Gravity account. CI reviews stop working if the
+          # service account exists yet). Threat models are created in the
+          # shared workspace named by OPLANE_WORKSPACE_ID; the PAT supplies
+          # identity and write access only. CI reviews stop working if the
           # token is rotated or the account is deprovisioned — the failure is
           # visible (the MCP-unavailable path posts a warning comment) rather
           # than silent. Migrate to a service account when Oplane offers one.
+          #
+          # The --allowed-tools wildcard mcp__oplane__* covers list_threatmodels,
+          # but the predecessor PRD's REQ-F-016 fallback enumerates six names
+          # without it. Adopting that fallback silently breaks dedup.
           claude_args: >-
             --mcp-config
             '{"mcpServers":{"oplane":{"type":"http","url":"https://gravity.oplane.io/mcp/","headers":{"Authorization":"Bearer ${{ secrets.OPLANE_PAT }}"}}}}'
