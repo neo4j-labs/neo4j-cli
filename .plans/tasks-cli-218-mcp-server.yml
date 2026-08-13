@@ -1302,3 +1302,105 @@ tasks:
       - 'The unreleased changelog entry names the command `tool`, not `tools`, and is otherwise unmodified'
       - 'make test, make fmt-check, make lint pass; output casing gate passes; no skill-bundle or policy.golden drift'
     source: review
+
+  - id: task-041
+    title: 'Remove the stale docker-password Gap note from AGENTS.md'
+    description: |
+      Found during the golang-security review of PR #232. `AGENTS.md` line 176
+      (in the Docker subsystem bullet list) ends with:
+
+        **Gap**: does NOT call `clievents.RegisterSecretValue` — under MCP,
+        `--format table`/`toon` leaks the generated password into transcripts
+        (JSON field regex closes it for `--format json`).
+
+      That gap is CLOSED. `neo4j-cli/internal/subcommands/docker/password.go`
+      calls `clievents.RegisterSecretValue(pw)` inside `generatePassword()` at the
+      single mint point (added by CLI-228, commit f0ca2485 / PR #234). Verified by
+      reading the function body, not just the commit message.
+
+      Worse, the stale note directly CONTRADICTS AGENTS.md line 139 in the same
+      file, which reads "Register at the mint point, as `docker/password.go`
+      does." — citing that exact file as the positive example. A future agent
+      reading line 176 would either re-implement a fix that already exists or
+      distrust line 139.
+
+      IMPLEMENT:
+      - In `AGENTS.md`, delete ONLY the `**Gap**: ...` clause from the
+        `create` bullet under the Docker subsystem section (currently line 176).
+        The bullet should end at "consumed by `query --env`."
+
+      SCOPE NOTES:
+      - Every other claim on that line was re-verified and is still accurate — keep
+        them verbatim: `create` auto-suffixes name vs `PsAll` +
+        `DbmsCredentials.List()`; `--ephemeral` adds `--rm`; skips cred
+        persistence; emits `.env` blob to stdout or `--env-out-file` (0600);
+        consumed by `query --env`. Do not reword or "tidy" these.
+      - Do NOT touch line 139 or line 136 — both are correct as written.
+      - Do not add a replacement note claiming the gap is closed. The absence of a
+        gap is the default; line 139 already documents the required pattern.
+      - AGENTS.md is not compiled and has no test gate, so the verification here is
+        a careful read of the diff plus confirming `make test` still passes
+        (the skill bundle does not embed AGENTS.md, so no regeneration is needed).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'The **Gap** clause about RegisterSecretValue no longer appears on the docker `create` bullet in AGENTS.md'
+      - 'The remaining claims on that bullet (auto-suffix, --ephemeral/--rm, no cred persistence, .env 0600, query --env) are unchanged verbatim'
+      - 'AGENTS.md lines 136 and 139 are untouched'
+      - 'No replacement note asserting the gap is closed was added'
+      - 'make test, make fmt-check, make lint pass; no skill-bundle drift'
+    source: review
+
+  - id: task-042
+    title: 'Document the single-call contract on server.Configure'
+    description: |
+      Found during the golang-security review of PR #232. The task-039 package
+      split moved `storedRootFactory`/`storedVersion` into
+      `neo4j-cli/internal/subcommands/mcp/server/config.go` behind an EXPORTED
+      setter `server.Configure(newRoot, version)`. Before the split these globals
+      were package-private to `mcp` and could only be assigned from `NewCmd`.
+
+      The access pattern is write-once-at-startup, read-many-per-request: handlers
+      read `storedRootFactory`/`storedVersion` directly (`run.go:49`,
+      `list_commands.go:26,:33,:34`, `tooldefs.go:38,:46,:53`, `server.go:32,:39,:47`)
+      with no synchronisation. `go test -race` on both packages is clean, and the
+      only production caller is `mcp.NewCmd` (`mcp.go:23`), so there is no live
+      defect.
+
+      The risk is latent rather than exploitable: because the setter is now
+      exported, any future caller anywhere under `subcommands/mcp/...` could
+      re-point the root factory while tool calls are in flight, which would be a
+      data race on the globals AND could swap the command tree mid-session. It is
+      unreachable from outside that subtree (Go `internal/` visibility plus no
+      external importers — verified), so this is a maintainability guard-rail, not
+      a vulnerability. The current comment says "Called once from the mcp parent
+      command's NewCmd during CLI startup", which DESCRIBES today's caller rather
+      than stating a CONSTRAINT on future ones.
+
+      IMPLEMENT:
+      - Strengthen the doc comment on `Configure` in
+        `neo4j-cli/internal/subcommands/mcp/server/config.go` so it states the
+        requirement and the consequence of violating it: must be called exactly
+        once, from `mcp.NewCmd`, before any server runs; handlers read these
+        globals per request without synchronisation, so a later write would race
+        in-flight tool calls and could swap the tree mid-session.
+
+      SCOPE NOTES:
+      - Comment-only change. Do NOT add a `sync.Once`, a mutex, an atomic, or a
+        "already configured" panic/error. Any of those changes runtime behaviour
+        and would need its own test coverage and review; the point here is to
+        record the invariant, not enforce it.
+      - Keep it terse — a few lines. Per the repo comment policy a comment must
+        capture a real gotcha a reader could not infer; the unsynchronised
+        read-many pattern qualifies, so this is a legitimate comment rather than
+        narration.
+      - Leave the `StoredRootFactory`/`StoredVersion` accessor comments as they
+        are; they are accurate.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'Configure''s doc comment states it must be called exactly once, before any server runs, and names the consequence (handlers read the globals per request unsynchronised, so a later write races in-flight tool calls)'
+      - 'No runtime behaviour change: no sync.Once, mutex, atomic, panic or error was introduced'
+      - 'StoredRootFactory and StoredVersion comments are unchanged'
+      - 'make test, make fmt-check, make lint pass; go test -race on both mcp packages stays clean; no skill-bundle drift'
+    source: review

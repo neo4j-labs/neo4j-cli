@@ -334,3 +334,6 @@ Decisions: kept the four cobra-level tests (serve annotation, credential-store p
 Renamed mcp list output column installed_version to installed_command so it matches mcp check for the same binary-path value; corrected the stale `tools` command name to `tool` in the unreleased changelog entry.
 Files: ~neo4j-cli/internal/subcommands/mcp/list.go, ~neo4j-cli/internal/subcommands/mcp/list_test.go, ~.changes/unreleased/neo4j-cli-Minor-20260804-234825.yaml
 Decisions: list_test.go now asserts installed_command present AND installed_version absent — the lack of any column-name assertion is why list.go silently drifted from check.go
+
+## REVIEW — 2026-08-13T09:04:57Z
+Added 2 review tasks (task-041..task-042).
