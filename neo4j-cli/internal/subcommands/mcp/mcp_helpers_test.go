@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp"
 	"github.com/neo4j/cli/test/utils/testfs"
@@ -109,7 +110,14 @@ func newMCPInstallFixture(t *testing.T, detected bool) (*bytes.Buffer, *bytes.Bu
 
 	if detected {
 		t.Setenv("HOME", "/Users/test")
-		claudeDir := "/Users/test/Library/Application Support/Claude"
+		// Derive the detect dir rather than hardcoding the darwin path:
+		// $APP_SUPPORT resolves under %APPDATA% on Windows and XDG elsewhere,
+		// so a literal path would seed the wrong location and silently make
+		// detected=true behave like detected=false.
+		a := skill.FindAgent("claude-desktop")
+		require.NotNil(t, a)
+		claudeDir, ok := a.DetectPath()
+		require.True(t, ok)
 		require.NoError(t, fs.MkdirAll(claudeDir, 0755))
 	}
 
