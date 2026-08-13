@@ -208,7 +208,7 @@ tasks:
       REQ-F-006 holds at the final commit: `grep -n panic neo4j-cli/aura/internal/api/response.go`
       returns only the two `ParseBody` / `ParseRawBody` hits. (REQ-F-011, REQ-NF-003, REQ-NF-004,
       REQ-NF-005)
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -220,4 +220,4 @@ tasks:
       - '`make test`, `make fmt-check` and `make lint` all pass'
       - '`make generate-check` reports no drift, and `TestErrorCodesInSyncWithClierr` passes unedited'
       - '`grep -n panic neo4j-cli/aura/internal/api/response.go` returns exactly the two out-of-scope hits'
-    completed_at: null
+    completed_at: '2026-08-13T11:45:00Z'

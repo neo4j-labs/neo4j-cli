@@ -39,7 +39,7 @@ func TestHandleResponseError_RedactsBodySecrets(t *testing.T) {
 			body:       `{"password":"` + secret + `"}`,
 		},
 		{
-			name:       "307 permanent redirect with secret in body",
+			name:       "308 permanent redirect with secret in body",
 			statusCode: http.StatusPermanentRedirect,
 			body:       `{"password":"` + secret + `"}`,
 		},
@@ -241,8 +241,14 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			wantCode:   8,
 		},
 		{
-			name:       "307 permanent redirect -> upstream (8)",
+			name:       "308 permanent redirect -> upstream (8)",
 			statusCode: http.StatusPermanentRedirect,
+			body:       `{}`,
+			wantCode:   8,
+		},
+		{
+			name:       "307 temporary redirect (default arm) -> upstream (8)",
+			statusCode: http.StatusTemporaryRedirect,
 			body:       `{}`,
 			wantCode:   8,
 		},

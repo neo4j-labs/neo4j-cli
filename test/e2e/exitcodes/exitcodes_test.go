@@ -429,7 +429,7 @@ func TestExitCodes(t *testing.T) {
 		// upstream_error (exit 8). If the client behaviour changes, this scenario
 		// will fail — see the 307 discussion in PRD CLI-227's REQ-F-010.
 		{
-			name:            "permanent_redirect_307_exit_8",
+			name:            "temporary_redirect_307_exit_8",
 			args:            append([]string{"aura", "instance", "list"}, scopeFlags...),
 			status:          307,
 			body:            "",
