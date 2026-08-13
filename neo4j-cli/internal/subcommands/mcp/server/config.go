@@ -18,8 +18,10 @@ type RootFactory func(*clicfg.Config) *cobra.Command
 var storedRootFactory RootFactory
 var storedVersion string
 
-// Configure sets the server's global root factory and version. Called once from
-// the mcp parent command's NewCmd during CLI startup.
+// Configure sets the server's global root factory and version. Must be called
+// exactly once, from mcp.NewCmd, before any server runs. Handlers read these
+// globals per request without synchronisation; a later write would race
+// in-flight tool calls and could swap the command tree mid-session.
 func Configure(newRoot RootFactory, version string) {
 	storedRootFactory = newRoot
 	storedVersion = version

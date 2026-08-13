@@ -1397,7 +1397,8 @@ tasks:
         narration.
       - Leave the `StoredRootFactory`/`StoredVersion` accessor comments as they
         are; they are accurate.
-    status: pending
+    status: completed
+    completed_at: 2026-08-13T09:12:44Z
     dependencies: []
     acceptance_criteria:
       - 'Configure''s doc comment states it must be called exactly once, before any server runs, and names the consequence (handlers read the globals per request unsynchronised, so a later write races in-flight tool calls)'

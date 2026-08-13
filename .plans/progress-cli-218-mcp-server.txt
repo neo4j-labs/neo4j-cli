@@ -341,3 +341,7 @@ Added 2 review tasks (task-041..task-042).
 ## TASK-041 — 2026-08-13T09:05:40Z
 Deleted the stale **Gap** clause about `clievents.RegisterSecretValue` from the docker `create` bullet in AGENTS.md — the gap was closed by CLI-228 / PR #234 (`password.go` line 56 calls `RegisterSecretValue`). All other claims on that bullet preserved. Lines 136/139 untouched.
 Files: ~AGENTS.md
+
+## TASK-042 — 2026-08-13T09:12:44Z
+Strengthened the doc comment on server.Configure to state the single-call-before-server-runs constraint and the race consequence of violating it (handlers read storedRootFactory/storedVersion per request without synchronisation). Comment-only change; no runtime behaviour altered.
+Files: ~neo4j-cli/internal/subcommands/mcp/server/config.go
