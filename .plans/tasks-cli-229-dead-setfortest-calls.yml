@@ -1,0 +1,104 @@
+feature: cli-229-dead-setfortest-calls
+prd: ./prd-cli-229-dead-setfortest-calls.md
+created_at: 2026-08-13T07:57:26Z
+updated_at: 2026-08-13T07:57:26Z
+
+tasks:
+  - id: task-001
+    title: 'Delete the four dead SetForTest(flag.aura-beta) calls'
+    description: |
+      Remove the four inert `cfg.Flags.SetForTest("flag.aura-beta", true)` lines from
+      `neo4j-cli/aura/internal/api/organization_test.go` (currently lines 88, 146, 214, 273).
+      They are no-ops: `clicfg.Registry` is empty and `Enabled` returns false for an
+      unregistered key before reading the override map. Nothing replaces them — the
+      surrounding assertions already cover the only behaviour that exists.
+
+      This MUST land before task-002: once the guard is in place, these calls would panic.
+      Do not touch the `buildOrgTestServer` / `buildTestConfig` helpers or the `v2beta1`
+      mock paths in that file. (REQ-F-001)
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'No `SetForTest` call remains in `neo4j-cli/aura/internal/api/organization_test.go`'
+      - 'No other line in that file is modified — the diff is exactly four deletions'
+      - '`go test ./neo4j-cli/aura/internal/api/... -run "TestListOrganizations|TestGetOrganization"` passes'
+      - '`grep -rn "aura-beta" --include=*.go . | grep -v configmigrate` returns zero results'
+    completed_at: null
+
+  - id: task-002
+    title: 'Guard SetForTest against unregistered keys and cover it with a test'
+    description: |
+      In `common/clicfg/flags.go`, add a Registry precondition to `SetForTest` (line ~113)
+      that panics when the key is not registered, with message
+      `clicfg.SetForTest: %q is not in Registry — the override would be ignored by Enabled`.
+      The check MUST run before `f.mu.Lock()` so the panic does not unwind through a held
+      mutex. Add `"fmt"` to the stdlib import group above `"log/slog"`. Update the doc
+      comment to state the precondition and drop the stale trailing sentence referencing
+      `AuraConfig.SetBetaEnabled`.
+
+      In the same change, add `TestFlagSet_SetForTest_PanicsOnUnregisteredKey` to
+      `common/clicfg/flags_test.go`, reusing the existing `registerTestFlag(t)`
+      (flags_test.go:33) and `newFlagSetForTest(t)` (flags_test.go:25) helpers.
+      `registerTestFlag` already restores Registry via `t.Cleanup` — no extra teardown.
+
+      Do NOT change `Enabled`'s resolution order; registry-as-source-of-truth is
+      deliberate and pinned by two existing tests. (REQ-F-002, REQ-F-003, REQ-F-004)
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - '`SetForTest` panics on an unregistered key; the Registry check precedes `f.mu.Lock()`'
+      - '`common/clicfg/flags.go` imports `fmt`; doc comment states the precondition and no longer mentions `AuraConfig.SetBetaEnabled`'
+      - '`TestFlagSet_SetForTest_PanicsOnUnregisteredKey` asserts NotPanics for `flag.test-sentinel` and Panics for an unregistered key'
+      - '`FlagSet.Enabled` is byte-for-byte unchanged'
+      - '`go test ./common/clicfg/...` passes, including the two pre-existing unknown-key tests'
+    completed_at: null
+
+  - id: task-003
+    title: 'Correct stale flag.aura-beta claims in .agents/feature-flags.md'
+    description: |
+      Fix three spots in `.agents/feature-flags.md`. Line ~40 ("Migrating aura.beta-enabled")
+      currently claims production and tests use `flag.aura-beta` via the Registry — false
+      since CLI-154. Rewrite it in past tense: migration completed in CLI-136, flag retired
+      in CLI-154, and both `flag.aura-beta` and legacy `aura.beta-enabled` are now stripped
+      from user configs by config-migration v1 (`common/configmigrate/migrations.go:32`).
+      Line 8: drop `flag.aura-beta` from the naming examples, keeping the hypothetical ones.
+      Under "Unknown / removed keys": add one line noting `SetForTest` panics on an
+      unregistered key, so retiring a flag surfaces leftover test overrides.
+
+      Leave line 31 (the `helper.SetConfigValue` example) alone — explicitly out of scope.
+      (REQ-F-005, REQ-F-006, REQ-F-007)
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'Line ~40 describes `flag.aura-beta` as retired in CLI-154 and references config-migration v1'
+      - 'Line 8 no longer lists `flag.aura-beta`; the hypothetical examples remain'
+      - 'The "Unknown / removed keys" section documents the `SetForTest` panic'
+      - 'Line 31 is unchanged'
+      - 'No file under `common/configmigrate/`, `.plans/archive/`, `CHANGELOG.md`, or `.changes/` is modified'
+    completed_at: null
+
+  - id: task-004
+    title: 'Run final gates and confirm no changelog or bundle drift'
+    description: |
+      Run the project final gates from AGENTS.md and confirm the change is inert on the
+      release surface. `make test`, `make fmt-check`, and `make lint` must all pass.
+      Verify `TestGenerator_RoundTrip` stays green untouched — no cobra Short/Long/Example
+      field was modified and `.agents/**` does not feed the skill bundle, so no
+      `go generate` run is required.
+
+      Confirm no changelog entry was added: this is internal test and doc cleanup with zero
+      user-visible change, matching the rationale in CLI-154 REQ-F-009. (REQ-NF-002,
+      REQ-NF-003, REQ-NF-004)
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - '`make test` passes'
+      - '`make fmt-check` passes'
+      - '`make lint` passes'
+      - 'No new file under `.changes/unreleased/` and no diff under `neo4j-cli/internal/skill/bundle/`'
+      - '`grep -rn "aura-beta" --include=*.go . | grep -v configmigrate` returns zero results'
+    completed_at: null
