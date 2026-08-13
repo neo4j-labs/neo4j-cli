@@ -30,8 +30,9 @@ tasks:
       `vars.X` usage across all 16 workflows. The deviation is deliberate — a step-level
       entry buried mid-file would not give the visible single edit point this feature is
       for. Call it out so it is not "normalised" away later.
-    status: pending
+    status: completed
     dependencies: []
+    completed_at: 2026-08-13T12:37:18Z
     acceptance_criteria:
       - 'A top-level `env:` block exists above `jobs:` with `OPLANE_WORKSPACE_ID: 6a246538-76d1-4857-830e-2aad4681d044`'
       - 'Its comment names the target workspace, the Gravity URL, and `search_workspaces` as the way to find another UUID'

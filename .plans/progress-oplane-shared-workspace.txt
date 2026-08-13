@@ -1,0 +1,5 @@
+# Progress: oplane-shared-workspace
+
+## TASK-001 — 2026-08-13T12:37:18Z
+Added top-level `env:` block with `OPLANE_WORKSPACE_ID` constant and threaded it into the `prompt:` input. Comment block marks the single copy-and-edit point with workspace info and UUID discovery guidance.
+Files: ~.github/workflows/claude-review-oplane.yml

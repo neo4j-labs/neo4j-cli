@@ -4,6 +4,19 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
+# ── env ──────────────────────────────────────────────────────────────────
+# Copying this workflow? Change OPLANE_WORKSPACE_ID below — that is the one
+# value you need. It routes threat models to the shared org workspace:
+#   workspace: neo4j-labs/neo4j-cli
+#   Gravity:   https://gravity.oplane.io/org/neo4j/workspaces/4
+#
+# To find the UUID for a different workspace, use the Oplane MCP tool
+# `search_workspaces` with `name_pattern: "<org>/<repo>"`, or browse the
+# workspace page in Gravity — the UUID is in the URL, NOT derivable from
+# the `/workspaces/N` numerical id you start from.
+env:
+  OPLANE_WORKSPACE_ID: 6a246538-76d1-4857-830e-2aad4681d044
+
 jobs:
   oplane-review:
     # Skip drafts; restrict to org members/owners/collaborators. Outside
@@ -94,6 +107,7 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
+            OPLANE WORKSPACE ID: ${{ env.OPLANE_WORKSPACE_ID }}
 
             ${{ env.PROMPT }}
 
