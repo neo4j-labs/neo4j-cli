@@ -1,7 +1,7 @@
 feature: cli-229-dead-setfortest-calls
 prd: ./prd-cli-229-dead-setfortest-calls.md
 created_at: 2026-08-13T07:57:26Z
-updated_at: 2026-08-13T08:30:00Z
+updated_at: 2026-08-13T08:14:20Z
 
 tasks:
   - id: task-001
@@ -90,7 +90,7 @@ tasks:
       Confirm no changelog entry was added: this is internal test and doc cleanup with zero
       user-visible change, matching the rationale in CLI-154 REQ-F-009. (REQ-NF-002,
       REQ-NF-003, REQ-NF-004)
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -101,4 +101,4 @@ tasks:
       - '`make lint` passes'
       - 'No new file under `.changes/unreleased/` and no diff under `neo4j-cli/internal/skill/bundle/`'
       - '`grep -rn "aura-beta" --include=*.go . | grep -v configmigrate` returns zero results'
-    completed_at: null
+    completed_at: 2026-08-13T08:14:20Z

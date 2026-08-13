@@ -11,3 +11,7 @@ Files: ~common/clicfg/flags.go, ~common/clicfg/flags_test.go
 Corrected three stale spots in .agents/feature-flags.md: dropped flag.aura-beta from naming examples, rewrote migrating section in past tense (retired CLI-154, stripped by config-migration v1), added SetForTest panic note under Unknown/removed keys.
 Files: ~.agents/feature-flags.md
 Decisions: none
+
+## TASK-004 — 2026-08-13T08:14:20Z
+Ran final gates: make test, fmt-check, lint all pass; TestGenerator_RoundTrip green; no bundle or .changes/ drift vs main; Go-file grep for aura-beta clean outside configmigrate.
+Files: none (verification only)
