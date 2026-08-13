@@ -108,6 +108,37 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
+          # ⚠️ TEMPORARY — REVERT BEFORE MERGE ⚠️
+          #
+          # Symptom (only on PRs that edit THIS file):
+          #   App token exchange failed: 401 Unauthorized
+          #   Workflow validation failed. The workflow file must exist and have
+          #   identical content to the version on the repository's default branch.
+          #
+          # Cause: the Claude GitHub App refuses to mint a token via the OIDC
+          # exchange unless the running workflow matches the default-branch copy
+          # byte-for-byte — a deliberate guard against a PR editing a workflow to
+          # exfiltrate credentials. Any PR modifying this file therefore cannot
+          # smoke-test itself. Same root cause hits reusable `workflow_call`
+          # setups, where the caller lives in a different repo:
+          #   https://github.com/anthropics/claude-code-action/issues/443
+          #   https://github.com/anthropics/claude-code-action/issues/503
+          #   https://github.com/anthropics/claude-code-action/issues/722
+          #
+          # Workaround (named in the error text itself): supply your own
+          # `github_token` to bypass the OIDC exchange and its validation.
+          #
+          # Side-effect that makes this UNSAFE to leave in: the action then posts
+          # as github-actions[bot] instead of claude[bot], so the Step 3
+          # discover-then-edit lookup (which filters on claude[bot]) never
+          # matches and every push creates a NEW summary comment instead of
+          # editing the prior one.
+          #
+          # Normal path is to merge the workflow to the default branch first and
+          # let the NEXT PR exercise it; this override exists only to prove the
+          # workspace routing before merging.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
           additional_permissions: |
             actions: read
 
