@@ -1241,3 +1241,62 @@ tasks:
       - 'server/main_test.go seeds commonoutput.IsAgent to false, mirroring the existing main_test.go'
       - 'make test, make fmt-check, make lint pass; go generate ./neo4j-cli/internal/skill/... produces no bundle drift'
     source: review
+
+  - id: task-040
+    title: 'Rename mcp list installed_version to installed_command and fix the stale tools/tool changelog entry'
+    description: |
+      Follow-on to task-038, found while verifying it. `mcp list` carries the
+      IDENTICAL defect task-038 just fixed in `mcp check`: its `installed_version`
+      column (`list.go:19` struct field + json tag, `:28` asArrayRow key, `:46` Long
+      text, `:75` assignment, `:83` PrintBodyMap field slice) is populated from
+      `skill.MCPList`, whose `AgentInstall.InstalledVersion` is set from
+      `readMCPCommandPath(fs, a)` (`common/skill/mcpconfig.go:35`) — a BINARY PATH,
+      not a version. `list.go:46` even documents the column as "the binary path from
+      the config entry" while naming it `installed_version`.
+
+      Leaving this would ship `mcp check` reporting `installed_command` and
+      `mcp list` reporting `installed_version` for the exact same underlying value,
+      which is worse than either name alone being wrong.
+
+      Additionally, the unreleased changelog entry
+      `.changes/unreleased/neo4j-cli-Minor-20260804-234825.yaml` lists the mcp
+      group's commands as "(`serve`, `tools`, `install`, `remove`, `list`, `check`,
+      `bundle`)". The command was renamed from `tools` to `tool` (singular) in
+      response to an earlier review comment, so the entry is stale and describes a
+      command that does not exist.
+
+      IMPLEMENT:
+      - In `neo4j-cli/internal/subcommands/mcp/list.go`, rename on the LOCAL result
+        struct only: field `InstalledVersion` -> `InstalledCommand`, json tag and
+        asArrayRow key `installed_version` -> `installed_command`, the
+        `PrintBodyMap` field slice entry, and the `Long` text description. The
+        right-hand side of the assignment at `:75` still reads
+        `inst.InstalledVersion` — that is the skill-side field name and stays.
+      - In `.changes/unreleased/neo4j-cli-Minor-20260804-234825.yaml`, change
+        `` `tools` `` to `` `tool` `` in the command list. Change nothing else in
+        that entry.
+
+      SCOPE NOTES:
+      - Do NOT touch `skill.AgentInstall.InstalledVersion` in `common/skill/`. On
+        the skill side that field holds a real semver from SKILL.md frontmatter;
+        only the MCP projection of it is a path.
+      - Output field names are snake_case per CLI-127 and
+        `common/output/casing_gate_test.go` gates `Print*` literals — the new name
+        must stay snake_case.
+      - `printTable` upper-cases header cells, so any table assertion compares
+        against INSTALLED_COMMAND.
+      - `list_test.go` currently asserts no column names at all. Add an assertion
+        that pins `installed_command` in the json output so the name is covered by a
+        test — the absence of coverage is why this drifted from `check.go` silently.
+      - No NEW changelog entry: the whole mcp group is unreleased and already
+        covered by the entry being corrected here.
+    status: pending
+    dependencies: [task-038]
+    acceptance_criteria:
+      - 'mcp list emits installed_command in json, toon and table output; installed_version no longer appears as an output name anywhere in the mcp package'
+      - 'mcp check and mcp list use the same column name for the same underlying binary-path value'
+      - 'skill.AgentInstall.InstalledVersion in common/skill/ is unchanged, and list.go still reads from it on the assignment right-hand side'
+      - 'list_test.go asserts installed_command appears in the json output'
+      - 'The unreleased changelog entry names the command `tool`, not `tools`, and is otherwise unmodified'
+      - 'make test, make fmt-check, make lint pass; output casing gate passes; no skill-bundle or policy.golden drift'
+    source: review

@@ -321,3 +321,6 @@ Files: ~neo4j-cli/internal/subcommands/mcp/manifest.go, -neo4j-cli/internal/subc
 Renamed output columns in mcp check from installed_version/current_version to installed_command/current_command (local mcpCheckResultRow struct only). Left skill.Installation.InstalledVersion in common/skill/ untouched.
 Files: ~neo4j-cli/internal/subcommands/mcp/check.go
 Review: all gates pass; cosmetic Example indentation shift noted but behaviorally identical
+
+## REVIEW — 2026-08-13T08:15:01Z
+Added 1 review task (task-040).
