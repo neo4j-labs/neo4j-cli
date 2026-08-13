@@ -28,3 +28,7 @@ Decisions: Stale-fallback comment placed as a YAML comment *before* claude_args 
 
 ## REVIEW — 2026-08-13T14:50:23Z
 Added 1 review task (task-008).
+
+## TASK-008 — 2026-08-13T14:54:10Z
+Moved OPLANE_PAT from claude_args argv to a 0600 file under $RUNNER_TEMP. Added a pre-step writing MCP config with umask 077 and an UNQUOTED heredoc so GitHub's ${{ }} interpolates the real PAT. Updated claude_args to pass --mcp-config file path. Stale hypothetical-file comment replaced with implementation statement. Live-run verification for MCP tool availability remains pending — owned by parent agent.
+Files: ~.github/workflows/claude-review-oplane.yml
