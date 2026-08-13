@@ -257,9 +257,10 @@ func TestRemoveCmd_HelpListsAgents(t *testing.T) {
 
 	out := f.stdout.String()
 	assert.Contains(t, out, "Supported agents:")
-	for _, a := range skill.AGENTS {
+	for _, a := range skill.SkillAgents() {
 		assert.Contains(t, out, a.Name, "help output must list agent %q", a.Name)
 	}
+	assert.NotContains(t, out, "claude-desktop", "MCP-only agents must not be advertised as skill targets")
 	assert.Contains(t, out, "Examples:")
 	assert.Contains(t, out, "skill remove self")
 	assert.Contains(t, out, "--agent")

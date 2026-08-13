@@ -38,3 +38,6 @@ test-api/
 
 # agent worktree scratch (Claude Code isolated worktrees)
 /.claude/worktrees/
+
+# macOS Finder metadata
+.DS_Store

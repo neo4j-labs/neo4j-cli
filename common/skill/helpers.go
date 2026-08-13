@@ -16,9 +16,14 @@ import (
 // formatAgentErr converts skill-package sentinel errors into user-facing
 // usage errors that include the valid agent names. Other errors pass
 // through unchanged. Used by install + remove leaves.
+// When ErrUnknownAgent names an MCP-only agent, the error points at
+// `mcp install --agent <name>` instead of listing skill agents.
 func formatAgentErr(err error) error {
 	switch {
 	case errors.Is(err, ErrUnknownAgent):
+		if name := extractAgentName(err); name != "" && isMCPOnlyAgent(name) {
+			return clierr.NewUsageError("unknown agent: %q is an MCP-only agent — use 'mcp install --agent %s' instead", name, name)
+		}
 		return clierr.NewUsageError("%v\nvalid agents: %s", err, strings.Join(agentNames(), ", "))
 	case errors.Is(err, ErrAgentNotDetected):
 		return clierr.NewUsageError("%v", err)
@@ -29,21 +34,66 @@ func formatAgentErr(err error) error {
 	}
 }
 
+// isMCPOnlyAgent reports whether name matches a catalog entry that supports
+// MCP but not skills. Used so `skill install --agent claude-desktop` produces
+// a helpful error pointing at `mcp install --agent <name>`.
+func isMCPOnlyAgent(name string) bool {
+	a := FindAgent(name)
+	return a != nil && a.SupportsMCP() && !a.SupportsSkills()
+}
+
+// extractAgentName attempts to extract the quoted agent name from an
+// ErrUnknownAgent-wrapping error which is formatted as `skill: unknown agent: "name"`.
+func extractAgentName(err error) string {
+	msg := err.Error()
+	// Format: 'skill: unknown agent: "name"'
+	if idx := strings.LastIndex(msg, ": "); idx >= 0 {
+		return strings.Trim(msg[idx+2:], `"`)
+	}
+	return ""
+}
+
+// agentNames lists the skill-capable agent names. Load-bearing: it is
+// interpolated into the `skill install` / `skill remove` Long text, which is
+// rendered into the committed skill bundle, so an MCP-only catalog entry
+// leaking in here would both advertise skill support the app lacks and drift
+// the bundle.
 func agentNames() []string {
-	names := make([]string, 0, len(AGENTS))
-	for i := range AGENTS {
-		names = append(names, AGENTS[i].Name)
+	return agentNamesOf(SkillAgents())
+}
+
+// MCPAgentNames lists the MCP-capable agent names, for the `mcp` command
+// group's help text and --agent validation.
+func MCPAgentNames() []string {
+	return agentNamesOf(MCPAgents())
+}
+
+func agentNamesOf(agents []*Agent) []string {
+	names := make([]string, 0, len(agents))
+	for _, a := range agents {
+		names = append(names, a.Name)
 	}
 	return names
 }
 
-// isAgentName reports whether name matches a known agent in AGENTS
+// findSkillAgent resolves an --agent value on the skill surface. A catalog
+// entry with no SkillsDir is not a skill target, so it resolves to nil just
+// like an unknown name.
+func findSkillAgent(name string) *Agent {
+	a := FindAgent(name)
+	if a == nil || !a.SupportsSkills() {
+		return nil
+	}
+	return a
+}
+
+// isAgentName reports whether name matches a skill-capable agent
 // (case-insensitive). Used by the hard-break guard so a user typing
 // `skill install claude-code` (the old positional shape) gets a clear
 // pointer to `--agent claude-code` instead of a generic "unknown skill"
 // error.
 func isAgentName(name string) bool {
-	return FindAgent(name) != nil
+	return findSkillAgent(name) != nil
 }
 
 // didYouMeanAgentErr returns the hard-break usage error mandated by

@@ -48,7 +48,16 @@ neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000
 			if statusCode == http.StatusOK {
 				responseData := api.ParseBody(resBody)
 				normalized := utils.NormalizeV2Beta1Response(responseData)
-				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "status", "project_id", "cloud_provider"})
+				// Inject the owning organization so downstream consumers
+				// (e.g. neo4j_cli_list_targets) can surface the relationship.
+				rows := normalized.AsArray()
+				for i := range rows {
+					if _, ok := rows[i]["organization_id"]; !ok {
+						rows[i]["organization_id"] = orgID
+					}
+				}
+				normalized = api.NewListResponseData(rows)
+				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "status", "organization_id", "project_id", "cloud_provider"})
 			}
 			return nil
 		},

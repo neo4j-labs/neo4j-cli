@@ -31,6 +31,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/desktop"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/docker"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/history"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/update"
 	"github.com/neo4j/cli/neo4j-cli/internal/versioncheck"
 	"github.com/neo4j/cli/neo4j-cli/query"
@@ -104,6 +105,11 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 	cmd.AddCommand(update.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 	cmd.AddCommand(agentcontext.NewCmd(cfg, Version))
+	if cfg.Flags.Enabled("flag.mcp-server") {
+		// NewCmd is handed back to the group as its root factory: mcp builds a
+		// fresh tree per tool call and cannot import this package to do it.
+		cmd.AddCommand(mcp.NewCmd(cfg, NewCmd))
+	}
 
 	cobra.EnableTraverseRunHooks = true
 

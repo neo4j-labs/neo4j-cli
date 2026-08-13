@@ -41,7 +41,16 @@ type Flag struct {
 // Registry is the source of truth for all registered feature flags. Add a new
 // entry here to introduce a flag; callers gate behaviour via
 // (*Config).Flags.Enabled("flag.<area>-<feature>").
-var Registry = map[string]Flag{}
+var Registry = map[string]Flag{
+	"flag.mcp-server": {
+		Name:             "flag.mcp-server",
+		Default:          false,
+		Owner:            "neo4j-cli-workinggroup",
+		Gates:            "the `neo4j-cli mcp` command group — the stdio MCP server plus its Claude Desktop bundle/install leaves. When disabled the group is not registered on the root command at all.",
+		IntroducedIn:     "1.12.0",
+		RemovalCondition: "GA of `neo4j-cli mcp`: this entry and the gated branch in app.go are deleted in the same PR. Never flipped to default true.",
+	},
+}
 
 // FlagSet wraps the runtime override surface (env vars + config file via viper)
 // with an in-process override map for tests and a per-legacy-key sync.Once that

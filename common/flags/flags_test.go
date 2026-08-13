@@ -300,6 +300,26 @@ func TestRegisterAuraCredentialFlag_PriorHook(t *testing.T) {
 	}
 }
 
+// TestIsWriteCommand pins the exported annotation reader shared with the MCP
+// policy table: only the exact "true" string counts as a write.
+func TestIsWriteCommand(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		annotations map[string]string
+		want        bool
+	}{
+		{name: "no annotations", annotations: nil, want: false},
+		{name: "write true", annotations: map[string]string{"write": "true"}, want: true},
+		{name: "write false", annotations: map[string]string{"write": "false"}, want: false},
+		{name: "write TRUE is not true", annotations: map[string]string{"write": "TRUE"}, want: false},
+		{name: "other annotation", annotations: map[string]string{"other": "true"}, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsWriteCommand(&cobra.Command{Use: "x", Annotations: tc.annotations}))
+		})
+	}
+}
+
 func TestEnforceWriteGate(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
@@ -468,4 +488,28 @@ func TestRegisterRwFlagHelp(t *testing.T) {
 	require.NotNil(t, flag)
 	assert.Equal(t, "false", flag.DefValue)
 	assert.Equal(t, "Allow write operations. Auto-applied in interactive terminals; required when running under an agent harness or non-interactive script.", flag.Usage)
+}
+
+// TestForceNonInteractive pins the TTY probe off, which the MCP server needs
+// because ClaimStdio redirects the os.Stdout variable to stderr — a
+// shell-launched server would otherwise look interactive and RequireWriteAccess
+// step 3 would let write-annotated commands run without --rw.
+func TestForceNonInteractive(t *testing.T) {
+	orig := stdoutIsTerminal
+	t.Cleanup(func() { stdoutIsTerminal = orig })
+
+	stdoutIsTerminal = func() bool { return true }
+	require.True(t, stdoutIsTerminal(), "precondition: probe reports interactive")
+
+	ForceNonInteractive()
+	assert.False(t, stdoutIsTerminal(), "probe must report non-interactive after ForceNonInteractive")
+
+	// A write-annotated command with no --rw must now be refused rather than
+	// waved through by the TTY branch.
+	cmd := &cobra.Command{Use: "w", Annotations: map[string]string{"write": "true"}}
+	cmd.Flags().Bool("rw", false, "")
+	origDetect := detectAgent
+	t.Cleanup(func() { detectAgent = origDetect })
+	detectAgent = func() bool { return false }
+	assert.Error(t, EnforceWriteGate(cmd), "write gate must fire once TTY detection is pinned off")
 }

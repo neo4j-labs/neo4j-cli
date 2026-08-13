@@ -243,7 +243,7 @@ func renderListTwoSection(cmd *cobra.Command, cfg *clicfg.Config, rows []Invento
 // for one catalog skill, preserved in plugin.json order via the input
 // order produced by BuildInventory).
 func splitInventory(rows []InventoryRow) (selfResults, [][]InventoryRow) {
-	self := make(selfResults, 0, len(AGENTS))
+	self := make(selfResults, 0, skillAgentCount())
 	groups := make([][]InventoryRow, 0)
 	index := map[string]int{}
 	for _, r := range rows {
@@ -271,10 +271,10 @@ func splitInventory(rows []InventoryRow) (selfResults, [][]InventoryRow) {
 
 // formatInstalledIn renders the catalog row's installed_in cell:
 //   - "—" when no agent holds the skill,
-//   - "N/M" when every agent in AGENTS holds it,
+//   - "N/M" when every skill-capable agent holds it,
 //   - "N/M (a, b, ...)" otherwise.
 func formatInstalledIn(s catalogSummary) string {
-	total := len(AGENTS)
+	total := skillAgentCount()
 	if s.InstalledCount == 0 {
 		return "—"
 	}

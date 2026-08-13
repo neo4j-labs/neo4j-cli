@@ -29,6 +29,19 @@ var stdoutIsTerminal = func() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
+// ForceNonInteractive pins TTY detection to false for the rest of the process.
+//
+// It exists for the MCP server, which redirects the os.Stdout variable to
+// stderr so a stray write cannot corrupt the JSON-RPC frame. That redirect also
+// makes stdoutIsTerminal read stderr's descriptor, so a developer running
+// `neo4j-cli mcp serve` from a shell would look interactive to the write gate —
+// silently satisfying RequireWriteAccess step 3 and letting write-annotated
+// commands run without --rw. A machine-driven caller is never interactive, so
+// the server pins this off at start-up.
+func ForceNonInteractive() {
+	stdoutIsTerminal = func() bool { return false }
+}
+
 // RegisterOutputFlag adds a persistent --format flag to cmd and installs a
 // PersistentPreRunE hook that validates the value and binds it to cfg.Global.
 func RegisterOutputFlag(cmd *cobra.Command, cfg *clicfg.Config) {
@@ -84,10 +97,17 @@ func BindFormatFromFlag(cmd *cobra.Command, cfg *clicfg.Config) error {
 	return nil
 }
 
+// IsWriteCommand reports whether cmd is annotated as a write. It is the single
+// reader of the annotation string, so a second consumer (the MCP policy table)
+// cannot drift from what EnforceWriteGate below actually enforces.
+func IsWriteCommand(cmd *cobra.Command) bool {
+	return cmd.Annotations["write"] == "true"
+}
+
 // EnforceWriteGate rejects write-annotated commands unless RequireWriteAccess
 // allows them.
 func EnforceWriteGate(cmd *cobra.Command) error {
-	if cmd.Annotations["write"] != "true" {
+	if !IsWriteCommand(cmd) {
 		return nil
 	}
 

@@ -54,6 +54,34 @@ func setupHomeWithAgents(t *testing.T, home string, names ...string) afero.Fs {
 	return memFs
 }
 
+// TestSkillOpsRejectMCPOnlyAgent guards the case that would otherwise write
+// a bundle to a relative path: claude-desktop has no SkillsDir, so its
+// SkillsPath() is "" and `filepath.Join("", skillName)` would resolve
+// against the working directory. The skill surface must treat it as an
+// unknown agent, even with its detect dir present on disk.
+func TestSkillOpsRejectMCPOnlyAgent(t *testing.T) {
+	setGOOSForTest(t, "darwin")
+	memFs := setupHomeWithAgents(t, filepath.FromSlash("/Users/alice"), "claude-code", "claude-desktop")
+
+	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1.0.0"}, skillNameForTests, "claude-desktop")
+	assert.ErrorIs(t, err, ErrUnknownAgent)
+
+	_, err = Remove(memFs, skillNameForTests, "claude-desktop")
+	assert.ErrorIs(t, err, ErrUnknownAgent)
+
+	// Installing to "every detected agent" must skip it too.
+	got, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1.0.0"}, skillNameForTests, "")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "claude-code", got[0].Name)
+
+	rows, err := List(memFs, skillNameForTests)
+	require.NoError(t, err)
+	for _, r := range rows {
+		assert.NotEqual(t, "claude-desktop", r.Agent.Name)
+	}
+}
+
 func TestInstallNoAgentsDetected(t *testing.T) {
 	t.Setenv("HOME", "/home/alice")
 	t.Setenv("XDG_CONFIG_HOME", "")
@@ -240,7 +268,7 @@ func TestList(t *testing.T) {
 
 	rows, err := List(memFs, skillNameForTests)
 	require.NoError(t, err)
-	require.Len(t, rows, len(AGENTS))
+	require.Len(t, rows, len(SkillAgents()))
 
 	idx := func(name string) int {
 		for i, r := range rows {

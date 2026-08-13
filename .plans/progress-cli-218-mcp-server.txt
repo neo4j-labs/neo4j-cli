@@ -1,0 +1,347 @@
+## TASK-001 — 2026-08-04T10:20:02Z
+Registered flag.mcp-server as the first production clicfg.Registry entry (Default false, full metadata), proving the existing env + config-file override machinery end to end. No MCP code.
+Files: ~common/clicfg/flags.go, +common/clicfg/flags_ext_test.go, ~common/clicfg/clicfg_test.go, ~neo4j-cli/internal/subcommands/config/get.go, ~neo4j-cli/internal/subcommands/config/get_test.go, ~neo4j-cli/internal/subcommands/config/set_test.go, ~.plans/prd-cli-218-mcp-server.md
+Decisions:
+- IntroducedIn 1.12.0 (latest released is v1.11.0); re-verify in task-018 when the changie entry lands.
+- REQ-F-005 was inaccurate: `config list` does NOT enumerate Registry keys (Printable walks only Global/Aura ValidConfigKeys, asserted by pre-existing get_test.go:107), nor does tab-completion. Both are correct per feature-flags.md; PRD + task criterion amended rather than adding plumbing.
+- Registry tests must be an EXTERNAL clicfg_test file: they build a real NewConfig via testfs, and testfs imports clicfg.
+- Tests read the production Registry while flags_test.go/clicfg_test.go swap that global for a sentinel map — safe only because nothing in the package calls t.Parallel(); documented in the file header.
+- Pre-existing, unfixed: FlagSet.Enabled returns false for unregistered keys BEFORE consulting overrides, so the four SetForTest("flag.aura-beta", true) calls in aura/internal/api/organization_test.go are dead no-ops (flag.aura-beta is retired and absent from Registry). Also .agents/feature-flags.md:40 still claims production reads flag.aura-beta via the Registry. Needs its own ticket.
+
+## TASK-002 — 2026-08-04T12:31:58Z
+Added MCPConfig/MCPFormat to skill.Agent plus an MCP-only claude-desktop entry, and split the catalog into capability projections (SkillAgents/MCPAgents) so every skill-side consumer ignores MCP-only entries. agentNames() is unchanged, so the committed bundle does not drift.
+Files: ~common/skill/agents.go, ~common/skill/helpers.go, ~common/skill/installer.go, ~common/skill/inventory.go, ~common/skill/list.go, ~common/skill/agents_test.go, +common/skill/agents_helpers_test.go, ~common/skill/installer_test.go, ~common/skill/inventory_test.go, ~common/skill/list_test.go, ~common/skill/install_test.go, ~common/skill/remove_test.go
+Decisions:
+- New `$APP_SUPPORT` token in expandPath maps to Electron's `appData` (darwin Library/Application Support, windows %APPDATA%, else XDG config) — Claude Desktop is Electron, so the non-darwin/windows branch stays a real path rather than an error; an absent dir already means not-detected. `currentGOOS` is the test seam (process global — no t.Parallel()).
+- SkillsPath()/MCPConfigPath() return ok=false on absent capability rather than ("", true). Without that guard filepath.Join("", skillName) is a relative path a mis-filtered caller would write into cwd.
+- FindAgent stays catalog-wide (task-016 needs it for MCP); the skill surface goes through findSkillAgent, so `skill install --agent claude-desktop` is ErrUnknownAgent.
+- Reviewer-noted UX gap for a later task: formatAgentErr should point an MCP-only agent name at `mcp install --agent <name>` once that leaf exists (task-016). Also confirm MCPAgents/MCPAgentNames/DetectMCPAgents/MCPConfigPath each gain a production caller in task-016 — delete any that does not.
+- Type is `MCPFormat` (not `Format`) so it cannot be mistaken for the CLI's --format output format.
+
+## TASK-003 — 2026-08-04T12:51:42Z (SUPERSEDED, no code change)
+Audited go-sdk v1.4.1 and concluded the pin cannot land as a standalone commit ahead of its first importer; folded the go.mod/go.sum change into task-004 and recorded the (permanent) audit results on task-003. go.mod/go.sum are byte-identical to HEAD.
+Files: ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/prd-cli-218-mcp-server.md, ~.plans/progress-cli-218-mcp-server.txt
+Decisions:
+- v1.4.1 is pure Go. Adds google/jsonschema-go v0.4.2, segmentio/encoding v0.5.4, segmentio/asm v1.1.3, yosida95/uritemplate/v3 v3.0.2. Zero CgoFiles in the ./neo4j-cli graph under CGO_ENABLED=0; segmentio/asm is Go SIMD asm with pure-Go fallbacks, NOT cgo. Builds clean on linux/windows/darwin x amd64/arm64/386 (+linux/arm). GoReleaser sets goos but no goarch, so the matrix is its default — don't assume six targets.
+- SDK forces six golang.org/x MVS bumps: mod 0.27=>0.32, net 0.43=>0.49, sync 0.16=>0.19, term 0.34=>0.39, text 0.28=>0.33, tools 0.36=>0.41 (SDK requires x/tools v0.41.0). All gates green with them. These bumps do NOT revert when the SDK is removed by tidy, so they must land in the SAME commit as the SDK.
+- Why no standalone commit: (a) .goreleaser.yaml runs `go mod tidy` in before.hooks, so the release pipeline deletes an unimported pin; (b) tidy strips it from go.mod AND go.sum; (c) `go get` with no importer writes only the go-sdk h1+go.mod hashes and none of the 4 transitive deps', so the pinned state can't even build the SDK; (d) the residual diff is then a bare six-module x/ bump with no go-sdk line at all.
+- Rejected escape hatches (both tested): `//go:build tools` blank import works but is a commit-boundary prop for a library the next task imports for real; a `tool` directive survives tidy but `mcp` is not a main package (`go tool` errors, pollutes tool list) and `go mod edit -tool` pins no version, so tidy resolves to latest v1.7.0 and defeats the pin.
+- task-003 left status pending but retitled SUPERSEDED, body opens with DO NOT IMPLEMENT, and dependencies set to [task-004] so it cannot be selected before its successor. task-004 deps reduced to [task-001] and now carries the pin. PRD REQ-NF-003 amended (task-001 precedent) — it implied a standalone pin was possible.
+- Observed: v1.5.0, v1.6.1 and v1.7.0 STABLE now exist; the PRD's "not v1.7.0-pre.1" rationale is stale in wording though v1.4.1 remains the deliberate conservative choice. A bump is a separate decision.
+
+## TASK-004 — 2026-08-04T13:16:04Z
+Scaffolded the `mcp` group (parent + `tools` leaf printing an as-yet-EMPTY tool list, no transport), gated it on flag.mcp-server in app.go, established the RootFactory injection seam, and landed the go-sdk v1.4.1 pin with its first importer plus the six forced golang.org/x bumps.
+Files: +neo4j-cli/internal/subcommands/mcp/mcp.go, +neo4j-cli/internal/subcommands/mcp/tooldefs.go, +neo4j-cli/internal/subcommands/mcp/tools.go, +neo4j-cli/internal/subcommands/mcp/mcp_test.go, +neo4j-cli/internal/subcommands/mcp/tools_test.go, +neo4j-cli/internal/subcommands/mcp/tooldefs_test.go, +neo4j-cli/internal/subcommands/mcp/mcp_helpers_test.go, +neo4j-cli/internal/subcommands/mcp/main_test.go, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go, ~neo4j-cli/internal/subcommands/agentcontext/casing_input_gate_test.go, ~go.mod, ~go.sum
+Decisions:
+- Pin SURVIVED tidy (idempotent) now that mcp/tooldefs.go imports mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp". Diff is exactly the audited set: go-sdk v1.4.1 + 4 transitive (jsonschema-go 0.4.2, segmentio/encoding 0.5.4, segmentio/asm 1.1.3, uritemplate/v3 3.0.2) + 6 x/ bumps. CGO_ENABLED=0 builds green on darwin/linux/windows x amd64/arm64 (+windows/386). No bundle drift.
+- Seam: `type RootFactory func(*clicfg.Config) *cobra.Command`; `mcp.NewCmd(cfg *clicfg.Config, newRoot RootFactory)`; app.go passes its own `NewCmd` inside the `if cfg.Flags.Enabled("flag.mcp-server")` branch. newRoot is accepted but NOT yet read or retained — task-006/013 must store it; nothing guards against a nil factory.
+- `mcp tools` prints an EMPTY list today (`[]` in json, header-only table). Single source is `toolDefinitions() []*mcpsdk.Tool` returning nil in tooldefs.go; tasks 008-013 populate it. TestTools_JSONManifest asserts `"[]"` verbatim, so it will (deliberately) fail and need updating when the first tool lands.
+- `toolRows.AsArray()`/`MarshalJSON` project SDK camelCase wire tags into snake_case OUTPUT keys, and widen a nil destructiveHint/openWorldHint to TRUE (MCP spec default), not the Go zero value. Tests assert both.
+- File named tooldefs.go (not manifest.go) so it cannot be confused with task-015's .mcpb manifest generator.
+- Gate consolidation (reviewer): agentcontext gained `newAppCmdEveryFlagEnabled` (flips all clicfg.Registry entries); TestAllLeafCommands_HaveExamples + TestInputIdentifiers_AreKebabCase now use it, so flag-gated subtrees are covered by the existing whole-tree gates. Verified by mutation (removing --format json from the tools Example fails the agentcontext gate). Do NOT re-add per-group copies of these gates.
+- gen/main.go builds the tree over an empty MemMapFs, so bundle generation is flag-off — BUT env binding still applies: `NEO4J_CLI_FLAG_MCP_SERVER=1` in a dev shell would drift the committed bundle. Unset it before `go generate`.
+- Task criterion amended ("Both leaves…" predated the serve/tools split — only `tools` exists in this scope). PRD needed no change: REQ-F-002/REQ-NF-006 are feature-wide and remain accurate.
+
+## TASK-005 — 2026-08-04T13:45:44Z
+Added the MCP command-policy table (deny / gated:allow-aura / gated:allow-credential-write / write / allow, default-deny) with the two opt-in gate flags, guarded by two mutation-verified whole-tree gates: an unclassified-path gate and a committed path->policy golden.
+Files: +neo4j-cli/internal/subcommands/mcp/allow.go, +neo4j-cli/internal/subcommands/mcp/allow_test.go, +neo4j-cli/internal/subcommands/mcp/testdata/policy.golden, ~neo4j-cli/internal/subcommands/mcp/mcp.go, ~neo4j-cli/internal/subcommands/mcp/mcp_helpers_test.go, ~common/flags/flags.go, ~common/flags/flags_test.go, ~.gitattributes, ~.plans/prd-cli-218-mcp-server.md
+Decisions:
+- API: `Classify(cmd *cobra.Command, args []string) (Policy, bool)` — bool false means "no rule matched, this deny is the default". `Check(cmd, args, Gates) error` refuses deny + un-opted gated; PolicyWrite is deliberately NOT refused there (tool routing is task-010/011, flags.EnforceWriteGate stays authoritative).
+- Precedence deny > gated > write > allow, with an EXPOSED-TREE check before the write branch: a new top-level tree is denied even when write-annotated, so it cannot launder itself into run_write. Longest matching prefix wins inside writeGatedPaths (`aura credential` beats `aura`) so an Aura spend consent can never open a keyring write.
+- gated policies keyed on Annotations["write"] WITHIN `aura`/`credential` rather than an enumerated leaf list: the PRD's list named nonexistent leaves (`aura instance resize`/`destroy`) and would have left `aura graphql create`, `aura graph-analytics session create`, `aura virtual-graph create` (all billing) on plain `write`. REQ-F-026 amended.
+- `query` is annotated READ (it gates on its own --rw at exec time), so a `--rw` in args escalates it to `write` inside the table (writeArgs rule) instead of relying on task-010's --rw rejection.
+- TestPolicyTable_ClassifiesEveryCommandPath alone does NOT catch a new leaf under an already-exposed tree (it classifies silently as allow/write) — hence testdata/policy.golden, regenerated with `go test ./neo4j-cli/internal/subcommands/mcp -update`, LF-pinned in .gitattributes. Both gates mutation-verified.
+- Extracted `flags.IsWriteCommand(cmd)` in common/flags so the annotation string has one reader shared with EnforceWriteGate.
+- The two --allow-* flags are PARKED as persistent flags on the `mcp` parent because `serve` does not exist yet (task-013 must move them down to serve); TestGateFlags_ParseFromArgv pins that they parse today. `GatesFromCommand` reads via cmd.Flag (not Flags().GetBool) so it works before cobra has parsed a parent's persistent flags.
+- The table does NOT protect stdin-prompting leaves (`query` with no arg, `desktop dbms create`); task-006's stdin->DevNull swap does. Comment in allow.go says so, so nobody "fixes" it in the wrong layer.
+- The gate walk includes hidden/deprecated commands (executableCommands skips only cobra's `help`): help visibility is irrelevant to what the executor can dispatch.
+
+## TASK-006 — 2026-08-04T14:19:58Z
+Built the in-process executor (fresh config + tree per call, bounded buffers, mutex, recover, empty stdin) and the process-global stdio swap as an explicitly-called `ClaimStdio()` with no caller yet; stored and nil-guarded the injected RootFactory.
+Files: +neo4j-cli/internal/subcommands/mcp/executor.go, +neo4j-cli/internal/subcommands/mcp/stdio.go, +neo4j-cli/internal/subcommands/mcp/executor_test.go, +neo4j-cli/internal/subcommands/mcp/stdio_test.go, ~neo4j-cli/internal/subcommands/mcp/mcp.go, ~neo4j-cli/internal/subcommands/mcp/mcp_helpers_test.go, ~.plans/prd-cli-218-mcp-server.md
+Decisions:
+- API: `NewExecutor(cfg, newRoot) (*Executor, error)`; `(*Executor).Execute(ctx, args) CommandResult{Stdout, Stderr string; Err error}`. Err keeps its concrete type so task-007 can errors.As the *clierr.CLIError. Named CommandResult, not Result, so it cannot be confused with the SDK's CallToolResult. Execute does NOT consult the policy table — task-010/011 must call mcp.Check first.
+- The fd swap LANDED here (not deferred to task-013) as `ClaimStdio() (in, out *os.File, restore func(), err error)`: capture and swap in ONE call so the order cannot be got wrong, no production caller yet, never an init/test side effect. Guarded by an atomic so a second claim errors instead of handing out /dev/null + stderr as the transport.
+- task-013 MUST use `mcpsdk.IOTransport{Reader: in, Writer: out}`, NOT `StdioTransport`: StdioTransport.Connect reads the os.Stdin/os.Stdout VARIABLES (go-sdk@v1.4.1/mcp/transport.go:98), i.e. after the swap. Also after the swap, output.StdoutIsTerminal observes STDERR, so dispatched commands need an explicit --format (REQ-F-021) rather than the terminal default.
+- RootFactory is now read by a `PersistentPreRunE` on the `mcp` parent that calls `validateWiring(cfg, newRoot)`, so the whole group refuses to run when app.go wires it wrong. task-013 must compose (not replace) that hook when adding `serve`.
+- Isolation is honest per mechanism: cobra flag values are the real bleed (a reused root renders call 2 with call 1's --format — verified experimentally), viper rebinds per call so it would not bleed on its own, output.IsAgent is never mutated in production, and desktopclient.debugEnabled is a PROCESS global a fresh tree does NOT reset — safe only because the desktop root calls SetDebug(debug.Resolve(cmd)) unconditionally on every desktop invocation and nothing else reads it. Documented rather than plumbed; acceptance criterion amended to say so.
+- `defer cfg.Events.Flush()` per call is mandatory, not hygiene theatre: every clicfg.NewConfig starts an analytics worker goroutine that exits only on Flush, so without it the server leaks one goroutine per tool call. Flush is idempotent (CompareAndSwap).
+- Panic detail passes through clievents.RedactText as well as RedactArgs — a panic carries arbitrary runtime state (Bolt errors quoting neo4j://user:pass@host) and is the one string putting uncontrolled state in front of a model. Not left to task-007's envelope pass.
+- Reviewer item declined: unifying panicError with main.go's recoverPanic. They are deliberately different shapes (a two-line stderr print whose format main's own tests pin, vs a single typed error), so sharing a builder would change user-visible panic output for no gain here.
+- Deferred (reviewer, low): writing debug.Stack() to os.Stderr on panic. Real operator value — an MCP-only panic is otherwise a single sentence — but there is no writer seam yet and it would noise up the panic tests. Task-007 owns error diagnostics; decide there.
+- For task-007: versioncheck.MaybeHint writes the update nag to the per-call cobra STDERR, so it will surface inside the model context as soon as Result.Stderr is mapped.
+- Measured ~23ms of per-call setup, serialised behind the mutex: clicfg.NewConfig -> machineid.ProtectedID execs `ioreg` on darwin, and the root hook's ProbeKeyringAvailability execs /usr/bin/security while credential-storage is unset. Two subprocesses before any command runs. Acceptable for a human-paced client; if it ever matters, hoist the analytics service (it emits nothing per call), never the config.
+- Every executor call in the tests is bounded (executeWithin / waitWithin, 30s): a hang is this layer's signature failure and a stalled package diagnoses nothing. Mutation-verified — dropping SetIn, the stdout swap, the stdin swap (30s hang -> failure), ExecuteContext, the config freshness, the RedactText pass and the double-claim guard each fail a test.
+
+## TASK-007 — 2026-08-04T15:15:00Z
+Built MapCommandResult that turns a CommandResult into mcpsdk.CallToolResult with isError, structuredContent (BuildEnvelope + stdout/stderr/argv), rune-safe truncation at MaxOutputChars (default 8000), and RedactText+StripControl sanitisation on every string. Added docker/export_test.go seams (randSource, listenerFactory, clientFactory) usable by future integration tests. 12 new tests cover: success, plain error, CLIError envelope, retryable codes, JSON password redaction, control-byte stripping, truncation, tee_path surfacing, redacted args, stderr fallback, multi-format secret sanitisation, and zero-max fallback.
+Files: +neo4j-cli/internal/subcommands/mcp/result.go, +neo4j-cli/internal/subcommands/mcp/result_test.go, ~neo4j-cli/internal/subcommands/docker/export_test.go
+
+## TASK-008 — 2026-08-04T16:07:56Z
+First real tool `neo4j_cli_list_commands` (readOnly+idempotent): no-arg returns 12 top-level trees, `tree` arg lists that tree's commands as `use: short` lines. Projects `agentcontext.BuildContext` via the stored RootFactory; `completion` filtered. `mcp tools --format json` now lists one tool; the old `"[]"` test updated.
+Files: +list_commands.go, +list_commands_test.go, ~mcp.go, ~tooldefs.go, ~tools_test.go
+Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED without committing; fixed a duplicate `status: pending` the child left in task-007's block.
+
+## TASK-009 — 2026-08-04T18:26:00Z
+Implemented neo4j_cli_read_docs tool — resolves a space-separated CLI path against the embedded skill bundle by matching the heading with the full command path, returning content until the next sibling heading at the same level. Tree-only (H1) requests return Contents TOC + tree prose only, never children. Supports offset/max_chars pagination (default 6000, max 20000) with continuation hint and next_offset in structuredContent. All text sanitized through RedactText+StripControl per REQ-F-031. Drift hazard test cross-references every list_commands entry against the bundle, filtering completion.
+Files: +read_docs.go, +read_docs_test.go, +read_docs_drift_test.go, ~tooldefs.go
+
+## TASK-010 — 2026-08-04T19:05:00Z
+Implemented neo4j_cli_run tool (readOnlyHint) taking command + args as separate params (args capped at 64). Pre-exec validation: write-classified commands refused with neo4j_cli_run_write hint; --rw/--debug in args rejected; flag long-names validated with Levenshtein did-you-mean; query with empty args caught before exec (stdin leaf guard). Uses existing Executor and MapCommandResult for execution/redaction. Updated setupListCommandsTest with save/restore global state for test isolation.
+Files: +run.go, +run_test.go, ~tooldefs.go, ~list_commands_test.go
+
+## TASK-011 — 2026-08-04T19:45:00Z
+Implemented neo4j_cli_run_write with three-layer write gating: process gate (WriteAllowed in Gates), policy table (Check), and authoritative EnforceWriteGate inside Execute. Reuses run's helpers (parseRunArgs, validateRunFlags, isStdinLeaf, runError). Added alwaysKnownFlags (--rw, --format) to validateRunFlags so root-level flags pass validation on any tree. Gates.WriteAllowed added for task-013 to wire from serve --rw.
+Files: +run_write.go, +run_write_test.go, ~run.go, ~tooldefs.go, ~allow.go
+Decisions:
+- WriteAllowed added to Gates struct (not a separate parameter) so task-013 sets it from serve --rw alongside AllowAura/AllowCredentialWrite.
+- alwaysKnownFlags in run.go avoids requiring every test stub to register root-level flags. Only --rw and --format.
+- Authoritative gate test (TestHandleRunWrite_AuthoritativeGate) uses a writeGateRootFactory with EnforceWriteGate installed and proves layer 3 catches writes without --rw even when MCP-layer gates are open.
+
+## TASK-012 — 2026-08-04T18:02:20Z
+Fifth and final tool `neo4j_cli_list_targets` (readOnly+idempotent, no params): fans out over docker/desktop/credential-dbms/aura-instance list and merges into one table; an unavailable source becomes a noted omission rather than a failure.
+Files: +list_targets.go, +list_targets_test.go, ~tooldefs.go
+Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED without committing; also repaired a duplicate `status:` line the child left in task-011's block.
+
+## TASK-013 — 2026-08-04T18:52:01Z
+Wired `mcp serve` over stdio: IOTransport on the ClaimStdio files, five tools from toolDefinitions(), 918-byte instructions field, --rw/--allow-aura/--allow-credential-write/--format/--max-output-chars moved onto serve. Verified by manual JSON-RPC smoke test (initialize + tools/list).
+Files: +serve.go, +server.go, +server_test.go, ~allow.go, ~allow_test.go, ~mcp.go, ~mcp_test.go, ~testdata/policy.golden
+Decisions: finalize run by parent after child agent stalled mid-review. `mcp serve` classified deny in policy.golden (no recursive servers). Tool defs measure 3259 B via `mcp tools --format json`, under the 4000 B budget task-014 gates; the wire tools/list response is larger (4874 B) because the SDK injects schema scaffolding the budget does not cover.
+
+## TASK-014 — 2026-08-04T19:22:25Z
+Added token-budget (4000 B ceiling on `toolRows` serialization of `toolDefinitions()`) and tool-naming (regex gates for tool names and schema properties) CI gates, both reading from `toolDefinitions()` so they cannot be bypassed. Mutation-verified: budget gate fails at ceiling=1; naming gate catches camelCase tool names (`neo4jCliRun`) and camelCase schema properties (`Command`). The existing whole-tree gates (TestAllLeafCommands_HaveExamples, TestInputIdentifiers_AreKebabCase) still pass; no per-package duplicates added.
+Files: +neo4j-cli/internal/subcommands/mcp/tooldefs_gate_test.go, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt, ~AGENTS.md
+Decisions:
+- Budget measures the `toolRows` projection (used by `mcp tools --format json` and `server.go`), not the SDK wire response (4874 B). PRD ceiling was written against this surface.
+- `instructions` field (918 B) deliberately NOT folded into the budget — it is sent once at initialize and lives in the cached prompt prefix, not per-tool-definition.
+- Reviewer removed `exemptNamingFields` map (speculative generality — SDK fields never appear inside `InputSchema["properties"]`).
+- Tightened tool name regex from `^neo4j_cli_[a-z0-9_]+$` to `^neo4j_cli_[a-z][a-z0-9]*(_[a-z0-9]+)*$` to prevent double underscores, trailing underscores, and purely numeric segments.
+
+## TASK-015 — 2026-08-04T22:00:00Z
+Built the manifest generator (GenerateBundle) and `mcp bundle --out <path>` leaf, producing a valid .mcpb zip (manifest.json + README.md, no binary) with manifest_version "0.3", tools derived from toolDefinitions(), user_config with no secret fields, and icon cleanly omitted. Validated against `npx @anthropic-ai/mcpb validate` — passes. The shared function is GenerateBundle(path string) error; task-016 calls it with a cache-dir path.
+Files: +neo4j-cli/internal/subcommands/mcp/manifest.go, +neo4j-cli/internal/subcommands/mcp/bundle.go, +neo4j-cli/internal/subcommands/mcp/manifest_test.go, +neo4j-cli/internal/subcommands/mcp/bundle_test.go, ~neo4j-cli/internal/subcommands/mcp/mcp.go, ~neo4j-cli/internal/subcommands/mcp/mcp_helpers_test.go, ~neo4j-cli/internal/subcommands/mcp/testdata/policy.golden, ~.plans/tasks-cli-218-mcp-server.yml
+Decisions:
+- tools[] in the manifest carries only "name" (validated against mcpb@2.1.2 schema), not title/hints — those come from the runtime tools/list response. The PRD/task description's assumption that hints are in the manifest was corrected against the real validator.
+- Platforms use MCPB spec enum: darwin, win32, linux (not "windows").
+- privacy_policies is []string of URLs, not []objects (validated schema).
+- user_config fields each require title+description (validated schema).
+- Author is an object {"name": "Neo4j"} (validated schema).
+
+## TASK-016 — 2026-08-04T22:45:00Z
+Added mcp install/remove/list/check for Claude Desktop, reusing GenerateBundle and the task-002 agent catalog. Config writes are surgical merge (map[string]any, temp-file+rename, mode preserved). formatAgentErr extended so skill install --agent claude-desktop points at mcp install. All forward-looking APIs from task-002 now have callers; none deleted.
+Files: +common/skill/mcpconfig.go, +common/skill/mcpconfig_test.go, +neo4j-cli/internal/subcommands/mcp/install.go, +neo4j-cli/internal/subcommands/mcp/install_test.go, +neo4j-cli/internal/subcommands/mcp/remove.go, +neo4j-cli/internal/subcommands/mcp/remove_test.go, +neo4j-cli/internal/subcommands/mcp/list.go, +neo4j-cli/internal/subcommands/mcp/list_test.go, +neo4j-cli/internal/subcommands/mcp/check.go, +neo4j-cli/internal/subcommands/mcp/check_test.go, ~common/skill/helpers.go, ~neo4j-cli/internal/subcommands/mcp/mcp.go, ~neo4j-cli/internal/subcommands/mcp/mcp_helpers_test.go, ~neo4j-cli/internal/subcommands/mcp/testdata/policy.golden
+
+
+## TASK-017 — 2026-08-04T21:45:00Z
+Inject --no-print-password for docker create under MCP (mirrors injectFormat pattern), add credential store availability probe at mcp serve startup that returns actionable clierr error when keyring is locked/unreachable. Existing dbconn.ResolveConn path handles zero-credential resolution with no MCP-side change. All gates pass.
+Files: ~neo4j-cli/internal/subcommands/mcp/serve.go, ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go
+Decisions: --no-print-password injection lives in server.go's handlerFor alongside injectFormat, not in the executor, so normal CLI behaviour is unchanged (human running docker create still sees password). Credential probe uses probeKeyringFn seam (var, not function call) so tests swap a stub. Probe fires only when credential-storage is keyring; insecure mode skips it.
+
+## TASK-018 — 2026-08-04T23:55:00Z
+Regenerated skill bundle (no drift — flag default-false), added changie Minor entry describing the user-facing mcp command group, and documented four MCP conventions in AGENTS.md: stdio fd-swap, tool-result redaction obligation, RegisterSecretValue hazard for MCP transcripts, and docker create's missing RegisterSecretValue gap.
+Files: ~AGENTS.md, +.changes/unreleased/neo4j-cli-Minor-20260804-234825.yaml, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt
+
+## TASK-019 — 2026-08-05T05:00:00Z
+Validated discovery convergence end to end. Drove the MCP server via stdio JSON-RPC with hand-written requests (initialize -> tools/list -> tools/call for each discovery step). Measured every round trip's byte count; converted to tokens at 3.6 B/tok.
+
+### Measured Fixed Costs (cached in prompt prefix, paid once per session)
+- Instructions field: 918 B (~255 tokens)
+- Tool definitions (toolRows projection, budget gate surface): 3253 B (~903 tokens, under 4000 B ceiling)
+- tools/list wire response: 5063 B (~1406 tokens, includes SDK schema scaffolding)
+
+### Measured Per-Call Response Costs
+- list_targets: ~800+ chars (~222+ tokens, varies with targets present)
+- read_docs("docker load"): 2323 chars (~645 tokens) — includes prose, flags table, examples
+- run("dataset list"): 1897 chars (~527 tokens) — lists all available datasets with descriptions
+- run_write: depends on result; successful gate-pass but failed execution returned did-you-mean error
+
+### Round Trip Counts
+- Optimal cold session discovery path: 3 RTs (list_targets -> read_docs("docker load") -> run_write)
+- Known-command path: 1 RT (run_write directly)
+- Covers within the REQ-NF-002 budget of ≤4 RTs from cold, ≤1 RT when known
+
+### Token Budget Assessment
+- Per-call tokens for optimal 3-RT path: ~1394 tokens (list_targets ~222 + read_docs ~645 + run_write variable)
+- Well under the 2k ceiling when counting only per-call tokens
+- Including fixed costs (instructions 255 + tool defs 903 = 1158): ~2552 total — slightly over 2k, but those are cached prompt prefix costs paid once per session, not per task
+- Recommendation: clarify REQ-NF-002 as measuring per-call (response) tokens (met) vs total session tokens (slightly over, first-task only)
+
+### Write Gate Verification
+All three independent layers confirmed via CLI:
+- Layer (a): run_write without server --rw -> "Write operations are not allowed; restart with --rw" (99 chars)
+- Layer (b): run on write-classified command -> points at neo4j_cli_run_write (65 chars)
+- Layer (c): run_write with server --rw + --rw in args on write command -> passes all gates, fails at real execution with did-you-mean, proving EnforceWriteGate is authoritative
+
+### Curation Recommendation
+Five-tool surface holds. Progressive disclosure (list_targets -> list_commands -> read_docs -> run -> run_write) converges in 3 RTs for the dataset-loading task, under the 4-RT budget. Tool definitions at 3253 B (under 4000 B ceiling) and instructions at 918 B leave comfortable headroom. No tool should be removed.
+
+### Limitations
+- Full Claude Desktop end-to-end test REQUIRES THE HUMAN: the model's thinking tokens per tool turn, the quality of its choices (does it reach for list_targets first?), and whether read_docs(…) is sufficient to avoid flag guessing are only measurable in a live chat turn.
+- Docker load not executed to completion (would create containers); gate-pass verification used a write-classified command that correctly failed on flag validation, confirming gates are open and functional.
+
+## REVIEW — 2026-08-05T06:30:00Z
+Added 9 review tasks (task-020..task-028) from the hone end-of-feature audit: 2 blocking (resolveCommandAndExec extraction, hintTrue shared *bool), 7 non-blocking (injectFlag collapse, precise flag matching, isStdinLeaf annotation, RedactedArgs deletion, argSpellings simplification, column-descriptor table, shared AsArray boilerplate).
+
+## TASK-020 — 2026-08-05T08:06:51Z
+Extracted `resolveCommand` helper shared by HandleRun and HandleRunWrite, eliminating ~65 lines of duplicate tree-building/path-resolution/flag-validation/stdin-catch logic. Pure refactor, no behavior change.
+Files: ~run.go, ~run_write.go
+Decisions: finalize run by parent after child agent stopped at TASK_COMPLETED without committing.
+
+## TASK-021 — 2026-08-05T08:21:09Z
+Replaced shared package-level `hintTrue *bool` pointer with a `boolPtr(v bool) *bool` function, materialising a fresh pointer per tool definition so no two tools share annotation state. Pure refactor, no behavior change. Reviewer noted and fixed: used plain `func` instead of `var`-func, corrected British spelling in comment.
+Files: ~tooldefs.go
+
+## TASK-022 — 2026-08-05T08:28:31Z
+Collapsed injectFormat/injectNoPrintPassword/hasFormatFlag/hasNoPrintPasswordFlag into injectFlag(req, predicate, flagItems...) — a single generic helper that unmarshals Args, checks a caller-provided predicate, prepends flag items, and remarshals. injectFormat kept as a thin wrapper (adds the empty-format guard). shouldInjectFormat and shouldInjectNoPrintPassword are the two predicate implementations. No behavior change: 253 mcp tests pass.
+Files: ~server.go, ~server_test.go
+
+## TASK-023 — 2026-08-05T00:00:00Z
+Tightened shouldInjectFormat's HasPrefix check to exact equality (s == "--format" || strings.HasPrefix(s, "--format=")), removing implicit dependency on the flag catalog. shouldInjectNoPrintPassword already used precise matching (unchanged). Added two tests matching NoPrintPassword coverage: equals-form and prefix-collision. 255 mcp tests pass (was 253). All gates green.
+Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go
+
+## TASK-024 — 2026-08-05T08:47:42Z
+Replaced hard-coded command-name list in isStdinLeaf with a cobra annotation (Annotations["stdin-reader"]="true"). Added the annotation to the real query command in query/query.go with a comment explaining why (reads os.Stdin, would hang a stdio MCP server). Updated all test stubs (run_test.go, server_test.go) to carry the annotation. No bundle drift. 255 mcp tests pass, all gates green.
+Files: ~neo4j-cli/internal/subcommands/mcp/run.go, ~neo4j-cli/query/query.go, ~neo4j-cli/internal/subcommands/mcp/run_test.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt
+
+## TASK-025 — 2026-08-05T08:56:25Z
+Deleted RedactedArgs middle-man wrapper (result.go:161-163). Verified the wrapper had zero callers; executor.go already imports clievents and calls clievents.RedactArgs directly. Pure deletion refactor, no behavior change. All gates pass.
+Files: ~neo4j-cli/internal/subcommands/mcp/result.go, ~.plans/tasks-cli-218-mcp-server.yml
+
+## TASK-026 — 2026-08-05T10:15:00Z
+Simplified argSpellings slice-range idiom: replaced the three-index slice expression parts[:len(parts):len(parts)] with initialLen := len(parts); parts[:initialLen], removing the subtle Go capacity-constraint trick. Pure refactor, no behavior change.
+Files: ~neo4j-cli/internal/subcommands/mcp/allow.go, ~.plans/tasks-cli-218-mcp-server.yml
+
+## TASK-027 — 2026-08-05T09:13:00Z
+
+## TASK-028 — 2026-08-05T10:45:00Z
+Extracted shared `resultRows[T asArrayRower]` generic type in `result_rows.go` eliminating three identical `AsArray()` / `MarshalJSON()` implementations in check.go, install.go, and list.go. Each row struct now implements `asArrayRow() map[string]any`. Updated remove.go's `installResults` references. 255 mcp tests pass; all gates green.
+Files: +neo4j-cli/internal/subcommands/mcp/result_rows.go, ~install.go, ~check.go, ~list.go, ~remove.go
+Introduced colDef slice (name + width) driving the header, separator, and data-row rendering in formatTargetsTable. Adding a column is now one entry in targetColumns plus one field in the vals slice. Pure refactor, byte-identical output verified by standalone program. Reviewer noted comment accuracy; fixed.
+Files: ~neo4j-cli/internal/subcommands/mcp/list_targets.go, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt
+
+## REVIEW — 2026-08-05T12:40:00Z
+Added 2 review tasks (task-029..task-030) from live Claude Desktop testing: Aura org/project pairing invariant in the instructions field, and surfacing the owning org on list_targets Aura rows. A third reported finding (--type free-db vs free enum contradiction) was disproved by tee logs and deliberately NOT filed.
+
+## TASK-029 — 2026-08-05T13:07:04Z
+Added Aura scoping invariant to the instructions field in server.go: pair --organization-id and --project-id from the same org, and a not-found is a scoping error not an auth error. Added test assertions for both statements so guidance cannot be silently dropped. Instructions field grew from 944 B to 1189 B (under 1500 B ceiling). All gates pass.
+Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go, ~.plans/tasks-cli-218-mcp-server.yml
+
+## TASK-030 — 2026-08-05T16:30:00Z
+Injected `organization_id` into each Aura instance row in `aura instance list` output (zero extra API round-trips — orgID is already in scope from the handler). Added `organization` column to the merged list_targets table via the existing colDef descriptor slice. Updated all test data and assertions.
+Files: ~neo4j-cli/aura/internal/subcommands/instance/list.go, ~neo4j-cli/aura/internal/subcommands/instance/list_test.go, ~neo4j-cli/internal/subcommands/mcp/list_targets.go, ~neo4j-cli/internal/subcommands/mcp/list_targets_test.go, ~.plans/tasks-cli-218-mcp-server.yml
+
+## REVIEW — 2026-08-05T13:55:00Z
+Added 2 review tasks (task-031..task-032) from PR #232 CI failures: CodeQL high-severity allocation-size-overflow in injectFlag, and Windows-only path portability in mcpconfig_test.
+
+## TASK-031 — 2026-08-05T17:00:00Z
+Bounded `len(existing)` to `MaxRunArgs` (64) inside `injectFlag` before it reaches `make()` capacity, closing the CodeQL `go/allocation-size-overflow` high-severity alert. Chose truncation over rejection: `injectFlag` returns `*mcpsdk.CallToolRequest` with no error-signalling path, so silently skipping injection (returning the original req) is worse than truncating. The handler's own 64-item cap in `resolveCommand` re-checks the truncated args, so behavior is consistent. Added `TestServer_InjectFlagTruncatesOversizedArgs` asserting a >64-item args array is capped rather than allocated at full size.
+Files: ~neo4j-cli/internal/subcommands/mcp/server.go, ~neo4j-cli/internal/subcommands/mcp/server_test.go
+
+## TASK-032 — 2026-08-05T14:09:26Z
+Fixed four Windows-only mcpconfig_test failures by deriving config paths from `a.MCPConfigPath()` (same expandPath the production code uses) instead of hardcoding darwin literals (`/Users/test/Library/Application Support/Claude`). Added a GOOS-parameterised cross-platform test exercising the surgical merge for darwin/windows/linux via the currentGOOS seam. No t.Parallel() needed (process-global seam). All gates pass: make test (no FAIL), make fmt-check, make lint (0 issues).
+Files: ~common/skill/mcpconfig_test.go, ~AGENTS.md, ~.plans/tasks-cli-218-mcp-server.yml, ~.plans/progress-cli-218-mcp-server.txt
+
+## REVIEW — 2026-08-05T13:58:00Z
+Added 1 task (task-033): replace the placeholder .mcpb icon with the real Neo4j CLI glyph. Official SVG committed at neo4j-cli/internal/subcommands/mcp/icon.svg. No rasteriser available in-session (rsvg-convert/inkscape/magick/cairosvg absent; qlmanage produced a blank image), so rasterisation is deferred to the task.
+
+## TASK-033 — 2026-08-05T14:12:00Z
+Replaced the placeholder circle with the real Neo4j CLI glyph. Owner supplied a 3412x2594 PNG with a white background; converted to a 512x512 square RGBA icon — white keyed to transparent, glyph box-sampled and centred (margins L30/R30 T47/B47), aspect 1.082 vs the SVG's 1.089 so no stretch. Icon test strengthened to check PNG magic, squareness, >=256px and colour type 6, since the old ">100 bytes" assertion passed for the placeholder.
+Files: ~icon.png, ~manifest_test.go
+Decisions: converted in-repo with a pure-Python decoder (no rasteriser available; rsvg/inkscape/magick/cairosvg absent and qlmanage produced a blank image), so no build-time dependency was added — icon.png stays a committed //go:embed asset.
+
+## TASK-031 (follow-up) — 2026-08-05T14:35:00Z
+CodeQL still flagged go/allocation-size-overflow after the capacity-bounding fix: the non-oversized branch still passed len(existing) into the make capacity, so the taint path survived. Removed the capacity hint entirely and let append grow the slice — the allocation CodeQL objected to no longer exists. Behaviour unchanged (200/200 args preserved so resolveCommand still rejects); the hint was a micro-optimisation on a <=64-item slice.
+Files: ~server.go
+
+## WINDOWS CI FIXES — 2026-08-05T14:45:00Z
+Two more windows-only test failures, both POSIX-path assumptions written earlier this session: bundle_test.go compared a JSON-encoded path against a raw path (JSON escapes backslashes, so the substring never matched), and manifest_test.go used `entryPoint[0] == '/'` for an absolute-path check, false for C:\ drive letters. Fixed by decoding the JSON before comparing, and by using filepath.IsAbs. Grepped the mcp and skill test files for other leading-slash path assumptions — none remain.
+Files: ~bundle_test.go, ~manifest_test.go
+
+## SECURITY REVIEW FIXES — 2026-08-05T15:10:00Z
+PR #232 security-review (golang-security skill) flagged 3 real issues, all fixed and regression-tested:
+1. [Medium] read_docs.go panic — strings.Fields on a whitespace-only `command` returns no tokens; tokens[0] panicked, and HandleReadDocs is not recover()-wrapped, so a request with command=" " crashed the serve process. Reproduced, then guarded. Test: TestHandleReadDocs_WhitespaceOnlyCommand.
+2. [Low] server.go suppression bypass — shouldInjectNoPrintPassword used exact equality while resolveCommand normalises via strings.Fields, so "docker  create" skipped --no-print-password yet still executed, leaking the generated password into the tool result. Now normalises before comparing. Test: TestShouldInjectNoPrintPassword_WhitespaceVariants (covers double-space, tab, surrounding whitespace, plus negative cases).
+3. [Medium] tab-indented Example: fields in 6 leaves (bundle/serve/install/remove/list/check) — render.go TrimSpaces only the first line, so continuation tabs would render into the skill bundle at GA. De-indented; tools.go was already correct.
+Files: ~read_docs.go, ~read_docs_test.go, ~server.go, ~server_test.go, ~bundle.go, ~serve.go, ~install.go, ~remove.go, ~list.go, ~check.go
+Decisions: first de-indent attempt used a naive line filter that stripped tabs from the whole file (93 lines in serve.go) and was reverted; the second targets the Example raw-string span only (30 lines total, gofmt clean).
+
+## SECURITY + CONVENTIONS REVIEW ROUND 2 — 2026-08-05T15:40:00Z
+Two more review findings, both real and both fixed:
+1. [Medium security] --no-print-password=false bypass. shouldInjectNoPrintPassword treated ANY occurrence of the flag (including =false) as "already handled", so a caller could disable suppression and leak the docker create password. First attempt (only skip when enabling) was INSUFFICIENT: verified with a cobra test that pflag resolves repeated flags to the LAST occurrence, so a prepended injected flag loses to a caller's trailing =false. Real fix: injectFlag now APPENDS injected flags instead of prepending, so ours wins. Proven end to end at the cobra layer for =false, =0, and mid-args placement.
+2. [Medium conventions] serve.go was the only leaf without a colocated test file. Added serve_test.go covering gate-flag defaults (all safe), the not-write-annotated invariant (REQ-NF-006), and envBool's parsing.
+An existing test asserted the injected flag was FIRST — that assertion encoded the vulnerable ordering and was updated to assert LAST, with a comment explaining why.
+Files: ~server.go, ~server_test.go, +serve_test.go
+
+## REBASE ON MAIN — 2026-08-05T16:00:00Z
+Rebased 52 commits onto origin/main (which gained CLI-225, `aura api` raw passthrough). One conflict, in common/flags/flags.go: main refactored EnforceWriteGate to delegate to a new RequireWriteAccess, my side added IsWriteCommand. Resolved by keeping main's delegation AND routing its annotation check through IsWriteCommand, so the single-reader rule holds.
+The policy gate then caught a real hole: `aura api` is a raw passthrough to arbitrary Aura endpoints and carries NO static write annotation (main's own test says "write-ness is decided from the resolved method"), so the write policy cannot see it and the default classification was `allow` — which would have let an MCP client reach instance create/delete, bypassing every gated:allow-aura path. Moved to gatedAuraPaths and regenerated the golden. This is exactly the drift the whole-tree gate exists to catch.
+Files: ~common/flags/flags.go, ~mcp/allow.go, ~mcp/testdata/policy.golden
+
+## REBASE ON CLI-228 + 2 UNADDRESSED REVIEW FINDINGS — 2026-08-05T17:10:00Z
+Rebased 53 commits onto origin/main (now carrying CLI-228, the RegisterSecretValue fix I filed earlier — docker/password.go is now the single mint point and registers each generated password itself, covering table and TOON output). Two AGENTS.md conflicts, both resolved to keep main's refinements AND the MCP notes.
+While auditing the PR's unresolved review threads I found TWO findings from an earlier round that were never fixed:
+1. [HIGH] Policy bypass via non-runnable parent path. root.Find(["config"]) returns the PARENT, and parents report IsAvailableCommand()==true, so classification ran against ["config"] (allow) while execArgs routed cobra to the child leaf. Proved it: command="config" args=["set","credential-storage","insecure"] classified `allow` while the leaf `config set` classifies `deny` — defeating the keyring-downgrade rule. Fixed by adding !cmd.Runnable() to the guard. Test: TestResolveCommand_RejectsNonRunnableParent.
+2. [Medium] ClaimStdio corrupts write-gate TTY detection. stdio.go sets os.Stdout = os.Stderr; flags.stdoutIsTerminal reads os.Stdout's fd, so `mcp serve` from a shell looked interactive and RequireWriteAccess step 3 waved write-annotated commands through without --rw — silently disabling the authoritative Layer 3. Added flags.ForceNonInteractive(), called right after ClaimStdio. Test: TestForceNonInteractive.
+Files: ~AGENTS.md, ~common/flags/flags.go, ~common/flags/flags_test.go, ~mcp/run.go, ~mcp/run_test.go, ~mcp/serve.go
+
+## RENAME mcp tools -> mcp tool — 2026-08-05T17:35:00Z
+Conventions-review finding: `tools` violated the repo's singular-noun rule for command names. Renamed the leaf to `tool` (files tools.go/tools_test.go -> tool.go/tool_test.go, newToolsCmd -> newToolCmd) and updated every invocation, the Example lines, the PRD and the policy golden. Deliberately NOT renamed: the MCPB manifest's `Tools []map[string]string \`json:"tools"\`` (spec wire format) and the unrelated uv `.local/share/uv/tools` install path. Safe to rename because nothing has shipped — the group is flag-gated and unreleased.
+Files: >tools.go=>tool.go, >tools_test.go=>tool_test.go, ~mcp.go, ~tooldefs.go, ~tooldefs_gate_test.go, ~mcp_test.go, ~executor_test.go, ~allow_test.go, ~tooldefs_test.go, ~testdata/policy.golden, ~.plans/prd-cli-218-mcp-server.md
+
+## TASK-034 — 2026-08-06T10:25:00Z
+Removed tracked .DS_Store from git index and working tree, added .DS_Store to .gitignore. No other tracked .DS_Store files exist.
+Files: ~.gitignore, ~.plans/tasks-cli-218-mcp-server.yml
+Decisions:
+- gitignore pattern `.DS_Store` (no leading slash) matches at any depth, covering the previously-tracked path and all future occurrences.
+
+## REVIEW — 2026-08-06T10:13:21Z
+Added 2 review tasks (task-034..task-035).
+
+## TASK-035 — 2026-08-06T13:10:00Z
+Extracted duplicated read-file + unmarshal + mcpServers navigation from four functions into shared readMCPConfig/readMCPConfigServerEntry helpers. Removed unused "os" import.
+Files: ~common/skill/mcpconfig.go
+Decisions:
+
+## REVIEW — 2026-08-06T12:17:18Z
+Added 1 review task (task-036).
+
+## TASK-036 — 2026-08-06T12:34:35Z
+Gated the three MCP gate env vars behind a NEO4J_CLI_MCP_MANIFEST=1 marker set by the .mcpb manifest, so ambient env cannot open a gate for a hand-run server while Claude Desktop UI toggles keep working.
+Files: ~neo4j-cli/internal/subcommands/mcp/serve.go, ~neo4j-cli/internal/subcommands/mcp/serve_test.go, ~neo4j-cli/internal/subcommands/mcp/manifest.go, ~neo4j-cli/internal/subcommands/mcp/manifest_test.go, ~AGENTS.md
+Decisions: rejected reusing accept-env-vars (not MCP-scoped; would silently enable credential env reads across ~14 GatedGetenv call sites)
+
+## REVIEW — 2026-08-13T07:55:23Z
+Added 3 review tasks (task-037..task-039).
+
+## TASK-037 — 2026-08-13T08:00:31Z
+Moved icon.png into assets/ subdirectory, deleted dead icon.svg, updated //go:embed directive to assets/icon.png. Bundle-internal names stay "icon.png".
+Files: ~neo4j-cli/internal/subcommands/mcp/manifest.go, -neo4j-cli/internal/subcommands/mcp/icon.svg, +neo4j-cli/internal/subcommands/mcp/assets/icon.png
+
+## TASK-038 — 2026-08-13T08:13:00Z
+Renamed output columns in mcp check from installed_version/current_version to installed_command/current_command (local mcpCheckResultRow struct only). Left skill.Installation.InstalledVersion in common/skill/ untouched.
+Files: ~neo4j-cli/internal/subcommands/mcp/check.go
+Review: all gates pass; cosmetic Example indentation shift noted but behaviorally identical
+
+## REVIEW — 2026-08-13T08:15:01Z
+Added 1 review task (task-040).
+
+## TASK-039 — 2026-08-13T08:43:17Z
+Split the mcp package: cobra leaves stay in mcp, MCP server runtime moved to mcp/server. storedRootFactory/storedVersion relocated behind server.Configure(); NewServer/validateWiring/ensureToolDefinitions/toolDefinitions/toolRows exported as server.New/ValidateWiring/EnsureToolDefinitions/ToolDefinitions/ToolRows.
+Files: ~neo4j-cli/internal/subcommands/mcp/{mcp,serve,tool,manifest,server_test,serve_test,mcp_helpers_test}.go, +neo4j-cli/internal/subcommands/mcp/server/{config,main_test,server_helpers_test}.go, >neo4j-cli/internal/subcommands/mcp/{server,executor,stdio,allow,tooldefs,run,run_write,read_docs,list_commands,list_targets,result}.go=>neo4j-cli/internal/subcommands/mcp/server/, >neo4j-cli/internal/subcommands/mcp/testdata/policy.golden=>neo4j-cli/internal/subcommands/mcp/server/testdata/policy.golden, ~AGENTS.md
+Decisions: kept the four cobra-level tests (serve annotation, credential-store probe) in mcp/server_test.go and moved only the genuine MCP-server tests; added StoredRootFactory/StoredVersion accessors because serve.go stays in mcp and needs read access
+
+## TASK-040 — 2026-08-13T08:51:00Z
+Renamed mcp list output column installed_version to installed_command so it matches mcp check for the same binary-path value; corrected the stale `tools` command name to `tool` in the unreleased changelog entry.
+Files: ~neo4j-cli/internal/subcommands/mcp/list.go, ~neo4j-cli/internal/subcommands/mcp/list_test.go, ~.changes/unreleased/neo4j-cli-Minor-20260804-234825.yaml
+Decisions: list_test.go now asserts installed_command present AND installed_version absent — the lack of any column-name assertion is why list.go silently drifted from check.go
+
+## REVIEW — 2026-08-13T09:04:57Z
+Added 2 review tasks (task-041..task-042).
+
+## TASK-041 — 2026-08-13T09:05:40Z
+Deleted the stale **Gap** clause about `clievents.RegisterSecretValue` from the docker `create` bullet in AGENTS.md — the gap was closed by CLI-228 / PR #234 (`password.go` line 56 calls `RegisterSecretValue`). All other claims on that bullet preserved. Lines 136/139 untouched.
+Files: ~AGENTS.md
+
+## TASK-042 — 2026-08-13T09:12:44Z
+Strengthened the doc comment on server.Configure to state the single-call-before-server-runs constraint and the race consequence of violating it (handlers read storedRootFactory/storedVersion per request without synchronisation). Comment-only change; no runtime behaviour altered.
+Files: ~neo4j-cli/internal/subcommands/mcp/server/config.go

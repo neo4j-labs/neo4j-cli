@@ -15,6 +15,10 @@ import (
 // It includes all global keys plus "aura.<key>" for each aura key, excluding any
 // aura key that would shadow a global key (e.g. "aura.output" is excluded because
 // "output" already exists as a global key).
+//
+// Registered feature-flag keys ("flag.*") are deliberately excluded: they are
+// experimental and opt-in, so completion must not advertise them. They remain
+// addressable by name — ResolveConfigKey accepts them (see clicfg.Registry).
 func validGetArgs(cfg *clicfg.Config) []string {
 	args := make([]string, 0, len(cfg.Global.ValidConfigKeys)+len(cfg.Aura.ValidConfigKeys))
 	args = append(args, cfg.Global.ValidConfigKeys...)

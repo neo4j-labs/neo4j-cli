@@ -17,10 +17,10 @@ import (
 )
 
 // expectedRowCount returns the number of (skill × agent) rows for `n`
-// catalog skills plus the always-present self row, across the full AGENTS
-// catalog. JSON output still emits one row per (skill × agent).
+// catalog skills plus the always-present self row, across the skill-capable
+// agents. JSON output still emits one row per (skill × agent).
 func expectedRowCount(catalogSkills int) int {
-	return (1 + catalogSkills) * len(skill.AGENTS)
+	return (1 + catalogSkills) * len(skill.SkillAgents())
 }
 
 func TestListCmd_ColdCache_OnlySelfRows(t *testing.T) {
@@ -34,7 +34,7 @@ func TestListCmd_ColdCache_OnlySelfRows(t *testing.T) {
 
 	var rows []map[string]any
 	require.NoError(t, json.Unmarshal(f.stdout.Bytes(), &rows))
-	assert.Len(t, rows, len(skill.AGENTS), "cold cache must show self rows only")
+	assert.Len(t, rows, len(skill.SkillAgents()), "cold cache must show self rows only")
 	for _, r := range rows {
 		assert.Equal(t, testSkillName, r["skill"])
 		assert.Equal(t, "embedded", r["source"])
@@ -57,20 +57,20 @@ func TestListCmd_WarmCache_SelfAndCatalogRows(t *testing.T) {
 	assert.Len(t, rows, expectedRowCount(2))
 
 	// Self rows come first.
-	for i := 0; i < len(skill.AGENTS); i++ {
+	for i := 0; i < len(skill.SkillAgents()); i++ {
 		assert.Equal(t, testSkillName, rows[i]["skill"])
 		assert.Equal(t, "embedded", rows[i]["source"])
 		assert.Equal(t, "1.7.0", rows[i]["available_version"])
 	}
 	// Followed by catalog rows in plugin.json order.
-	cypherStart := len(skill.AGENTS)
-	for i := cypherStart; i < cypherStart+len(skill.AGENTS); i++ {
+	cypherStart := len(skill.SkillAgents())
+	for i := cypherStart; i < cypherStart+len(skill.SkillAgents()); i++ {
 		assert.Equal(t, "neo4j-cypher-skill", rows[i]["skill"])
 		assert.Equal(t, "catalog", rows[i]["source"])
 		assert.Equal(t, "1.0.0", rows[i]["available_version"])
 	}
-	gdsStart := cypherStart + len(skill.AGENTS)
-	for i := gdsStart; i < gdsStart+len(skill.AGENTS); i++ {
+	gdsStart := cypherStart + len(skill.SkillAgents())
+	for i := gdsStart; i < gdsStart+len(skill.SkillAgents()); i++ {
 		assert.Equal(t, "neo4j-gds-skill", rows[i]["skill"])
 		assert.Equal(t, "catalog", rows[i]["source"])
 	}
@@ -219,9 +219,8 @@ func TestListCmd_Table_InstalledInFormatting(t *testing.T) {
 		body := "---\nname: skill-some\nversion: 1.0.0\n---\n# some\n"
 		require.NoError(t, afero.WriteFile(f.fs, filepath.Join(dir, "SKILL.md"), []byte(body), 0600))
 	}
-	// skill-all: installed on every agent in AGENTS.
-	for i := range skill.AGENTS {
-		a := &skill.AGENTS[i]
+	// skill-all: installed on every skill-capable agent.
+	for _, a := range skill.SkillAgents() {
 		sp, _ := a.SkillsPath()
 		dir := filepath.Join(sp, "skill-all")
 		require.NoError(t, f.fs.MkdirAll(dir, 0755))
@@ -245,7 +244,7 @@ func TestListCmd_Table_InstalledInFormatting(t *testing.T) {
 	assert.Contains(t, catalog, "skill-some", "partial catalog skill must render")
 	assert.Contains(t, catalog, "partial", "partial status must render")
 	assert.Contains(t, catalog, "2/11 (claude-code, codex)",
-		"partial install must render 'N/11 (a, b)' in AGENTS order")
+		"partial install must render 'N/11 (a, b)' in catalog order")
 
 	assert.Contains(t, catalog, "skill-all", "fully installed catalog skill must render")
 	assert.Contains(t, catalog, "11/11", "fully installed must render '11/11' without parenthetical")
