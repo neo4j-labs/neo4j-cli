@@ -1,0 +1,223 @@
+feature: oplane-shared-workspace
+prd: ./prd-oplane-shared-workspace.md
+created_at: 2026-08-13T12:31:43Z
+updated_at: 2026-08-13T12:31:43Z
+
+tasks:
+  - id: task-001
+    title: 'Add OPLANE_WORKSPACE_ID top-level env constant and thread it into the prompt'
+    description: |
+      In `.github/workflows/claude-review-oplane.yml`, add a top-level `env:` block above
+      `jobs:` defining `OPLANE_WORKSPACE_ID: 6a246538-76d1-4857-830e-2aad4681d044`. The
+      comment above it is the whole point of this feature and must carry three things:
+      a loud "copying this workflow? change this one value" line; the workspace it names
+      (`neo4j-labs/neo4j-cli`, https://gravity.oplane.io/org/neo4j/workspaces/4); and how
+      to get another workspace's UUID (Oplane MCP tool `search_workspaces` with
+      `name_pattern: "<org>/<repo>"`, or the Gravity workspace page). Point (c) matters
+      because the UUID is not derivable from the `/workspaces/4` URL a user starts from.
+
+      Then add `OPLANE WORKSPACE ID: ${{ env.OPLANE_WORKSPACE_ID }}` as a third line in the
+      `prompt:` input, after `PR NUMBER:`. Use the spaced label (not the underscore form) to
+      match the existing `PR NUMBER:` style — these lines are read by the model, not a shell.
+      `${{ env.X }}` already resolves in this `with:` block; `${{ env.PROMPT }}` on line 98
+      uses the same mechanism.
+
+      Do NOT touch `claude_args`, the `--mcp-config` JSON, or the step-level
+      `env: OPLANE_BASE_URL`. Workspace selection is a per-call argument on
+      `new_threatmodel`, not a connection property. (REQ-F-001..004)
+
+      Note for the PR description: this repo has zero top-level `env:` blocks and zero
+      `vars.X` usage across all 16 workflows. The deviation is deliberate — a step-level
+      entry buried mid-file would not give the visible single edit point this feature is
+      for. Call it out so it is not "normalised" away later.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'A top-level `env:` block exists above `jobs:` with `OPLANE_WORKSPACE_ID: 6a246538-76d1-4857-830e-2aad4681d044`'
+      - 'Its comment names the target workspace, the Gravity URL, and `search_workspaces` as the way to find another UUID'
+      - 'The `prompt:` input has an `OPLANE WORKSPACE ID:` line alongside `REPO:` and `PR NUMBER:`'
+      - '`claude_args`, the `--mcp-config` JSON, and the step-level `OPLANE_BASE_URL` are byte-identical to before'
+      - '`actionlint .github/workflows/claude-review-oplane.yml` reports no findings'
+    completed_at: null
+
+  - id: task-002
+    title: 'Correct the stale OPLANE_PAT ownership comment'
+    description: |
+      In the same workflow file, the `OPLANE_PAT` comment block (currently lines 111-116)
+      asserts "All threat models are therefore created under his Gravity account." That
+      becomes false with task-001 in place. Replace that one clause with the accurate
+      statement: models are created in the shared workspace named by `OPLANE_WORKSPACE_ID`;
+      the PAT supplies identity and write access only.
+
+      Retain everything else in that block UNCHANGED — no service account exists, CI reviews
+      stop working if the token is rotated or the account is deprovisioned, the failure is
+      visible via the MCP-unavailable path, migrate to a service account when Oplane offers
+      one. This comment is load-bearing documentation satisfying REQ-F-027 of the
+      predecessor PRD (`.plans/archive/prd-oplane-threat-model-pr-review.md`). Trim the
+      false clause, not the warning. (REQ-F-005)
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - 'The comment no longer claims threat models are created under the PAT owner''s Gravity account'
+      - 'It states that models go to the workspace named by `OPLANE_WORKSPACE_ID` and that the PAT supplies identity/write access only'
+      - 'The rotation, deprovisioning, visible-failure, and service-account-migration warnings all survive verbatim'
+      - 'No YAML key or value changes — the diff is comment-only'
+    completed_at: null
+
+  - id: task-003
+    title: 'Swap Step 2 dedup from my_recent_threatmodels to workspace-scoped list_threatmodels'
+    description: |
+      In `.github/prompts/claude-review-oplane.md` Step 2 item 1, replace the
+      `my_recent_threatmodels` call with `list_threatmodels`, passing `workspace_id` set to
+      the `OPLANE WORKSPACE ID` value from the context line. Record the rationale in the
+      prompt text: `my_recent_threatmodels` is scoped to the calling PAT, so it cannot see a
+      teammate's or a future service account's models in a shared workspace.
+
+      Critical narrowing, verified against the live API: `list_threatmodels` does NOT return
+      `pull_request_url`. Its response projects only `threatmodel_id`, `title`,
+      `description`, `user_id`, `workspaces`, `workspace_id`, `workspace_name`,
+      `workspace_type`, `created_at`, `updated_at`. So the `pull_request_url` match arm must
+      be DROPPED from the lookup and the match becomes title-only.
+
+      Pin the marker to the exact literal `[<owner/repo>#<PR_NUMBER>]` — square brackets, no
+      space, e.g. `[neo4j-labs/neo4j-cli#232]`. That is what real runs already produce
+      (confirmed on the four most recent models). The current prompt's
+      `<${GITHUB_REPOSITORY}>#${PR_NUMBER}` wording renders angle brackets literally and must
+      be corrected here. (Item 3's copy of the same marker is task-004's job.)
+
+      Leave item 4's fallback intact in intent: if the existing model cannot be updated for
+      any reason, create a new one rather than failing the run. (REQ-F-006, 007, 008-lookup, 011)
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'Step 2 item 1 calls `list_threatmodels` with `workspace_id`; no `my_recent_threatmodels` call remains anywhere in Step 2'
+      - 'The prompt explains why identity-scoped lookup is wrong for a shared workspace'
+      - '`pull_request_url` is no longer offered as a lookup match key'
+      - 'The lookup matches the literal `[<owner/repo>#<N>]` form, not `<REPO>#<N>`'
+      - 'Item 4''s create-rather-than-fail fallback is preserved'
+    completed_at: null
+
+  - id: task-004
+    title: 'Pass workspace_id on every new_threatmodel call, including the skill-initiated one'
+    description: |
+      In `.github/prompts/claude-review-oplane.md` Step 2 item 3 (the new-model path), add
+      `workspace_id` to the enumerated `new_threatmodel` arguments, sourced from the
+      `OPLANE WORKSPACE ID` context line, alongside the existing `pull_request_url` and
+      title-shape requirements. Keep passing `pull_request_url` on create — the write API
+      still accepts it even though `list_threatmodels` does not project it on read. Correct
+      this item's copy of the title marker to the same `[<owner/repo>#<N>]` literal pinned
+      in task-003.
+
+      This is the load-bearing instruction of the whole feature. State EXPLICITLY that
+      `workspace_id` must be supplied on every `new_threatmodel` call, including the run
+      where the upstream `oplane:analyze-pr` skill would otherwise create the model itself.
+      The skill's own step 3 calls `new_threatmodel` with no workspace, and the skill is
+      installed at run time from `https://github.com/oplane/oplane-plugin.git` — unpinned and
+      uneditable by this repo. Our prompt already overrides the skill's create path (Step 2
+      opens by noting the skill "calls `new_threatmodel` unconditionally and has no dedup step
+      of its own"), so the override point exists and is being extended. Word it so it cannot
+      be read as applying only to the dedup-miss branch. (REQ-F-008-create, 009, 010)
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - 'Step 2 item 3 lists `workspace_id` among the required `new_threatmodel` arguments'
+      - 'The instruction explicitly covers the skill-initiated create, not just the dedup-miss branch'
+      - '`pull_request_url` is still passed on create'
+      - 'Item 3''s title marker matches the `[<owner/repo>#<N>]` literal used by the task-003 lookup'
+    completed_at: null
+
+  - id: task-005
+    title: 'Disambiguate Step 1''s connectivity-probe sentence from the new dedup lookup'
+    description: |
+      Step 1's closing sentence (line 13) currently reads: "The skill's own step 1 verifies
+      the MCP connection via `my_recent_threatmodels` and hard-stops on failure, which feeds
+      into Step 4 below." The claim about the SKILL stays true — the skill is upstream and
+      unchanged, and it really does probe with `my_recent_threatmodels`. But after task-003
+      that sentence is the only remaining mention of `my_recent_threatmodels` in the file, and
+      it must not read as describing our dedup.
+
+      Reword so the two calls are plainly distinct: the skill's connectivity probe (upstream,
+      identity-scoped, unchanged) versus our workspace-scoped dedup lookup in Step 2. Keep the
+      Step 4 linkage. (REQ-F-012)
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - 'Step 1 distinguishes the skill''s connectivity probe from our Step 2 dedup lookup'
+      - 'The sentence still attributes `my_recent_threatmodels` to the skill, not to our prompt'
+      - 'The hard-stop / Step 4 linkage is preserved'
+    completed_at: null
+
+  - id: task-006
+    title: 'Verify the no-change surface and annotate the stale tool-allowlist fallback'
+    description: |
+      Static verification pass over the finished diff, confirming this stayed a scoped
+      `.github/`-only change:
+
+      - `actionlint .github/workflows/claude-review-oplane.yml` clean (binary is at
+        `/opt/homebrew/bin/actionlint`).
+      - Prompt Step 3 (summary comment discover-then-edit) and Step 4 (MCP-unavailable
+        failure mode) are untouched.
+      - `claude_args`, `--mcp-config`, `continue-on-error: true`, the `if:` gate, the
+        `concurrency` block and `permissions:` are all unmodified.
+      - Diff touches nothing outside `.github/` and `.plans/`. No `.changes/unreleased/`
+        entry (CI-only, no user-facing CLI impact per the AGENTS.md changie rule). No Go
+        source, no `go generate`, no skill-bundle diff.
+
+      Separately, record the stale-fallback hazard. The `--allowed-tools` wildcard
+      `mcp__oplane__*` already covers `list_threatmodels`, so no `claude_args` change is
+      needed. But the predecessor PRD's REQ-F-016 fallback — "if the wildcard does not match
+      at runtime, list all six tools explicitly" — enumerates six names that do NOT include
+      `list_threatmodels`. If that fallback is ever adopted it must gain
+      `mcp__oplane__list_threatmodels`, otherwise a wildcard failure silently disables dedup
+      and every push duplicates. (REQ-F-013, REQ-NF-001..005)
+    status: pending
+    dependencies:
+      - task-002
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - '`actionlint .github/workflows/claude-review-oplane.yml` reports no findings'
+      - 'Prompt Steps 3 and 4 are byte-identical to before the change'
+      - '`git diff --name-only` against the base shows only paths under `.github/` and `.plans/`'
+      - 'No file added under `.changes/unreleased/`; no diff under `neo4j-cli/internal/skill/bundle/`'
+      - 'The stale REQ-F-016 fallback list is annotated as needing `mcp__oplane__list_threatmodels`'
+    completed_at: null
+
+  - id: task-007
+    title: 'Post-merge live-run verification that models land in workspace 4'
+    description: |
+      NOT auto-implementable — requires a real PR run and, for the final criterion, a second
+      human. Tracked here because the PRD's primary acceptance criteria are runtime, not
+      static: a green job does not prove the routing worked.
+
+      Baseline established during authoring: `list_threatmodels` for workspace
+      `6a246538-76d1-4857-830e-2aad4681d044` returns `[]`, and the four most recent models
+      (PRs #232, #238, #233, #237) all carry `"workspace_type": "personal"`. So ANY result in
+      workspace 4 proves the change took effect.
+
+      Known wrinkle when smoke-testing from this PR itself (recorded in commit e241c447):
+      Anthropic's token exchange refuses to mint a GitHub App token when the workflow file on
+      the PR branch differs from `main` (`workflow_not_found_on_default_branch`). A temporary
+      `github_token: ${{ secrets.GITHUB_TOKEN }}` override works around it but MUST be
+      reverted before merge — with it set the action posts as `github-actions[bot]` instead
+      of `claude[bot]`, which breaks the Step 3 discover-then-edit lookup (it filters on
+      `.user.login == "claude[bot]"`) and produces a new comment per push instead of an edit.
+
+      Expect one-time cutover cost: personal-workspace models for currently-open PRs will not
+      be found by the new workspace-scoped lookup, so the next push to any open PR creates one
+      fresh model in workspace 4. That is intended, not a bug.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - '`list_threatmodels` with `workspace_id=6a246538-76d1-4857-830e-2aad4681d044` returns the PR''s model (baseline was `[]`)'
+      - 'The returned model''s `workspace_type` is not `personal`'
+      - 'A second push to the same PR leaves exactly one model for that PR — updated, not duplicated'
+      - 'The summary comment is edited on the second push, not re-posted'
+      - 'The job exits 0 regardless of findings (advisory preserved)'
+      - 'A person who is not the OPLANE_PAT owner opens https://gravity.oplane.io/org/neo4j/workspaces/4 and sees the model'
+      - 'Any temporary `github_token` smoke-test override has been reverted before merge'
+    completed_at: null
