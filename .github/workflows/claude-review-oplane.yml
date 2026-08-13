@@ -76,6 +76,24 @@ jobs:
             echo 'PROMPT_EOF'
           } >> "$GITHUB_ENV"
 
+      - name: Write Oplane MCP config
+        # The PAT must NOT reach argv: anything passed via claude_args lands in
+        # the action's process arguments and is world-readable through
+        # /proc/<pid>/cmdline to any process on the runner. GitHub masks secrets
+        # in logs, but not in /proc. AGENTS.md states the repo rule directly:
+        # "Secrets via process env ... NEVER argv (world-readable via /proc)".
+        #
+        # The literal ${OPLANE_PAT} below is deliberately NOT expanded here —
+        # the quoted heredoc keeps it intact on disk, and Claude Code expands
+        # ${VAR} when it READS .mcp.json. The secret therefore has to be in the
+        # env of the step that runs Claude (below), not this one. The token
+        # only ever exists in that step's env: never on disk, never in argv.
+        run: |
+          umask 077
+          cat > "${RUNNER_TEMP}/oplane-mcp.json" <<'MCP_EOF'
+          {"mcpServers":{"oplane":{"type":"http","url":"https://gravity.oplane.io/mcp/","headers":{"Authorization":"Bearer ${OPLANE_PAT}"}}}}
+          MCP_EOF
+
       - name: Run Claude Code (Oplane threat-model review)
         id: claude
         continue-on-error: true # advisory check: neither findings nor integration
@@ -83,6 +101,9 @@ jobs:
                                 # still surfaces as a warning annotation.
         env:
           OPLANE_BASE_URL: https://gravity.oplane.io
+          # Consumed by Claude Code when it expands ${OPLANE_PAT} inside the
+          # MCP config written above. Must live here, not on the writer step.
+          OPLANE_PAT: ${{ secrets.OPLANE_PAT }}
         uses: anthropics/claude-code-action@939ae9c056ecf8a1a01409ddd1c4eadec5f8c77b # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -115,12 +136,8 @@ jobs:
           # GitHub MCP servers, so mcp__github_inline_comment__* remains
           # available. --strict-mcp-config is deliberately NOT passed.
           #
-          # Secret-in-argv trade-off: ${{ secrets.OPLANE_PAT }} interpolates
-          # into the action's process arguments via claude_args. GitHub masks
-          # registered secrets in logs. If this proves unacceptable, the
-          # file-based alternative is: write /tmp/mcp.json in a prior step
-          # using ${OPLANE_PAT} shell-env expansion (Claude Code expands
-          # ${VAR} inside .mcp.json) and pass --mcp-config /tmp/mcp.json.
+          # --mcp-config takes a PATH, not inline JSON, so the PAT never enters
+          # argv (see the "Write Oplane MCP config" step for why).
           #
           # OPLANE_PAT is a personal PAT belonging to Oskar Hane (no Oplane
           # service account exists yet). Threat models are created in the
@@ -135,6 +152,6 @@ jobs:
           # without it. Adopting that fallback silently breaks dedup.
           claude_args: >-
             --mcp-config
-            '{"mcpServers":{"oplane":{"type":"http","url":"https://gravity.oplane.io/mcp/","headers":{"Authorization":"Bearer ${{ secrets.OPLANE_PAT }}"}}}}'
+            "${{ runner.temp }}/oplane-mcp.json"
             --allowed-tools
             "mcp__oplane__*,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(tee:*),Read,Grep,Glob,Skill"
