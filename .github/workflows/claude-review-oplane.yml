@@ -79,23 +79,15 @@ jobs:
       - name: Write Oplane MCP config (keep PAT out of argv)
         # AGENTS.md: "Secrets via process env, NEVER argv". A 0600 file
         # under $RUNNER_TEMP is narrower exposure than /proc/<pid>/cmdline.
-        # Residual risk: reduced, not zero.
-        #
-        # The PAT arrives as step env and is injected with jq --arg, so the
-        # shell never parses it. Do NOT switch to an unquoted heredoc with
-        # ${{ secrets.OPLANE_PAT }} inline: that makes the shell expand the
-        # secret, so a token containing a backtick or $ would be executed or
-        # mangled. Do NOT switch to a quoted heredoc with a ${OPLANE_PAT}
-        # placeholder either -- Claude Code does NOT expand ${VAR} when
-        # reading .mcp.json (tried in df1ff24a, reverted in 4dc2f3c8; the
-        # server saw a literal placeholder and offered only OAuth stubs).
-        env:
-          OPLANE_PAT: ${{ secrets.OPLANE_PAT }}
+        # UNQUOTED heredoc -- GitHub's ${{ }} writes the real PAT at YAML
+        # level. Prior attempt: quoted heredoc + ${OPLANE_PAT} (df1ff24a,
+        # reverted 4dc2f3c8) -- Claude Code does NOT expand ${VAR} reading
+        # .mcp.json. Residual risk: reduced but not zero.
         run: |
           umask 077
-          jq -n --arg tok "Bearer ${OPLANE_PAT}" \
-            '{mcpServers:{oplane:{type:"http",url:"https://gravity.oplane.io/mcp/",headers:{Authorization:$tok}}}}' \
-            > "${{ runner.temp }}/oplane-mcp.json"
+          cat > "${{ runner.temp }}/oplane-mcp.json" << MCP_EOF
+          {"mcpServers":{"oplane":{"type":"http","url":"https://gravity.oplane.io/mcp/","headers":{"Authorization":"Bearer ${{ secrets.OPLANE_PAT }}"}}}}
+          MCP_EOF
 
       - name: Run Claude Code (Oplane threat-model review)
         id: claude
