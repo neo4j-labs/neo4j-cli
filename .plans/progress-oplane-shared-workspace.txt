@@ -8,3 +8,7 @@ Files: ~.github/workflows/claude-review-oplane.yml
 Swapped Step 2 dedup lookup from `my_recent_threatmodels` (identity-scoped) to `list_threatmodels` with `workspace_id` (workspace-scoped). Dropped the `pull_request_url` match arm (not returned by `list_threatmodels`). Corrected title marker from angle-bracket `<${GITHUB_REPOSITORY}>#${PR_NUMBER}` to the literal bracket form `[<owner/repo>#<PR_NUMBER>]` that models actually produce. Added rationale explaining why identity-scoped lookup fails for shared workspace.
 Files: ~.github/prompts/claude-review-oplane.md
 Decisions: Title marker is `[<owner/repo>#<PR_NUMBER>]` (square brackets, no space) — matches what real models use; item 3's copy deferred to task-004.
+
+## TASK-004 — 2026-08-13T12:45:24Z
+Added `workspace_id` to item 3's new_threatmodel args, fixed item 3 title marker to `[<owner/repo>#<PR_NUMBER>]`, added preamble covering skill-initiated creates. Kept `pull_request_url`.
+Files: ~.github/prompts/claude-review-oplane.md

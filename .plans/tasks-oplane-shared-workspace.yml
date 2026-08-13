@@ -119,7 +119,7 @@ tasks:
       opens by noting the skill "calls `new_threatmodel` unconditionally and has no dedup step
       of its own"), so the override point exists and is being extended. Word it so it cannot
       be read as applying only to the dedup-miss branch. (REQ-F-008-create, 009, 010)
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -127,7 +127,7 @@ tasks:
       - 'The instruction explicitly covers the skill-initiated create, not just the dedup-miss branch'
       - '`pull_request_url` is still passed on create'
       - 'Item 3''s title marker matches the `[<owner/repo>#<N>]` literal used by the task-003 lookup'
-    completed_at: null
+    completed_at: 2026-08-13T12:45:24Z
 
   - id: task-005
     title: 'Disambiguate Step 1''s connectivity-probe sentence from the new dedup lookup'

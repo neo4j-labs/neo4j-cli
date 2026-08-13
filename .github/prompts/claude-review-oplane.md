@@ -14,7 +14,7 @@ The skill owns the analysis flow — verifying the MCP connection, identifying t
 
 ## Step 2 — Reuse the PR's existing threat model
 
-The `analyze-pr` skill calls `new_threatmodel` unconditionally and has no dedup step of its own. Before creating anything, check for an existing model bound to this PR:
+The `analyze-pr` skill calls `new_threatmodel` unconditionally and has no dedup step of its own. Every `new_threatmodel` call — including any that the skill initiates — must pass `workspace_id` set to the `OPLANE WORKSPACE ID` value from the context line, otherwise the model lands in the caller's personal workspace. Before creating anything, check for an existing model bound to this PR:
 
 1. Call `list_threatmodels` with `workspace_id` set to the `OPLANE WORKSPACE ID` value from the context line (top of this prompt), and look for a model already associated with this PR — match on a title containing the marker `[<owner/repo>#<PR_NUMBER>]` (e.g., `[neo4j-labs/neo4j-cli#232]`), constructed from the REPO and PR NUMBER context lines. Use `list_threatmodels` rather than `my_recent_threatmodels` because the identity-scoped lookup cannot see models created by a teammate or future service account in the shared workspace.
 
@@ -24,7 +24,7 @@ The `analyze-pr` skill calls `new_threatmodel` unconditionally and has no dedup 
    - Do **not** call `new_threatmodel`.
 
 3. **If not found** (new model path):
-   - Call `new_threatmodel` with `pull_request_url` set to the PR's HTML URL (`https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}`) and `<${GITHUB_REPOSITORY}>#${PR_NUMBER}` in the title, so subsequent pushes can find it.
+   - Call `new_threatmodel` with `workspace_id` set to the `OPLANE WORKSPACE ID` value, `pull_request_url` set to the PR's HTML URL (`https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}`), and `[<owner/repo>#<PR_NUMBER>]` in the title (e.g., `[neo4j-labs/neo4j-cli#232]`), constructed from the REPO and PR NUMBER context lines, so subsequent pushes can find it.
 
 4. If the existing model cannot be updated for any reason (e.g. the MCP tool fails), fall back to creating a new one rather than failing the run — a duplicate threat model is better than no model at all.
 
