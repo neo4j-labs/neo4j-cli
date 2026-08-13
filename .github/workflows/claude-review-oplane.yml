@@ -146,12 +146,26 @@ jobs:
           # GitHub MCP servers, so mcp__github_inline_comment__* remains
           # available. --strict-mcp-config is deliberately NOT passed.
           #
-          # Secret-in-argv trade-off: ${{ secrets.OPLANE_PAT }} interpolates
-          # into the action's process arguments via claude_args. GitHub masks
-          # registered secrets in logs. If this proves unacceptable, the
-          # file-based alternative is: write /tmp/mcp.json in a prior step
-          # using ${OPLANE_PAT} shell-env expansion (Claude Code expands
-          # ${VAR} inside .mcp.json) and pass --mcp-config /tmp/mcp.json.
+          # KNOWN GAP — secret in argv. ${{ secrets.OPLANE_PAT }} interpolates
+          # into the action's process arguments, so the token is readable via
+          # /proc/<pid>/cmdline on the runner (GitHub masks logs, not /proc).
+          # This contradicts the AGENTS.md rule "secrets via process env, NEVER
+          # argv" and is tracked as Oplane OPLANE_REQ-00178024.
+          #
+          # It cannot currently be fixed by passing a file path. Both variants
+          # were tried on this branch and BOTH left the server unauthenticated
+          # (only OAuth stubs, no operational tools):
+          #   df1ff24a — quoted heredoc + ${OPLANE_PAT} placeholder. Claude Code
+          #              does NOT expand ${VAR} when reading .mcp.json.
+          #   71777a5c — real secret written to a 0600 file, path passed to
+          #              --mcp-config. Dropped by the action itself: it always
+          #              prepends its built-in GitHub servers as INLINE JSON,
+          #              and mergeMcpConfigs (base-action/src/parse-sdk-options.ts)
+          #              cannot read a file at parse time — "we don't have access
+          #              to the file system here" — so the inline config wins and
+          #              the file path is discarded.
+          # Inline JSON is therefore the only shape that registers this server.
+          # Revisit if upstream teaches mergeMcpConfigs to read file paths.
           #
           # OPLANE_PAT is a personal PAT belonging to Oskar Hane (no Oplane
           # service account exists yet). Threat models are created in the
