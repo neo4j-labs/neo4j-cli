@@ -78,7 +78,6 @@ tasks:
       502-malformed 1 -> 8. (REQ-F-002, REQ-F-003, REQ-F-004, REQ-F-005, REQ-F-006, REQ-F-007,
       REQ-NF-001, REQ-NF-002)
     status: completed
-    completed_at: '2026-08-13T11:00:34Z'
     dependencies:
       - task-001
     acceptance_criteria:
@@ -88,7 +87,7 @@ tasks:
       - 'No test asserts a panic from `handleResponseError`; `TestHandleResponseError_RedactsBodySecrets` passes'
       - '`TestHandleResponseError_NotFound_TagsResource`, `TestParseResourceFromRequest`, `TestSuggestionForResource` and `TestSuggestionForPaymentRequired` pass with zero edits'
       - '`make test` passes — the tree is green at this commit, not just at the end of the feature'
-    completed_at: null
+    completed_at: '2026-08-13T11:00:34Z'
 
   - id: task-003
     title: 'Extend the exit-code mapping table with new statuses and empty-errors bodies'
@@ -139,7 +138,6 @@ tasks:
       credential and nil cfg; the 401/403 fixture is only needed for paths that reach
       `ClearAccessToken`, so exclude 401 or supply the `newAuthFixture` helper for it. (REQ-F-009)
     status: completed
-    completed_at: '2026-08-13T11:25:00Z'
     dependencies:
       - task-002
     acceptance_criteria:
@@ -147,7 +145,7 @@ tasks:
       - 'It asserts no panic, a non-nil error, and a `Code` present in `clierr.Codes` for every combination'
       - 'It covers unmapped statuses (302, 408, 418, 451, 507, 599) in addition to the modelled ones'
       - 'It lives in the internal `package api` test file, not the external `api_test` package'
-    completed_at: null
+    completed_at: '2026-08-13T11:25:00Z'
 
   - id: task-005
     title: 'Add process-level e2e exit-code scenarios for 422/415/413/307'
@@ -221,3 +219,70 @@ tasks:
       - '`make generate-check` reports no drift, and `TestErrorCodesInSyncWithClierr` passes unedited'
       - '`grep -n panic neo4j-cli/aura/internal/api/response.go` returns exactly the two out-of-scope hits'
     completed_at: '2026-08-13T11:45:00Z'
+
+  - id: task-007
+    title: 'Single-source the status→exit-code contract shared by both error paths'
+    description: |
+      From the end-of-feature audit, its one "worth doing before the branch lands" finding.
+
+      Two near-parallel status→exit-code mappings now exist: `handleResponseError`
+      (`neo4j-cli/aura/internal/api/response.go`, the structured path behind ~55 shipped commands)
+      and `RawStatusError` (`neo4j-cli/aura/internal/api/raw.go`, the schema-less path behind the
+      `aura api` passthrough). They deliberately diverge on message rendering — RawStatusError always
+      emits `aura api request failed with status ...` while handleResponseError keeps the structured
+      `ErrorResponse` parse — but they MUST agree on exit codes, because the same upstream status
+      reaching a user by two different command paths must not produce two different exit codes.
+
+      I verified empirically that all 22 statuses agree today (302, 307, 308, 400, 402, 403, 404, 405,
+      408, 409, 413, 415, 418, 422, 429, 451, 500, 502, 503, 504, 507, 599 — identical codes on both
+      paths). So nothing is broken. The problem is structural: the mapping is written out twice, in two
+      files, with separate callers and no shared reference. A future change to one that forgets the
+      other diverges silently, and no test would catch it.
+
+      The audit offered a cross-checking test or a shared table; the shared table was chosen, because
+      it removes the duplication at its source rather than merely detecting it later.
+
+      Extract a single package-private function — suggested `exitCodeForStatus(status int) int` — that
+      is the one place the status→clierr-code contract is written. Have both call sites consult it to
+      pick their exit code, then keep constructing their own messages exactly as they do now.
+
+      Constraints that MUST hold, in rough order of risk:
+
+      1. Zero behaviour change on either path. Every one of the 22 statuses above must still produce
+         the same exit code, the same message text, and the same decorations (`WithResource`,
+         `WithSuggestion`, `RetryAfter`) as it does at HEAD. The full existing suite is the guard —
+         `TestHandleResponseError_ExitCodeMapping` (~36 entries), `TestHandleResponseError_NoPanic`
+         (88 subtests), `TestRawStatusError_StatusMatrix` (23 entries) — and it must pass with ZERO
+         test edits. If you find yourself editing an existing assertion, stop: you have changed
+         behaviour, not structure.
+      2. Preserve the deliberate 405 divergence. 405 is a 4xx that maps to upstream_error (8), NOT
+         the 4xx-class validation_error (6). It is documented at `raw.go:154-157` with a cross-
+         reference. Carry that comment (or an equivalent) onto the shared function so the next reader
+         does not "fix" it.
+      3. Preserve the class-based fallback split: unmodelled 4xx → 6, everything else (3xx, 5xx,
+         unknown) → 8, with the existing note that unmodelled transient 4xx (408, 425) are reported as
+         permanent because status class is the only available signal.
+      4. Do NOT unify message rendering, and do NOT touch `formatAuthorizationError`, `errorMessages`,
+         `upstreamDetail`, `rawErrorDetail`, or `scrubbedBodyTrunc`. The divergence in message text is
+         intentional and out of scope.
+      5. 401 keeps routing through `formatAuthorizationError` (which has a `ClearAccessToken` side
+         effect) and 429 keeps reading the `Retry-After` header — neither is a plain code lookup, so
+         decide deliberately whether they consult the shared function at all, and say which you chose
+         and why. A shared table that only covers the plain cases is acceptable if the exceptions are
+         explicit; a table that pretends to cover everything and then gets bypassed is not.
+
+      Add a test that locks the contract itself: assert that for a broad status list both
+      `handleResponseError` and `RawStatusError` yield the same `*clierr.CLIError.Code`. Even with the
+      shared table this is worth having — it pins the property a future refactor could break by
+      reintroducing a local mapping in one path.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - 'One package-private function is the sole place the status→exit-code mapping is written; neither `handleResponseError` nor `RawStatusError` contains its own copy'
+      - 'All 22 verified statuses produce identical exit codes on both paths, asserted by a new contract test'
+      - 'The existing suites pass with ZERO edits: TestHandleResponseError_ExitCodeMapping, TestHandleResponseError_NoPanic, TestRawStatusError_StatusMatrix'
+      - 'The 405→upstream(8) divergence and the unmodelled-4xx-is-permanent rationale are documented on the shared function'
+      - 'Message text, WithResource/WithSuggestion decorations and RetryAfter are byte-identical to HEAD on both paths'
+      - '`make test`, `make fmt-check`, `make lint` all pass'
+    completed_at: null
