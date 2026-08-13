@@ -1009,3 +1009,234 @@ tasks:
       - 'make test, make fmt-check, make lint pass; no skill-bundle or policy.golden drift'
     source: review
     completed_at: 2026-08-06T12:34:35Z
+
+  - id: task-037
+    title: 'Move MCP icon assets into an assets/ subdirectory and delete the dead icon.svg'
+    description: |
+      PR #232 review (Liam-Doodson, threads 3748702614 and 3748709481). Two related
+      observations on the icon files sitting at the top level of
+      `neo4j-cli/internal/subcommands/mcp/`: "I couldn't see this [icon.svg]
+      referenced from anywhere?" and, on icon.png, "as a nit could these be moved to
+      a sub dir? Just thinking when I'm looking at an editor I normally prefer to
+      have artefacts like this hidden away".
+
+      Both observations are correct. Investigation confirmed `icon.svg` is genuinely
+      dead: only `icon.png` is embedded (`manifest.go:14` `//go:embed icon.png`) and
+      written into the .mcpb zip (`manifest.go:106`) and named in the manifest JSON
+      (`manifest.go:149` `Icon: "icon.png"`). A repo-wide grep finds `icon.svg`
+      referenced nowhere in any .go, .json, .yaml, .yml, .md or golden file — the
+      only mention is in `.plans/tasks-cli-218-mcp-server.yml` itself, which planned
+      to "replace icon.png with a rasterisation of icon.svg" at 512x512. That
+      replacement was never carried out, so the SVG is an orphaned source artifact.
+
+      The user's decision is to DELETE icon.svg rather than keep it as a documented
+      vector source: nothing regenerates from it and no build step consumes it, so
+      removing it means one less unexplained file in the tree.
+
+      IMPLEMENT:
+      - `git rm neo4j-cli/internal/subcommands/mcp/icon.svg`
+      - `git mv neo4j-cli/internal/subcommands/mcp/icon.png
+        neo4j-cli/internal/subcommands/mcp/assets/icon.png`
+      - `manifest.go:14`: change `//go:embed icon.png` to `//go:embed
+        assets/icon.png`. Go's embed directive resolves subdirectory paths fine.
+
+      SCOPE NOTES:
+      - The zip entry name at `manifest.go:106` and the `Icon:` field value at
+        `manifest.go:149` must BOTH stay the literal string "icon.png". Those are
+        bundle-internal names that MCP clients resolve inside the .mcpb — they are
+        not filesystem paths into the repo and must not gain an `assets/` prefix.
+      - `manifest_test.go:192-208` asserts the generated bundle contains a valid PNG
+        at the `icon.png` entry. It should pass unchanged; verify rather than assume.
+      - No changelog entry: the whole `mcp` group is unreleased and already covered
+        by its existing `.changes/unreleased/` entry.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'neo4j-cli/internal/subcommands/mcp/icon.svg no longer exists in the repo'
+      - 'icon.png lives at neo4j-cli/internal/subcommands/mcp/assets/icon.png and the embed directive in manifest.go points at assets/icon.png'
+      - 'The generated .mcpb still contains a valid PNG at the bundle entry named exactly "icon.png", and manifest.json still sets icon to "icon.png" (no assets/ prefix leaks into bundle-internal names)'
+      - 'manifest_test.go passes without modification to its assertions'
+      - 'make test, make fmt-check, make lint pass; no skill-bundle or policy.golden drift'
+    source: review
+
+  - id: task-038
+    title: 'Rename mcp check output columns from installed_version/current_version to installed_command/current_command'
+    description: |
+      PR #232 review (Liam-Doodson, thread 3748681257) on `check.go:33`: "For the
+      agent skills, we have functionality to update any installed skills whenever
+      the CLI is updated right? Would it not be simpler to have the same behaviour
+      for MCP too?"
+
+      Investigating that question surfaced a real defect that very likely prompted
+      it. `mcp check` presents its output under the column names
+      `installed_version` and `current_version` (`check.go:19-20` struct fields,
+      `check.go:27-28` asArrayRow keys, `check.go:90` PrintBodyMap field slice) —
+      but neither field holds a version. Both hold BINARY PATHS: `currentVersion`
+      is `os.Executable()` (`check.go:61`), and `installedVersion` comes from
+      `skill.MCPList`, which populates `AgentInstall.InstalledVersion` from the
+      `command` field of the agent's MCP config JSON (see
+      `common/skill/mcpconfig.go`). So `mcp check` is a path-drift check wearing the
+      label of a version-staleness check.
+
+      That mislabeling is what makes the auto-refresh question look obvious when it
+      is not. The answer to the question itself requires no code change: skill
+      install copies a STATIC bundle snapshot that genuinely goes stale on binary
+      upgrade, which is why `skillrefresh.MaybeRefresh` compares
+      `skill-refresh.json`'s `last_refreshed_version` against `cfg.Version` on every
+      run. MCP install writes only `{command: <binPath>, args: ["mcp","serve"]}`;
+      the tool definitions are built from the LIVE cobra tree at serve time
+      (`ensureToolDefinitions`, `mcp.go:49`). A CLI upgrade at a stable path
+      therefore needs no config change at all, and there is no version to compare —
+      only a MOVED binary drifts, which is exactly what `mcp check` detects.
+      Renaming the columns makes that legible directly from the command's output.
+
+      IMPLEMENT (in `neo4j-cli/internal/subcommands/mcp/check.go`):
+      - On the LOCAL `mcpCheckResultRow` struct only: rename fields, their json
+        tags, the `asArrayRow` map keys, and the `PrintBodyMap` field slice —
+        `installed_version` -> `installed_command`, `current_version` ->
+        `current_command`.
+      - Update the `Long` text (`check.go:37-41`) to describe the columns as
+        commands rather than versions.
+      - Update `check_test.go` assertions to match.
+
+      SCOPE NOTES:
+      - Do NOT touch `skill.AgentInstall.InstalledVersion` in `common/skill/`. On
+        the skill side that field holds a real semver from the SKILL.md frontmatter;
+        only the MCP projection of it is a path. This is a rename local to the mcp
+        package's own output struct.
+      - Output field names are snake_case per the CLI-127 casing convention, and
+        `common/output/casing_gate_test.go` gates `Print*` literals — the new names
+        must stay snake_case.
+      - Note that `printTable` upper-cases header cells, so table-output assertions
+        compare against INSTALLED_COMMAND, not installed_command.
+      - No changelog entry: the whole `mcp` group is unreleased and already covered
+        by its existing `.changes/unreleased/` entry.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'mcp check emits installed_command and current_command in json, toon and table output; installed_version and current_version no longer appear anywhere in the mcp package'
+      - 'The check command Long text describes the columns as command paths, not versions'
+      - 'skill.AgentInstall.InstalledVersion in common/skill/ is unchanged'
+      - 'check_test.go asserts the new names and passes'
+      - 'make test, make fmt-check, make lint pass; output casing gate passes; no skill-bundle or policy.golden drift'
+    source: review
+
+  - id: task-039
+    title: 'Split the mcp package: cobra commands stay in mcp, MCP-server runtime moves to mcp/server'
+    description: |
+      PR #232 review (Liam-Doodson, thread 3748765868) on `mcp.go:1`: "As a nit -
+      there is a lot going on in this directory, would be nice if stuff to do with
+      commands (i.e. installing the MCP server) and running the MCP server we kept
+      separately".
+
+      The observation is well founded: `neo4j-cli/internal/subcommands/mcp/` is 47
+      files and 8318 lines in one flat directory, mixing 7 cobra leaf commands with
+      the entire MCP server runtime (policy engine, executor, stdio transport, tool
+      definitions, five tool handlers, result rendering).
+
+      Create a new package `server` at
+      `neo4j-cli/internal/subcommands/mcp/server/`.
+
+      STAY in package mcp (cobra surface + bundle packaging):
+      mcp.go, serve.go, install.go, remove.go, list.go, check.go, bundle.go,
+      tool.go, manifest.go, result_rows.go, assets/
+
+      MOVE to package server (runtime):
+      server.go, executor.go, stdio.go, allow.go, tooldefs.go, run.go,
+      run_write.go, read_docs.go, list_commands.go, list_targets.go, result.go,
+      plus testdata/policy.golden
+
+      EXPORTED SURFACE THE SPLIT REQUIRES. The runtime half is already mostly
+      exported, so the seam is small. Only these need adding or renaming:
+        - NewServer -> server.New              (consumed by serve.go:179)
+        - validateWiring -> server.ValidateWiring   (consumed by mcp.go:46)
+        - ensureToolDefinitions -> server.EnsureToolDefinitions  (mcp.go:49)
+        - toolDefinitions() -> server.ToolDefinitions()  (tool.go:29, manifest.go:129-130)
+        - toolRows -> server.ToolRows          (consumed by tool.go:29)
+      Already exported, they only gain a package qualifier: NewExecutor, Executor,
+      CommandResult, RootFactory, ClaimStdio, Gates, DefaultMaxOutputChars.
+      `resolveGates` STAYS in serve.go — it is flag-plumbing and its tests are
+      `package mcp`; it returns `server.Gates`.
+
+      THE storedRootFactory / storedVersion SEAM — this is the crux of the task.
+      Both are package globals declared in `mcp.go:22-23`, written by `NewCmd`, and
+      read from five runtime sites: `server.go:32,:39,:47`; `run.go:49`;
+      `tooldefs.go:38,:46,:53`; `list_commands.go:26,:33,:34`. They cannot cross the
+      new package boundary as globals. Move BOTH globals into the server package and
+      add exactly ONE exported setter in a new `server/config.go`:
+          func Configure(newRoot RootFactory, version string)
+      called from `mcp.NewCmd` in place of the current two assignments. This is a
+      mechanical relocation that preserves today's behaviour and, importantly,
+      preserves test access: `list_commands_test.go:161-177` and `run_test.go:22-25`
+      mutate these globals directly and are `package mcp` internal tests, so they
+      move into `package server` alongside their sources and keep unexported access.
+
+      DO NOT thread the factory through structs instead. That would be cleaner in
+      the abstract, but HandleRun/HandleRunWrite/resolveCommand already take
+      `newRoot` as an explicit parameter while tooldefs.go and list_commands.go
+      reach for the global; unifying those two styles is a separate refactor and
+      must not ride along inside a review-response commit.
+
+      TEST FILES — the real cost of the split. Test packages are MIXED, and that
+      decides where each file lands:
+        - package mcp (internal, move with their source) -> become package server:
+          run_test.go, run_write_test.go, server_test.go, tooldefs_test.go,
+          tooldefs_gate_test.go, list_commands_test.go, list_targets_test.go,
+          read_docs_test.go
+        - package mcp (stays): serve_test.go (it tests resolveGates)
+        - package mcp_test (external, testing moved code) -> become package
+          server_test with imports rewritten from mcp.X to server.X:
+          allow_test.go, executor_test.go, result_test.go, stdio_test.go,
+          read_docs_drift_test.go
+        - package mcp_test (stays): check_test.go, bundle_test.go, install_test.go,
+          list_test.go, remove_test.go, manifest_test.go, tool_test.go, mcp_test.go,
+          main_test.go, mcp_helpers_test.go
+
+      `mcp_helpers_test.go` (281 lines, package mcp_test) must be SPLIT. Its
+      newExecutor / stubFactory / executeWithin / executeCtxWithin / waitWithin
+      helpers (lines 130-193) serve the moved executor and result tests, so they
+      belong in a new `server/server_helpers_test.go`. The cobra-tree helpers stay:
+      newAppCmd, newAppCmdEveryFlagEnabled, findCommand, syntheticCmd, runApp,
+      openTestBundle, readTestManifest, newMCPInstallFixture, runMCPApp,
+      readZipFile. A few small helpers (syntheticCmd / commandPathOf shapes) are
+      used on both sides — duplicate those rather than inventing a third shared
+      test package.
+
+      Add `server/main_test.go` mirroring the existing `main_test.go` TestMain
+      (`commonoutput.IsAgent = func() bool { return false }`). Without it the moved
+      tests inherit the CLAUDECODE-driven toon-format flip and format-resolution
+      assertions will drift.
+
+      `git mv testdata/policy.golden server/testdata/policy.golden` — allow_test.go
+      reads it via `filepath.Join("testdata", "policy.golden")`, so the relative
+      path still resolves from the new package directory.
+
+      EXTERNAL SURFACE MUST BE UNCHANGED. The only importer outside this package is
+      `neo4j-cli/app/app.go:34` (import) and `:111` (`mcp.NewCmd(cfg, NewCmd)`).
+      `mcp.NewCmd` and `mcp.RootFactory` keep their current names and location, so
+      app.go needs NO edit. Declare RootFactory in whichever package suits and alias
+      it in the other — pick the direction that keeps app.go compiling untouched.
+
+      This is a refactor: no behaviour may change. Every pre-existing test must pass
+      with its assertions intact.
+
+      GATES THAT SPECIFICALLY PROBE THIS AREA:
+      - tooldefs_gate_test.go — 4000-byte tool-definition budget plus the tool/property
+        naming regex; must still read from ToolDefinitions() after the rename.
+      - allow_test.go golden — server/testdata/policy.golden must be BYTE-IDENTICAL
+        to the old file. No command was added, renamed or removed, so it should be.
+        If it drifts, STOP and investigate; do not paper over it with -update.
+      - read_docs_drift_test.go — bundle reference sections must still resolve.
+      - No changelog entry: pure refactor, invisible to the end user, and the mcp
+        group is unreleased anyway.
+    status: pending
+    dependencies: [task-037, task-038]
+    acceptance_criteria:
+      - 'A new package server exists at neo4j-cli/internal/subcommands/mcp/server/ containing the runtime files (server, executor, stdio, allow, tooldefs, run, run_write, read_docs, list_commands, list_targets, result) and the cobra command files remain in package mcp'
+      - 'storedRootFactory and storedVersion live in the server package and are set via a single exported server.Configure(newRoot, version) called from mcp.NewCmd; the internal tests that mutate them moved into package server and still access them unexported'
+      - 'neo4j-cli/app/app.go is byte-identical to before: mcp.NewCmd and mcp.RootFactory keep their names and location'
+      - 'Behaviour is unchanged — every pre-existing test passes with its assertions intact, including tooldefs_gate_test.go against ToolDefinitions() and read_docs_drift_test.go'
+      - 'server/testdata/policy.golden is byte-identical to the pre-split testdata/policy.golden'
+      - 'server/main_test.go seeds commonoutput.IsAgent to false, mirroring the existing main_test.go'
+      - 'make test, make fmt-check, make lint pass; go generate ./neo4j-cli/internal/skill/... produces no bundle drift'
+    source: review

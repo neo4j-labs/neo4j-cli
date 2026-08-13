@@ -309,3 +309,6 @@ Added 1 review task (task-036).
 Gated the three MCP gate env vars behind a NEO4J_CLI_MCP_MANIFEST=1 marker set by the .mcpb manifest, so ambient env cannot open a gate for a hand-run server while Claude Desktop UI toggles keep working.
 Files: ~neo4j-cli/internal/subcommands/mcp/serve.go, ~neo4j-cli/internal/subcommands/mcp/serve_test.go, ~neo4j-cli/internal/subcommands/mcp/manifest.go, ~neo4j-cli/internal/subcommands/mcp/manifest_test.go, ~AGENTS.md
 Decisions: rejected reusing accept-env-vars (not MCP-scoped; would silently enable credential env reads across ~14 GatedGetenv call sites)
+
+## REVIEW — 2026-08-13T07:55:23Z
+Added 3 review tasks (task-037..task-039).
