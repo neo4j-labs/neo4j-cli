@@ -1341,7 +1341,8 @@ tasks:
       - AGENTS.md is not compiled and has no test gate, so the verification here is
         a careful read of the diff plus confirming `make test` still passes
         (the skill bundle does not embed AGENTS.md, so no regeneration is needed).
-    status: pending
+    status: completed
+    completed_at: 2026-08-13T09:05:40Z
     dependencies: []
     acceptance_criteria:
       - 'The **Gap** clause about RegisterSecretValue no longer appears on the docker `create` bullet in AGENTS.md'

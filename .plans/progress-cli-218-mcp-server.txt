@@ -337,3 +337,7 @@ Decisions: list_test.go now asserts installed_command present AND installed_vers
 
 ## REVIEW — 2026-08-13T09:04:57Z
 Added 2 review tasks (task-041..task-042).
+
+## TASK-041 — 2026-08-13T09:05:40Z
+Deleted the stale **Gap** clause about `clievents.RegisterSecretValue` from the docker `create` bullet in AGENTS.md — the gap was closed by CLI-228 / PR #234 (`password.go` line 56 calls `RegisterSecretValue`). All other claims on that bullet preserved. Lines 136/139 untouched.
+Files: ~AGENTS.md
