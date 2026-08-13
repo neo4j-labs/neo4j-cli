@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp_test
+package server_test
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,7 @@ func TestNewExecutor_RequiresBothInjectedPieces(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		cfg     *clicfg.Config
-		newRoot mcp.RootFactory
+		newRoot server.RootFactory
 		want    string
 	}{
 		{name: "no config", newRoot: app.NewCmd, want: "without a config"},
@@ -40,7 +41,7 @@ func TestNewExecutor_RequiresBothInjectedPieces(t *testing.T) {
 		{name: "both present", cfg: cfg, newRoot: app.NewCmd},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			exec, err := mcp.NewExecutor(tc.cfg, tc.newRoot)
+			exec, err := server.NewExecutor(tc.cfg, tc.newRoot)
 			if tc.want == "" {
 				require.NoError(t, err)
 				assert.NotNil(t, exec)

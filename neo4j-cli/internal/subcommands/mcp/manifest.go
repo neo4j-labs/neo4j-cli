@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
+
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 )
 
 //go:embed assets/icon.png
@@ -126,8 +128,8 @@ func GenerateBundle(path string) error {
 // omitted — the repo ships no image assets and third-party logo mirrors are
 // not acceptable provenance for a committed brand asset (REQ-F-038a).
 func newManifest(binPath string) *mcpbManifest {
-	tools := make([]map[string]string, 0, len(toolDefinitions()))
-	for _, t := range toolDefinitions() {
+	tools := make([]map[string]string, 0, len(server.ToolDefinitions()))
+	for _, t := range server.ToolDefinitions() {
 		tools = append(tools, map[string]string{"name": t.Name})
 	}
 

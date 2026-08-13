@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,8 +23,8 @@ func TestServeCmd_FlagDefaults(t *testing.T) {
 
 	for _, tc := range []struct{ flag, want string }{
 		{"rw", "false"},
-		{AllowAuraFlag, "false"},
-		{AllowCredentialWriteFlag, "false"},
+		{server.AllowAuraFlag, "false"},
+		{server.AllowCredentialWriteFlag, "false"},
 		{"format", "toon"},
 	} {
 		f := cmd.Flag(tc.flag)

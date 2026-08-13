@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp
+package server
 
 import (
 	"context"
@@ -443,7 +443,7 @@ func TestListTargetsTool_InManifest(t *testing.T) {
 	// Verify neo4j_cli_list_targets appears in the tool definitions with
 	// the correct annotations.
 	var found bool
-	for _, td := range toolDefinitions() {
+	for _, td := range ToolDefinitions() {
 		if td.Name == "neo4j_cli_list_targets" {
 			found = true
 			require.NotNil(t, td.Annotations)
@@ -457,15 +457,15 @@ func TestListTargetsTool_InManifest(t *testing.T) {
 			break
 		}
 	}
-	assert.True(t, found, "neo4j_cli_list_targets must be in toolDefinitions()")
+	assert.True(t, found, "neo4j_cli_list_targets must be in ToolDefinitions()")
 
 	// Verify exactly five tools
-	require.Len(t, toolDefinitions(), 5)
+	require.Len(t, ToolDefinitions(), 5)
 }
 
 func TestListTargetsTool_NameConvention(t *testing.T) {
 	// Verify the tool name matches ^neo4j_cli_[a-z0-9_]+$
-	for _, td := range toolDefinitions() {
+	for _, td := range ToolDefinitions() {
 		assert.Regexp(t, `^neo4j_cli_[a-z0-9_]+$`, td.Name)
 	}
 }

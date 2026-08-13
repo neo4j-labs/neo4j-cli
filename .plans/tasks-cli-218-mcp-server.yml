@@ -1230,7 +1230,8 @@ tasks:
       - read_docs_drift_test.go — bundle reference sections must still resolve.
       - No changelog entry: pure refactor, invisible to the end user, and the mcp
         group is unreleased anyway.
-    status: pending
+    status: completed
+    completed_at: 2026-08-13T08:43:17Z
     dependencies: [task-037, task-038]
     acceptance_criteria:
       - 'A new package server exists at neo4j-cli/internal/subcommands/mcp/server/ containing the runtime files (server, executor, stdio, allow, tooldefs, run, run_write, read_docs, list_commands, list_targets, result) and the cobra command files remain in package mcp'

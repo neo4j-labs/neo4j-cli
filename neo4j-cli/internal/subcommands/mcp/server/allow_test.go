@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp_test
+package server_test
 
 import (
 	"flag"
@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	commonflags "github.com/neo4j/cli/common/flags"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,51 +32,51 @@ func TestClassify_LiveTreePaths(t *testing.T) {
 	for _, tc := range []struct {
 		path string
 		args []string
-		want mcp.Policy
+		want server.Policy
 	}{
-		{path: "docker list", want: mcp.PolicyAllow},
-		{path: "query :schema", want: mcp.PolicyAllow},
-		{path: "query", args: []string{"MATCH (n) RETURN n"}, want: mcp.PolicyAllow},
-		{path: "credential dbms list", want: mcp.PolicyAllow},
-		{path: "aura instance list", want: mcp.PolicyAllow},
-		{path: "config get", want: mcp.PolicyAllow},
-		{path: "history list", want: mcp.PolicyAllow},
-		{path: "agent-context", want: mcp.PolicyAllow},
+		{path: "docker list", want: server.PolicyAllow},
+		{path: "query :schema", want: server.PolicyAllow},
+		{path: "query", args: []string{"MATCH (n) RETURN n"}, want: server.PolicyAllow},
+		{path: "credential dbms list", want: server.PolicyAllow},
+		{path: "aura instance list", want: server.PolicyAllow},
+		{path: "config get", want: server.PolicyAllow},
+		{path: "history list", want: server.PolicyAllow},
+		{path: "agent-context", want: server.PolicyAllow},
 
-		{path: "docker create", want: mcp.PolicyWrite},
-		{path: "admin database create", want: mcp.PolicyWrite},
-		{path: "skill install", want: mcp.PolicyWrite},
-		{path: "config set", args: []string{"format", "json"}, want: mcp.PolicyWrite},
+		{path: "docker create", want: server.PolicyWrite},
+		{path: "admin database create", want: server.PolicyWrite},
+		{path: "skill install", want: server.PolicyWrite},
+		{path: "config set", args: []string{"format", "json"}, want: server.PolicyWrite},
 		// query is annotated read and gates writes on its own --rw at
 		// execution time, so the flag has to escalate it here.
-		{path: "query", args: []string{"--rw", "MATCH (n) DETACH DELETE n"}, want: mcp.PolicyWrite},
-		{path: "query", args: []string{"--rw=true", "CREATE (n)"}, want: mcp.PolicyWrite},
+		{path: "query", args: []string{"--rw", "MATCH (n) DETACH DELETE n"}, want: server.PolicyWrite},
+		{path: "query", args: []string{"--rw=true", "CREATE (n)"}, want: server.PolicyWrite},
 
-		{path: "aura instance create", want: mcp.PolicyGatedAura},
-		{path: "aura instance delete", want: mcp.PolicyGatedAura},
-		{path: "aura instance overwrite", want: mcp.PolicyGatedAura},
-		{path: "aura instance update", want: mcp.PolicyGatedAura},
-		{path: "aura graph-analytics session create", want: mcp.PolicyGatedAura},
-		{path: "aura agent invoke", want: mcp.PolicyGatedAura},
-		{path: "aura agent list", want: mcp.PolicyGatedAura},
-		{path: "aura customer-managed-key list", want: mcp.PolicyGatedAura},
+		{path: "aura instance create", want: server.PolicyGatedAura},
+		{path: "aura instance delete", want: server.PolicyGatedAura},
+		{path: "aura instance overwrite", want: server.PolicyGatedAura},
+		{path: "aura instance update", want: server.PolicyGatedAura},
+		{path: "aura graph-analytics session create", want: server.PolicyGatedAura},
+		{path: "aura agent invoke", want: server.PolicyGatedAura},
+		{path: "aura agent list", want: server.PolicyGatedAura},
+		{path: "aura customer-managed-key list", want: server.PolicyGatedAura},
 
-		{path: "credential dbms add", want: mcp.PolicyGatedCredentialWrite},
-		{path: "credential dbms use", want: mcp.PolicyGatedCredentialWrite},
-		{path: "credential dbms set-embed", want: mcp.PolicyGatedCredentialWrite},
-		{path: "credential aura-client remove", want: mcp.PolicyGatedCredentialWrite},
+		{path: "credential dbms add", want: server.PolicyGatedCredentialWrite},
+		{path: "credential dbms use", want: server.PolicyGatedCredentialWrite},
+		{path: "credential dbms set-embed", want: server.PolicyGatedCredentialWrite},
+		{path: "credential aura-client remove", want: server.PolicyGatedCredentialWrite},
 
-		{path: "update", want: mcp.PolicyDeny},
-		{path: "update check", want: mcp.PolicyDeny},
-		{path: "mcp tool", want: mcp.PolicyDeny},
-		{path: "history clear", want: mcp.PolicyDeny},
+		{path: "update", want: server.PolicyDeny},
+		{path: "update check", want: server.PolicyDeny},
+		{path: "mcp tool", want: server.PolicyDeny},
+		{path: "history clear", want: server.PolicyDeny},
 		// The keyring→plaintext downgrade must stay denied in every
 		// spelling an argument parser could plausibly accept, not just the
 		// one `config set` accepts today.
-		{path: "config set", args: []string{"credential-storage", "insecure"}, want: mcp.PolicyDeny},
-		{path: "config set", args: []string{"credential-storage=insecure"}, want: mcp.PolicyDeny},
-		{path: "config set", args: []string{"aura.credential-storage", "insecure"}, want: mcp.PolicyDeny},
-		{path: "config set", args: []string{"--key=credential-storage", "--value=insecure"}, want: mcp.PolicyDeny},
+		{path: "config set", args: []string{"credential-storage", "insecure"}, want: server.PolicyDeny},
+		{path: "config set", args: []string{"credential-storage=insecure"}, want: server.PolicyDeny},
+		{path: "config set", args: []string{"aura.credential-storage", "insecure"}, want: server.PolicyDeny},
+		{path: "config set", args: []string{"--key=credential-storage", "--value=insecure"}, want: server.PolicyDeny},
 	} {
 		name := tc.path
 		if len(tc.args) > 0 {
@@ -84,7 +84,7 @@ func TestClassify_LiveTreePaths(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			cmd := findCommand(t, root, tc.path)
-			policy, explicit := mcp.Classify(cmd, tc.args)
+			policy, explicit := server.Classify(cmd, tc.args)
 			assert.Equal(t, tc.want, policy)
 			assert.True(t, explicit, "must be an explicit rule, not the default deny")
 		})
@@ -100,18 +100,18 @@ func TestClassify_Precedence(t *testing.T) {
 
 	for _, tc := range []struct {
 		path string
-		want mcp.Policy
+		want server.Policy
 	}{
-		{path: "history clear", want: mcp.PolicyDeny},
-		{path: "aura instance create", want: mcp.PolicyGatedAura},
-		{path: "aura agent create", want: mcp.PolicyGatedAura},
-		{path: "credential embed add", want: mcp.PolicyGatedCredentialWrite},
+		{path: "history clear", want: server.PolicyDeny},
+		{path: "aura instance create", want: server.PolicyGatedAura},
+		{path: "aura agent create", want: server.PolicyGatedAura},
+		{path: "credential embed add", want: server.PolicyGatedCredentialWrite},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			cmd := findCommand(t, root, tc.path)
 			require.True(t, commonflags.IsWriteCommand(cmd),
 				"precedence case is only meaningful while %q is write-annotated", tc.path)
-			policy, _ := mcp.Classify(cmd, nil)
+			policy, _ := server.Classify(cmd, nil)
 			assert.Equal(t, tc.want, policy)
 		})
 	}
@@ -124,8 +124,8 @@ func TestClassify_Precedence(t *testing.T) {
 // away from being a live path.
 func TestClassify_MostSpecificWriteGateWins(t *testing.T) {
 	cmd := syntheticCmd(true, "aura", "credential", "add")
-	policy, explicit := mcp.Classify(cmd, nil)
-	assert.Equal(t, mcp.PolicyGatedCredentialWrite, policy)
+	policy, explicit := server.Classify(cmd, nil)
+	assert.Equal(t, server.PolicyGatedCredentialWrite, policy)
 	assert.True(t, explicit)
 }
 
@@ -133,8 +133,8 @@ func TestClassify_MostSpecificWriteGateWins(t *testing.T) {
 // cannot supply: cobra injects `completion` at Execute() time.
 func TestClassify_CompletionIsDenied(t *testing.T) {
 	cmd := syntheticCmd(false, "completion", "zsh")
-	policy, explicit := mcp.Classify(cmd, nil)
-	assert.Equal(t, mcp.PolicyDeny, policy)
+	policy, explicit := server.Classify(cmd, nil)
+	assert.Equal(t, server.PolicyDeny, policy)
 	assert.True(t, explicit)
 }
 
@@ -151,8 +151,8 @@ func TestClassify_UnclassifiedDefaultsToDeny(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := syntheticCmd(tc.write, "frobnicate", "widget")
-			policy, explicit := mcp.Classify(cmd, nil)
-			assert.Equal(t, mcp.PolicyDeny, policy)
+			policy, explicit := server.Classify(cmd, nil)
+			assert.Equal(t, server.PolicyDeny, policy)
 			assert.False(t, explicit,
 				"an unlisted tree must report as unclassified so the gate test fails")
 		})
@@ -163,8 +163,8 @@ func TestClassify_UnclassifiedDefaultsToDeny(t *testing.T) {
 // no command and must not match a prefix rule.
 func TestClassify_RootIsDenied(t *testing.T) {
 	root := newAppCmdEveryFlagEnabled(t)
-	policy, explicit := mcp.Classify(root, nil)
-	assert.Equal(t, mcp.PolicyDeny, policy)
+	policy, explicit := server.Classify(root, nil)
+	assert.Equal(t, server.PolicyDeny, policy)
 	assert.False(t, explicit)
 }
 
@@ -180,7 +180,7 @@ func TestPolicyTable_ClassifiesEveryCommandPath(t *testing.T) {
 
 	var unclassified []string
 	for _, cmd := range executableCommands(root) {
-		if _, explicit := mcp.Classify(cmd, nil); !explicit {
+		if _, explicit := server.Classify(cmd, nil); !explicit {
 			unclassified = append(unclassified, strings.Join(commandPathOf(cmd), " "))
 		}
 	}
@@ -200,7 +200,7 @@ func TestPolicyTable_Golden(t *testing.T) {
 
 	var lines []string
 	for _, cmd := range executableCommands(root) {
-		policy, _ := mcp.Classify(cmd, nil)
+		policy, _ := server.Classify(cmd, nil)
 		lines = append(lines, fmt.Sprintf("%s\t%s", strings.Join(commandPathOf(cmd), " "), policy))
 	}
 	sort.Strings(lines)
@@ -226,7 +226,7 @@ func TestCheck_Gates(t *testing.T) {
 		name        string
 		path        string
 		args        []string
-		gates       mcp.Gates
+		gates       server.Gates
 		wantErr     bool
 		wantContain string
 	}{
@@ -241,7 +241,7 @@ func TestCheck_Gates(t *testing.T) {
 		{
 			name:  "aura provisioning permitted when opted in",
 			path:  "aura instance create",
-			gates: mcp.Gates{AllowAura: true},
+			gates: server.Gates{AllowAura: true},
 		},
 		{
 			name:        "credential write refused by default",
@@ -252,19 +252,19 @@ func TestCheck_Gates(t *testing.T) {
 		{
 			name:  "credential write permitted when opted in",
 			path:  "credential dbms add",
-			gates: mcp.Gates{AllowCredentialWrite: true},
+			gates: server.Gates{AllowCredentialWrite: true},
 		},
 		{
 			name:        "the aura gate does not open the credential gate",
 			path:        "credential dbms add",
-			gates:       mcp.Gates{AllowAura: true},
+			gates:       server.Gates{AllowAura: true},
 			wantErr:     true,
 			wantContain: "--allow-credential-write",
 		},
 		{
 			name:        "denied path stays denied with both gates open",
 			path:        "history clear",
-			gates:       mcp.Gates{AllowAura: true, AllowCredentialWrite: true},
+			gates:       server.Gates{AllowAura: true, AllowCredentialWrite: true},
 			wantErr:     true,
 			wantContain: "cannot be run over MCP",
 		},
@@ -272,13 +272,13 @@ func TestCheck_Gates(t *testing.T) {
 			name:        "credential-storage downgrade stays denied",
 			path:        "config set",
 			args:        []string{"credential-storage", "insecure"},
-			gates:       mcp.Gates{AllowAura: true, AllowCredentialWrite: true},
+			gates:       server.Gates{AllowAura: true, AllowCredentialWrite: true},
 			wantErr:     true,
 			wantContain: "cannot be run over MCP",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := mcp.Check(findCommand(t, root, tc.path), tc.args, tc.gates)
+			err := server.Check(findCommand(t, root, tc.path), tc.args, tc.gates)
 			if !tc.wantErr {
 				assert.NoError(t, err)
 				return
@@ -303,19 +303,19 @@ func TestGateFlags_RegisteredOnServe(t *testing.T) {
 		assert.Equal(t, "false", flag.DefValue, "--%s must be opt-in", name)
 	}
 
-	gates, err := mcp.GatesFromCommand(serve)
+	gates, err := server.GatesFromCommand(serve)
 	require.NoError(t, err)
-	assert.Equal(t, mcp.Gates{}, gates, "both gates closed before any flag is set")
+	assert.Equal(t, server.Gates{}, gates, "both gates closed before any flag is set")
 
 	require.NoError(t, serve.Flags().Set("allow-aura", "true"))
-	gates, err = mcp.GatesFromCommand(serve)
+	gates, err = server.GatesFromCommand(serve)
 	require.NoError(t, err)
-	assert.Equal(t, mcp.Gates{AllowAura: true}, gates)
+	assert.Equal(t, server.Gates{AllowAura: true}, gates)
 }
 
 // TestGatesFromCommand_MissingFlagErrors pins the fail-loudly choice: a caller
 // that never registered the flags gets an error, not silently closed gates.
 func TestGatesFromCommand_MissingFlagErrors(t *testing.T) {
-	_, err := mcp.GatesFromCommand(&cobra.Command{Use: "bare"})
+	_, err := server.GatesFromCommand(&cobra.Command{Use: "bare"})
 	assert.Error(t, err)
 }

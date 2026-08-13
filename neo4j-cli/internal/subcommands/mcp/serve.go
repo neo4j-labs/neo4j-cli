@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/cobra"
 )
 
@@ -98,13 +99,13 @@ func checkCredentialStore(cfg *clicfg.Config) error {
 func addServeFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("rw", false,
 		"Allow write operations through neo4j_cli_run_write")
-	cmd.Flags().Bool(AllowAuraFlag, false,
+	cmd.Flags().Bool(server.AllowAuraFlag, false,
 		"Let MCP clients provision, modify and delete Aura resources, which costs money")
-	cmd.Flags().Bool(AllowCredentialWriteFlag, false,
+	cmd.Flags().Bool(server.AllowCredentialWriteFlag, false,
 		"Let MCP clients add, remove and select stored credentials in the OS keyring")
 	cmd.Flags().String("format", "toon",
 		"Default output format for executed commands (json, toon, table)")
-	cmd.Flags().Int("max-output-chars", DefaultMaxOutputChars,
+	cmd.Flags().Int("max-output-chars", server.DefaultMaxOutputChars,
 		"Maximum characters of output to return in tool results")
 }
 
@@ -113,7 +114,7 @@ func addServeFlags(cmd *cobra.Command) {
 // The gate flags (--rw, --allow-aura, --allow-credential-write) are the primary
 // controls. Each also has an env fallback guarded by manifestMarker: the env
 // var is only consulted when the flag is false AND the marker is present.
-func resolveGates(writeFlag, auraFlag, credFlag string, manifestMarker bool) Gates {
+func resolveGates(writeFlag, auraFlag, credFlag string, manifestMarker bool) server.Gates {
 	writeAllowed, _ := strconv.ParseBool(writeFlag)
 	if !writeAllowed && manifestMarker {
 		writeAllowed = envBool(envMCPAllowWrites)
@@ -126,7 +127,7 @@ func resolveGates(writeFlag, auraFlag, credFlag string, manifestMarker bool) Gat
 	if !allowCredWrite && manifestMarker {
 		allowCredWrite = envBool(envMCPAllowCredentialWrite)
 	}
-	return Gates{
+	return server.Gates{
 		AllowAura:            allowAura,
 		AllowCredentialWrite: allowCredWrite,
 		WriteAllowed:         writeAllowed,
@@ -160,8 +161,8 @@ func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 	manifestMarker := envBool(envManifestMarker)
 	gates := resolveGates(
 		cmd.Flag("rw").Value.String(),
-		cmd.Flag(AllowAuraFlag).Value.String(),
-		cmd.Flag(AllowCredentialWriteFlag).Value.String(),
+		cmd.Flag(server.AllowAuraFlag).Value.String(),
+		cmd.Flag(server.AllowCredentialWriteFlag).Value.String(),
 		manifestMarker,
 	)
 	defaultFormat := cmd.Flag("format").Value.String()
@@ -171,17 +172,17 @@ func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 		return err
 	}
 
-	exec, err := NewExecutor(cfg, storedRootFactory)
+	exec, err := server.NewExecutor(cfg, server.StoredRootFactory())
 	if err != nil {
 		return clierr.NewFatalError("cannot start MCP server: %s", err.Error())
 	}
 
-	server, err := NewServer(cfg, exec, gates, defaultFormat, maxOutputChars)
+	srv, err := server.New(cfg, exec, gates, defaultFormat, maxOutputChars)
 	if err != nil {
 		return clierr.NewFatalError("cannot create MCP server: %s", err.Error())
 	}
 
-	in, out, restore, err := ClaimStdio()
+	in, out, restore, err := server.ClaimStdio()
 	if err != nil {
 		return clierr.NewFatalError("cannot claim stdio for MCP server: %s", err.Error())
 	}
@@ -202,7 +203,7 @@ func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
 		Writer: out,
 	}
 
-	if err := server.Run(cmd.Context(), transport); err != nil {
+	if err := srv.Run(cmd.Context(), transport); err != nil {
 		return clierr.NewFatalError("MCP server exited: %s", err.Error())
 	}
 	return nil

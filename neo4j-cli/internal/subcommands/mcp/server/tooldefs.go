@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp
+package server
 
 import (
 	"encoding/json"
@@ -19,7 +19,7 @@ var (
 	toolTreeNames []string
 
 	// storedFlagStates captures the feature-flag state at server start so both
-	// the tool-definition enum (ensureToolDefinitions) and the tool handler
+	// the tool-definition enum (EnsureToolDefinitions) and the tool handler
 	// (HandleListCommands) build trees with the same flag configuration.
 	storedFlagStates map[string]bool
 
@@ -30,10 +30,10 @@ var (
 // two tool definitions share annotation state.
 func boolPtr(v bool) *bool { return &v }
 
-// ensureToolDefinitions populates toolTreeNames from the live tree. The config's
+// EnsureToolDefinitions populates toolTreeNames from the live tree. The config's
 // flag state is mirrored so flag-gated trees (mcp itself) appear in the enum.
 // Called from the mcp parent's PersistentPreRunE, once per process.
-func ensureToolDefinitions(srcCfg *clicfg.Config) {
+func EnsureToolDefinitions(srcCfg *clicfg.Config) {
 	toolDefsOnce.Do(func() {
 		if storedRootFactory == nil {
 			return
@@ -64,10 +64,10 @@ func ensureToolDefinitions(srcCfg *clicfg.Config) {
 	})
 }
 
-// toolDefinitions returns the tool definitions the server registers, in the
+// ToolDefinitions returns the tool definitions the server registers, in the
 // order tools are advertised to clients. Both `mcp tool` and the server read
 // them from here, so the printed surface cannot drift from the registered one.
-func toolDefinitions() []*mcpsdk.Tool {
+func ToolDefinitions() []*mcpsdk.Tool {
 	return []*mcpsdk.Tool{
 		{
 			Name:        "neo4j_cli_list_commands",
@@ -178,12 +178,12 @@ func toolDefinitions() []*mcpsdk.Tool {
 	}
 }
 
-// toolRows projects tool definitions into snake_case output rows. The SDK's own
+// ToolRows projects tool definitions into snake_case output rows. The SDK's own
 // JSON tags are camelCase (`readOnlyHint`) because they are wire fields, which
 // the repo's OUTPUT casing rule forbids for rendered output.
-type toolRows []*mcpsdk.Tool
+type ToolRows []*mcpsdk.Tool
 
-func (r toolRows) AsArray() []map[string]any {
+func (r ToolRows) AsArray() []map[string]any {
 	out := make([]map[string]any, 0, len(r))
 	for _, t := range r {
 		// An absent hint is not "false": the MCP spec defaults destructiveHint
@@ -216,6 +216,6 @@ func (r toolRows) AsArray() []map[string]any {
 // MarshalJSON delegates to AsArray so the json and toon renderings emit the
 // snake_case projection instead of the SDK struct's camelCase wire tags, and so
 // an empty manifest renders as `[]` rather than `null`.
-func (r toolRows) MarshalJSON() ([]byte, error) {
+func (r ToolRows) MarshalJSON() ([]byte, error) {
 	return json.Marshal(r.AsArray())
 }

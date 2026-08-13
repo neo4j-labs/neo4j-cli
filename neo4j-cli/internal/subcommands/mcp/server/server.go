@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp
+package server
 
 import (
 	"context"
@@ -24,12 +24,12 @@ type serverState struct {
 	maxOutputChars int
 }
 
-// NewServer creates an MCP server with the five neo4j_cli_* tools registered,
+// New creates an MCP server with the five neo4j_cli_* tools registered,
 // plus the instructions field. It is testable without a transport: after creating
 // the server, connect it to an SDK transport (e.g. NewInMemoryTransports) and
 // call Server.Run or Server.Connect.
-func NewServer(cfg *clicfg.Config, exec *Executor, gates Gates, defaultFormat string, maxOutputChars int) (*mcpsdk.Server, error) {
-	if err := validateWiring(cfg, storedRootFactory); err != nil {
+func New(cfg *clicfg.Config, exec *Executor, gates Gates, defaultFormat string, maxOutputChars int) (*mcpsdk.Server, error) {
+	if err := ValidateWiring(cfg, storedRootFactory); err != nil {
 		return nil, err
 	}
 
@@ -51,7 +51,7 @@ func NewServer(cfg *clicfg.Config, exec *Executor, gates Gates, defaultFormat st
 		},
 	)
 
-	for _, tool := range toolDefinitions() {
+	for _, tool := range ToolDefinitions() {
 		t := tool // copy the pointer so each handler closure captures its tool
 		s.AddTool(t, state.handlerFor(t.Name))
 	}

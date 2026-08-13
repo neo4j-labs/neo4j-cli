@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp_test
+package server_test
 
 import (
 	"context"
@@ -14,19 +14,19 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/clievents"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMapCommandResult_SuccessReturnsRedactedStdout(t *testing.T) {
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Stdout: `[{"name":"test","uri":"neo4j://user:pass@localhost"}]`,
 		Stderr: "",
 		Err:    nil,
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{})
+	result := server.MapCommandResult(res, server.ResultOptions{})
 
 	assert.False(t, result.IsError, "a successful command must not set isError")
 
@@ -40,12 +40,12 @@ func TestMapCommandResult_SuccessReturnsRedactedStdout(t *testing.T) {
 }
 
 func TestMapCommandResult_PlainErrorBecomesFatal(t *testing.T) {
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Stdout: "",
 		Stderr: "something went wrong",
 		Err:    errors.New("kaboom"),
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{})
+	result := server.MapCommandResult(res, server.ResultOptions{})
 
 	assert.True(t, result.IsError, "a failing command must set isError")
 	require.Len(t, result.Content, 1)
@@ -75,13 +75,13 @@ func TestMapCommandResult_CLIErrorCarriesFullEnvelope(t *testing.T) {
 		WithSuggestion("use --name instead").
 		WithResource("instance", "abc-123").
 		WithTeePath("/tmp/tee")
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Stdout: "",
 		Stderr: "",
 		Err:    ce,
 	}
 
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{Args: []string{"create", "--name", "test"}})
+	result := server.MapCommandResult(res, server.ResultOptions{Args: []string{"create", "--name", "test"}})
 
 	require.True(t, result.IsError)
 	tc := result.Content[0].(*mcpsdk.TextContent)
@@ -128,7 +128,7 @@ func TestMapCommandResult_RetryableReflectsExitCode(t *testing.T) {
 		{name: "usage error is not retryable", code: 2, retryable: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			res := mcp.CommandResult{
+			res := server.CommandResult{
 				Err: clierr.NewFatalError(""),
 			}
 			// Override code by constructing the right error type.
@@ -143,7 +143,7 @@ func TestMapCommandResult_RetryableReflectsExitCode(t *testing.T) {
 				res.Err = clierr.NewFatalError("boom")
 			}
 
-			result := mcp.MapCommandResult(res, mcp.ResultOptions{})
+			result := server.MapCommandResult(res, server.ResultOptions{})
 			require.True(t, result.IsError)
 
 			b, _ := json.Marshal(result.StructuredContent)
@@ -183,7 +183,7 @@ func TestMapCommandResult_RedactsPasswordFromJSON(t *testing.T) {
 	res := exec.Execute(context.Background(), []string{"secret-mint"})
 	require.NoError(t, res.Err)
 
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{MaxOutputChars: 20000})
+	result := server.MapCommandResult(res, server.ResultOptions{MaxOutputChars: 20000})
 
 	assert.False(t, result.IsError)
 	tc := result.Content[0].(*mcpsdk.TextContent)
@@ -192,11 +192,11 @@ func TestMapCommandResult_RedactsPasswordFromJSON(t *testing.T) {
 }
 
 func TestMapCommandResult_ControlBytesAreStripped(t *testing.T) {
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Stdout: "normal text\x1b[31mred\x00\ttab\t\r\n",
 		Err:    nil,
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{MaxOutputChars: 20000})
+	result := server.MapCommandResult(res, server.ResultOptions{MaxOutputChars: 20000})
 
 	tc := result.Content[0].(*mcpsdk.TextContent)
 	assert.NotContains(t, tc.Text, "\x1b", "ANSI escape must be stripped")
@@ -209,11 +209,11 @@ func TestMapCommandResult_ControlBytesAreStripped(t *testing.T) {
 
 func TestMapCommandResult_TruncatesLongOutput(t *testing.T) {
 	long := strings.Repeat("x", 10000)
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Stdout: long,
 		Err:    nil,
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{MaxOutputChars: 100})
+	result := server.MapCommandResult(res, server.ResultOptions{MaxOutputChars: 100})
 
 	tc := result.Content[0].(*mcpsdk.TextContent)
 	// Success case: no hint since suffix and suffixHint are both empty.
@@ -225,12 +225,12 @@ func TestMapCommandResult_TruncatesLongOutput(t *testing.T) {
 func TestMapCommandResult_TruncationWithTeePath(t *testing.T) {
 	long := strings.Repeat("y", 5000)
 	ce := clierr.NewFatalError("too much output").WithTeePath("/path/to/tee.out")
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Stdout: long,
 		Stderr: "",
 		Err:    ce,
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{MaxOutputChars: 50})
+	result := server.MapCommandResult(res, server.ResultOptions{MaxOutputChars: 50})
 
 	require.True(t, result.IsError)
 	tc := result.Content[0].(*mcpsdk.TextContent)
@@ -247,10 +247,10 @@ func TestMapCommandResult_TruncationWithTeePath(t *testing.T) {
 // TestMapCommandResult_RedactedArgsInStructuredContent checks that
 // model-supplied secrets passed as flags are redacted from the argv field.
 func TestMapCommandResult_RedactedArgsInStructuredContent(t *testing.T) {
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Err: clierr.NewUsageError("bad flag"),
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{
+	result := server.MapCommandResult(res, server.ResultOptions{
 		Args: []string{"create", "--password", "hunter2", "--name", "test"},
 	})
 
@@ -268,12 +268,12 @@ func TestMapCommandResult_RedactedArgsInStructuredContent(t *testing.T) {
 // TestMapCommandResult_StdoutFallbackToStderrOnError proves that when stdout
 // is empty and stderr has diagnostic output, the error text includes stderr.
 func TestMapCommandResult_StdoutFallbackToStderrOnError(t *testing.T) {
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Stdout: "",
 		Stderr: "container exited with code 1",
 		Err:    clierr.NewUpstreamError("docker failed"),
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{})
+	result := server.MapCommandResult(res, server.ResultOptions{})
 
 	tc := result.Content[0].(*mcpsdk.TextContent)
 	assert.Contains(t, tc.Text, "container exited with code 1", "stderr must be used as output tail")
@@ -291,11 +291,11 @@ func TestMapCommandResult_NoSecretsThroughSanitize(t *testing.T) {
 		"token": "sk-live-abc123def456",
 		"auth": "Bearer secret-token"
 	}`
-	res := mcp.CommandResult{
+	res := server.CommandResult{
 		Stdout: output,
 		Err:    nil,
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{MaxOutputChars: 20000})
+	result := server.MapCommandResult(res, server.ResultOptions{MaxOutputChars: 20000})
 
 	tc := result.Content[0].(*mcpsdk.TextContent)
 	assert.NotContains(t, tc.Text, "hunter2")
@@ -308,16 +308,16 @@ func TestMapCommandResult_NoSecretsThroughSanitize(t *testing.T) {
 // MaxOutputChars falls back to DefaultMaxOutputChars without panicking.
 func TestMapCommandResult_ZeroMaxOutputCharsUsesDefault(t *testing.T) {
 	// Build output slightly larger than the default so truncation kicks in.
-	text := strings.Repeat("z", mcp.DefaultMaxOutputChars+100)
-	res := mcp.CommandResult{
+	text := strings.Repeat("z", server.DefaultMaxOutputChars+100)
+	res := server.CommandResult{
 		Stdout: text,
 		Err:    nil,
 	}
-	result := mcp.MapCommandResult(res, mcp.ResultOptions{MaxOutputChars: 0})
+	result := server.MapCommandResult(res, server.ResultOptions{MaxOutputChars: 0})
 
 	tc := result.Content[0].(*mcpsdk.TextContent)
-	assert.Len(t, tc.Text, mcp.DefaultMaxOutputChars,
+	assert.Len(t, tc.Text, server.DefaultMaxOutputChars,
 		"zero MaxOutputChars must use the default")
 	// The output should be the first DefaultMaxOutputChars runes unchanged.
-	assert.Equal(t, text[:mcp.DefaultMaxOutputChars], tc.Text)
+	assert.Equal(t, text[:server.DefaultMaxOutputChars], tc.Text)
 }

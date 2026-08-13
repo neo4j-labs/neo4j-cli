@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp
+package server
 
 import (
 	"bytes"
@@ -62,7 +62,7 @@ type Executor struct {
 // newRoot over cfg's filesystem and version. It fails rather than deferring a
 // nil dereference to the first tool call when either piece is missing.
 func NewExecutor(cfg *clicfg.Config, newRoot RootFactory) (*Executor, error) {
-	if err := validateWiring(cfg, newRoot); err != nil {
+	if err := ValidateWiring(cfg, newRoot); err != nil {
 		return nil, err
 	}
 	return &Executor{
@@ -142,10 +142,10 @@ func panicError(args []string, r any) error {
 		clievents.RedactArgs(args), clievents.RedactText(detail), clierr.IssuesURL)
 }
 
-// validateWiring reports whether the pieces app.go injects into this group are
+// ValidateWiring reports whether the pieces app.go injects into this group are
 // present. Every leaf that dispatches a CLI command needs both, and neither is
 // under the user's control, so a missing one is a wiring bug worth naming.
-func validateWiring(cfg *clicfg.Config, newRoot RootFactory) error {
+func ValidateWiring(cfg *clicfg.Config, newRoot RootFactory) error {
 	if cfg == nil {
 		return clierr.NewFatalError("the mcp command group was built without a config, please report an issue in %s", clierr.IssuesURL)
 	}

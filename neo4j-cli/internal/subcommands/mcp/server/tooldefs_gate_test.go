@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp
+package server
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ import (
 const toolBudgetCeiling = 4000
 
 func TestToolDefinitions_Budget(t *testing.T) {
-	data, err := json.Marshal(toolRows(toolDefinitions()))
+	data, err := json.Marshal(ToolRows(ToolDefinitions()))
 	require.NoError(t, err)
 
 	size := len(data)
@@ -38,7 +38,7 @@ func TestToolDefinitions_Naming(t *testing.T) {
 	toolNameRe := regexp.MustCompile(`^neo4j_cli_[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 	schemaPropRe := regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-	for _, tool := range toolDefinitions() {
+	for _, tool := range ToolDefinitions() {
 		t.Run(tool.Name, func(t *testing.T) {
 			assert.Regexp(t, toolNameRe, tool.Name,
 				"Tool name must match ^neo4j_cli_[a-z][a-z0-9]*(_[a-z0-9]+)*$")

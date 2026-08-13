@@ -5,7 +5,7 @@
 // exercise the global-state-backed tool handler directly. It does NOT import
 // package app, which would create an import cycle (app imports mcp).
 
-package mcp
+package server
 
 import (
 	"context"

@@ -324,3 +324,8 @@ Review: all gates pass; cosmetic Example indentation shift noted but behaviorall
 
 ## REVIEW — 2026-08-13T08:15:01Z
 Added 1 review task (task-040).
+
+## TASK-039 — 2026-08-13T08:43:17Z
+Split the mcp package: cobra leaves stay in mcp, MCP server runtime moved to mcp/server. storedRootFactory/storedVersion relocated behind server.Configure(); NewServer/validateWiring/ensureToolDefinitions/toolDefinitions/toolRows exported as server.New/ValidateWiring/EnsureToolDefinitions/ToolDefinitions/ToolRows.
+Files: ~neo4j-cli/internal/subcommands/mcp/{mcp,serve,tool,manifest,server_test,serve_test,mcp_helpers_test}.go, +neo4j-cli/internal/subcommands/mcp/server/{config,main_test,server_helpers_test}.go, >neo4j-cli/internal/subcommands/mcp/{server,executor,stdio,allow,tooldefs,run,run_write,read_docs,list_commands,list_targets,result}.go=>neo4j-cli/internal/subcommands/mcp/server/, >neo4j-cli/internal/subcommands/mcp/testdata/policy.golden=>neo4j-cli/internal/subcommands/mcp/server/testdata/policy.golden, ~AGENTS.md
+Decisions: kept the four cobra-level tests (serve annotation, credential-store probe) in mcp/server_test.go and moved only the genuine MCP-server tests; added StoredRootFactory/StoredVersion accessors because serve.go stays in mcp and needs read access

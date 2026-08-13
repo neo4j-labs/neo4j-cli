@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package mcp_test
+package server_test
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/neo4j-cli/app"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ const jsonRPCFrame = `{"jsonrpc":"2.0","id":1,"method":"tools/list"}` + "\n"
 func TestClaimStdio_RedirectsTheProcessStreams(t *testing.T) {
 	realIn, realOut := os.Stdin, os.Stdout
 
-	in, out, restore, err := mcp.ClaimStdio()
+	in, out, restore, err := server.ClaimStdio()
 	require.NoError(t, err)
 	t.Cleanup(restore)
 
@@ -46,11 +46,11 @@ func TestClaimStdio_RedirectsTheProcessStreams(t *testing.T) {
 // TestClaimStdio_RefusesASecondClaim covers the guard: serving a second claim
 // would hand out /dev/null and stderr as if they were the client's streams.
 func TestClaimStdio_RefusesASecondClaim(t *testing.T) {
-	_, _, restore, err := mcp.ClaimStdio()
+	_, _, restore, err := server.ClaimStdio()
 	require.NoError(t, err)
 	t.Cleanup(restore)
 
-	in, out, again, err := mcp.ClaimStdio()
+	in, out, again, err := server.ClaimStdio()
 	require.Error(t, err)
 	assert.Nil(t, in)
 	assert.Nil(t, out)
@@ -59,7 +59,7 @@ func TestClaimStdio_RefusesASecondClaim(t *testing.T) {
 
 	restore()
 
-	_, _, restoreAgain, err := mcp.ClaimStdio()
+	_, _, restoreAgain, err := server.ClaimStdio()
 	require.NoError(t, err, "a restored process must be claimable again")
 	restoreAgain()
 }
@@ -72,7 +72,7 @@ func TestClaimStdio_StrayStdoutWriteCannotCorruptTheFrame(t *testing.T) {
 	transport := redirectProcessStream(t, &os.Stdout, "transport")
 	strays := redirectProcessStream(t, &os.Stderr, "strays")
 
-	_, out, restore, err := mcp.ClaimStdio()
+	_, out, restore, err := server.ClaimStdio()
 	require.NoError(t, err)
 	t.Cleanup(restore)
 	require.Same(t, transport, out)
@@ -104,23 +104,23 @@ func TestClaimStdio_StrayStdoutWriteCannotCorruptTheFrame(t *testing.T) {
 // without the swap it would drain the client's frames and hang the server
 // waiting for more.
 func TestClaimStdio_CommandCannotConsumeTheProtocolStream(t *testing.T) {
-	client, server, err := os.Pipe()
+	client, serverEnd, err := os.Pipe()
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = client.Close()
-		_ = server.Close()
+		_ = serverEnd.Close()
 	})
 
 	prev := os.Stdin
 	os.Stdin = client
 	t.Cleanup(func() { os.Stdin = prev })
 
-	in, _, restore, err := mcp.ClaimStdio()
+	in, _, restore, err := server.ClaimStdio()
 	require.NoError(t, err)
 	t.Cleanup(restore)
 	require.Same(t, client, in)
 
-	_, err = server.WriteString(jsonRPCFrame)
+	_, err = serverEnd.WriteString(jsonRPCFrame)
 	require.NoError(t, err)
 
 	exec := newExecutor(t, app.NewCmd)
@@ -128,7 +128,7 @@ func TestClaimStdio_CommandCannotConsumeTheProtocolStream(t *testing.T) {
 	require.Error(t, res.Err, "query with no Cypher and an empty stdin must fail, not block")
 	assert.Contains(t, res.Err.Error(), "no Cypher provided")
 
-	require.NoError(t, server.Close())
+	require.NoError(t, serverEnd.Close())
 	unread, err := io.ReadAll(in)
 	require.NoError(t, err)
 	assert.Equal(t, jsonRPCFrame, string(unread), "the command must not have consumed the frame")

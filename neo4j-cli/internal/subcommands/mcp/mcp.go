@@ -9,24 +9,18 @@ package mcp
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/cobra"
 )
 
-// RootFactory builds a fresh neo4j-cli root command for the given config. It is
-// injected rather than imported: package app imports this package to mount the
-// group, so this package must not import app.
-type RootFactory func(*clicfg.Config) *cobra.Command
-
-// storedRootFactory is the injected factory, kept for tool-definition
-// initialization and tool handlers that need to project the live tree.
-var storedRootFactory RootFactory
-var storedVersion string
+// RootFactory is a type alias for server.RootFactory, re-exported so
+// app.go imports only the mcp package.
+type RootFactory = server.RootFactory
 
 // NewCmd returns the `mcp` parent command. newRoot is the injected root factory
-// (see RootFactory) that the leaves use to build a tree per tool call.
+// (see server.RootFactory) that the leaves use to build a tree per tool call.
 func NewCmd(cfg *clicfg.Config, newRoot RootFactory) *cobra.Command {
-	storedRootFactory = newRoot
-	storedVersion = cfg.Version
+	server.Configure(newRoot, cfg.Version)
 
 	cmd := &cobra.Command{
 		Use:   "mcp",
@@ -43,10 +37,10 @@ func NewCmd(cfg *clicfg.Config, newRoot RootFactory) *cobra.Command {
 	// reportable error on the first `mcp` invocation rather than as a nil
 	// dereference in the middle of a tool call.
 	cmd.PersistentPreRunE = func(*cobra.Command, []string) error {
-		if err := validateWiring(cfg, newRoot); err != nil {
+		if err := server.ValidateWiring(cfg, newRoot); err != nil {
 			return err
 		}
-		ensureToolDefinitions(cfg)
+		server.EnsureToolDefinitions(cfg)
 		return nil
 	}
 

@@ -6,6 +6,7 @@ package mcp
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +27,7 @@ neo4j-cli mcp tool
 neo4j-cli mcp tool --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			commonoutput.PrintBodyMap(cmd, cfg, toolRows(toolDefinitions()),
+			commonoutput.PrintBodyMap(cmd, cfg, server.ToolRows(server.ToolDefinitions()),
 				[]string{"name", "title", "read_only_hint", "destructive_hint", "description"})
 			return nil
 		},

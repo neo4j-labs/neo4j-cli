@@ -4,7 +4,7 @@
 // This file is in the INTERNAL mcp package (unlike the rest of the tests) so it
 // can exercise the unexported tool-definition projection directly.
 
-package mcp
+package server
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ import (
 func TestToolRows_AsArray_HintDefaults(t *testing.T) {
 	falsy := false
 
-	rows := toolRows{
+	rows := ToolRows{
 		{Name: "neo4j_cli_no_annotations"},
 		{
 			Name:        "neo4j_cli_read",
@@ -59,7 +59,7 @@ func TestToolRows_AsArray_HintDefaults(t *testing.T) {
 }
 
 func TestToolRows_MarshalJSON_EmitsSnakeCaseArray(t *testing.T) {
-	data, err := json.Marshal(toolRows{{Name: "neo4j_cli_run"}})
+	data, err := json.Marshal(ToolRows{{Name: "neo4j_cli_run"}})
 	require.NoError(t, err)
 	assert.JSONEq(t, `[{
 		"name": "neo4j_cli_run",
@@ -75,7 +75,7 @@ func TestToolRows_MarshalJSON_EmitsSnakeCaseArray(t *testing.T) {
 // An empty manifest must render as `[]`, never `null`: a null body would make
 // `mcp tool --format json` undecodable as an array.
 func TestToolRows_EmptyMarshalsAsArray(t *testing.T) {
-	data, err := json.Marshal(toolRows(nil))
+	data, err := json.Marshal(ToolRows(nil))
 	require.NoError(t, err)
 	assert.Equal(t, "[]", string(data))
 }
