@@ -184,3 +184,23 @@ func setupListCommandsTest(t *testing.T) {
 		toolTreeNames = append(toolTreeNames, sub.Name())
 	}
 }
+
+// TestHandleListCommands_RedactsSecretInEchoedTree pins REQ-F-031 for this
+// handler: the unknown-tree error echoes the client-supplied tree back, so a
+// credential-shaped value in it must not reach model context verbatim.
+func TestHandleListCommands_RedactsSecretInEchoedTree(t *testing.T) {
+	setupListCommandsTest(t)
+
+	req := &mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{
+			Arguments: json.RawMessage(`{"tree":"nope --password=hunter2"}`),
+		},
+	}
+	result, err := HandleListCommands(context.Background(), req)
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+
+	text := result.Content[0].(*mcpsdk.TextContent).Text
+	assert.NotContains(t, text, "hunter2")
+	assert.Contains(t, text, "***")
+}

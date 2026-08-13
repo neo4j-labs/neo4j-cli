@@ -37,10 +37,14 @@ func HandleListCommands(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcps
 	// so the catalog and the docs resolver (task-009) agree.
 	delete(agCtx.Commands, "completion")
 
+	// Per REQ-F-031 every returned string passes through sanitize (RedactText
+	// then StripControl). The error path echoes the client-supplied tree, and
+	// the success paths are kept consistent so the invariant holds for the
+	// whole handler rather than case by case.
 	if tree == "" {
 		return &mcpsdk.CallToolResult{
 			Content: []mcpsdk.Content{
-				&mcpsdk.TextContent{Text: indexText(agCtx.Commands)},
+				&mcpsdk.TextContent{Text: sanitize(indexText(agCtx.Commands))},
 			},
 		}, nil
 	}
@@ -50,14 +54,14 @@ func HandleListCommands(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcps
 		return &mcpsdk.CallToolResult{
 			IsError: true,
 			Content: []mcpsdk.Content{
-				&mcpsdk.TextContent{Text: fmt.Sprintf("Unknown tree: %q", tree)},
+				&mcpsdk.TextContent{Text: sanitize(fmt.Sprintf("Unknown tree: %q", tree))},
 			},
 		}, nil
 	}
 
 	return &mcpsdk.CallToolResult{
 		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: treeText(tree, &cmd)},
+			&mcpsdk.TextContent{Text: sanitize(treeText(tree, &cmd))},
 		},
 	}, nil
 }
