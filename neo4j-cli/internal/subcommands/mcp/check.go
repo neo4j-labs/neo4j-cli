@@ -16,16 +16,16 @@ import (
 // mcpCheckResultRow is the JSON shape emitted by mcp check.
 type mcpCheckResultRow struct {
 	Agent            string `json:"agent"`
-	InstalledVersion string `json:"installed_version"`
-	CurrentVersion   string `json:"current_version"`
+	InstalledCommand string `json:"installed_command"`
+	CurrentCommand   string `json:"current_command"`
 	Status           string `json:"status"`
 }
 
 func (r mcpCheckResultRow) asArrayRow() map[string]any {
 	return map[string]any{
 		"agent":             r.Agent,
-		"installed_version": r.InstalledVersion,
-		"current_version":   r.CurrentVersion,
+		"installed_command": r.InstalledCommand,
+		"current_command":   r.CurrentCommand,
 		"status":            r.Status,
 	}
 }
@@ -36,17 +36,17 @@ func newCheckCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Check installed MCP servers for drift",
 		Long: "Inspects every MCP-capable agent and compares the neo4j-cli " +
 			"server entry's command path against the current binary path. Columns: " +
-			"agent, installed_version (path in config), current_version (this binary's " +
+			"agent, installed_command (path in config), current_command (this binary's " +
 			"path), status where status is ok | drift | not-installed. " +
 			"Exits non-zero when any installed entry has drifted.",
 		Example: `# Check MCP install state for drift (table)
-neo4j-cli mcp check
+	neo4j-cli mcp check
 
-# Check as JSON (machine-readable)
-neo4j-cli mcp check --format json
+	# Check as JSON (machine-readable)
+	neo4j-cli mcp check --format json
 
-# Check in toon format
-neo4j-cli mcp check --format toon`,
+	# Check in toon format
+	neo4j-cli mcp check --format toon`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
@@ -76,8 +76,8 @@ func runCheckCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
 		}
 		rows = append(rows, mcpCheckResultRow{
 			Agent:            inst.Agent.Name,
-			InstalledVersion: inst.InstalledVersion,
-			CurrentVersion:   currentBin,
+			InstalledCommand: inst.InstalledVersion,
+			CurrentCommand:   currentBin,
 			Status:           status,
 		})
 	}
@@ -87,7 +87,7 @@ func runCheckCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
 		return nil
 	}
 
-	commonoutput.PrintBodyMap(cmd, cfg, rows, []string{"agent", "installed_version", "current_version", "status"})
+	commonoutput.PrintBodyMap(cmd, cfg, rows, []string{"agent", "installed_command", "current_command", "status"})
 
 	drift := 0
 	for _, r := range rows {
