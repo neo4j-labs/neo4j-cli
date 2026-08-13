@@ -2,3 +2,7 @@
 Extracted body-rendering half of rawErrorDetail into package-private scrubbedBodyTrunc helper. Pure refactor; rawErrorDetail output unchanged. All raw_status_test.go regression tests pass unedited.
 Files: ~neo4j-cli/aura/internal/api/raw.go
 Decisions: Omitted PRD sketch's second strings.TrimSpace around inner truncateBytes to preserve byte-identical output.
+
+## TASK-002 — 2026-08-13T11:00:34Z
+Rewrite of handleResponseError to be panic-free with class-based status fallback. Added upstreamDetail and errorMessages helpers. Deleted reportIssueFatal and extractEmbeddedErrors. Updated redaction test from panic-based (os.Args manipulation) to body-based (secret in response body). Retargeted 3 exit-code entries (402/404/502 malformed from exit 1 to typed codes). Added 307/413/422/408 to exit code mapping table. Added ReadAll failure test. All gates pass.
+Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go, ~neo4j-cli/aura/internal/api/api.go

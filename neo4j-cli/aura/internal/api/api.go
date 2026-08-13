@@ -103,7 +103,7 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 			debugResponse(res.StatusCode, res.Header, responseBody, time.Since(start))
 		}
 
-		if msgs := extractEmbeddedErrors(responseBody); len(msgs) > 0 {
+		if msgs := errorMessages(responseBody, false); len(msgs) > 0 {
 			resourceType, resourceID := parseResourceFromRequest(req)
 			return responseBody, res.StatusCode, clierr.NewNotFoundError("%s", formatBracketedMessages(msgs)).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
 		}

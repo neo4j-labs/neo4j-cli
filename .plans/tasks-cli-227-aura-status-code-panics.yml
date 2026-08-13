@@ -77,7 +77,8 @@ tasks:
       `wantMsgContain: "unexpected error [status N]"`: 402-malformed 1 -> 5, 404-malformed 1 -> 3,
       502-malformed 1 -> 8. (REQ-F-002, REQ-F-003, REQ-F-004, REQ-F-005, REQ-F-006, REQ-F-007,
       REQ-NF-001, REQ-NF-002)
-    status: pending
+    status: completed
+    completed_at: '2026-08-13T11:00:34Z'
     dependencies:
       - task-001
     acceptance_criteria:
