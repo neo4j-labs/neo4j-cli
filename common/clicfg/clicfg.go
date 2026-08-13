@@ -223,8 +223,8 @@ func bindEnvironmentVariables(Viper *viper.Viper) {
 	Viper.BindEnv("accept-env-vars", "NEO4J_CLI_ACCEPT_ENV_VARS") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
 
 	// Bind one env var per registered feature flag. Names are derived
-	// purely from the flag name via FlagNameToEnv (e.g. "flag.aura-beta"
-	// -> "NEO4J_CLI_FLAG_AURA_BETA").
+	// purely from the flag name via FlagNameToEnv (e.g. "flag.docker-command"
+	// -> "NEO4J_CLI_FLAG_DOCKER_COMMAND").
 	for name := range Registry {
 		Viper.BindEnv(name, FlagNameToEnv(name)) //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
 	}

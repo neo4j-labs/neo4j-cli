@@ -5,7 +5,7 @@ How we name, gate, test, and retire experimental behaviour in `neo4j-cli`; imple
 ## Key naming
 
 - Prefix `flag.`, then `<area>-<feature>` (lowercase kebab). One area token, one feature token.
-- Examples: `flag.aura-beta`, `flag.docker-command`, `flag.secrets-os-keystore`.
+- Examples: `flag.docker-command`, `flag.secrets-os-keystore`.
 - Runtime source of truth: the `Registry` map in `common/clicfg/flags.go`. This doc is the narrative reference.
 
 ## Defaults & lifecycle
@@ -34,10 +34,11 @@ Explicit: no `--flag` CLI option. CI / one-shot use is covered by the env var at
 
 - Silent at runtime (debug-log only). Old user configs survive CLI upgrades without warnings.
 - Stripping retired keys from `config.json` is owned by the config-migration subsystem (see [`.agents/config-migrations.md`](config-migrations.md)), not the registry.
+- `SetForTest` panics on an unregistered key, so retiring a flag surfaces leftover test overrides.
 
 ## Migrating aura.beta-enabled
 
-- Migration completed in CLI-136: production + tests now use `flag.aura-beta` via the `common/clicfg/flags.go` `Registry`. The legacy `aura.beta-enabled` key is still read as a debug-logged fallback until the config-migration subsystem ships physical config cleanup.
+- Migration completed in CLI-136; flag retired in CLI-154. Both `flag.aura-beta` and legacy `aura.beta-enabled` are stripped from user configs by config-migration v1 (`common/configmigrate/migrations.go:32`).
 
 ## See also
 

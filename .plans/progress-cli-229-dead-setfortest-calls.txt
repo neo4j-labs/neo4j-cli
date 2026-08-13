@@ -1,0 +1,17 @@
+## TASK-001 — 2026-08-13T08:02:57Z
+Deleted the four inert cfg.Flags.SetForTest("flag.aura-beta", true) calls from the aura api organization tests; also swapped the retired flag out of the FlagNameToEnv doc-comment example so the Go-file grep gate is clean.
+Files: ~neo4j-cli/aura/internal/api/organization_test.go, ~common/clicfg/clicfg.go
+Decisions: clicfg.go:226 was outside the PRD's stated file list but its `flag.aura-beta` example blocked task-001's own grep acceptance criterion — same class as REQ-F-006, folded in rather than deferred.
+
+## TASK-002 — 2026-08-13T08:15:00Z
+Added Registry precondition panic to SetForTest and new test covering both the registered and unregistered key paths.
+Files: ~common/clicfg/flags.go, ~common/clicfg/flags_test.go
+
+## TASK-003 — 2026-08-13T08:30:00Z
+Corrected three stale spots in .agents/feature-flags.md: dropped flag.aura-beta from naming examples, rewrote migrating section in past tense (retired CLI-154, stripped by config-migration v1), added SetForTest panic note under Unknown/removed keys.
+Files: ~.agents/feature-flags.md
+Decisions: none
+
+## TASK-004 — 2026-08-13T08:14:20Z
+Ran final gates: make test, fmt-check, lint all pass; TestGenerator_RoundTrip green; no bundle or .changes/ drift vs main; Go-file grep for aura-beta clean outside configmigrate.
+Files: none (verification only)

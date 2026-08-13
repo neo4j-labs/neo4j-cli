@@ -85,7 +85,6 @@ func TestListOrganizations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := buildOrgTestServer(t, "/v2beta1/organizations", tc.status, tc.body)
 			cfg := buildTestConfig(t, srv.URL, testCredJSON)
-			cfg.Flags.SetForTest("flag.aura-beta", true)
 
 			resp, err := api.ListOrganizations(cfg)
 
@@ -143,7 +142,6 @@ func TestGetOrganization(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := buildOrgTestServer(t, fmt.Sprintf("/v2beta1/organizations/%s", orgID), tc.status, tc.body)
 			cfg := buildTestConfig(t, srv.URL, testCredJSON)
-			cfg.Flags.SetForTest("flag.aura-beta", true)
 
 			resp, err := api.GetOrganization(cfg, orgID)
 
@@ -211,7 +209,6 @@ func TestListProjects(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := buildOrgTestServer(t, fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID), tc.status, tc.body)
 			cfg := buildTestConfig(t, srv.URL, testCredJSON)
-			cfg.Flags.SetForTest("flag.aura-beta", true)
 
 			resp, err := api.ListProjects(cfg, orgID)
 
@@ -270,7 +267,6 @@ func TestGetProject(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := buildOrgTestServer(t, fmt.Sprintf("/v2beta1/organizations/%s/projects/%s", orgID, projectID), tc.status, tc.body)
 			cfg := buildTestConfig(t, srv.URL, testCredJSON)
-			cfg.Flags.SetForTest("flag.aura-beta", true)
 
 			resp, err := api.GetProject(cfg, orgID, projectID)
 
