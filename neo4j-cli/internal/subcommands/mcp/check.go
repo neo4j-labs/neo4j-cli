@@ -40,13 +40,13 @@ func newCheckCmd(cfg *clicfg.Config) *cobra.Command {
 			"path), status where status is ok | drift | not-installed. " +
 			"Exits non-zero when any installed entry has drifted.",
 		Example: `# Check MCP install state for drift (table)
-	neo4j-cli mcp check
+neo4j-cli mcp check
 
-	# Check as JSON (machine-readable)
-	neo4j-cli mcp check --format json
+# Check as JSON (machine-readable)
+neo4j-cli mcp check --format json
 
-	# Check in toon format
-	neo4j-cli mcp check --format toon`,
+# Check in toon format
+neo4j-cli mcp check --format toon`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

@@ -4,6 +4,7 @@
 # checks (the renderer always emits LF) and producing spurious CRLF/LF
 # diffs in `git diff --exit-code` after `go generate`.
 common/skill/render/testdata/** text eol=lf
+neo4j-cli/internal/subcommands/mcp/**/testdata/** text eol=lf
 neo4j-cli/internal/subcommands/mcp/testdata/** text eol=lf
 **/internal/skill/bundle/** text eol=lf
 **/internal/skill/additions.md text eol=lf
