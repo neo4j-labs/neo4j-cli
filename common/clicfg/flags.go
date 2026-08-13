@@ -4,6 +4,7 @@
 package clicfg
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -109,8 +110,12 @@ func (f *FlagSet) logLegacyOnce(spec Flag) {
 
 // SetForTest installs an in-process override for the named flag. The value is
 // never persisted to disk or viper; it is cleared when the process exits.
-// Matches the previous AuraConfig.SetBetaEnabled contract.
+// Panics if name is not in Registry — an unregistered override is always
+// ignored by Enabled.
 func (f *FlagSet) SetForTest(name string, value bool) {
+	if _, ok := Registry[name]; !ok {
+		panic(fmt.Sprintf("clicfg.SetForTest: %q is not in Registry — the override would be ignored by Enabled", name))
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.overrides == nil {

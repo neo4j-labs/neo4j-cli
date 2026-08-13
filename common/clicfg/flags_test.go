@@ -166,6 +166,20 @@ func TestFlagSet_Enabled_UnknownKeyDebugLog(t *testing.T) {
 	require.True(t, slog.Default().Enabled(ctx, slog.LevelDebug))
 }
 
+func TestFlagSet_SetForTest_PanicsOnUnregisteredKey(t *testing.T) {
+	registerTestFlag(t)
+	fs, _ := newFlagSetForTest(t)
+
+	assert.NotPanics(t, func() {
+		fs.SetForTest("flag.test-sentinel", true)
+	})
+
+	assert.PanicsWithValue(t,
+		`clicfg.SetForTest: "flag.does-not-exist" is not in Registry — the override would be ignored by Enabled`,
+		func() { fs.SetForTest("flag.does-not-exist", true) },
+	)
+}
+
 func TestFlagNameToEnv(t *testing.T) {
 	tests := []struct {
 		name string

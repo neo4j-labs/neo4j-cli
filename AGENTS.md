@@ -171,7 +171,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
   - Smoke test: `go test -tags=smoke ./.../docker/...` (NOT in `make test`; skips without docker). Missing-docker error suggests `alias docker=podman` if podman on PATH (`lookPathFn` seam).
 - **agent-context** — `neo4j-cli agent-context` reflects live cobra tree; hand-coded `schemaVersion`/`exitCodes`/`errorCodes`/`asyncFlag` in `agentcontext/build.go`. See [`.agents/agent-context.md`](.agents/agent-context.md).
 - **v2beta1 404 suggestions** — once a resource is migrated to the nested v2beta1 scoped path, its 404 suggestion should come natively from `api/response.go` `suggestionForResource(<singular>)` (parseResourceFromRequest tags the trailing plural/id), NOT a call-site `utils.WithNotFoundContext` rewrite — add a `case` there when migrating a resource.
-- **feature flags** — naming `flag.<area>-<feature>`, default-false, config+env override. See [`.agents/feature-flags.md`](.agents/feature-flags.md).
+- **feature flags** — naming `flag.<area>-<feature>`, default-false, config+env override. `SetForTest` panics on unregistered keys (Registry check precedes mutex). See [`.agents/feature-flags.md`](.agents/feature-flags.md).
 - **config migrations** — `common/configmigrate/`, `_schema_version` marker, warn-and-continue, `runWith` seam, under `common/` due to internal-pkg rule. See [`.agents/config-migrations.md`](.agents/config-migrations.md).
 - **`internal/quip/`** — intentional cosmetic terminal-message helper. Keep as-is; don't document triggers, simplify, or "tidy" the obfuscation.
 
