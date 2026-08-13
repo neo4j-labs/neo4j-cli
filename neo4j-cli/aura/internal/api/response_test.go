@@ -126,9 +126,13 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 		statusCode         int
 		body               string
 		header             http.Header
+		requestPath        string // when set, attaches a Request with this URL path
 		wantCode           int
 		wantMsgContain     string // optional substring check on the rendered message
+		wantMsgOmit        string // optional substring that must NOT appear in the message
 		wantSuggestion     string // optional Suggestion field check (errors.As)
+		wantResourceType   string // optional ResourceType check
+		wantResourceID     string // optional ResourceID check
 		assertNoSuggestion bool   // when set, assert Suggestion == "" even though wantSuggestion is empty
 		usesAuthCfg        bool   // 401/403-no-server-error paths call ClearAccessToken
 	}{
@@ -259,6 +263,161 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			body:       `{}`,
 			wantCode:   6,
 		},
+		// ---------- Group A: additional status and malformed-body entries ----------
+		{
+			name:       "400 bad request with malformed body -> validation (6)",
+			statusCode: http.StatusBadRequest,
+			body:       `<<<not-json>>>`,
+			wantCode:   6,
+		},
+		{
+			name:           "403 forbidden with malformed body -> auth (4) with authSuggestion",
+			statusCode:     http.StatusForbidden,
+			body:           `<<<not-json>>>`,
+			wantCode:       4,
+			wantSuggestion: authSuggestion,
+		},
+		{
+			name:       "413 payload too large with parseable errors[] -> validation (6)",
+			statusCode: http.StatusRequestEntityTooLarge,
+			body:       `{"errors":[{"message":"payload too large"}]}`,
+			wantCode:   6,
+		},
+		{
+			name:       "415 unsupported media type with schema-less body -> validation (6)",
+			statusCode: http.StatusUnsupportedMediaType,
+			body:       `{}`,
+			wantCode:   6,
+		},
+		{
+			name:           "422 unprocessable entity with parseable errors[] -> validation (6) surfacing message",
+			statusCode:     http.StatusUnprocessableEntity,
+			body:           `{"errors":[{"message":"database limit reached for this instance"}]}`,
+			wantCode:       6,
+			wantMsgContain: "database limit reached for this instance",
+		},
+		{
+			name:       "422 unprocessable entity with schema-less plain-text body -> validation (6)",
+			statusCode: http.StatusUnprocessableEntity,
+			body:       `plain text error body`,
+			wantCode:   6,
+		},
+		{
+			name:       "405 method not allowed with malformed body -> upstream (8)",
+			statusCode: http.StatusMethodNotAllowed,
+			body:       `<<<not-json>>>`,
+			wantCode:   8,
+		},
+		{
+			name:       "409 conflict with malformed body -> conflict (5)",
+			statusCode: http.StatusConflict,
+			body:       `<<<not-json>>>`,
+			wantCode:   5,
+		},
+		{
+			name:       "599 unknown status -> upstream (8)",
+			statusCode: 599,
+			body:       `{}`,
+			wantCode:   8,
+		},
+		{
+			name:       "451 unavailable for legal reasons (unmapped 4xx) -> validation (6)",
+			statusCode: 451,
+			body:       `{}`,
+			wantCode:   6,
+		},
+		// ---------- Group B: empty-errors bodies proving REQ-F-004 ----------
+		// Both '{}' and '{"errors":[]}' parse as valid JSON leaving an empty
+		// Errors slice, so errorMessages returns nil and the message falls back
+		// to upstreamDetail rather than rendering the empty "[\n\t\n]".
+		{
+			name:           "400 empty json body -> validation (6) with raw body fallback",
+			statusCode:     http.StatusBadRequest,
+			body:           `{}`,
+			wantCode:       6,
+			wantMsgContain: "upstream error [status 400]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "400 empty errors[] body -> validation (6) with raw body fallback",
+			statusCode:     http.StatusBadRequest,
+			body:           `{"errors":[]}`,
+			wantCode:       6,
+			wantMsgContain: "upstream error [status 400]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "402 empty json body -> conflict (5) with raw body fallback",
+			statusCode:     http.StatusPaymentRequired,
+			body:           `{}`,
+			wantCode:       5,
+			wantMsgContain: "upstream error [status 402]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "402 empty errors[] body -> conflict (5) with raw body fallback",
+			statusCode:     http.StatusPaymentRequired,
+			body:           `{"errors":[]}`,
+			wantCode:       5,
+			wantMsgContain: "upstream error [status 402]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:             "404 empty json body -> not_found (3) with resource tags and raw body",
+			statusCode:       http.StatusNotFound,
+			body:             `{}`,
+			requestPath:      "/v1/instances/inst-1",
+			wantCode:         3,
+			wantMsgContain:   "upstream error [status 404]",
+			wantMsgOmit:      "[\n\t\n]",
+			wantResourceType: "instance",
+			wantResourceID:   "inst-1",
+			wantSuggestion:   "Run 'neo4j-cli aura instance list' to see available instances.",
+		},
+		{
+			name:             "404 empty errors[] body -> not_found (3) with resource tags and raw body",
+			statusCode:       http.StatusNotFound,
+			body:             `{"errors":[]}`,
+			requestPath:      "/v1/instances/inst-1",
+			wantCode:         3,
+			wantMsgContain:   "upstream error [status 404]",
+			wantMsgOmit:      "[\n\t\n]",
+			wantResourceType: "instance",
+			wantResourceID:   "inst-1",
+			wantSuggestion:   "Run 'neo4j-cli aura instance list' to see available instances.",
+		},
+		{
+			name:           "409 empty json body -> conflict (5) with raw body fallback",
+			statusCode:     http.StatusConflict,
+			body:           `{}`,
+			wantCode:       5,
+			wantMsgContain: "upstream error [status 409]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "409 empty errors[] body -> conflict (5) with raw body fallback",
+			statusCode:     http.StatusConflict,
+			body:           `{"errors":[]}`,
+			wantCode:       5,
+			wantMsgContain: "upstream error [status 409]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "500 empty json body -> upstream (8) with raw body fallback",
+			statusCode:     http.StatusInternalServerError,
+			body:           `{}`,
+			wantCode:       8,
+			wantMsgContain: "upstream error [status 500]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
+		{
+			name:           "500 empty errors[] body -> upstream (8) with raw body fallback",
+			statusCode:     http.StatusInternalServerError,
+			body:           `{"errors":[]}`,
+			wantCode:       8,
+			wantMsgContain: "upstream error [status 500]",
+			wantMsgOmit:    "[\n\t\n]",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			res := &http.Response{
@@ -268,6 +427,9 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			}
 			if res.Header == nil {
 				res.Header = http.Header{}
+			}
+			if tc.requestPath != "" {
+				res.Request = &http.Request{URL: &url.URL{Path: tc.requestPath}}
 			}
 
 			var cfg *clicfg.Config
@@ -293,6 +455,18 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 
 			if tc.assertNoSuggestion {
 				assert.Equal(t, "", ce.Suggestion, "Suggestion should be empty for status %d", tc.statusCode)
+			}
+
+			if tc.wantMsgOmit != "" {
+				assert.NotContains(t, ce.Error(), tc.wantMsgOmit)
+			}
+
+			if tc.wantResourceType != "" {
+				assert.Equal(t, tc.wantResourceType, ce.ResourceType, "ResourceType mismatch for status %d", tc.statusCode)
+			}
+
+			if tc.wantResourceID != "" {
+				assert.Equal(t, tc.wantResourceID, ce.ResourceID, "ResourceID mismatch for status %d", tc.statusCode)
 			}
 
 			// 429 also asserts the Retry-After landed on the struct field.

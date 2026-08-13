@@ -111,7 +111,7 @@ tasks:
       those come from the request URL and survive an uninformative body. If the table grows
       unwieldy, splitting the status matrix into a concern-named `response_status_test.go` is
       acceptable and precedented per AGENTS.md. (REQ-F-004, REQ-F-008)
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -120,7 +120,7 @@ tasks:
       - 'No empty-errors case renders the empty bracketed message; each carries the raw body instead'
       - 'The 404 empty-errors cases still assert ResourceType, ResourceID and Suggestion'
       - 'The 422 parseable case asserts the upstream message text reaches the error, not just the exit code'
-    completed_at: null
+    completed_at: '2026-08-13T11:12:00Z'
 
   - id: task-004
     title: 'Add TestHandleResponseError_NoPanic invariant matrix'
@@ -173,7 +173,7 @@ tasks:
       This suite is not wired into CI or the Makefile, so it will not run under `make test`. Run it
       explicitly with `go test -tags=e2e_exitcodes ./test/e2e/exitcodes/...` and report the result;
       wiring it into CI is out of scope. (REQ-F-010)
-    status: pending
+    status: in_progress
     dependencies:
       - task-002
     acceptance_criteria:

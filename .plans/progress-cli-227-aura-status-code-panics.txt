@@ -6,3 +6,7 @@ Decisions: Omitted PRD sketch's second strings.TrimSpace around inner truncateBy
 ## TASK-002 — 2026-08-13T11:00:34Z
 Rewrite of handleResponseError to be panic-free with class-based status fallback. Added upstreamDetail and errorMessages helpers. Deleted reportIssueFatal and extractEmbeddedErrors. Updated redaction test from panic-based (os.Args manipulation) to body-based (secret in response body). Retargeted 3 exit-code entries (402/404/502 malformed from exit 1 to typed codes). Added 307/413/422/408 to exit code mapping table. Added ReadAll failure test. All gates pass.
 Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go, ~neo4j-cli/aura/internal/api/api.go
+
+## TASK-003 — 2026-08-13T11:12:00Z
+Extended the exit-code mapping table with 20 new entries. Group A adds previously-panicking/unmodelled statuses (400/403/405/409 malformed, 413/415/422 parseable+schema-less, 599, 451) with typed exit codes. Group B adds empty-errors bodies `{}`/`{"errors":[]}` for 400/402/404/409/500 proving REQ-F-004 fallback. Added 4 new struct fields (requestPath, wantMsgOmit, wantResourceType, wantResourceID) and their assertion wiring. Added wantStderrOmits field to e2e scenario struct for follow-up task-005. All gates pass (test, lint, fmt-check).
+Files: ~neo4j-cli/aura/internal/api/response_test.go, ~test/e2e/exitcodes/exitcodes_test.go, ~.plans/tasks-cli-227-aura-status-code-panics.yml
