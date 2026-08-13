@@ -16,7 +16,7 @@ The skill owns the analysis flow — verifying the MCP connection, identifying t
 
 The `analyze-pr` skill calls `new_threatmodel` unconditionally and has no dedup step of its own. Before creating anything, check for an existing model bound to this PR:
 
-1. Call `my_recent_threatmodels` and look for a model already associated with this PR — match on `pull_request_url` (the PR's HTML URL at `https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}`), or on a title containing `<${GITHUB_REPOSITORY}>#${PR_NUMBER}`.
+1. Call `list_threatmodels` with `workspace_id` set to the `OPLANE WORKSPACE ID` value from the context line (top of this prompt), and look for a model already associated with this PR — match on a title containing the marker `[<owner/repo>#<PR_NUMBER>]` (e.g., `[neo4j-labs/neo4j-cli#232]`), constructed from the REPO and PR NUMBER context lines. Use `list_threatmodels` rather than `my_recent_threatmodels` because the identity-scoped lookup cannot see models created by a teammate or future service account in the shared workspace.
 
 2. **If found** (reuse path):
    - Call `add_threatmodel_comment` describing what changed since the last push (the current diff).

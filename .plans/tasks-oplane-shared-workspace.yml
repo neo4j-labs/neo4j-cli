@@ -89,7 +89,7 @@ tasks:
 
       Leave item 4's fallback intact in intent: if the existing model cannot be updated for
       any reason, create a new one rather than failing the run. (REQ-F-006, 007, 008-lookup, 011)
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'Step 2 item 1 calls `list_threatmodels` with `workspace_id`; no `my_recent_threatmodels` call remains anywhere in Step 2'
@@ -97,7 +97,7 @@ tasks:
       - '`pull_request_url` is no longer offered as a lookup match key'
       - 'The lookup matches the literal `[<owner/repo>#<N>]` form, not `<REPO>#<N>`'
       - 'Item 4''s create-rather-than-fail fallback is preserved'
-    completed_at: null
+    completed_at: 2026-08-13T12:41:09Z
 
   - id: task-004
     title: 'Pass workspace_id on every new_threatmodel call, including the skill-initiated one'
