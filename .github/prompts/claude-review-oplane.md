@@ -70,8 +70,8 @@ Full threat model: <link>
 
 For the `Full threat model:` line:
 - If the MCP tools return a URL, use it as a Markdown link.
-- If they return only an id, print `id: <id>` and link `https://gravity.oplane.io`.
-- **Never guess a deep-link path.**
+- Otherwise build the link from the threat-model id: `https://gravity.oplane.io/links/threat-model/<id>`. This path is documented in the `new_threatmodel` tool description and redirects to the model's workspace page after login. Prefer it over the `/org/<org>/workspaces/<n>/tm/<id>` form, which is equivalent but needs the org slug and workspace number — neither derivable from `OPLANE_WORKSPACE_ID`.
+- **Never invent any other deep-link path.** If you have neither a returned URL nor an id, print the bare `https://gravity.oplane.io` rather than guessing.
 
 ## Step 4 — Failure mode: Oplane MCP unavailable
 
