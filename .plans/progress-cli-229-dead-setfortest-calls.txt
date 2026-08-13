@@ -1,0 +1,4 @@
+## TASK-001 — 2026-08-13T08:02:57Z
+Deleted the four inert cfg.Flags.SetForTest("flag.aura-beta", true) calls from the aura api organization tests; also swapped the retired flag out of the FlagNameToEnv doc-comment example so the Go-file grep gate is clean.
+Files: ~neo4j-cli/aura/internal/api/organization_test.go, ~common/clicfg/clicfg.go
+Decisions: clicfg.go:226 was outside the PRD's stated file list but its `flag.aura-beta` example blocked task-001's own grep acceptance criterion — same class as REQ-F-006, folded in rather than deferred.

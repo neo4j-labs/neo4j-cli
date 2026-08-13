@@ -1,7 +1,7 @@
 feature: cli-229-dead-setfortest-calls
 prd: ./prd-cli-229-dead-setfortest-calls.md
 created_at: 2026-08-13T07:57:26Z
-updated_at: 2026-08-13T07:57:26Z
+updated_at: 2026-08-13T08:02:57Z
 
 tasks:
   - id: task-001
@@ -16,14 +16,14 @@ tasks:
       This MUST land before task-002: once the guard is in place, these calls would panic.
       Do not touch the `buildOrgTestServer` / `buildTestConfig` helpers or the `v2beta1`
       mock paths in that file. (REQ-F-001)
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'No `SetForTest` call remains in `neo4j-cli/aura/internal/api/organization_test.go`'
       - 'No other line in that file is modified — the diff is exactly four deletions'
       - '`go test ./neo4j-cli/aura/internal/api/... -run "TestListOrganizations|TestGetOrganization"` passes'
       - '`grep -rn "aura-beta" --include=*.go . | grep -v configmigrate` returns zero results'
-    completed_at: null
+    completed_at: 2026-08-13T08:02:57Z
 
   - id: task-002
     title: 'Guard SetForTest against unregistered keys and cover it with a test'
