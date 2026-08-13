@@ -1,0 +1,4 @@
+## TASK-001 — 2026-08-13T10:49:32Z
+Extracted body-rendering half of rawErrorDetail into package-private scrubbedBodyTrunc helper. Pure refactor; rawErrorDetail output unchanged. All raw_status_test.go regression tests pass unedited.
+Files: ~neo4j-cli/aura/internal/api/raw.go
+Decisions: Omitted PRD sketch's second strings.TrimSpace around inner truncateBytes to preserve byte-identical output.

@@ -20,14 +20,14 @@ tasks:
       (line 117). Carry the doc comment from the PRD, including the note that the generous outer
       cut keeps redaction safe because a secret split by it is dropped by the final cut.
       (REQ-F-001)
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - '`scrubbedBodyTrunc` exists in `raw.go` and is called by `rawErrorDetail`'
       - '`truncateBytes` and `rawErrorBodyLimit` are unchanged'
       - '`go test ./neo4j-cli/aura/internal/api/... -run RawStatus` passes with zero edits to `raw_status_test.go`'
       - 'The new function carries a doc comment explaining the double bound and its redaction rationale'
-    completed_at: null
+    completed_at: '2026-08-13T10:49:32Z'
 
   - id: task-002
     title: 'Make handleResponseError panic-free with class-based status fallback'
