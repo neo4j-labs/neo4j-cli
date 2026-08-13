@@ -222,3 +222,56 @@ tasks:
       - 'A person who is not the OPLANE_PAT owner opens https://gravity.oplane.io/org/neo4j/workspaces/4 and sees the model'
       - 'Any temporary `github_token` smoke-test override has been reverted before merge'
     completed_at: null
+
+  - id: task-008
+    title: 'Keep OPLANE_PAT out of argv — write MCP config to a file'
+    description: |
+      Flagged by the Oplane threat model for PR #240 as OPLANE_REQ-00178024 (High,
+      PARTIALLY_IMPLEMENTED). `OPLANE_PAT` is interpolated inline into `claude_args` as
+      `--mcp-config '{...\"Authorization\":\"Bearer ${{ secrets.OPLANE_PAT }}\"...}'`, which
+      places the token in the action's process arguments — world-readable via
+      `/proc/<pid>/cmdline` to any process on the runner. GitHub Actions masks registered
+      secrets in log output, but masking does NOT cover `/proc`. AGENTS.md:181 states the
+      repo rule outright: "Secrets via process env, NEVER argv (world-readable via /proc)."
+      The Go side of this repo already follows that rule; this workflow does not. The
+      exposure is pre-existing and was not introduced by the workspace-routing change.
+
+      FIX (per the action's own docs, `docs/configuration.md` "Passing Secrets to MCP
+      Servers"): add a step that writes the MCP config to a file under `$RUNNER_TEMP` with
+      `umask 077`, letting GitHub interpolate `${{ secrets.OPLANE_PAT }}` into the heredoc at
+      YAML level, then pass `--mcp-config "<path>"` instead of inline JSON. The secret then
+      lives in a 0600 file scoped to the job (wiped at job end) rather than in argv.
+
+      CRITICAL — DO NOT REPEAT THE FAILED ATTEMPT. A prior attempt (commit df1ff24a, reverted
+      in 4dc2f3c8) used a QUOTED heredoc to keep `${OPLANE_PAT}` an unexpanded literal on
+      disk, on the assumption — inherited from the predecessor PRD's REQ-F-018 — that Claude
+      Code expands `${VAR}` when reading `.mcp.json`. IT DOES NOT. Verified by CI run
+      31710779629: the Oplane MCP server received a literal `${OPLANE_PAT}`, never reached an
+      authenticated state, exposed only OAuth stubs (`authenticate`,
+      `complete_authentication`) instead of the operational tools, and the run posted
+      "⚠️ Oplane MCP unavailable". Use an UNQUOTED heredoc delimiter so GitHub's `${{ }}`
+      interpolation writes the real token into the file.
+
+      Note the residual risk honestly: this moves the secret from argv to a 0600 file. That
+      is a real reduction (any process can read `/proc/<pid>/cmdline`; only the runner user
+      can read the file) but it is not zero exposure. Say so rather than claiming the
+      finding is fully closed.
+
+      VERIFICATION IS MANDATORY AND MUST BE A LIVE RUN. Every official example in
+      `docs/configuration.md` configures a **stdio** server, where the secret goes in an
+      `env` block. Ours is an **http** server needing an `Authorization` header — that shape
+      is unverified. Re-apply the temporary `github_token` override, push, confirm from the
+      run that MCP connected and the threat model was updated (NOT that it merely "looks
+      unchanged" — an unchanged model is also what total failure looks like; read the PR
+      comment for the MCP-unavailable warning), then revert the override before merge.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - 'No `OPLANE_PAT` reference remains inside `claude_args`; `--mcp-config` receives a file path'
+      - 'The config file is written under `$RUNNER_TEMP` with `umask 077` and an UNQUOTED heredoc so the secret is interpolated by GitHub'
+      - '`actionlint .github/workflows/claude-review-oplane.yml` reports no findings'
+      - 'A live CI run shows the Oplane MCP tools available (no "MCP unavailable" comment on the PR)'
+      - 'That same run updates threat model 3c53b60b rather than creating a duplicate in workspace 6a246538-76d1-4857-830e-2aad4681d044'
+      - 'The temporary `github_token` override used for verification is reverted before merge'
+    completed_at: null

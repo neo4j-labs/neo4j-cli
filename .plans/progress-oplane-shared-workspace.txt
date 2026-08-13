@@ -25,3 +25,6 @@ Files: ~.github/prompts/claude-review-oplane.md
 Static verification of the full diff: actionlint clean, prompt Steps 3/4 byte-identical, diff scoped to .github/ and .plans/ only, no extra files (changes/unreleased/, skill bundle). Annotated the REQ-F-016 stale-tool-fallback hazard in a YAML comment above claude_args. task-007 remains pending as post-merge live verification.
 Files: ~.github/workflows/claude-review-oplane.yml
 Decisions: Stale-fallback comment placed as a YAML comment *before* claude_args (not inside the `>-` block scalar, where YAML treats `#` as literal content).
+
+## REVIEW — 2026-08-13T14:50:23Z
+Added 1 review task (task-008).
