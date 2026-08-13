@@ -129,6 +129,10 @@ jobs:
           # token is rotated or the account is deprovisioned — the failure is
           # visible (the MCP-unavailable path posts a warning comment) rather
           # than silent. Migrate to a service account when Oplane offers one.
+          #
+          # The --allowed-tools wildcard mcp__oplane__* covers list_threatmodels,
+          # but the predecessor PRD's REQ-F-016 fallback enumerates six names
+          # without it. Adopting that fallback silently breaks dedup.
           claude_args: >-
             --mcp-config
             '{"mcpServers":{"oplane":{"type":"http","url":"https://gravity.oplane.io/mcp/","headers":{"Authorization":"Bearer ${{ secrets.OPLANE_PAT }}"}}}}'

@@ -20,3 +20,8 @@ Files: ~.github/workflows/claude-review-oplane.yml
 ## TASK-005 — 2026-08-13T12:51:29Z
 Reworded Step 1's closing sentence to distinguish the upstream skill's identity-scoped `my_recent_threatmodels` connectivity probe from our workspace-scoped `list_threatmodels` dedup lookup in Step 2. Probe-to-Step-4 linkage preserved.
 Files: ~.github/prompts/claude-review-oplane.md
+
+## TASK-006 — 2026-08-13T13:44:15Z
+Static verification of the full diff: actionlint clean, prompt Steps 3/4 byte-identical, diff scoped to .github/ and .plans/ only, no extra files (changes/unreleased/, skill bundle). Annotated the REQ-F-016 stale-tool-fallback hazard in a YAML comment above claude_args. task-007 remains pending as post-merge live verification.
+Files: ~.github/workflows/claude-review-oplane.yml
+Decisions: Stale-fallback comment placed as a YAML comment *before* claude_args (not inside the `>-` block scalar, where YAML treats `#` as literal content).

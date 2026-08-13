@@ -174,7 +174,7 @@ tasks:
       `list_threatmodels`. If that fallback is ever adopted it must gain
       `mcp__oplane__list_threatmodels`, otherwise a wildcard failure silently disables dedup
       and every push duplicates. (REQ-F-013, REQ-NF-001..005)
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-004
@@ -185,7 +185,7 @@ tasks:
       - '`git diff --name-only` against the base shows only paths under `.github/` and `.plans/`'
       - 'No file added under `.changes/unreleased/`; no diff under `neo4j-cli/internal/skill/bundle/`'
       - 'The stale REQ-F-016 fallback list is annotated as needing `mcp__oplane__list_threatmodels`'
-    completed_at: null
+    completed_at: 2026-08-13T13:44:15Z
 
   - id: task-007
     title: 'Post-merge live-run verification that models land in workspace 4'
