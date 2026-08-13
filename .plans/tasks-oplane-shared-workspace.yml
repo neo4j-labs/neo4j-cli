@@ -252,10 +252,28 @@ tasks:
       "⚠️ Oplane MCP unavailable". Use an UNQUOTED heredoc delimiter so GitHub's `${{ }}`
       interpolation writes the real token into the file.
 
-      Note the residual risk honestly: this moves the secret from argv to a 0600 file. That
-      is a real reduction (any process can read `/proc/<pid>/cmdline`; only the runner user
-      can read the file) but it is not zero exposure. Say so rather than claiming the
-      finding is fully closed.
+      OUTCOME — ATTEMPTED AND ABANDONED. Do not retry as written. The file-based approach
+      cannot work with `anthropics/claude-code-action` at its current pin. Both variants were
+      implemented and live-tested on this branch; both left the Oplane MCP server
+      unauthenticated (only `authenticate`/`complete_authentication` stubs, no operational
+      tools), and both were reverted:
+
+        df1ff24a (reverted 4dc2f3c8) — quoted heredoc + `${OPLANE_PAT}` placeholder. Claude
+          Code does NOT expand `${VAR}` when reading `.mcp.json`, so the server received a
+          literal placeholder. Disproves predecessor PRD REQ-F-018's premise.
+        71777a5c + 71106029 (reverted 61ebba77) — real secret written to a 0600 file under
+          $RUNNER_TEMP, path passed to `--mcp-config`. Dropped by the action: it always
+          prepends its built-in GitHub servers as INLINE JSON, and `mergeMcpConfigs`
+          (base-action/src/parse-sdk-options.ts) cannot read a file path at parse time — its
+          own comment says "we don't have access to the file system here" — so the inline
+          config wins and the file path is discarded.
+
+      Inline JSON is therefore the ONLY shape that registers this server, and the argv
+      exposure is structural until upstream teaches `mergeMcpConfigs` to read file paths.
+      The reasoning is recorded in a comment above `claude_args` in the workflow so it is
+      visible at the point of temptation. OPLANE_REQ-00178024 stays open and correctly
+      un-closed; the right next move is an upstream issue against claude-code-action, not
+      another local attempt.
 
       VERIFICATION IS MANDATORY AND MUST BE A LIVE RUN. Every official example in
       `docs/configuration.md` configures a **stdio** server, where the secret goes in an
