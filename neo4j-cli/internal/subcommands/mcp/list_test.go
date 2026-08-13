@@ -62,4 +62,10 @@ func TestList_JSONFieldsAreSnakeCase(t *testing.T) {
 			assert.Regexp(t, `^[a-z][a-z0-9_]*$`, key, "JSON key %q must be snake_case", key)
 		}
 	}
+
+	// Verify the column is named installed_command and not the stale installed_version
+	require.Greater(t, len(rows), 0, "expected at least one row with seeded detection")
+	_, hasInstalledVersion := rows[0]["installed_version"]
+	assert.False(t, hasInstalledVersion, "installed_version must be renamed to installed_command")
+	assert.Contains(t, rows[0], "installed_command")
 }

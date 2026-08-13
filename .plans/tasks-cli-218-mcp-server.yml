@@ -1291,7 +1291,8 @@ tasks:
         test — the absence of coverage is why this drifted from `check.go` silently.
       - No NEW changelog entry: the whole mcp group is unreleased and already
         covered by the entry being corrected here.
-    status: pending
+    status: completed
+    completed_at: 2026-08-13T08:51:00Z
     dependencies: [task-038]
     acceptance_criteria:
       - 'mcp list emits installed_command in json, toon and table output; installed_version no longer appears as an output name anywhere in the mcp package'

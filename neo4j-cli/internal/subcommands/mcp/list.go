@@ -16,7 +16,7 @@ type mcpListResultRow struct {
 	DisplayName      string `json:"display_name"`
 	Detected         bool   `json:"detected"`
 	Installed        bool   `json:"installed"`
-	InstalledVersion string `json:"installed_version"`
+	InstalledCommand string `json:"installed_command"`
 }
 
 func (r mcpListResultRow) asArrayRow() map[string]any {
@@ -25,7 +25,7 @@ func (r mcpListResultRow) asArrayRow() map[string]any {
 		"display_name":      r.DisplayName,
 		"detected":          boolStr(r.Detected),
 		"installed":         boolStr(r.Installed),
-		"installed_version": r.InstalledVersion,
+		"installed_command": r.InstalledCommand,
 	}
 }
 
@@ -43,7 +43,7 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Lists every MCP-capable agent and whether neo4j-cli is installed " +
 			"as an MCP server for each. Columns: agent, display_name, detected " +
 			"(agent directory exists), installed (neo4j-cli entry in config), " +
-			"and installed_version (the binary path from the config entry, if any).",
+			"and installed_command (the binary path from the config entry, if any).",
 		Example: `# List MCP agents and their install state (table)
 neo4j-cli mcp list
 
@@ -72,7 +72,7 @@ func runListCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
 			DisplayName:      inst.Agent.DisplayName,
 			Detected:         inst.Detected,
 			Installed:        inst.Installed,
-			InstalledVersion: inst.InstalledVersion,
+			InstalledCommand: inst.InstalledVersion,
 		})
 	}
 
@@ -80,6 +80,6 @@ func runListCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
 		cmd.Println("No MCP-capable agents found.")
 		return nil
 	}
-	commonoutput.PrintBodyMap(cmd, cfg, rows, []string{"agent", "display_name", "detected", "installed", "installed_version"})
+	commonoutput.PrintBodyMap(cmd, cfg, rows, []string{"agent", "display_name", "detected", "installed", "installed_command"})
 	return nil
 }

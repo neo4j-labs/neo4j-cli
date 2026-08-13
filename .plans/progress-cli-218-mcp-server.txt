@@ -329,3 +329,8 @@ Added 1 review task (task-040).
 Split the mcp package: cobra leaves stay in mcp, MCP server runtime moved to mcp/server. storedRootFactory/storedVersion relocated behind server.Configure(); NewServer/validateWiring/ensureToolDefinitions/toolDefinitions/toolRows exported as server.New/ValidateWiring/EnsureToolDefinitions/ToolDefinitions/ToolRows.
 Files: ~neo4j-cli/internal/subcommands/mcp/{mcp,serve,tool,manifest,server_test,serve_test,mcp_helpers_test}.go, +neo4j-cli/internal/subcommands/mcp/server/{config,main_test,server_helpers_test}.go, >neo4j-cli/internal/subcommands/mcp/{server,executor,stdio,allow,tooldefs,run,run_write,read_docs,list_commands,list_targets,result}.go=>neo4j-cli/internal/subcommands/mcp/server/, >neo4j-cli/internal/subcommands/mcp/testdata/policy.golden=>neo4j-cli/internal/subcommands/mcp/server/testdata/policy.golden, ~AGENTS.md
 Decisions: kept the four cobra-level tests (serve annotation, credential-store probe) in mcp/server_test.go and moved only the genuine MCP-server tests; added StoredRootFactory/StoredVersion accessors because serve.go stays in mcp and needs read access
+
+## TASK-040 — 2026-08-13T08:51:00Z
+Renamed mcp list output column installed_version to installed_command so it matches mcp check for the same binary-path value; corrected the stale `tools` command name to `tool` in the unreleased changelog entry.
+Files: ~neo4j-cli/internal/subcommands/mcp/list.go, ~neo4j-cli/internal/subcommands/mcp/list_test.go, ~.changes/unreleased/neo4j-cli-Minor-20260804-234825.yaml
+Decisions: list_test.go now asserts installed_command present AND installed_version absent — the lack of any column-name assertion is why list.go silently drifted from check.go
