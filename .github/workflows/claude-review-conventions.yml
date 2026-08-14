@@ -40,6 +40,15 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
+          # WORKFLOW-CHANGE ESCAPE HATCH — keep commented out on main.
+          # See the full explanation in claude-review-security.yml. Short form:
+          # a PR editing this file 401s the App-token exchange, so the review
+          # cannot run; supplying github_token skips that exchange but posts as
+          # github-actions[bot], which requires the paired VERDICT_BOT_LOGIN
+          # below. Uncomment BOTH lines together, and revert before merge.
+          #
+          # github_token: ${{ secrets.GITHUB_TOKEN }}
+
           additional_permissions: |
             actions: read
 
@@ -65,4 +74,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_KIND: "Conventions review"
+          # Paired with the github_token escape hatch above — uncomment both or neither.
+          # VERDICT_BOT_LOGIN: "github-actions[bot]"
         run: .github/scripts/enforce-claude-verdict.sh

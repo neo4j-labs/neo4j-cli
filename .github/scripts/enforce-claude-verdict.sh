@@ -26,6 +26,9 @@ export LC_ALL=C.UTF-8
 #                      GITHUB_REPOSITORY, GH_TOKEN
 # Env var (optional):  VERDICT_FILE
 #                      (default /tmp/claude-verdict.txt)
+# Env var (optional):  VERDICT_BOT_LOGIN
+#                      (default claude[bot]) — must match the
+#                      identity the review step posts as
 # ============================================================
 
 # --- Input validation ---
@@ -44,6 +47,12 @@ for cmd in gh jq; do
 done
 
 : "${VERDICT_FILE:=/tmp/claude-verdict.txt}"
+
+# Author whose comment carries the verdict. Defaults to the Claude GitHub App.
+# Only override when the review step authenticates with a different identity
+# (see the `github_token` note in the review workflows) — a wider value lets a
+# third party author a comment the gate will trust.
+: "${VERDICT_BOT_LOGIN:=claude[bot]}"
 
 verdict=""
 
@@ -64,13 +73,14 @@ if [ -z "$verdict" ]; then
     exit 1
   fi
 
-  # Extract the latest claude[bot] body containing the kind marker.
+  # Extract the latest review-bot body containing the kind marker.
   # --slurp + --paginate yields [[page1...],[page2...]] hence .[][] to flatten.
   # --arg passes the marker to jq; never shell-interpolate REVIEW_KIND into a
   # jq filter string (quoting/injection hazard).
   body=""
-  if ! body="$(printf '%s\n' "$api_json" | jq -r --arg marker "**${REVIEW_KIND}:**" '
-    [ .[][] | select(.user.login == "claude[bot]"
+  if ! body="$(printf '%s\n' "$api_json" | jq -r --arg marker "**${REVIEW_KIND}:**" \
+                                              --arg login "$VERDICT_BOT_LOGIN" '
+    [ .[][] | select(.user.login == $login
                      and (.body | contains($marker))) ]
     | sort_by(.created_at) | last | .body // ""
   ')"; then
@@ -79,7 +89,7 @@ if [ -z "$verdict" ]; then
   fi
 
   if [ -z "$body" ]; then
-    echo "::error::No claude[bot] comment with marker '**${REVIEW_KIND}:**' found"
+    echo "::error::No ${VERDICT_BOT_LOGIN} comment with marker '**${REVIEW_KIND}:**' found"
     exit 1
   fi
 
@@ -158,11 +168,11 @@ fi
 # --- Tier 4: fail-closed ---
 if [ -z "$verdict" ]; then
   if [ -z "${body:-}" ]; then
-    echo "::error::No claude[bot] comment with marker '**${REVIEW_KIND}:**' found"
+    echo "::error::No ${VERDICT_BOT_LOGIN} comment with marker '**${REVIEW_KIND}:**' found"
   elif [ -n "${unclassified_line:-}" ]; then
     echo "::error::Marker line did not yield a known verdict: ${unclassified_line}"
   else
-    echo "::error::No line starting with marker '**${REVIEW_KIND}:**' in claude[bot] comment"
+    echo "::error::No line starting with marker '**${REVIEW_KIND}:**' in ${VERDICT_BOT_LOGIN} comment"
   fi
   exit 1
 fi

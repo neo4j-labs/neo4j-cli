@@ -299,6 +299,27 @@ run_verdict() {
   [ "$status" -eq 0 ]
 }
 
+# VERDICT_BOT_LOGIN must match the identity the review step posts as. When the
+# github_token escape hatch is used, comments come from github-actions[bot] and
+# the default claude[bot] filter would fail-close on a review that really ran.
+@test "VERDICT_BOT_LOGIN override trusts the matching author" {
+  write_gh_response "**Security review:** ✅ no issues found" \
+    "2024-01-01T00:00:00Z" "github-actions[bot]"
+  VERDICT_BOT_LOGIN="github-actions[bot]" \
+    GH_STUB_RESPONSE_FILE="${TEST_TMP}/gh_response.json" run run_verdict
+  echo "$output"
+  [ "$status" -eq 0 ]
+}
+
+@test "default bot login ignores a non-claude[bot] author (fail-closed)" {
+  write_gh_response "**Security review:** ✅ no issues found" \
+    "2024-01-01T00:00:00Z" "github-actions[bot]"
+  GH_STUB_RESPONSE_FILE="${TEST_TMP}/gh_response.json" run run_verdict
+  echo "$output"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"claude[bot]"* ]]
+}
+
 # fixture replay: pr239-summary-no-checkmark.md verbatim through the gate
 @test "fixture: pr239 summary without checkmark passes" {
   fixture_body="$(cat "${FIXTURES_DIR}/pr239-summary-no-checkmark.md")"
