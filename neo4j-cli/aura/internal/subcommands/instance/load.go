@@ -100,11 +100,11 @@ func NewLoadCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "load <owner/repo>",
 		Short:       "Creates a new Aura instance pre-loaded with an example dataset",
 		Args:        cobra.ExactArgs(1),
-		Example: `# Load the movies dataset into a new free-db Aura instance
-neo4j-cli aura instance load neo4j-graph-examples/movies --rw --name movies-demo --type free-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+		Example: `# Load the movies dataset into a new free Aura instance
+neo4j-cli aura instance load neo4j-graph-examples/movies --rw --name movies-demo --type free --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
-# Load the recommendations dataset into a new professional-db instance on AWS and emit JSON
-neo4j-cli aura instance load neo4j-graph-examples/recommendations --rw --name recs --type professional-db --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
+# Load the recommendations dataset into a new professional instance on AWS and emit JSON
+neo4j-cli aura instance load neo4j-graph-examples/recommendations --rw --name recs --type professional --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		Long: `This subcommand creates a new Aura instance and loads an example Neo4j dataset into it.
 
 A dataset is a '.dump' published by a GitHub repo carrying a 'relate.project-install.json' manifest (e.g. 'neo4j-graph-examples/movies'). The manifest is resolved for the requested --version, the matching dump is downloaded from the Git-LFS media host, and the data is loaded into the --database (default "neo4j") of a new Aura instance provisioned with the same flags as 'instance create'.
@@ -238,7 +238,7 @@ If the data load fails after the instance was created, the instance is left in p
 	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes.")
 	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01).")
 
-	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds".`)
+	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud". The former names "free-db", "professional-db", and "enterprise-db" are still accepted.`)
 	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, `The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp".`)

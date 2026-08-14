@@ -33,20 +33,20 @@ func TestDatabaseName(t *testing.T) {
 		want         string
 	}{
 		{
-			name:         "free-db with non-neo4j username returns username",
-			instanceType: "free-db",
+			name:         "free with non-neo4j username returns username",
+			instanceType: "free",
 			username:     "alice",
 			want:         "alice",
 		},
 		{
-			name:         "free-db with neo4j username returns neo4j",
-			instanceType: "free-db",
+			name:         "free with neo4j username returns neo4j",
+			instanceType: "free",
 			username:     "neo4j",
 			want:         "neo4j",
 		},
 		{
-			name:         "professional-db always returns neo4j",
-			instanceType: "professional-db",
+			name:         "professional always returns neo4j",
+			instanceType: "professional",
 			username:     "alice",
 			want:         "neo4j",
 		},

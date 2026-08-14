@@ -50,14 +50,14 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "create",
 		Short:       "Creates a new instance",
-		Example: `# Create a free-db instance (no cloud provider, region, or memory required)
-neo4j-cli aura instance create --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --type free-db --wait --rw
+		Example: `# Create a free instance (no cloud provider, region, or memory required)
+neo4j-cli aura instance create --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --type free --wait --rw
 
-# Create a professional-db instance on AWS (us-east-1, N. Virginia)
-neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider aws --region us-east-1 --memory 1GB
+# Create a professional instance on AWS (us-east-1, N. Virginia)
+neo4j-cli aura instance create --rw --name my-aws-instance --type professional --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider aws --region us-east-1 --memory 1GB
 
-# Create a professional-db instance on GCP and emit JSON for scripting
-neo4j-cli aura instance create --rw --name my-gcp-instance --type professional-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider gcp --region europe-west1 --memory 8GB --format json`,
+# Create a professional instance on GCP and emit JSON for scripting
+neo4j-cli aura instance create --rw --name my-gcp-instance --type professional --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider gcp --region europe-west1 --memory 8GB --format json`,
 		Long: `This subcommand starts the creation process of an Aura instance.
 
 Region identifiers follow each cloud provider's own naming convention: AWS uses identifiers such as us-east-1, Azure uses identifiers such as eastus, and GCP uses identifiers such as us-central1.
@@ -83,8 +83,8 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				return err
 			}
 
-			if graphAnalyticsPlugin && _type != "professional-db" {
-				return errors.New(`"--graph-analytics-plugin" flag can only be set when "--type" flag is set to "professional-db"`)
+			if graphAnalyticsPlugin && _type != "professional" {
+				return errors.New(`"--graph-analytics-plugin" flag can only be set when "--type" flag is set to "professional"`)
 			}
 
 			return nil
@@ -143,7 +143,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01).")
 
-	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds".`)
+	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud". The former names "free-db", "professional-db", and "enterprise-db" are still accepted.`)
 	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, `The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp".`)

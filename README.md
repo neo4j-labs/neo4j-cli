@@ -164,13 +164,15 @@ neo4j-cli aura instance list --organization-id <org-id> --project-id <project-id
 ### Create an instance
 
 ```bash
-# Free-db — no cloud provider, region, or memory required (workspace already set)
-neo4j-cli aura instance create --name my-free-db --type free-db --rw
+# Free — no cloud provider, region, or memory required (workspace already set)
+neo4j-cli aura instance create --name my-free-db --type free --rw
 
-# Professional-db on AWS, waiting for readiness (with explicit flags)
-neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-provider aws \
+# Professional on AWS, waiting for readiness (with explicit flags)
+neo4j-cli aura instance create --name my-pro-db --type professional --cloud-provider aws \
   --region us-east-1 --memory 4GB --organization-id <org-id> --project-id <project-id> --wait --rw
 ```
+
+`--type` takes the Aura tier names `free`, `professional`, `business-critical`, and `virtual-dedicated-cloud`. The former names `free-db`, `professional-db`, and `enterprise-db` are still accepted and mapped to their current equivalents.
 
 Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
 
@@ -393,14 +395,14 @@ neo4j-cli desktop dbms load neo4j-graph-examples/movies --dbms-id <uuid> --force
 
 ### Into a new Aura instance
 
-`aura instance load` always creates a **new** instance (Aura has no dump-upload API, so the dump is staged through an ephemeral local Docker container and pushed over Bolt — a local Docker daemon is required). It reuses the `instance create` flag set (`--type`, plus `--cloud-provider`/`--region`/`--memory` for paid types). `free-db` is the simplest. Datasets requiring the `graph-data-science` plugin can't be loaded into Aura and are rejected up front.
+`aura instance load` always creates a **new** instance (Aura has no dump-upload API, so the dump is staged through an ephemeral local Docker container and pushed over Bolt — a local Docker daemon is required). It reuses the `instance create` flag set (`--type`, plus `--cloud-provider`/`--region`/`--memory` for paid types). `free` is the simplest. Datasets requiring the `graph-data-science` plugin can't be loaded into Aura and are rejected up front.
 
 ```bash
-# Load into a new free-db instance (simplest)
-neo4j-cli aura instance load neo4j-graph-examples/movies --name movies-demo --type free-db --rw
+# Load into a new free instance (simplest)
+neo4j-cli aura instance load neo4j-graph-examples/movies --name movies-demo --type free --rw
 
-# Load into a new professional-db instance on AWS
-neo4j-cli aura instance load neo4j-graph-examples/recommendations --name recs --type professional-db \
+# Load into a new professional instance on AWS
+neo4j-cli aura instance load neo4j-graph-examples/recommendations --name recs --type professional \
   --cloud-provider aws --region us-east-1 --memory 2GB --rw
 ```
 

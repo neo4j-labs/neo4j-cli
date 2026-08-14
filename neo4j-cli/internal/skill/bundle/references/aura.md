@@ -1147,7 +1147,7 @@ Flags:
 | `--no-credential-print` | bool | false | Omit the password from the command output. |
 | `--no-credential-storage` | bool | false | Skip storing the instance credentials locally after creation. |
 | `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'project get' to see the full list of supported regions for your project. |
-| `--type` | type | - | (required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds". |
+| `--type` | type | - | (required) The type of the instance. Must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud". The former names "free-db", "professional-db", and "enterprise-db" are still accepted. |
 | `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
 | `--version` | string | 5 | The Neo4j version of the instance. |
 | `--wait` | bool | false | Waits until created instance is ready. |
@@ -1155,14 +1155,14 @@ Flags:
 Examples:
 
 ```
-# Create a free-db instance (no cloud provider, region, or memory required)
-neo4j-cli aura instance create --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --type free-db --wait --rw
+# Create a free instance (no cloud provider, region, or memory required)
+neo4j-cli aura instance create --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --type free --wait --rw
 
-# Create a professional-db instance on AWS (us-east-1, N. Virginia)
-neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider aws --region us-east-1 --memory 1GB
+# Create a professional instance on AWS (us-east-1, N. Virginia)
+neo4j-cli aura instance create --rw --name my-aws-instance --type professional --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider aws --region us-east-1 --memory 1GB
 
-# Create a professional-db instance on GCP and emit JSON for scripting
-neo4j-cli aura instance create --rw --name my-gcp-instance --type professional-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider gcp --region europe-west1 --memory 8GB --format json
+# Create a professional instance on GCP and emit JSON for scripting
+neo4j-cli aura instance create --rw --name my-gcp-instance --type professional --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider gcp --region europe-west1 --memory 8GB --format json
 ```
 
 ### neo4j-cli aura instance delete
@@ -1230,18 +1230,18 @@ Flags:
 | `--no-credential-print` | bool | false | Omit the password from the command output. |
 | `--no-credential-storage` | bool | false | Skip storing the instance credentials locally after creation. |
 | `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'project get' to see the full list of supported regions for your project. |
-| `--type` | type | - | (required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds". |
+| `--type` | type | - | (required) The type of the instance. Must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud". The former names "free-db", "professional-db", and "enterprise-db" are still accepted. |
 | `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
 | `--version` | string | 5 | The Neo4j version of the instance. |
 
 Examples:
 
 ```
-# Deploy a local Docker container's neo4j database into a new free-db Aura instance
-neo4j-cli aura instance deploy --rw --from-docker my-local-neo4j --type free-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+# Deploy a local Docker container's neo4j database into a new free Aura instance
+neo4j-cli aura instance deploy --rw --from-docker my-local-neo4j --type free --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
-# Deploy a Neo4j Desktop 2 DBMS database into a new professional-db instance on AWS
-neo4j-cli aura instance deploy --rw --from-desktop dbms-1234 --database movies --type professional-db --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+# Deploy a Neo4j Desktop 2 DBMS database into a new professional instance on AWS
+neo4j-cli aura instance deploy --rw --from-desktop dbms-1234 --database movies --type professional --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 ```
 
 ### neo4j-cli aura instance get
@@ -1317,18 +1317,18 @@ Flags:
 | `--no-credential-print` | bool | false | Omit the password from the command output. |
 | `--no-credential-storage` | bool | false | Skip storing the instance credentials locally after creation. |
 | `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'project get' to see the full list of supported regions for your project. |
-| `--type` | type | - | (required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds". |
+| `--type` | type | - | (required) The type of the instance. Must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud". The former names "free-db", "professional-db", and "enterprise-db" are still accepted. |
 | `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
 | `--version` | string | 5 | The Neo4j version of the instance. Also used to resolve the dataset manifest. |
 
 Examples:
 
 ```
-# Load the movies dataset into a new free-db Aura instance
-neo4j-cli aura instance load neo4j-graph-examples/movies --rw --name movies-demo --type free-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+# Load the movies dataset into a new free Aura instance
+neo4j-cli aura instance load neo4j-graph-examples/movies --rw --name movies-demo --type free --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
-# Load the recommendations dataset into a new professional-db instance on AWS and emit JSON
-neo4j-cli aura instance load neo4j-graph-examples/recommendations --rw --name recs --type professional-db --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
+# Load the recommendations dataset into a new professional instance on AWS and emit JSON
+neo4j-cli aura instance load neo4j-graph-examples/recommendations --rw --name recs --type professional --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 ### neo4j-cli aura instance overwrite

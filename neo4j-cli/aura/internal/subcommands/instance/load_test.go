@@ -160,7 +160,7 @@ func TestLoadGDSHardErrorsBeforeAnyWork(t *testing.T) {
 	})
 	dockerAvailableFn = func(context.Context) error { dockerProbed = true; return nil }
 
-	err := h.run("neo4j-graph-examples/gds --name demo --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("neo4j-graph-examples/gds --name demo --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "graph-data-science")
 	require.False(t, createCalled, "no instance must be created for a GDS dataset")
@@ -181,7 +181,7 @@ func TestLoadDockerAbsentErrorsBeforeInstanceCreation(t *testing.T) {
 		return nil
 	})
 
-	err := h.run("neo4j-graph-examples/movies --name demo --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("neo4j-graph-examples/movies --name demo --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Docker is not available")
 	require.False(t, createCalled, "no instance must be created when docker is unavailable")
@@ -201,7 +201,7 @@ func TestLoadResolveErrorBeforeInstanceCreation(t *testing.T) {
 		return nil
 	})
 
-	err := h.run("neo4j-graph-examples/nope --name demo --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("neo4j-graph-examples/nope --name demo --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "resolve dataset")
 	require.False(t, createCalled)
@@ -219,7 +219,7 @@ func TestLoadSuccessCreatesStagesAndPushes(t *testing.T) {
 		return nil
 	})
 
-	err := h.run("neo4j-graph-examples/movies --name Instance01 --database neo4j --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("neo4j-graph-examples/movies --name Instance01 --database neo4j --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.NoError(t, err)
 
 	require.Equal(t, "neo4j", gotLoad.Database)
@@ -252,7 +252,7 @@ func TestLoadCreatesThenStages(t *testing.T) {
 		return nil
 	})
 
-	require.NoError(t, h.run("neo4j-graph-examples/movies --name Instance01 --type free-db --rw --organization-id "+deployOrgID+" --project-id "+deployProjectID))
+	require.NoError(t, h.run("neo4j-graph-examples/movies --name Instance01 --type free --rw --organization-id "+deployOrgID+" --project-id "+deployProjectID))
 	require.Equal(t, []string{"create", "poll", "stage"}, order)
 }
 
@@ -265,7 +265,7 @@ func TestLoadStageFailureLeavesInstance(t *testing.T) {
 		return errors.New("neo4j-admin upload: boom")
 	})
 
-	err := h.run("neo4j-graph-examples/movies --name Instance01 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("neo4j-graph-examples/movies --name Instance01 --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "neo4j-admin upload: boom")
 	require.Contains(t, h.out.String(), `"load_status": "failed"`)
@@ -274,7 +274,7 @@ func TestLoadStageFailureLeavesInstance(t *testing.T) {
 
 func TestLoadRejectsSystemDatabase(t *testing.T) {
 	h := newLoadHarness(t)
-	err := h.run("neo4j-graph-examples/movies --name demo --database system --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("neo4j-graph-examples/movies --name demo --database system --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "system database")
 }

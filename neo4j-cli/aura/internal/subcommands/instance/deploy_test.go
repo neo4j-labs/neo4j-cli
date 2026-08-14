@@ -128,7 +128,7 @@ const deployCreateResponse = `{
 		"tenant_id": "YOUR_TENANT_ID",
 		"cloud_provider": "gcp",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"name": "Instance01"
 	}
 }`
@@ -162,7 +162,7 @@ func withStubbedDispatch(t *testing.T, dockerFn func(ctx context.Context, cfg *c
 
 func TestDeploySourceFlagsMutuallyExclusive(t *testing.T) {
 	h := newDeployHarness(t)
-	err := h.run("deploy --from-docker my-container --from-desktop dbms-1 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("deploy --from-docker my-container --from-desktop dbms-1 --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "from-docker")
 	require.Contains(t, err.Error(), "from-desktop")
@@ -170,7 +170,7 @@ func TestDeploySourceFlagsMutuallyExclusive(t *testing.T) {
 
 func TestDeploySourceFlagsOneRequired(t *testing.T) {
 	h := newDeployHarness(t)
-	err := h.run("deploy --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("deploy --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "from-docker")
 	require.Contains(t, err.Error(), "from-desktop")
@@ -180,7 +180,7 @@ func TestDeployRejectsSystemDatabase(t *testing.T) {
 	for _, name := range []string{"system", "SYSTEM", "System"} {
 		t.Run(name, func(t *testing.T) {
 			h := newDeployHarness(t)
-			err := h.run("deploy --from-docker my-container --database " + name + " --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+			err := h.run("deploy --from-docker my-container --database " + name + " --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "system database cannot be cloned")
 		})
@@ -199,16 +199,16 @@ func TestDeployFreeDbRejectsTargetSizingFlags(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newDeployHarness(t)
-			err := h.run("deploy --from-docker my-container --type free-db " + tc.flag + " --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+			err := h.run("deploy --from-docker my-container --type free " + tc.flag + " --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 			require.Error(t, err)
-			require.Contains(t, err.Error(), "free-db")
+			require.Contains(t, err.Error(), "free")
 		})
 	}
 }
 
 func TestDeployNonFreeRequiresSizingFlags(t *testing.T) {
 	h := newDeployHarness(t)
-	err := h.run("deploy --from-docker my-container --type professional-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("deploy --from-docker my-container --type professional --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	// Cobra reports the required flags it is missing.
 	require.Contains(t, err.Error(), "required flag")
@@ -216,7 +216,7 @@ func TestDeployNonFreeRequiresSizingFlags(t *testing.T) {
 
 func TestDeployInvalidVersionRejected(t *testing.T) {
 	h := newDeployHarness(t)
-	err := h.run("deploy --from-docker my-container --type free-db --version 3 --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("deploy --from-docker my-container --type free --version 3 --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "version")
 }
@@ -233,7 +233,7 @@ func TestDeployDockerSuccess(t *testing.T) {
 		return nil
 	})
 
-	err := h.run("deploy --from-docker my-container --name Instance01 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("deploy --from-docker my-container --name Instance01 --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.NoError(t, err)
 
 	require.Equal(t, "my-container", gotContainer)
@@ -268,7 +268,7 @@ func TestDeployCreatesAndPollsBeforePush(t *testing.T) {
 		return nil
 	})
 
-	require.NoError(t, h.run("deploy --from-docker my-container --name Instance01 --type free-db --rw --organization-id "+deployOrgID+" --project-id "+deployProjectID))
+	require.NoError(t, h.run("deploy --from-docker my-container --name Instance01 --type free --rw --organization-id "+deployOrgID+" --project-id "+deployProjectID))
 
 	require.Equal(t, []string{"create", "poll", "push"}, order)
 }
@@ -283,7 +283,7 @@ func TestDeployPushFailureLeavesInstance(t *testing.T) {
 		return pushErr
 	})
 
-	err := h.run("deploy --from-docker my-container --name Instance01 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("deploy --from-docker my-container --name Instance01 --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	// Underlying tool error surfaced verbatim.
 	require.Contains(t, err.Error(), "neo4j-admin upload: boom")
@@ -321,7 +321,7 @@ func TestDeployDesktopDispatch(t *testing.T) {
 		return nil
 	}
 
-	err := h.run("deploy --from-desktop dbms-99 --desktop-port 44222 --name Instance01 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("deploy --from-desktop dbms-99 --desktop-port 44222 --name Instance01 --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.NoError(t, err)
 
 	require.Equal(t, "dbms-99", gotID)
@@ -343,7 +343,7 @@ func TestDeployTargetPasswordNotLeaked(t *testing.T) {
 		return errors.New("neo4j-admin upload: boom")
 	})
 
-	_ = h.run("deploy --from-docker my-container --name Instance01 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	_ = h.run("deploy --from-docker my-container --name Instance01 --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 
 	require.NotContains(t, h.err.String(), "letMeIn123!", "target password must not appear on stderr")
 }
@@ -374,7 +374,7 @@ func TestDeployDockerCommunityFastFails(t *testing.T) {
 		dockerSourceEditionFn = prevEdition
 	})
 
-	err := h.run("deploy --from-docker my-container --name Instance01 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	err := h.run("deploy --from-docker my-container --name Instance01 --type free --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "enterprise")
 
