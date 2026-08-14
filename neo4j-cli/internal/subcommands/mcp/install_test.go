@@ -4,13 +4,17 @@
 package mcp_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
+	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/common/skill"
+	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
+	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -220,4 +224,60 @@ func TestInstall_WritesResolvedGatesToConfig(t *testing.T) {
 			assert.Equal(t, tt.wantCredentialWrite, env[skill.EnvMCPAllowCredentialWrite])
 		})
 	}
+}
+
+func TestInstall_BundleFallbackToConfig(t *testing.T) {
+	// When --bundle is used but openFile fails, install should fall back to
+	// writing the config directly, return method "config".
+	mcp.SetOpenFileFn(func(path string) error {
+		return assert.AnError // any non-nil error triggers fallback
+	})
+	t.Cleanup(func() { mcp.SetOpenFileFn(nil) })
+
+	// Use a real temp dir for HOME so os.UserCacheDir + os.MkdirAll succeed.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+
+	a := skill.FindAgent("claude-desktop")
+	require.NotNil(t, a)
+	claudeDir, ok := a.DetectPath()
+	require.True(t, ok)
+	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	for name := range clicfg.Registry {
+		cfg.Flags.SetForTest(name, true)
+	}
+	root := app.NewCmd(cfg)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+
+	root.SetArgs([]string{"mcp", "install", "--agent", "claude-desktop", "--bundle", "--rw"})
+	require.NoError(t, root.Execute(), "stderr=%s", stderr.String())
+
+	// Method must be "config" (the fallback path).
+	assert.Contains(t, stdout.String(), "config")
+	assert.Contains(t, stdout.String(), "claude-desktop")
+
+	// Config must have been written to the agent's config file.
+	configPath, ok := a.MCPConfigPath()
+	require.True(t, ok)
+
+	raw, err := afero.ReadFile(fs, configPath)
+	require.NoError(t, err, "config file should exist after fallback write")
+
+	var cfgMap map[string]any
+	require.NoError(t, json.Unmarshal(raw, &cfgMap))
+
+	servers, ok := cfgMap["mcpServers"].(map[string]any)
+	require.True(t, ok, "mcpServers must exist")
+	entry, ok := servers["neo4j-cli"].(map[string]any)
+	require.True(t, ok, "neo4j-cli entry must exist")
+	assert.Equal(t, "1", entry["env"].(map[string]any)[skill.EnvMCPManifest])
 }

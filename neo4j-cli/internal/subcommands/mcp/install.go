@@ -4,6 +4,7 @@
 package mcp
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,6 +27,9 @@ type installResult struct {
 	DisplayName string `json:"display_name"`
 	Method      string `json:"method"`
 }
+
+// openFileFn is a test seam for the bundle open operation.
+var openFileFn = openFile
 
 func (r installResult) asArrayRow() map[string]any {
 	return map[string]any{
@@ -146,12 +150,9 @@ func runInstallCmd(cfg *clicfg.Config, cmd *cobra.Command, agentFilter string, i
 
 	var rows resultRows[installResult]
 	for _, a := range targets {
-		if err := runInstallOne(fs, a, useBundle, gates); err != nil {
+		method, err := runInstallOne(fs, a, useBundle, gates)
+		if err != nil {
 			return err
-		}
-		method := "config"
-		if useBundle {
-			method = "mcpb"
 		}
 		rows = append(rows, installResult{
 			Agent:       a.Name,
@@ -164,49 +165,51 @@ func runInstallCmd(cfg *clicfg.Config, cmd *cobra.Command, agentFilter string, i
 	return nil
 }
 
-// runInstallAndRender installs into one agent and renders the result row.
 func runInstallAndRender(fs afero.Fs, cfg *clicfg.Config, cmd *cobra.Command, a *skill.Agent, useBundle bool, gates skill.MCPGates) error {
-	if err := runInstallOne(fs, a, useBundle, gates); err != nil {
+	method, err := runInstallOne(fs, a, useBundle, gates)
+	if err != nil {
 		return err
-	}
-	method := "config"
-	if useBundle {
-		method = "mcpb"
 	}
 	rows := resultRows[installResult]{{Agent: a.Name, DisplayName: a.DisplayName, Method: method}}
 	renderInstallResults(cmd, cfg, rows)
 	return nil
 }
 
-func runInstallOne(fs afero.Fs, a *skill.Agent, useBundle bool, gates skill.MCPGates) error {
+func runInstallOne(fs afero.Fs, a *skill.Agent, useBundle bool, gates skill.MCPGates) (string, error) {
 	binPath, err := os.Executable()
 	if err != nil {
-		return clierr.NewFatalError("cannot resolve binary path: %s", err.Error())
+		return "", clierr.NewFatalError("cannot resolve binary path: %s", err.Error())
 	}
 	if useBundle {
-		return runInstallBundle(a, binPath)
+		return runInstallBundle(a, binPath, fs, gates)
 	}
-	return runInstallConfig(fs, a, binPath, gates)
+	return "config", runInstallConfig(fs, a, binPath, gates)
 }
 
 // runInstallBundle generates a .mcpb in a cache directory and opens it.
-func runInstallBundle(a *skill.Agent, binPath string) error {
+func runInstallBundle(a *skill.Agent, binPath string, fs afero.Fs, gates skill.MCPGates) (string, error) {
 	cacheDir, err := os.UserCacheDir()
 	if err != nil {
-		return clierr.NewFatalError("cannot resolve user cache directory: %s", err.Error())
+		return "", clierr.NewFatalError("cannot resolve user cache directory: %s", err.Error())
 	}
 	bundleDir := filepath.Join(cacheDir, "neo4j-cli-mcp")
 	if err := os.MkdirAll(bundleDir, 0755); err != nil {
-		return clierr.NewFatalError("cannot create bundle directory: %s", err.Error())
+		return "", clierr.NewFatalError("cannot create bundle directory: %s", err.Error())
 	}
 	bundlePath := filepath.Join(bundleDir, "neo4j-cli.mcpb")
 	if err := GenerateBundle(bundlePath); err != nil {
-		return clierr.NewFatalError("cannot generate MCP bundle: %s", err.Error())
+		return "", clierr.NewFatalError("cannot generate MCP bundle: %s", err.Error())
 	}
-	if err := openFile(bundlePath); err != nil {
-		return clierr.NewFatalError("cannot open bundle file: %s; it is at %s", err.Error(), bundlePath)
+	if err := openFileFn(bundlePath); err != nil {
+		// openFile unavailable; fall back to config write.
+		if cfgErr := runInstallConfig(fs, a, binPath, gates); cfgErr != nil {
+			// Both paths failed: return the original open error -- it is more useful.
+			return "", clierr.NewFatalError("cannot open bundle file: %s; it is at %s", err.Error(), bundlePath)
+		}
+		fmt.Fprintf(os.Stderr, "Bundle file at %s; open it manually to complete the install.\n", bundlePath)
+		return "config", nil
 	}
-	return nil
+	return "mcpb", nil
 }
 
 // runInstallConfig writes the neo4j-cli server entry into the agent's config.

@@ -12,3 +12,8 @@ import (
 func ResolveInstallGates(cmd *cobra.Command) skill.MCPGates {
 	return resolveInstallGates(cmd)
 }
+
+// SetOpenFileFn sets the openFileFn test seam for external-package tests.
+func SetOpenFileFn(fn func(string) error) {
+	openFileFn = fn
+}
