@@ -1,0 +1,21 @@
+## TASK-001 — 2026-08-14T12:00:00Z
+Baselined shellcheck on pre-existing .github/scripts/*.sh; both already warning-clean, no change needed.
+Files: (none)
+Decisions: sole finding is info-level SC2012 in smoke-test-wheel.sh, below the `severity: warning` CI threshold — left unsuppressed.
+
+## TASK-002 — 2026-08-14T12:00:00Z
+Added the shared four-tier verdict gate: verdict file, HTML marker, single-marker-line phrase match (fail-first), fail-closed.
+Files: +.github/scripts/enforce-claude-verdict.sh
+Decisions: bash 3.2 aborts `$(... grep ...)` on no-match under `set -euo pipefail` — two pipelines need `|| true`; process-substitution paths do not.
+
+## TASK-003 — 2026-08-14T12:00:00Z
+Captured the real PR #239 claude[bot] summary as a fixture plus a checkmark-stripped variant for the regression replay.
+Files: +.github/scripts/tests/fixtures/pr239-summary.md, +.github/scripts/tests/fixtures/pr239-summary-no-checkmark.md
+
+## TASK-006 — 2026-08-14T12:00:00Z
+Security prompt: verdict write moved before summary post on all three paths; HTML marker mandated in the summary fence; load-bearing phrases named.
+Files: ~.github/prompts/claude-review-security.md
+
+## TASK-007 — 2026-08-14T12:00:00Z
+Conventions prompt: same reordering (step 7 → step 5) and marker/phrase clarification.
+Files: ~.github/prompts/claude-review-conventions.md
