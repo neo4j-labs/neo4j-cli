@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/cobra"
 )
@@ -52,16 +53,6 @@ neo4j-cli mcp serve --allow-aura`,
 // server start. Production wires credentials.ProbeKeyringAvailability; tests
 // swap in a stub so the test does not depend on the real OS keyring.
 var probeKeyringFn = credentials.ProbeKeyringAvailability
-
-// envManifestMarker is the env key that unlocks the gate env-var fallback.
-// Set unconditionally in the .mcpb manifest's Env block so Claude Desktop
-// settings-UI toggles work. Without it, only CLI flags grant capability.
-const envManifestMarker = "NEO4J_CLI_MCP_MANIFEST"
-
-// Gate env-var names. Read in serveRun when the manifest marker is present.
-const envMCPAllowWrites = "NEO4J_CLI_MCP_ALLOW_WRITES"
-const envMCPAllowAura = "NEO4J_CLI_MCP_ALLOW_AURA"
-const envMCPAllowCredentialWrite = "NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE"
 
 // envBool reads a boolean env var, returning false if unset or unparseable.
 func envBool(key string) bool {
@@ -117,15 +108,15 @@ func addServeFlags(cmd *cobra.Command) {
 func resolveGates(writeFlag, auraFlag, credFlag string, manifestMarker bool) server.Gates {
 	writeAllowed, _ := strconv.ParseBool(writeFlag)
 	if !writeAllowed && manifestMarker {
-		writeAllowed = envBool(envMCPAllowWrites)
+		writeAllowed = envBool(skill.EnvMCPAllowWrites)
 	}
 	allowAura, _ := strconv.ParseBool(auraFlag)
 	if !allowAura && manifestMarker {
-		allowAura = envBool(envMCPAllowAura)
+		allowAura = envBool(skill.EnvMCPAllowAura)
 	}
 	allowCredWrite, _ := strconv.ParseBool(credFlag)
 	if !allowCredWrite && manifestMarker {
-		allowCredWrite = envBool(envMCPAllowCredentialWrite)
+		allowCredWrite = envBool(skill.EnvMCPAllowCredentialWrite)
 	}
 	return server.Gates{
 		AllowAura:            allowAura,
@@ -158,7 +149,7 @@ func resolveGates(writeFlag, auraFlag, credFlag string, manifestMarker bool) ser
 //
 // Audit these vars if the read-only posture matters.
 func serveRun(cfg *clicfg.Config, cmd *cobra.Command) error {
-	manifestMarker := envBool(envManifestMarker)
+	manifestMarker := envBool(skill.EnvMCPManifest)
 	gates := resolveGates(
 		cmd.Flag("rw").Value.String(),
 		cmd.Flag(server.AllowAuraFlag).Value.String(),

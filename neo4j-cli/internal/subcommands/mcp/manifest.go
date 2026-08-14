@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/neo4j/cli/common/skill"
+
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 )
 
@@ -156,11 +158,11 @@ func newManifest(binPath string) *mcpbManifest {
 				Command: "${user_config.neo4j_cli_path}",
 				Args:    []string{"mcp", "serve"},
 				Env: map[string]string{
-					"NEO4J_CLI_FLAG_MCP_SERVER":            "1",
-					"NEO4J_CLI_MCP_MANIFEST":               "1",
-					"NEO4J_CLI_MCP_ALLOW_WRITES":           "${user_config.allow_writes}",
-					"NEO4J_CLI_MCP_ALLOW_AURA":             "${user_config.allow_aura}",
-					"NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE": "${user_config.allow_credential_write}",
+					skill.EnvMCPFeatureFlag:          "1",
+					skill.EnvMCPManifest:             "1",
+					skill.EnvMCPAllowWrites:          "${user_config.allow_writes}",
+					skill.EnvMCPAllowAura:            "${user_config.allow_aura}",
+					skill.EnvMCPAllowCredentialWrite: "${user_config.allow_credential_write}",
 				},
 			},
 		},

@@ -84,7 +84,6 @@ tasks:
       existing assertions (name "neo4j-cli", display_name "Neo4j CLI", and the env
       assertions at lines 91 and 97) are the regression guard proving the refactor
       changed no manifest bytes. If a manifest test fails, the refactor is wrong.
-    status: pending
     dependencies:
       - task-001
     acceptance_criteria:
@@ -93,7 +92,8 @@ tasks:
       - 'manifest_test.go passes with ZERO edits to that file'
       - 'A repo-wide grep for NEO4J_CLI_MCP_ALLOW / NEO4J_CLI_MCP_MANIFEST / NEO4J_CLI_FLAG_MCP_SERVER finds the literals only in common/skill/mcpenv.go and tests'
       - 'go test ./neo4j-cli/internal/subcommands/mcp/... passes'
-    completed_at: null
+    status: completed
+    completed_at: 2026-08-14T12:30:00Z
 
   - id: task-003
     title: 'Write the env block in InstallMCPConfig and update the six test call sites'
@@ -118,7 +118,7 @@ tasks:
       "1". Keep asserting that the pre-existing neo4j-data-modeling sibling entry and
       the unrelated top-level keys survive; that is the whole point of the surgical
       merge and it must not regress.
-    status: pending
+    status: in_progress
     dependencies:
       - task-001
     acceptance_criteria:
