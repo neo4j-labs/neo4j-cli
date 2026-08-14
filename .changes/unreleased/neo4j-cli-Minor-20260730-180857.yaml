@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: New `neo4j-cli aura api <endpoint>` command makes an authenticated request to any Aura API endpoint and prints the response. The endpoint carries its own API version segment (`v1/instances`, `v2beta1/organizations/{org_id}/projects`), and `{org_id}`/`{project_id}` are substituted from `--organization-id`/`--project-id` or the default workspace. Supports `--method`/`-X`, repeatable `--field`/`-F` and `--raw-field`/`-f` (query parameters on GET/HEAD/DELETE, a JSON body otherwise), `--input` for a verbatim body from a file or stdin, repeatable `--header`/`-H`, plus `--include`/`-i` and `--silent`. Non-GET/HEAD methods require `--rw` and DELETE also requires confirmation (`--yes --force` when non-interactive). With `--format json` the response body is written byte-for-byte so it can be piped into `jq`; a failing status yields the usual error envelope and exit code.
-time: 2026-07-30T18:08:57.151341+02:00
