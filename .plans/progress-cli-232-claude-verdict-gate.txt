@@ -28,3 +28,17 @@ Files: +.github/scripts/tests/enforce-claude-verdict.bats
 Both review workflows now invoke the shared script; inline verdict blocks and their migrated prose deleted. `grep -c "grep -qF"` → 0 on both.
 Files: ~.github/workflows/claude-review-security.yml, ~.github/workflows/claude-review-conventions.yml
 Decisions: GITHUB_REPOSITORY left implicit — Actions sets it on every step.
+
+## TASK-008 — 2026-08-14T14:00:00Z
+Added paths-scoped ubuntu-only ci-scripts-tests.yml running the bats suite plus shellcheck over .github/scripts.
+Files: +.github/workflows/ci-scripts-tests.yml
+Decisions: action SHAs copied verbatim from installer-tests.yml (checkout) and shellcheck.yml (action-shellcheck).
+
+## TASK-009 — 2026-08-14T14:00:00Z
+Added the test-ci-scripts Makefile target and .gitattributes eol=lf pins for .github/scripts shell/bats files.
+Files: ~Makefile, ~.gitattributes
+Decisions: repo has no `make help` target, so the `##` doc comment is convention-only here.
+
+## TASK-010 — 2026-08-14T14:00:00Z
+Verified the assembled branch: diff touches only .github/**, Makefile, .gitattributes and .plans/**; no .go, bundle, or policy.golden change; no changelog entry. make test / fmt-check / lint / generate-check / test-ci-scripts all exit 0; script mode is 100755; grep gate returns 0 on both review workflows.
+Files: (verification only)

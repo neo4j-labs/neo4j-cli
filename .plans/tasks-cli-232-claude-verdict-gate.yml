@@ -1,7 +1,7 @@
 feature: cli-232-claude-verdict-gate
 prd: ./prd-cli-232-claude-verdict-gate.md
 created_at: 2026-08-14T00:00:00Z
-updated_at: 2026-08-14T13:00:00Z
+updated_at: 2026-08-14T14:00:00Z
 
 tasks:
   - id: task-001
@@ -149,7 +149,7 @@ tasks:
       (matching `installer-tests.yml:25`) and running `bats .github/scripts/tests/` plus
       `ludeeus/action-shellcheck` with `scandir: .github/scripts`, `severity: warning`.
       Action SHAs must be copied verbatim from `installer-tests.yml` / `shellcheck.yml`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-004
@@ -158,7 +158,7 @@ tasks:
       - "`actions/checkout` and `ludeeus/action-shellcheck` are pinned to the same SHAs already used in `.github/workflows/`"
       - "Both steps run: `bats .github/scripts/tests/` and shellcheck with `scandir: .github/scripts`, `severity: warning`"
       - "`shellcheck.yml`'s `scandir` is not widened"
-    completed_at: null
+    completed_at: 2026-08-14T14:00:00Z
 
   - id: task-009
     title: "Add test-ci-scripts Makefile target and .gitattributes eol=lf rules"
@@ -168,7 +168,7 @@ tasks:
       and register it in `.PHONY` (REQ-F-020). Add `.github/scripts/**/*.sh` and
       `.github/scripts/**/*.bats` as `text eol=lf` in `.gitattributes` under a new comment
       block explaining that a CRLF shebang makes the kernel look for `bash\r` (REQ-F-021).
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -176,7 +176,7 @@ tasks:
       - "The target appears in `.PHONY` and in `make help` output with its doc comment"
       - "`.gitattributes` pins `eol=lf` for `.github/scripts/**/*.sh` and `**/*.bats` with an explanatory comment block"
       - "Existing `distribution/**` .gitattributes rules are unchanged"
-    completed_at: null
+    completed_at: 2026-08-14T14:00:00Z
 
   - id: task-010
     title: "Verify no-Go-diff and green gates across the whole change"
@@ -185,7 +185,7 @@ tasks:
       bundle, or `policy.golden` diff, no new `.changes/unreleased/` entry (REQ-F-022,
       REQ-NF-001), and that all repo gates stay green. Also confirm the acceptance-criteria
       greps in the PRD hold on the real tree.
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-006
@@ -198,4 +198,4 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
       - "`make test-ci-scripts` passes and `shellcheck -S warning .github/scripts/**/*.sh .github/scripts/tests/*.bats` is clean"
       - "`grep -c \"grep -qF\" .github/workflows/claude-review-*.yml` returns 0"
-    completed_at: null
+    completed_at: 2026-08-14T14:00:00Z
