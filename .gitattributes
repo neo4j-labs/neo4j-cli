@@ -11,6 +11,12 @@ neo4j-cli/internal/subcommands/mcp/testdata/** text eol=lf
 **/internal/skill/query-additions.md text eol=lf
 **/internal/skill/description.txt text eol=lf
 
+# Pin LF for CI script and bats test files. A CRLF shebang (#!/usr/bin/env bash\r)
+# makes the kernel look for an interpreter named "bash\r", so the script fails
+# to execute on Linux runners.
+.github/scripts/**/*.sh text eol=lf
+.github/scripts/**/*.bats text eol=lf
+
 # Pin LF for distribution-channel scripts and templates. The npm publish
 # script (`distribution/npm/publish.sh`) and committed `*.tmpl` / `*.js`
 # / `*.json` / `*.tsv` files must stay LF on Windows checkouts so they

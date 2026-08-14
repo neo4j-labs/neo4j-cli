@@ -1,7 +1,7 @@
 GOPATH := $(shell go env GOPATH)
 GOLANGCI_LINT := $(GOPATH)/bin/golangci-lint
 
-.PHONY: build build-neo4j snapshot test lint fmt fmt-check license-check run-neo4j clean changelog generate generate-check npm-publish-dry npm-bootstrap test-installer-sh test-installer-ps1 test-installer-npm test-installer-rb test-installer
+.PHONY: build build-neo4j snapshot test lint fmt fmt-check license-check run-neo4j clean changelog generate generate-check npm-publish-dry npm-bootstrap test-ci-scripts test-installer-sh test-installer-ps1 test-installer-npm test-installer-rb test-installer
 
 ## build: build neo4j-cli into bin/
 build: build-neo4j
@@ -87,6 +87,11 @@ npm-bootstrap:
 	bash distribution/npm/bootstrap-stubs.sh
 
 ## Installer Tests
+
+## test-ci-scripts: run bats-core behavioral tests for .github/scripts/
+## REQUIRES: bats-core >= 1.5.0 on PATH (brew install bats-core / apt-get install bats)
+test-ci-scripts:
+	bats .github/scripts/tests/
 
 ## test-installer-sh: run bats-core behavioral tests for install-neo4j-cli.sh
 ## REQUIRES: bats-core >= 1.5.0 on PATH (brew install bats-core / apt-get install bats)
