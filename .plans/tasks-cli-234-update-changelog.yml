@@ -397,7 +397,7 @@ tasks:
       The audit explicitly rated this non-blocking and suggested deferring it until the next feature
       adds tests, so treat it as the lowest-priority item here; it is a large diff with zero
       behaviour change, which will make the feature diff harder to review.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-013
@@ -408,4 +408,4 @@ tasks:
       - 'Every pre-existing test function still exists with unmodified assertions'
       - '`go test -count=1 ./neo4j-cli/internal/subcommands/update/...` passes with the same test count as before'
       - 'The `TestMain` network guard still trips on an unstubbed seam'
-    completed_at: null
+    completed_at: '2026-08-14T10:12:00Z'

@@ -52,3 +52,9 @@ Files: ~neo4j-cli/internal/subcommands/update/release.go,
 ## TASK-015 — 2026-08-14T10:02:35Z
 Added doc comment to runOpts.check noting only update check sets it; parent update always passes false.
 Files: ~neo4j-cli/internal/subcommands/update/update.go
+
+## TASK-016 — 2026-08-14T13:00:00Z
+Split update_test.go along concern boundaries: seam helpers + run harnesses into helpers_test.go, output-format tests into output_test.go. update_test.go trimmed to orchestration/post-swap/metadata only. Mechanical move — no assertions rewritten, tests renamed, or coverage changed. 152 PASS invariant held across all three gates (test, fmt-check, lint). hone-reviewer passed clean.
+Files: ~neo4j-cli/internal/subcommands/update/update_test.go,
++neo4j-cli/internal/subcommands/update/helpers_test.go,
++neo4j-cli/internal/subcommands/update/output_test.go
