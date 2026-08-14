@@ -32,3 +32,8 @@ Decisions: path drift and env drift both report the single "drift" status — th
 Rewrote mcp install's Long and Example to document the --rw implication rule, the three --allow-* flags, the config-vs-bundle difference (including the bundle-only display name and settings screen limitation), and the actual fallback behavior. Example flush-left with 4 invocations, comments, and a subset-form example.
 Files: ~neo4j-cli/internal/subcommands/mcp/install.go
 Decisions: none
+
+## TASK-008 — 2026-08-14T15:26:16Z
+Created Patch changelog entry for the env-block fix, the three --allow-* flags, and the mcp check drift signal. Every claim verified against actual test assertions (golden merge, gate matrix, drift detection).
+Files: +.changes/unreleased/neo4j-cli-Patch-20260814-152616.yaml
+Decisions: none
