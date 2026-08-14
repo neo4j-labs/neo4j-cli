@@ -47,3 +47,6 @@ Decisions: manifest_test.go staying byte-identical is the proof the shared-const
 Verified end to end against the real Claude Desktop config: install wrote the 5-key env block, the live neo4j-data-modeling entry and all unrelated top-level keys survived byte-identical, mcp check reported ok, and remove restored the file exactly. Drove mcp serve over JSON-RPC both with and without the env block.
 Files: (verification only)
 Decisions: proof is the A/B probe — without the env block a write tool call returns "Write operations are not allowed"; with it the same call passes the gate and reaches the CLI. Same for the aura gate. Confirms the env->serve->Gates chain is live.
+
+## REVIEW — 2026-08-14T14:19:03Z
+Added 2 review tasks (task-011..task-012).

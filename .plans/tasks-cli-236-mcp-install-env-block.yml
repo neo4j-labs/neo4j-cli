@@ -373,3 +373,93 @@ tasks:
       - 'After a Desktop restart the connector starts and a write tool call SUCCEEDS (it fails today)'
       - 'mcp remove cleans the entry back out and the real config is left intact'
     completed_at: 2026-08-14T13:37:38Z
+
+  - id: task-011
+    title: 'Seed manifest user_config defaults from the resolved gate flags'
+    description: |
+      `mcp install --bundle` ignores the three gate flags entirely. runInstallBundle
+      (install.go:210) receives `gates skill.MCPGates` but only uses them in the
+      openFile-failure FALLBACK path - the actual bundle generation calls
+      GenerateBundle(bundlePath) (manifest.go:82), which takes no gates parameter at
+      all. So newManifest(binPath) always emits user_config defaults of
+      `Default: false` for allow_writes / allow_aura / allow_credential_write no
+      matter what the user typed, and `--bundle --rw` produces a Desktop extension
+      whose config UI shows all three toggles OFF. The user hit this testing locally.
+
+      This was a deliberate design decision, not an oversight: install.go's Long
+      currently asserts "With --bundle these flags have no effect -- the settings
+      screen controls the gates instead." That claim is the wrong call and must be
+      REPLACED, not defended. If you type --rw, the toggles should arrive on.
+
+      Decision: seed the manifest's user_config Defaults from the resolved gates.
+      `--bundle --rw` -> all three toggles ON; `--bundle --rw --allow-writes` ->
+      writes ON, other two off. They stay user-editable in the settings screen
+      afterward, so this changes the STARTING state only.
+
+      Thread gates into GenerateBundle(path) and newManifest(binPath) and use them
+      for the three boolean Default: fields. Keep the ${user_config.*} template
+      VALUES in Server.MCPConfig.Env exactly as they are - those read the toggles at
+      runtime and must not become literals. Only the user_config Defaults change.
+      runInstallBundle passes its existing `gates` through.
+
+      `mcp bundle` (bundle.go) also calls GenerateBundle and has no gate flags today.
+      Prefer consistency with `mcp install`: give it the same three flags so a
+      hand-generated bundle can be seeded the same way, unless something in the repo
+      makes that wrong - in which case pass all-false explicitly and say why.
+
+      manifest_test.go must now be updated. It has been the byte-identical regression
+      guard for this whole feature (task-002 forbade touching it), but the defaults
+      becoming gate-dependent is exactly the intended change here, so editing it is
+      legitimate THIS TIME. Keep its existing assertions on name, display_name and
+      the env template values intact - those must still not drift - and add coverage
+      that the three user_config defaults track the passed gates. Update the
+      openTestBundle / readTestManifest helpers in mcp_helpers_test.go if the
+      signature change reaches them.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - 'GenerateBundle and newManifest take gates; runInstallBundle passes its resolved gates through'
+      - '--bundle --rw yields user_config defaults true/true/true; --bundle --rw --allow-writes yields true/false/false'
+      - 'Server.MCPConfig.Env still holds the ${user_config.*} template strings, unchanged'
+      - 'manifest_test.go still asserts name "neo4j-cli", display_name "Neo4j CLI" and the env template values'
+      - 'New test coverage asserts the three user_config defaults track the passed gates'
+      - 'mcp bundle behaviour is implemented deliberately (same flags, or all-false with a stated reason)'
+    completed_at: null
+
+  - id: task-012
+    title: 'Correct the install Long text and the changelog for bundle-mode gates'
+    description: |
+      install.go's Long claims "With --bundle these flags have no effect -- the
+      settings screen controls the gates instead." After task-011 that is false.
+      Replace it with what actually happens: the flags seed the initial toggle state
+      in the extension's settings screen, which still controls the gates afterward.
+      Do not merely soften the sentence - a reader must come away knowing that
+      --bundle --rw arrives with the toggles on.
+
+      Keep the rest of the Long accurate: the --rw implication rule, the three flags
+      and what each unlocks, the config-vs-bundle difference, and the permanent
+      limitation that config mode has no display name or settings screen. Keep the
+      Example block flush-left with >=2 invocations, a `# comment` per invocation,
+      the neo4j-cli prefix and --rw on writes (gate:
+      TestAllLeafCommands_HaveExamples). If `mcp bundle` gained flags in task-011,
+      its own Long and Example need the same treatment.
+
+      Then handle the changelog. .changes/unreleased/neo4j-cli-Patch-20260814-152616.yaml
+      already describes the config-mode env block and the three flags. Judge whether
+      amending that body to also cover bundle-mode seeding is more appropriate than
+      adding a second entry - one coherent user-facing statement is usually better
+      than two fragments describing one feature. Per AGENTS.md the body states only
+      observable user-facing impact, never internal mechanics, and every claim must
+      be verified against a real test assertion rather than described from intent.
+    status: pending
+    source: review
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - 'The "these flags have no effect with --bundle" claim is gone from install.go Long'
+      - 'Long states that the flags seed the initial toggle state and the settings screen still controls them'
+      - 'Example blocks remain flush-left and TestAllLeafCommands_HaveExamples passes'
+      - 'The changelog covers bundle-mode seeding, as one coherent entry rather than two fragments'
+      - 'Every changelog claim is verified against a test assertion, not intent'
+    completed_at: null
