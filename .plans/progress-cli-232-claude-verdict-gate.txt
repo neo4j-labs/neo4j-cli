@@ -19,3 +19,12 @@ Files: ~.github/prompts/claude-review-security.md
 ## TASK-007 — 2026-08-14T12:00:00Z
 Conventions prompt: same reordering (step 7 → step 5) and marker/phrase clarification.
 Files: ~.github/prompts/claude-review-conventions.md
+
+## TASK-004 — 2026-08-14T13:00:00Z
+Added the bats suite: 18 PRD cases plus the #239 fixture replay, 19/19 green on macOS. `gh` stubbed as an external command so the real jq filter, --slurp flattening and pagination stay under test. No script fix needed.
+Files: +.github/scripts/tests/enforce-claude-verdict.bats
+
+## TASK-005 — 2026-08-14T13:00:00Z
+Both review workflows now invoke the shared script; inline verdict blocks and their migrated prose deleted. `grep -c "grep -qF"` → 0 on both.
+Files: ~.github/workflows/claude-review-security.yml, ~.github/workflows/claude-review-conventions.yml
+Decisions: GITHUB_REPOSITORY left implicit — Actions sets it on every step.

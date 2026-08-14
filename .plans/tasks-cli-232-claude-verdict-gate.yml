@@ -1,7 +1,7 @@
 feature: cli-232-claude-verdict-gate
 prd: ./prd-cli-232-claude-verdict-gate.md
 created_at: 2026-08-14T00:00:00Z
-updated_at: 2026-08-14T12:00:00Z
+updated_at: 2026-08-14T13:00:00Z
 
 tasks:
   - id: task-001
@@ -70,7 +70,7 @@ tasks:
       on a `STUBS_DIR`-prepended PATH so the real `jq` filter, `--slurp` flattening and
       pagination stay under test. Implement REQ-F-017's 18 cases plus the REQ-F-018
       fixture replay.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -82,7 +82,7 @@ tasks:
       - "Cases 8 and 9 prove tier 2 overrides a contradictory marker line; case 15 proves fail-first on a mixed line"
       - "`gh` is stubbed as an external command, not by overriding an internal script function"
       - "`shellcheck -S warning` clean on the bats file"
-    completed_at: null
+    completed_at: 2026-08-14T13:00:00Z
 
   - id: task-005
     title: "Wire both review workflows to the shared script"
@@ -93,7 +93,7 @@ tasks:
       setting `REVIEW_KIND` to `Security review` / `Conventions review` respectively. The
       step keeps a one-line pointer comment; the explanation lives in the script header.
       No `claude_args` allowlist change is needed.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -101,7 +101,7 @@ tasks:
       - "Neither workflow contains an inline verdict shell block; both invoke the shared script"
       - "Each step passes `GH_TOKEN`, `PR_NUMBER`, `GITHUB_REPOSITORY` and the correct `REVIEW_KIND` via `env:`"
       - "`claude-review-oplane.yml` and `claude.yml` are untouched"
-    completed_at: null
+    completed_at: 2026-08-14T13:00:00Z
 
   - id: task-006
     title: "Reorder and extend .github/prompts/claude-review-security.md"
