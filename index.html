@@ -1271,6 +1271,10 @@
           <span>embed</span>
           <span class="label-tag">vectors</span>
         </button>
+        <button class="example-tab" data-tab="admin" role="tab">
+          <span>admin</span>
+          <span class="label-tag">rbac</span>
+        </button>
       </div>
 
       <!-- aura -->
@@ -1589,6 +1593,49 @@
 <span class="out">{<span class="string">"dimensions"</span>:<span class="num">1536</span>,<span class="string">"provider"</span>:<span class="string">"openai"</span>,<span class="string">"model"</span>:<span class="string">"text-embedding-3-small"</span>,<span class="string">"vector"</span>:[<span class="num">0.021</span>,<span class="num">-0.013</span>,<span class="num">0.007</span>,...]}</span>
 <span class="agentic-line"><span class="agentic-result">Added embed credential, linked to dbms profile, and returned top 5 semantically similar movies.</span></span>
 </pre>
+      </div>
+
+      <!-- admin -->
+      <div class="example-pane" data-pane="admin">
+        <div class="example-header">
+          <span class="desc">Administer databases, users, roles &amp; privileges over the system database</span>
+          <button class="copy-mini" data-copy-pane="admin">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="agentic-line"><span class="agentic-comment">&gt; Create an analyst user, give it a read-only role on the movies graph, then show me who has what</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
+<span class="comment"># create a user — password prompted on a TTY, or pass --set-password</span>
+<span class="prompt">$</span> neo4j-cli admin user create alice <span class="flag">--credential</span> local <span class="flag">--rw</span>
+
+<span class="ok">✓</span> user <span class="string">"alice"</span> created · password change required on first login
+
+<span class="comment"># create a role and grant it to the user</span>
+<span class="prompt">$</span> neo4j-cli admin role create analyst <span class="flag">--credential</span> local <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli admin role grant <span class="flag">--role</span> analyst <span class="flag">--user</span> alice <span class="flag">--credential</span> local <span class="flag">--rw</span>
+
+<span class="ok">✓</span> alice · roles: <span class="keyword">PUBLIC</span>, <span class="keyword">analyst</span>
+
+<span class="comment"># grant a read privilege on every graph to that role</span>
+<span class="prompt">$</span> neo4j-cli admin privilege grant property read <span class="flag">--on-graph</span> <span class="string">'*'</span> \
+    <span class="flag">--role</span> analyst <span class="flag">--credential</span> local <span class="flag">--rw</span>
+
+<span class="ok">✓</span> GRANT READ {*} ON GRAPH * TO analyst
+
+<span class="comment"># who has what</span>
+<span class="prompt">$</span> neo4j-cli admin user list <span class="flag">--credential</span> local <span class="flag">--format</span> table
+
+<span class="out">┌───────┬──────────────────┬──────────────────────────┬───────────┐
+│ user  │ roles            │ password_change_required │ suspended │
+├───────┼──────────────────┼──────────────────────────┼───────────┤
+│ <span class="string">neo4j</span> │ <span class="keyword">PUBLIC, admin</span>    │ <span class="num">false</span>                    │ <span class="num">false</span>     │
+│ <span class="string">alice</span> │ <span class="keyword">PUBLIC, analyst</span>  │ <span class="num">true</span>                     │ <span class="num">false</span>     │
+└───────┴──────────────────┴──────────────────────────┴───────────┘</span>
+
+<span class="comment"># databases live on the same tree</span>
+<span class="prompt">$</span> neo4j-cli admin database list <span class="flag">--credential</span> local <span class="flag">--format</span> table
+<span class="prompt">$</span> neo4j-cli admin database create movies <span class="flag">--credential</span> local <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="agentic-line"><span class="agentic-result">User "alice" created with the analyst role and READ on every graph.</span></span></pre>
       </div>
 
       <!-- desktop -->
@@ -2288,6 +2335,7 @@
     skill: 'neo4j-cli skill install --rw',
     embed: 'neo4j-cli query --param \'q:embed=sci-fi movies\' --param k=5 "CALL db.index.vector.queryNodes(\'plot_idx\', $k, $q) YIELD node, score RETURN node.title, score"',
     desktop: 'neo4j-cli desktop dbms create --name dev --wait --rw',
+    admin: 'neo4j-cli admin user list --credential local --format table',
   };
   const panePrompts = {
     aura: 'Set up my Aura environment — add credentials, create a free movies instance, then list all',
@@ -2298,6 +2346,7 @@
     skill: 'Install the neo4j skill for all my agents, then verify it\'s up to date everywhere',
     embed: 'Add an OpenAI embedding credential, link it to my dbms profile, then find the 5 most similar movies to "sci-fi movies"',
     desktop: 'Set up Neo4j Desktop 2, spin up a local DBMS called dev, run a query against it, then list everything Desktop manages',
+    admin: 'Create an analyst user, give it a read-only role on the movies graph, then show me who has what',
   };
   document.querySelectorAll('.copy-mini').forEach(btn => {
     btn.addEventListener('click', async () => {
