@@ -17,14 +17,14 @@ tasks:
       `swap_test.go`) must keep passing untouched — the guard is the DEFAULT, not an override,
       so per-test stubbing still wins. Place it in a new `main_test.go` or at the top of
       `update_test.go`; do not modify any existing test body. (REQ-NF-002 mitigation 2)
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'A `TestMain` exists in the update package and installs a failing default `httpDoFn`'
       - '`go test -count=1 ./neo4j-cli/internal/subcommands/update/...` passes with zero edits to existing test bodies'
       - 'Tests that stub `httpDoFn` themselves still exercise their own stub, not the guard'
       - 'A deliberately unstubbed network call in a scratch test fails with a clear message naming the guard'
-    completed_at: null
+    completed_at: '2026-08-14T09:00:02Z'
 
   - id: task-002
     title: 'Add Release.Body and ListReleases to release.go'

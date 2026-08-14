@@ -1,0 +1,6 @@
+## TASK-001 — 2026-08-14T13:30:00Z
+
+Add TestMain network guard to the update package.
+
+Files:
+  - neo4j-cli/internal/subcommands/update/main_test.go (NEW)
