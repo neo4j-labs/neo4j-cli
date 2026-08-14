@@ -1,0 +1,301 @@
+feature: cli-234-update-changelog
+prd: ./prd-cli-234-update-changelog.md
+created_at: 2026-08-14T08:45:39Z
+updated_at: 2026-08-14T08:45:39Z
+
+tasks:
+  - id: task-001
+    title: 'Add TestMain network guard to the update package'
+    description: |
+      Add a `TestMain` to `neo4j-cli/internal/subcommands/update/` (the package currently has
+      none — verified via `grep -rn "func TestMain"`). It points the package-level `httpDoFn`
+      seam (`release.go:54`) at a fake that returns an error and records the violation, so any
+      test reaching real network fails loudly instead of silently hitting api.github.com.
+
+      Standalone hardening win, independent of the changelog feature, and the precondition for
+      REQ-NF-002. Existing tests that legitimately stub `httpDoFn` (all of `release_test.go`,
+      `swap_test.go`) must keep passing untouched — the guard is the DEFAULT, not an override,
+      so per-test stubbing still wins. Place it in a new `main_test.go` or at the top of
+      `update_test.go`; do not modify any existing test body. (REQ-NF-002 mitigation 2)
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - 'A `TestMain` exists in the update package and installs a failing default `httpDoFn`'
+      - '`go test -count=1 ./neo4j-cli/internal/subcommands/update/...` passes with zero edits to existing test bodies'
+      - 'Tests that stub `httpDoFn` themselves still exercise their own stub, not the guard'
+      - 'A deliberately unstubbed network call in a scratch test fails with a clear message naming the guard'
+    completed_at: null
+
+  - id: task-002
+    title: 'Add Release.Body and ListReleases to release.go'
+    description: |
+      In `neo4j-cli/internal/subcommands/update/release.go`, add `Body string ` + "`" + `json:"body"` + "`" + `
+      to the `Release` struct (line 72) — `fetchReleases` already decodes the JSON carrying it, so
+      this is free and needs NO change to the existing 4 MiB `io.LimitReader` cap (line 188) or the
+      `assertAllowedHostURL` host pin (line 169).
+
+      Add `ListReleases(ctx context.Context, preReleases bool) ([]Release, error)` beside `Latest`.
+      It calls `fetchReleases` and applies the same three filters `Latest` uses (lines 94-105): skip
+      drafts, skip `!semver.IsValid(tag)`, skip prereleases unless `preReleases`. Returns API order
+      (newest first). Do NOT touch the `Latest` or `GetByTag` signatures —
+      `neo4j-cli/internal/versioncheck/versioncheck.go` binds `latestFn = update.Latest` and would
+      break. Add `TestListReleases_*` cases in `release_test.go` reusing the existing `httpDoFn` +
+      `withAllowedHost` pattern. (REQ-F-001, REQ-F-002)
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - '`Release` has a `Body` field with a `json:"body"` tag; the LimitReader cap and host pin are unchanged'
+      - '`ListReleases` filters drafts, non-semver tags, and prereleases identically to `Latest`'
+      - '`Latest` and `GetByTag` signatures are byte-identical to before; `versioncheck` compiles untouched'
+      - '`TestListReleases_*` covers happy path, drafts filtered, prereleases filtered, and prereleases accepted'
+    completed_at: null
+
+  - id: task-003
+    title: 'Create changelog.go with releaseNotesEntry and trimReleaseBody'
+    description: |
+      Create `neo4j-cli/internal/subcommands/update/changelog.go` with the unexported
+      `type releaseNotesEntry struct{ tag, body string }` (unexported keeps
+      `common/output/casing_gate_test.go` `outputStructAllowlist` untouched per REQ-NF-005), a
+      `changelogURL = "https://github.com/neo4j-labs/neo4j-cli/releases"` const, and the 3-entry
+      cap const.
+
+      Implement `trimReleaseBody(body string) string`: cut at the first line that is exactly `---`,
+      dropping the redundant `## Versions`/`## Changes` boilerplate. If the remainder is blank —
+      pre-v1.3-era tags such as v1.0.0 are boilerplate-only — return the ORIGINAL body. Also strip a
+      leading `## Release notes` heading, which would otherwise sit redundantly beneath our own
+      `## <tag>` header. Colocate `changelog_test.go` with table-driven cases. (REQ-F-005,
+      REQ-F-006, REQ-NF-005)
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - '`changelog.go` exists with unexported `releaseNotesEntry`, `changelogURL` const, and cap const'
+      - 'A body with a `---` separator is trimmed to the part above it, with a leading `## Release notes` heading stripped'
+      - 'A boilerplate-only body (no `---`, or blank remainder) returns the full original body'
+      - '`releaseNotesEntry` is unexported and `common/output/casing_gate_test.go` needs no new allowlist entry'
+    completed_at: null
+
+  - id: task-004
+    title: 'Implement changelogForRange with 3-entry cap and elided flag'
+    description: |
+      In `changelog.go`, implement
+      `changelogForRange(releases []Release, current, target string) (entries []releaseNotesEntry, elided bool)`.
+      Filter to `(current, target]` — `semver.Compare(tag, current) > 0 && semver.Compare(tag, target) <= 0`
+      — newest first, skipping entries whose body is empty (a skipped entry must NOT consume a cap
+      slot). Truncate to the 3 newest and run each surviving body through `trimReleaseBody`.
+
+      Set `elided` true when the cap dropped entries OR when `current` does not appear among the
+      supplied releases (stale binary more than 30 releases behind), so the caller knows to print
+      the full-changelog link. A downgrade (`target` older than `current`) yields an empty range by
+      construction — no special-case branch. Extend `changelog_test.go`. (REQ-F-003, REQ-F-004,
+      REQ-F-005, REQ-F-012, REQ-NF-003)
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - 'A 3-version range returns 3 entries newest-first with `elided` false'
+      - 'A range wider than 3 returns exactly the 3 newest with `elided` true'
+      - 'A `current` absent from the supplied releases sets `elided` true (stale-binary case)'
+      - 'Empty-body releases are skipped without consuming a cap slot; a downgrade range returns zero entries'
+      - 'Prereleases are included or excluded consistently with the `preReleases` filtering already applied by `ListReleases`'
+    completed_at: null
+
+  - id: task-005
+    title: 'Implement printChangelog with StripControl and link line'
+    description: |
+      In `changelog.go`, implement
+      `printChangelog(cmd *cobra.Command, entries []releaseNotesEntry, elided bool)`. Per entry emit
+      `## <tag>`, a blank line, then the body passed through `output.StripControl`, with a blank line
+      between entries. When `elided`, append a trailing `Full changelog: <changelogURL>` line.
+
+      The `StripControl` call is the security requirement, not cosmetic: release bodies are
+      third-party content rendered straight into a terminal, and a tampered release could otherwise
+      inject ANSI escapes to move the cursor or spoof output. Note the toon path already gets this
+      via `stripControlDeep` (`common/output/output.go:345`) and JSON via `encoding/json` escaping —
+      the PLAIN-TEXT path is the one needing the explicit call. Extend `changelog_test.go` with an
+      ANSI/C0-laden body case and a case asserting the link line appears ONLY when `elided`.
+      (REQ-F-007, REQ-F-005, REQ-NF-001)
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - 'Each entry renders as `## <tag>`, blank line, trimmed body, with blank lines between entries'
+      - 'A body containing ANSI escapes and C0 bytes is neutralised in the rendered output'
+      - 'The `Full changelog:` line appears when `elided` is true and is absent when false'
+      - 'Output is written through the passed `*cobra.Command` so tests can capture it'
+    completed_at: null
+
+  - id: task-006
+    title: 'Add listReleasesFn seam, --no-changelog flag, and test-helper defaults'
+    description: |
+      In `neo4j-cli/internal/subcommands/update/update.go`: add `listReleasesFn = ListReleases` to
+      the seam block (line 57); add `noChangelog bool` to `runOpts` (line 141); in `NewCmd` (line 82)
+      add the var, a `noChangelogFlag = "no-changelog"` const, the `cmd.Flags().BoolVar` registration
+      with description "Suppress the changelog printed after a successful update", thread it into the
+      `RunE` `runOpts`, and extend the flush-left `Example:` block with a `--no-changelog` invocation
+      carrying its own `#` comment. Flag name is kebab-case per CLI-127.
+
+      CRITICAL (REQ-NF-002 mitigation 1): 44 sites in `update_test.go` plus 4 in `check_test.go` stub
+      `latestFn`/`getByTagFn` but none would stub `listReleasesFn`. Default it to an empty-list stub
+      inside the shared helpers `runWithOptsFormat` (`update_test.go:107`) and `runWithOptsSplit`
+      (line 129) — one edit each, all 48 sites inherit it — and add a `withListReleases(t, fn)` helper
+      for tests that DO want a changelog. `update check` must NOT gain the flag (REQ-F-013).
+      (REQ-F-008, REQ-F-014, REQ-NF-002)
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - '`update --no-changelog` parses; `update check --no-changelog` is still an unknown-flag error'
+      - '`runWithOptsFormat` and `runWithOptsSplit` default `listReleasesFn` to an empty-list stub'
+      - '`withListReleases` exists and follows the existing `withLatest` save/restore + `t.Cleanup` pattern'
+      - 'The `Example:` block is flush-left with a `#` comment per invocation and passes `TestAllLeafCommands_HaveExamples`'
+      - 'All 48 existing stub sites pass with no per-test edits'
+    completed_at: null
+
+  - id: task-007
+    title: 'Wire changelog into runUpdate plain-text success path'
+    description: |
+      In `runUpdate` (`update.go`), after the successful swap and after `refreshSkillBundles`
+      (~line 490), gated on `!opts.noChangelog`: call `listReleasesFn`, then `changelogForRange`, and
+      store the result on `updateResult` via new `releaseNotes []releaseNotesEntry` and
+      `releaseNotesElided bool` fields (line 161). Call `printChangelog` INSIDE the existing
+      plain-text closure (~line 494), after the success line and any skill-refresh line, so
+      structured formats stay silent until their single final document.
+
+      Notes go to stdout via `cmd.Printf`; the progress narrative (`Current version:`,
+      `Checking for updates...`) stays on stderr as today. A `listReleasesFn` error is NON-FATAL —
+      the swap already succeeded — so emit a brief stderr warning matching the existing
+      `refreshSkillBundles` convention (`update.go:569`), leave `releaseNotes` empty, and keep
+      `updated: true` with exit code 0. Never fetch when `--no-changelog` is set.
+      (REQ-F-003, REQ-F-007, REQ-F-011, REQ-F-012)
+    status: pending
+    dependencies:
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - 'Changelog prints only after a successful swap — not on `check`, pkg-mgr passthrough, up-to-date, or swap failure'
+      - 'Notes land on stdout after the success line; the progress narrative stays on stderr'
+      - 'A `listReleasesFn` error produces a stderr warning, empty `releaseNotes`, `updated: true`, and exit code 0'
+      - '`--no-changelog` skips the fetch entirely (assert via a seam that records invocation)'
+      - 'A downgrade via `--version <older>` prints no changelog'
+    completed_at: null
+
+  - id: task-008
+    title: 'Add release_notes and changelog_url to JSON and toon output only'
+    description: |
+      Add `release_notes` (`omitempty`) as an array of `{version, notes}` objects — snake_case keys
+      per CLI-127 — plus `changelog_url` (`omitempty`) when `releaseNotesElided`, to
+      `printableUpdateResult.MarshalJSON` (`update.go:216`) ONLY.
+
+      Deliberately do NOT add them to `AsArray` (line 190) or `fieldOrder` (line 264). This gets the
+      required json+toon / not-table split for free with no format-sniffing branch, because
+      `printToon` marshals through `MarshalJSON` (`common/output/output.go:330`) while `printTable`
+      reads `AsArray` + `fields` (line 114). Multi-line 3 KB markdown in a grid cell is unreadable,
+      hence table omits it. Both fields must be absent under `--no-changelog`.
+      (REQ-F-009, REQ-F-010)
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - '`--format json` emits `release_notes` as `[{version, notes}]` and `changelog_url` only when elided'
+      - '`--format toon` includes `release_notes` without any format-specific branch in the update package'
+      - '`--format table` omits both fields and renders an intact grid'
+      - '`AsArray` and `fieldOrder` are unchanged; both fields are absent under `--no-changelog`'
+    completed_at: null
+
+  - id: task-009
+    title: 'Update the byte-for-byte golden test and add output-format tests'
+    description: |
+      `TestPlainTextOutput_GoldenSuccess` (`update_test.go:803`) asserts byte-for-byte on a buffer
+      that MERGES stdout and stderr (`runWithOptsFormat` sets both to the same `out`) and WILL break
+      — expected, and updating it is part of this work. Extend each case with the changelog block via
+      `withListReleases`, and add a sibling case asserting `--no-changelog` reproduces today's exact
+      3-line golden unchanged.
+
+      Extend the `updateJSON` struct (~line 848) with `release_notes`/`changelog_url` and add tests
+      for: present-and-populated under json, omitted under `--no-changelog`, present under toon,
+      absent under table. Also cover the multi-version range (3 entries, no link) versus the
+      stale-binary case (3 entries plus link) end-to-end through `runUpdate`.
+      (REQ-F-004, REQ-F-005, REQ-F-009, REQ-F-010)
+    status: pending
+    dependencies:
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - '`TestPlainTextOutput_GoldenSuccess` passes with the changelog block in its expected output'
+      - 'A `--no-changelog` golden case reproduces the pre-feature 3-line output byte-for-byte'
+      - 'JSON, toon, and table format tests assert the REQ-F-010 split'
+      - 'A 3-entry no-link case and a stale-binary with-link case are both covered end-to-end'
+    completed_at: null
+
+  - id: task-010
+    title: 'Add body field to the e2e release fixtures'
+    description: |
+      Add a `body` field to each entry in `test/e2e/release_fixture/testdata/releases-stable-head.json`
+      and `releases-pre-release-head.json` so the `e2e_seams` harness exercises the notes path rather
+      than only the tag-comparison path. Use a realistic shape mirroring a real GitHub release body:
+      a `## Release notes` / `### Highlights` section, a `---` separator, then the
+      `## Versions` / `## Changes` boilerplate — so the fixture actually exercises `trimReleaseBody`.
+
+      Purely additive; nothing currently asserts the absence of a `body` field. Verify with
+      `go test -tags=e2e_seams -count=1 ./test/e2e/...`. (REQ-F-006, verification step 4)
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - 'Both fixture files have a `body` on every entry, shaped like a real release body with a `---` separator'
+      - '`go test -tags=e2e_seams -count=1 ./test/e2e/...` passes'
+      - 'The fixture body exercises the `trimReleaseBody` path (boilerplate is dropped in output)'
+    completed_at: null
+
+  - id: task-011
+    title: 'Regenerate the skill bundle for the new flag'
+    description: |
+      The new `--no-changelog` flag and the edited `Example:` block drift
+      `neo4j-cli/internal/skill/bundle/references/update.md`, which `TestGenerator_RoundTrip` gates.
+      Run `go generate ./neo4j-cli/internal/skill/...` and commit source plus regenerated bundle
+      together.
+
+      Unset any `NEO4J_CLI_FLAG_*` env vars first — `gen/main.go` builds over an empty MemMapFs but
+      env binding still applies, so a stray flag var commits a drifted bundle. Editing the bundle by
+      hand is futile (generate overwrites). `policy.golden` needs NO update: it was verified to index
+      command paths and gates (`update  deny`, `update check  deny`), not flags — so no new command
+      means no golden diff. (PRD Gates section)
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - '`bundle/references/update.md` documents `--no-changelog` and the new Example invocation'
+      - '`TestGenerator_RoundTrip` passes'
+      - '`neo4j-cli/internal/subcommands/mcp/server/testdata/policy.golden` is unchanged'
+      - '`make generate-check` reports no drift on a clean tree'
+    completed_at: null
+
+  - id: task-012
+    title: 'Add changie entry and run the final gates'
+    description: |
+      Add the user-facing changelog entry:
+      `changie new --projects neo4j-cli --kind Minor --body "..."`. Kinds are `Major`/`Minor`/`Patch`
+      only — verified in `.changie.yaml:9-15`; there is no `added` kind. The body states ONLY the
+      observable effect: the changelog now prints after a successful update, `--no-changelog`
+      suppresses it, and `--format json`/`toon` gain a `release_notes` field. Do not describe the
+      internal seam or struct mechanics.
+
+      Then run the full gate set: `make test`, `make fmt-check`, `make lint`. Additionally confirm
+      REQ-NF-002 holds by running `go test -count=1 ./neo4j-cli/internal/subcommands/update/...`
+      with networking blocked — it must pass, proving no test reaches api.github.com.
+      (PRD Gates + Verification sections)
+    status: pending
+    dependencies:
+      - task-009
+      - task-010
+      - task-011
+    acceptance_criteria:
+      - 'A `.changes/unreleased/neo4j-cli-Minor-*.yaml` entry exists describing only the observable user-facing effect'
+      - '`make test`, `make fmt-check`, and `make lint` all pass'
+      - 'The update package test suite passes with networking blocked'
+      - 'The claimed changelog effect is verified against real output assertions, not just described'
+    completed_at: null
