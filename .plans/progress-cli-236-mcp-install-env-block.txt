@@ -27,3 +27,8 @@ Decisions: when both open and the config fallback fail, the ORIGINAL open error 
 mcp check now reports drift when an installed entry's env block lacks the manifest marker, so pre-existing gate-dead installs get a signal. Added readMCPConfigEnv plus InstalledHasMCPManifest on AgentInstall.
 Files: ~neo4j-cli/internal/subcommands/mcp/check.go, ~neo4j-cli/internal/subcommands/mcp/check_test.go, ~common/skill/mcpconfig.go, ~common/skill/mcpconfig_test.go, ~common/skill/installer.go
 Decisions: path drift and env drift both report the single "drift" status — the remediation (mcp install refresh) is identical for both.
+
+## TASK-007 — 2026-08-14T14:05:00Z
+Rewrote mcp install's Long and Example to document the --rw implication rule, the three --allow-* flags, the config-vs-bundle difference (including the bundle-only display name and settings screen limitation), and the actual fallback behavior. Example flush-left with 4 invocations, comments, and a subset-form example.
+Files: ~neo4j-cli/internal/subcommands/mcp/install.go
+Decisions: none

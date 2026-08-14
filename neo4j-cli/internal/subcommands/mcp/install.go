@@ -50,17 +50,37 @@ func newInstallCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "install",
 		Short: "Install neo4j-cli as an MCP server",
 		Long: "Installs neo4j-cli as an MCP server into supported agents. " +
-			"By default writes mcpServers.\"neo4j-cli\" directly into the agent's " +
-			"config file. Use --bundle to generate a .mcpb and open it instead " +
-			"(opens the Claude Desktop install UI on macOS; falls back to " +
-			"config write on other platforms when the open command is unavailable). " +
+			"Two install methods are available.\n\n" +
+			"Config mode (default) writes mcpServers.\"neo4j-cli\" into the agent's " +
+			"config file. The env block controlling server capabilities is part of " +
+			"the entry and can be hand-edited later.\n\n" +
+			"Bundle mode (--bundle) generates a .mcpb file and opens it into the " +
+			"Desktop extension installer. The extension registers as \"Neo4j CLI\" " +
+			"with a settings screen where the same gates are toggles. The display " +
+			"name and settings screen are bundle-only -- a mcpServers entry " +
+			"cannot display them.\n\n" +
+			"Capability gates control what the server is allowed to do:\n\n" +
+			"  --allow-writes            allow write operations (modify databases)\n" +
+			"  --allow-aura              allow creating, modifying or deleting Aura\n" +
+			"                            resources (costs money)\n" +
+			"  --allow-credential-write  allow adding or removing stored credentials\n\n" +
+			"--rw lets this command modify your config file, and by implication " +
+			"enables all three capabilities above. Naming any single " +
+			"--allow-* flag switches to explicit mode: only the capabilities you " +
+			"name are enabled. With --bundle these flags have no effect -- the " +
+			"settings screen controls the gates instead.\n\n" +
+			"If opening the bundle file fails for any reason, install falls back to " +
+			"the config write and reports the method it actually used.\n\n" +
 			"Use --agent <name> (case-insensitive) to scope to one agent, or omit " +
 			"to install into every detected MCP-capable agent. " +
 			"\n\nSupported agents: " + strings.Join(skill.MCPAgentNames(), ", "),
-		Example: `# Install neo4j-cli into every detected MCP agent
+		Example: `# Install into every detected agent, enabling all three capabilities
 neo4j-cli mcp install --rw
 
-# Install into Claude Desktop by generating a .mcpb bundle and opening it
+# Install into a single agent, explicit mode: only allow writes, not aura or credentials
+neo4j-cli mcp install --agent claude-desktop --rw --allow-writes
+
+# Generate a .mcpb bundle and open the Desktop extension installer
 neo4j-cli mcp install --agent claude-desktop --bundle --rw
 
 # Install into a single agent and emit the result as JSON
