@@ -1,0 +1,201 @@
+feature: cli-232-claude-verdict-gate
+prd: ./prd-cli-232-claude-verdict-gate.md
+created_at: 2026-08-14T00:00:00Z
+updated_at: 2026-08-14T14:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Baseline shellcheck status of existing .github/scripts/*.sh"
+    description: |
+      Run `shellcheck -S warning .github/scripts/*.sh` against the two pre-existing
+      scripts (`version-to-pep440.sh`, `smoke-test-wheel.sh`), which have never been
+      linted. Decide fix-vs-narrow-`# shellcheck disable` for any warning-level finding
+      and apply it, so the new `scandir: .github/scripts` CI job does not go red on
+      arrival. Resolves the PRD's open question on pre-existing lint status.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`shellcheck -S warning .github/scripts/*.sh` exits 0 on the existing scripts"
+      - "Any suppression is a narrow per-line `# shellcheck disable=SCxxxx` with a reason, never a blanket file-level disable"
+      - "No behavioural change to either existing script (verified by reading the diff)"
+      - "Findings and the fix-vs-suppress decision are stated in the task notes"
+    completed_at: 2026-08-14T12:00:00Z
+
+  - id: task-002
+    title: "Add .github/scripts/enforce-claude-verdict.sh with the four-tier gate"
+    description: |
+      Implement the shared verdict gate per REQ-F-001..REQ-F-009: env-var-only inputs
+      (`REVIEW_KIND`, `PR_NUMBER`, `GITHUB_REPOSITORY`, `GH_TOKEN`, optional
+      `VERDICT_FILE`), tier 1 verdict file, tier 2 `<!-- claude-verdict: (pass|fail) -->`,
+      tier 3 single-marker-line phrase match (fail indicators first), tier 4 fail-closed.
+      Comment fetch uses `gh api ... --paginate --slurp` piped to a real `jq` with `--arg`
+      (never a shell-interpolated filter), flattening with `.[][]`. Move the workflows'
+      long explanatory comments into the script header.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "File committed with mode 100755 (`git ls-files -s` shows 100755), `#!/usr/bin/env bash`, `set -euo pipefail`, `export LC_ALL=C.UTF-8`"
+      - "Missing/empty required env var, or missing `gh`/`jq` on PATH, prints a message naming the item and exits 1"
+      - "Exit 0 iff resolved verdict is exactly `pass`; every other path emits a `::error::` annotation and exits 1"
+      - "Every path logs which tier produced the verdict"
+      - "Body handling uses `printf '%s\\n'` (never `echo`), `tr -d '\\r'` before matching, `grep -F` for REVIEW_KIND plus a separate prefix-position check; no `eval`, no unquoted expansion, no regex built from REVIEW_KIND or the body"
+      - "`gh api` failure (network, rate limit, 404) yields a clear message and exit 1, not a bare `set -e` abort"
+      - "`GH_TOKEN` is never echoed and is passed to `gh` only via the inherited environment"
+      - "`shellcheck -S warning` clean; no GNU-only `grep`/`sed` flags (runs under BSD userland on macOS)"
+    completed_at: 2026-08-14T12:00:00Z
+
+  - id: task-003
+    title: "Capture the #239 comment body as a test fixture"
+    description: |
+      Fetch the real PR #239 claude[bot] summary body via
+      `gh api repos/neo4j-labs/neo4j-cli/issues/comments/5281539476 --jq .body` and commit
+      it under `.github/scripts/tests/fixtures/`, plus the `✅`-stripped variant the
+      REQ-F-018 regression case replays. Tests must read the fixture from disk and never
+      hit the network.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Fixture file(s) exist under `.github/scripts/tests/fixtures/` and contain the real #239 summary body"
+      - "The variant used by the regression case has the `✅` removed but the `**Security review:**` marker line otherwise verbatim"
+      - "No test or script performs a network call to obtain the body"
+      - "Fixture files are LF-terminated"
+    completed_at: 2026-08-14T12:00:00Z
+
+  - id: task-004
+    title: "Add the bats suite covering all 18 gate scenarios"
+    description: |
+      Add `.github/scripts/tests/enforce-claude-verdict.bats` mirroring
+      `distribution/installation-scripts/tests/install-neo4j-cli.bats`: Neo4j Apache-2.0
+      header, `bats_require_minimum_version 1.5.0`, per-test `mktemp -d`, and a `gh` stub
+      on a `STUBS_DIR`-prepended PATH so the real `jq` filter, `--slurp` flattening and
+      pagination stay under test. Implement REQ-F-017's 18 cases plus the REQ-F-018
+      fixture replay.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "All 18 REQ-F-017 cases plus the #239 fixture replay pass on macOS and on ubuntu"
+      - "Case 3 (marker line without `✅`) exits 0 — the CLI-232 regression lock"
+      - "Case 7 (`⚠️` in analysis prose, clean marker line) exits 0; case 12 (comment on page 2) exits 0; case 13 (CRLF body) exits 0"
+      - "Cases 10, 11, 16, 17 exit 1 and cases 16/17 assert the message names the missing var"
+      - "Cases 8 and 9 prove tier 2 overrides a contradictory marker line; case 15 proves fail-first on a mixed line"
+      - "`gh` is stubbed as an external command, not by overriding an internal script function"
+      - "`shellcheck -S warning` clean on the bats file"
+    completed_at: 2026-08-14T13:00:00Z
+
+  - id: task-005
+    title: "Wire both review workflows to the shared script"
+    description: |
+      Replace the inline verdict block in `claude-review-security.yml:88-138` and the
+      copy-pasted one in `claude-review-conventions.yml:62-112` with a step invoking
+      `.github/scripts/enforce-claude-verdict.sh`, keeping each existing `env:` block and
+      setting `REVIEW_KIND` to `Security review` / `Conventions review` respectively. The
+      step keeps a one-line pointer comment; the explanation lives in the script header.
+      No `claude_args` allowlist change is needed.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`grep -c \"grep -qF\" .github/workflows/claude-review-*.yml` returns 0"
+      - "Neither workflow contains an inline verdict shell block; both invoke the shared script"
+      - "Each step passes `GH_TOKEN`, `PR_NUMBER`, `GITHUB_REPOSITORY` and the correct `REVIEW_KIND` via `env:`"
+      - "`claude-review-oplane.yml` and `claude.yml` are untouched"
+    completed_at: 2026-08-14T13:00:00Z
+
+  - id: task-006
+    title: "Reorder and extend .github/prompts/claude-review-security.md"
+    description: |
+      Move the Step 4 verdict-file write to before the Step 3 summary post, and apply the
+      same reordering to the Step 2 no-op path and the Step 5 skill-unavailable path
+      (REQ-F-012). Mandate `<!-- claude-verdict: pass|fail -->` as the final summary line
+      immediately after the `**Security review:**` line, shown in the summary-shape fence,
+      noting it renders invisibly and that CI reads it (REQ-F-014). State that the marker
+      line's wording is what CI parses when the HTML marker is absent, with
+      `no issues found` / `flagged inline` load-bearing and the emoji cosmetic (REQ-F-015).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "The verdict file is written before the summary is posted on the main path and on every early-exit path"
+      - "The summary-shape code fence shows the `<!-- claude-verdict: pass -->` line directly after the `**Security review:**` line"
+      - "The prompt states the marker renders invisibly on GitHub and is read by CI"
+      - "The prompt names `no issues found` / `flagged inline` as load-bearing and the emoji as cosmetic"
+      - "Review scope, severity rubric and inline-comment body format are unchanged"
+    completed_at: 2026-08-14T12:00:00Z
+
+  - id: task-007
+    title: "Reorder and extend .github/prompts/claude-review-conventions.md"
+    description: |
+      Move step 7 (verdict write) before steps 5-6 (compose + post summary) and reorder
+      the step 2 no-op path likewise (REQ-F-013). Add the same mandated
+      `<!-- claude-verdict: pass|fail -->` final line and summary-shape fence update, and
+      the same statement of which phrases CI parses when the marker is absent — using
+      `Conventions review` and `no convention-relevant changes` (REQ-F-014, REQ-F-015).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "The verdict file is written before the summary is composed/posted on the main path and the step 2 no-op path"
+      - "The summary-shape fence shows the HTML marker directly after the `**Conventions review:**` line"
+      - "The prompt names `no issues found` / `no convention-relevant changes` / `flagged inline` as the load-bearing phrases"
+      - "The changelog-exception list and rule rubric are unchanged"
+    completed_at: 2026-08-14T12:00:00Z
+
+  - id: task-008
+    title: "Add ci-scripts-tests.yml workflow"
+    description: |
+      Add `.github/workflows/ci-scripts-tests.yml`: one `ubuntu-latest` job,
+      `push`/`pull_request` `paths`-scoped to `.github/scripts/**` and the workflow's own
+      file, `permissions: contents: read`, installing bats via `sudo npm install -g bats`
+      (matching `installer-tests.yml:25`) and running `bats .github/scripts/tests/` plus
+      `ludeeus/action-shellcheck` with `scandir: .github/scripts`, `severity: warning`.
+      Action SHAs must be copied verbatim from `installer-tests.yml` / `shellcheck.yml`.
+    status: completed
+    dependencies:
+      - task-001
+      - task-004
+    acceptance_criteria:
+      - "Workflow is ubuntu-only, `paths`-scoped, and declares `permissions: contents: read`"
+      - "`actions/checkout` and `ludeeus/action-shellcheck` are pinned to the same SHAs already used in `.github/workflows/`"
+      - "Both steps run: `bats .github/scripts/tests/` and shellcheck with `scandir: .github/scripts`, `severity: warning`"
+      - "`shellcheck.yml`'s `scandir` is not widened"
+    completed_at: 2026-08-14T14:00:00Z
+
+  - id: task-009
+    title: "Add test-ci-scripts Makefile target and .gitattributes eol=lf rules"
+    description: |
+      Add a `test-ci-scripts` target running `bats .github/scripts/tests/` with a `##` doc
+      comment and a `REQUIRES: bats-core >= 1.5.0` note in the `test-installer-sh` style,
+      and register it in `.PHONY` (REQ-F-020). Add `.github/scripts/**/*.sh` and
+      `.github/scripts/**/*.bats` as `text eol=lf` in `.gitattributes` under a new comment
+      block explaining that a CRLF shebang makes the kernel look for `bash\r` (REQ-F-021).
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "`make test-ci-scripts` runs the bats suite and passes locally on macOS"
+      - "The target appears in `.PHONY` and in `make help` output with its doc comment"
+      - "`.gitattributes` pins `eol=lf` for `.github/scripts/**/*.sh` and `**/*.bats` with an explanatory comment block"
+      - "Existing `distribution/**` .gitattributes rules are unchanged"
+    completed_at: 2026-08-14T14:00:00Z
+
+  - id: task-010
+    title: "Verify no-Go-diff and green gates across the whole change"
+    description: |
+      Final verification pass over the assembled change: confirm no Go source, skill
+      bundle, or `policy.golden` diff, no new `.changes/unreleased/` entry (REQ-F-022,
+      REQ-NF-001), and that all repo gates stay green. Also confirm the acceptance-criteria
+      greps in the PRD hold on the real tree.
+    status: completed
+    dependencies:
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+    acceptance_criteria:
+      - "`git diff` shows no change to any `.go` file, any `bundle/**`, or `mcp/server/testdata/policy.golden`"
+      - "No new file under `.changes/unreleased/`"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
+      - "`make test-ci-scripts` passes and `shellcheck -S warning .github/scripts/**/*.sh .github/scripts/tests/*.bats` is clean"
+      - "`grep -c \"grep -qF\" .github/workflows/claude-review-*.yml` returns 0"
+    completed_at: 2026-08-14T14:00:00Z

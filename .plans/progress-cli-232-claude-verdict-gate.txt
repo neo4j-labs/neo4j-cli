@@ -1,0 +1,44 @@
+## TASK-001 — 2026-08-14T12:00:00Z
+Baselined shellcheck on pre-existing .github/scripts/*.sh; both already warning-clean, no change needed.
+Files: (none)
+Decisions: sole finding is info-level SC2012 in smoke-test-wheel.sh, below the `severity: warning` CI threshold — left unsuppressed.
+
+## TASK-002 — 2026-08-14T12:00:00Z
+Added the shared four-tier verdict gate: verdict file, HTML marker, single-marker-line phrase match (fail-first), fail-closed.
+Files: +.github/scripts/enforce-claude-verdict.sh
+Decisions: bash 3.2 aborts `$(... grep ...)` on no-match under `set -euo pipefail` — two pipelines need `|| true`; process-substitution paths do not.
+
+## TASK-003 — 2026-08-14T12:00:00Z
+Captured the real PR #239 claude[bot] summary as a fixture plus a checkmark-stripped variant for the regression replay.
+Files: +.github/scripts/tests/fixtures/pr239-summary.md, +.github/scripts/tests/fixtures/pr239-summary-no-checkmark.md
+
+## TASK-006 — 2026-08-14T12:00:00Z
+Security prompt: verdict write moved before summary post on all three paths; HTML marker mandated in the summary fence; load-bearing phrases named.
+Files: ~.github/prompts/claude-review-security.md
+
+## TASK-007 — 2026-08-14T12:00:00Z
+Conventions prompt: same reordering (step 7 → step 5) and marker/phrase clarification.
+Files: ~.github/prompts/claude-review-conventions.md
+
+## TASK-004 — 2026-08-14T13:00:00Z
+Added the bats suite: 18 PRD cases plus the #239 fixture replay, 19/19 green on macOS. `gh` stubbed as an external command so the real jq filter, --slurp flattening and pagination stay under test. No script fix needed.
+Files: +.github/scripts/tests/enforce-claude-verdict.bats
+
+## TASK-005 — 2026-08-14T13:00:00Z
+Both review workflows now invoke the shared script; inline verdict blocks and their migrated prose deleted. `grep -c "grep -qF"` → 0 on both.
+Files: ~.github/workflows/claude-review-security.yml, ~.github/workflows/claude-review-conventions.yml
+Decisions: GITHUB_REPOSITORY left implicit — Actions sets it on every step.
+
+## TASK-008 — 2026-08-14T14:00:00Z
+Added paths-scoped ubuntu-only ci-scripts-tests.yml running the bats suite plus shellcheck over .github/scripts.
+Files: +.github/workflows/ci-scripts-tests.yml
+Decisions: action SHAs copied verbatim from installer-tests.yml (checkout) and shellcheck.yml (action-shellcheck).
+
+## TASK-009 — 2026-08-14T14:00:00Z
+Added the test-ci-scripts Makefile target and .gitattributes eol=lf pins for .github/scripts shell/bats files.
+Files: ~Makefile, ~.gitattributes
+Decisions: repo has no `make help` target, so the `##` doc comment is convention-only here.
+
+## TASK-010 — 2026-08-14T14:00:00Z
+Verified the assembled branch: diff touches only .github/**, Makefile, .gitattributes and .plans/**; no .go, bundle, or policy.golden change; no changelog entry. make test / fmt-check / lint / generate-check / test-ci-scripts all exit 0; script mode is 100755; grep gate returns 0 on both review workflows.
+Files: (verification only)

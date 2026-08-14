@@ -28,7 +28,14 @@ Out of scope for this review (do **not** post inline comments for these):
 ## Steps
 
 1. Read the PR diff with `gh pr diff`. Use `gh pr view` and `gh pr checks` only if you need context the diff alone doesn't give you.
-2. If the diff contains **no changes** under `neo4j-cli/`, `common/`, or `.changes/` (e.g. docs-only, `.github/` workflow tweak, `gh-pages` content), post-or-update the single summary comment (see step 6 for the exact discover-then-edit pattern) with body `**Conventions review:** no convention-relevant changes. ✅` and then write `pass` to `/tmp/claude-verdict.txt`. Stop. Do not continue further.
+2. If the diff contains **no changes** under `neo4j-cli/`, `common/`, or `.changes/` (e.g. docs-only, `.github/` workflow tweak, `gh-pages` content), write `pass` to `/tmp/claude-verdict.txt`. Then post-or-update the single summary comment (see step 7 for the exact discover-then-edit pattern) with body:
+
+   ```
+   **Conventions review:** no convention-relevant changes.
+   <!-- claude-verdict: pass -->
+   ```
+
+   Stop. Do not continue further.
 3. Otherwise, read the changed files (and tightly-coupled adjacent files when needed to verify a rule, e.g. the parent `<resource>.go` when a new leaf appears) with the `Read` tool. You may use `Grep`/`Glob` to find call sites or to confirm whether a regenerated `bundle/**` diff is present.
 4. For each concrete violation you can name a specific `AGENTS.md` rule for, post an inline comment via `mcp__github_inline_comment__create_inline_comment` on the exact line. Inline comment body format:
 
@@ -40,7 +47,8 @@ Out of scope for this review (do **not** post inline comments for these):
    ```
 
    Severity is one of `Critical`, `High`, `Medium`, `Low`. Reserve `Critical`/`High` for rules that will fail CI (missing license header, missing `Example:`, stale skill bundle, missing changelog for an obvious user-facing change). Use `Medium`/`Low` for naming/layout drift that compiles cleanly but violates the documented convention.
-5. Compose the top-level summary body with this shape:
+5. Write the verdict to `/tmp/claude-verdict.txt`. Write `pass` if you posted zero inline comments (or skipped because there were no convention-relevant changes). Write `fail` if you posted one or more inline comments. Use a single word — no trailing newline-only content matters, but no other words either.
+6. Compose the top-level summary body with this shape:
 
    ```
    **Conventions review** (AGENTS.md gates)
@@ -50,10 +58,11 @@ Out of scope for this review (do **not** post inline comments for these):
    <bulleted list of inline findings by severity, or "No issues found.">
 
    **Conventions review:** ✅ no issues found
+   <!-- claude-verdict: pass -->
    ```
 
-   The very last line must be **either** `**Conventions review:** ✅ no issues found` (when you posted zero inline comments) **or** `**Conventions review:** ⚠️ N issue(s) flagged inline` (where N is the exact count of inline comments you posted).
-6. Post-or-update that summary using the discover-then-edit pattern so the PR ends up with exactly one Conventions-review comment, not one per push:
+   The final line of the body (immediately after `**Conventions review:**`) must be `<!-- claude-verdict: pass -->` or `<!-- claude-verdict: fail -->`. This HTML comment renders invisibly on GitHub but CI reads it as the authoritative verdict. When the HTML comment is absent, CI falls back to parsing the `**Conventions review:**` line's wording: `no issues found` and `no convention-relevant changes` signal pass, `flagged inline` signals fail — the emoji (`✅`/`⚠️`) is cosmetic only.
+7. Post-or-update that summary using the discover-then-edit pattern so the PR ends up with exactly one Conventions-review comment, not one per push:
 
    1. Look up any prior summary written by this workflow:
       ```
@@ -74,7 +83,6 @@ Out of scope for this review (do **not** post inline comments for these):
       ```
 
    Write the summary body to a temp file first (e.g. `/tmp/claude-summary.md`) via `tee` so it survives shell quoting. Never post a second summary in the same run — if PATCH fails, surface the error rather than falling back to `gh pr comment`.
-7. As your final action, write the verdict to `/tmp/claude-verdict.txt`. Write `pass` if you posted zero inline comments (or skipped because there were no convention-relevant changes). Write `fail` if you posted one or more inline comments. Use a single word — no trailing newline-only content matters, but no other words either.
 
 ## Constraints
 

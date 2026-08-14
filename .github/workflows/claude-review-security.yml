@@ -56,6 +56,25 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
+          # WORKFLOW-CHANGE ESCAPE HATCH — keep commented out on main.
+          #
+          # claude-code-action mints a GitHub App token, and that exchange 401s
+          # ("Workflow validation failed ... identical content to the version on
+          # the repository's default branch") whenever a PR edits this file. The
+          # action then exits 1, so a PR that touches these review workflows can
+          # never satisfy its own required check. It clears on merge.
+          #
+          # Supplying github_token skips the App-token exchange entirely, letting
+          # the review actually run on such a PR. Two coupled consequences:
+          #   - comments post as github-actions[bot], NOT claude[bot], so the
+          #     verdict step below must set VERDICT_BOT_LOGIN to match or the
+          #     gate fail-closes on a review that really ran;
+          #   - a wider trusted author is a weaker forgery guard, which is why
+          #     this is temporary scaffolding and not the default.
+          # Uncomment BOTH this and the VERDICT_BOT_LOGIN line below, together.
+          #
+          # github_token: ${{ secrets.GITHUB_TOKEN }}
+
           additional_permissions: |
             actions: read
 
@@ -86,53 +105,11 @@ jobs:
             "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
 
       - name: Enforce verdict
-        # Fail-closed: missing verdict file is treated as fail so an early Claude
-        # exit (or tool denial) cannot silently pass the check.
-        #
-        # Robustness: Claude occasionally posts the mandated summary comment
-        # but skips the final verdict-file write. The comment carries a
-        # mandated marker line (`**Security review:** ✅ no issues found`
-        # or `**Security review:** ⚠️ N issue(s) flagged inline`); when the
-        # verdict file is empty we fall back to scraping the latest
-        # claude[bot] PR comment that contains the kind marker. Mirrors the
-        # logic in claude-review-conventions.yml.
+        # Four-tier verdict gate; see script header.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_KIND: "Security review"
-        run: |
-          set -uo pipefail
-
-          verdict=""
-          if [ -s /tmp/claude-verdict.txt ]; then
-            verdict="$(tr -d '[:space:]' < /tmp/claude-verdict.txt)"
-            echo "Verdict from file: '${verdict}'"
-          else
-            echo "Verdict file empty/missing; will scrape PR comment fallback."
-          fi
-
-          if [ -z "${verdict}" ]; then
-            latest="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-              --jq 'map(select(.user.login == "claude[bot]"
-                                and (.body | contains("**'"${REVIEW_KIND}"':**"))))
-                    | sort_by(.created_at)
-                    | last
-                    | .body // ""')"
-            if [ -z "${latest}" ]; then
-              echo "No claude[bot] comment with the ${REVIEW_KIND} marker found."
-            elif echo "${latest}" | grep -qF '⚠️'; then
-              verdict="fail"
-              echo "Verdict from comment: 'fail' (⚠️ marker)"
-            elif echo "${latest}" | grep -qF '✅'; then
-              verdict="pass"
-              echo "Verdict from comment: 'pass' (✅ marker, no ⚠️)"
-            else
-              echo "Latest claude[bot] comment had neither ✅ nor ⚠️ marker."
-            fi
-          fi
-
-          if [ "${verdict}" = "pass" ]; then
-            exit 0
-          fi
-          echo "::error::Claude security review did not produce a pass verdict (file='/tmp/claude-verdict.txt'; comment-fallback also did not yield pass)"
-          exit 1
+          # Paired with the github_token escape hatch above — uncomment both or neither.
+          # VERDICT_BOT_LOGIN: "github-actions[bot]"
+        run: .github/scripts/enforce-claude-verdict.sh
