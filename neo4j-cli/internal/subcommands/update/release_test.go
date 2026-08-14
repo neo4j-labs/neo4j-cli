@@ -478,6 +478,97 @@ func TestLatest_Cancellation(t *testing.T) {
 	}
 }
 
+func TestListReleases_HappyPath(t *testing.T) {
+	releases := []Release{
+		{TagName: "v0.2.0", Draft: false, Prerelease: false, Body: "## v0.2.0\n\nsecond release"},
+		{TagName: "v0.1.0-alpha.1", Draft: false, Prerelease: true},
+		{TagName: "v0.1.0", Draft: false, Prerelease: false, Body: "## v0.1.0\n\nfirst release"},
+	}
+	srv := releaseListServer(t, releases, nil)
+	withApiBaseURL(t, srv.URL)
+
+	got, err := ListReleases(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, "v0.2.0", got[0].TagName)
+	assert.Equal(t, "v0.1.0", got[1].TagName)
+	assert.Equal(t, "## v0.2.0\n\nsecond release", got[0].Body)
+	assert.Equal(t, "## v0.1.0\n\nfirst release", got[1].Body)
+}
+
+func TestListReleases_DraftsFiltered(t *testing.T) {
+	releases := []Release{
+		{TagName: "v0.0.7", Draft: true, Prerelease: false},
+		{TagName: "v0.0.5", Draft: false, Prerelease: false},
+	}
+	srv := releaseListServer(t, releases, nil)
+	withApiBaseURL(t, srv.URL)
+
+	got, err := ListReleases(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "v0.0.5", got[0].TagName)
+}
+
+func TestListReleases_PrereleasesFiltered(t *testing.T) {
+	releases := []Release{
+		{TagName: "v0.2.0-alpha.1", Draft: false, Prerelease: true},
+		{TagName: "v0.1.0", Draft: false, Prerelease: false},
+	}
+	srv := releaseListServer(t, releases, nil)
+	withApiBaseURL(t, srv.URL)
+
+	got, err := ListReleases(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "v0.1.0", got[0].TagName)
+}
+
+func TestListReleases_AcceptsAllWithPreReleases(t *testing.T) {
+	releases := []Release{
+		{TagName: "v0.2.0-alpha.1", Draft: false, Prerelease: true},
+		{TagName: "v0.1.0", Draft: false, Prerelease: false},
+	}
+	srv := releaseListServer(t, releases, nil)
+	withApiBaseURL(t, srv.URL)
+
+	got, err := ListReleases(context.Background(), true)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, "v0.2.0-alpha.1", got[0].TagName)
+	assert.Equal(t, "v0.1.0", got[1].TagName)
+}
+
+func TestListReleases_SkipsNonSemverTags(t *testing.T) {
+	releases := []Release{
+		{TagName: "nightly", Draft: false, Prerelease: false},
+		{TagName: "v0.0.5", Draft: false, Prerelease: false},
+	}
+	srv := releaseListServer(t, releases, nil)
+	withApiBaseURL(t, srv.URL)
+
+	got, err := ListReleases(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "v0.0.5", got[0].TagName)
+}
+
+func TestFilterReleases_InputNotAliased(t *testing.T) {
+	input := []Release{
+		{TagName: "v3.0.0", Draft: true},
+		{TagName: "v2.0.0", Draft: false},
+		{TagName: "v1.0.0", Draft: false},
+	}
+	inputCopy := make([]Release, len(input))
+	copy(inputCopy, input)
+
+	got := filterReleases(input, false)
+	require.Len(t, got, 2)
+	assert.Equal(t, "v2.0.0", got[0].TagName)
+	assert.Equal(t, "v1.0.0", got[1].TagName)
+	assert.Equal(t, inputCopy, input, "filterReleases must not alias its input backing array")
+}
+
 // TestLatest_HostInURLNotInError ensures the API URL host (where the token
 // is sent as a Bearer header) does not accidentally appear with the token in
 // any error message — it's belt-and-suspenders alongside the explicit

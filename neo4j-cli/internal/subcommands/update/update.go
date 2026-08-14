@@ -63,6 +63,10 @@ var (
 	// uses common/skill.List; tests swap to seed installed/uninstalled
 	// agents without touching disk.
 	listSkillsFn = commonskill.List
+	// listReleasesFn fetches the 30 latest releases from the GitHub API for
+	// changelog rendering after a successful swap. Tests swap to control the
+	// returned release list without network.
+	listReleasesFn = ListReleases
 	// installSkillFn refreshes a single agent's bundle. Production uses
 	// common/skill.Install with a one-agent filter; tests swap to assert
 	// per-agent invocation order and simulate refresh failures.
@@ -84,12 +88,14 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 		preReleases bool
 		version     string
 		force       bool
+		noChangelog bool
 	)
 
 	const (
 		preReleasesFlag = "pre-releases"
 		versionFlag     = "version"
 		forceFlag       = "force"
+		noChangelogFlag = "no-changelog"
 	)
 
 	cmd := &cobra.Command{
@@ -113,12 +119,16 @@ neo4j-cli update --pre-releases
 neo4j-cli update --version v1.1.0 --format json
 
 # Force an in-place swap even on a package-manager-managed binary
-neo4j-cli update --force`,
+neo4j-cli update --force
+
+# Suppress the changelog printed after a successful update
+neo4j-cli update --no-changelog`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdate(cmd.Context(), cmd, cfg, runOpts{
 				preReleases: preReleases,
 				version:     version,
 				force:       force,
+				noChangelog: noChangelog,
 				bundle:      bundle,
 				skillName:   skillName,
 			})
@@ -128,6 +138,7 @@ neo4j-cli update --force`,
 	cmd.Flags().BoolVar(&preReleases, preReleasesFlag, false, "Include alpha/beta/rc tags when looking up the latest release")
 	cmd.Flags().StringVar(&version, versionFlag, "", "Update to the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0)")
 	cmd.Flags().BoolVarP(&force, forceFlag, "f", false, "Bypass the package-manager-managed-binary check and proceed with the in-place swap")
+	cmd.Flags().BoolVar(&noChangelog, noChangelogFlag, false, "Suppress the changelog printed after a successful update")
 
 	cmd.AddCommand(newCheckCmd(cfg, bundle, skillName))
 
@@ -140,9 +151,12 @@ neo4j-cli update --force`,
 // exported API.
 type runOpts struct {
 	preReleases bool
+	// check is set only by `update check` (check.go). When true, runUpdate
+	// prints version info and returns before reaching the swap path.
 	check       bool
 	version     string
 	force       bool
+	noChangelog bool
 	// bundle / skillName are nil/empty for unit tests that don't exercise
 	// the post-swap skill-refresh path. Production wires both via NewCmd.
 	bundle    fs.FS
@@ -172,6 +186,12 @@ type updateResult struct {
 	// the skill installed, so the user is hinted to run
 	// `neo4j-cli skill install`. omitempty in JSON.
 	skillInstallSuggested bool
+	// releaseNotes is the trimmed changelog entries for the update range,
+	// populated after a successful swap when --no-changelog is not set.
+	releaseNotes []releaseNotesEntry
+	// releaseNotesElided is true when the changelog was truncated or the
+	// binary is too stale to show all intermediate releases.
+	releaseNotesElided bool
 }
 
 // printableUpdateResult wraps updateResult and satisfies output.ResponseData
@@ -205,7 +225,7 @@ func (p printableUpdateResult) AsArray() []map[string]any {
 	return []map[string]any{row}
 }
 
-// MarshalJSON emits a single object (not an array) with the documented
+// MarshalJSON emits a single object
 // REQ-F-018 field order. PrintBodyMap's JSON path calls json.MarshalIndent
 // which honours this; the table/toon paths use AsArray which wraps in a
 // slice for grid rendering.
@@ -214,15 +234,35 @@ func (p printableUpdateResult) AsArray() []map[string]any {
 // skill_install_suggested follow with omitempty so the JSON shape stays
 // stable for callers on the no-swap branches (passthrough hint, --check).
 func (p printableUpdateResult) MarshalJSON() ([]byte, error) {
+	type releaseNotesItem struct {
+		Version string `json:"version"`
+		Notes   string `json:"notes"`
+	}
+
+	var notes []releaseNotesItem
+	for _, e := range p.r.releaseNotes {
+		notes = append(notes, releaseNotesItem{
+			Version: e.tag,
+			Notes:   e.body,
+		})
+	}
+
+	var cgu string
+	if p.r.releaseNotesElided {
+		cgu = changelogURL
+	}
+
 	doc := struct {
-		Current               string   `json:"current"`
-		Latest                string   `json:"latest"`
-		Updated               bool     `json:"updated"`
-		Check                 bool     `json:"check"`
-		Channel               string   `json:"channel"`
-		InstallMethod         string   `json:"install_method"`
-		UpdatedSkills         []string `json:"updated_skills,omitempty"`
-		SkillInstallSuggested bool     `json:"skill_install_suggested,omitempty"`
+		Current               string             `json:"current"`
+		Latest                string             `json:"latest"`
+		Updated               bool               `json:"updated"`
+		Check                 bool               `json:"check"`
+		Channel               string             `json:"channel"`
+		InstallMethod         string             `json:"install_method"`
+		UpdatedSkills         []string           `json:"updated_skills,omitempty"`
+		SkillInstallSuggested bool               `json:"skill_install_suggested,omitempty"`
+		ReleaseNotes          []releaseNotesItem `json:"release_notes,omitempty"`
+		ChangelogURL          string             `json:"changelog_url,omitempty"`
 	}{
 		Current:               p.r.current,
 		Latest:                p.r.latest,
@@ -232,6 +272,8 @@ func (p printableUpdateResult) MarshalJSON() ([]byte, error) {
 		InstallMethod:         p.r.installMethod,
 		UpdatedSkills:         p.r.updatedSkills,
 		SkillInstallSuggested: p.r.skillInstallSuggested,
+		ReleaseNotes:          notes,
+		ChangelogURL:          cgu,
 	}
 	return json.Marshal(doc)
 }
@@ -491,6 +533,22 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	result.updatedSkills = refreshed
 	result.skillInstallSuggested = suggestInstall
 
+	// REQ-F-003/REQ-F-012: fetch changelog for the update range, gated on
+	// --no-changelog. Errors are non-fatal — the binary update already
+	// succeeded; surface a stderr warning and keep `updated: true`.
+	//
+	// opts.preReleases must be threaded through: with a hardcoded false, an
+	// `update --pre-releases` landing on an alpha tag would filter that very
+	// tag out of its own changelog.
+	if !opts.noChangelog {
+		releases, err := listReleasesFn(ctx, opts.preReleases)
+		if err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not fetch release notes (%s).\n", err) //nolint:errcheck // warning to stderr; write errors are not actionable
+		} else {
+			result.releaseNotes, result.releaseNotesElided = changelogForRange(releases, current, target.TagName)
+		}
+	}
+
 	printResult(cmd, cfg, result, func() {
 		cmd.Printf("Successfully updated from %s to %s\n", current, target.TagName)
 		switch {
@@ -499,6 +557,7 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		case suggestInstall:
 			fmt.Fprintln(cmd.ErrOrStderr(), "Tip: install the agent skill so AI assistants pick up the new commands — run `neo4j-cli skill install`.") //nolint:errcheck // status to stderr; write errors are not actionable
 		}
+		printChangelog(cmd, result.releaseNotes, result.releaseNotesElided)
 	})
 	return nil
 }

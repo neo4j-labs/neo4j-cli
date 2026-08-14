@@ -1,0 +1,60 @@
+## TASK-001 — 2026-08-14T09:00:02Z
+Add TestMain network guard to the update package: default httpDoFn fails loudly on unstubbed network calls.
+Files: +neo4j-cli/internal/subcommands/update/main_test.go
+
+## TASK-002 — 2026-08-14T09:04:32Z
+Add Body field to Release struct and implement ListReleases with tests.
+Files: ~neo4j-cli/internal/subcommands/update/release.go, ~neo4j-cli/internal/subcommands/update/release_test.go
+
+## TASK-003..012 — 2026-08-14T09:38:45Z
+Remaining tasks landed in one pass: changelog.go (releaseNotesEntry, trimReleaseBody, changelogForRange with
+3-entry cap + elided, printChangelog with StripControl), update.go wiring (listReleasesFn seam,
+--no-changelog flag, releaseNotes/releaseNotesElided on updateResult, release_notes + changelog_url in
+MarshalJSON only), output-format tests, e2e fixture bodies, regenerated skill bundle, changie entry.
+Files: +neo4j-cli/internal/subcommands/update/changelog.go,
++neo4j-cli/internal/subcommands/update/changelog_test.go,
+~neo4j-cli/internal/subcommands/update/update.go,
+~neo4j-cli/internal/subcommands/update/update_test.go,
+~neo4j-cli/internal/skill/bundle/references/update.md,
+~test/e2e/release_fixture/testdata/releases-stable-head.json,
+~test/e2e/release_fixture/testdata/releases-pre-release-head.json,
++.changes/unreleased/neo4j-cli-Minor-20260814-113047.yaml
+Decisions:
+  - release_notes lives in MarshalJSON only, NOT AsArray/fieldOrder — printToon marshals via
+    MarshalJSON while printTable reads AsArray, so json+toon get the field and table omits it with
+    no format-sniffing branch (REQ-F-010).
+  - Fixed two defects found while verifying this batch: (a) listReleasesFn was called with a
+    hardcoded false, so `update --pre-releases` onto an alpha tag filtered that tag out of its own
+    changelog — now threads opts.preReleases, locked by
+    TestRunUpdate_Changelog_PropagatesPreReleases; (b) the runWithOpts* helpers unconditionally
+    overwrote listReleasesFn, silently discarding any withListReleases stub — now gated on a
+    listReleasesStubbed flag via defaultListReleases.
+  - Lint reported a phantom errcheck issue at ../neo4j-cli-2/; stale golangci-lint cache, cleared
+    with `golangci-lint cache clean` (already documented in AGENTS.md).
+
+## REVIEW — 2026-08-14T09:50:05Z
+Added 4 review tasks (task-013..task-016).
+
+## TASK-013 — 2026-08-14T09:56:47Z
+Fixed slice aliasing in ListReleases: replaced releases[:0] with make([]Release, 0, len(releases)).
+Extracted filterReleases helper called by ListReleases, enabling a regression test that directly
+proves the input slice is not aliased (fails if releases[:0] is restored).
+Files: ~neo4j-cli/internal/subcommands/update/release.go,
+~neo4j-cli/internal/subcommands/update/release_test.go,
+~.plans/tasks-cli-234-update-changelog.yml
+Decisions: Extracted filterReleases so the regression test passes a slice directly (through JSON round-trip the test could not observe the aliasing). filterReleases also serves as a foundation for task-014.
+
+## TASK-014 — 2026-08-14T10:00:48Z
+Pointed Latest at the shared filterReleases helper, removing the only duplicated inlined three-check loop.
+Files: ~neo4j-cli/internal/subcommands/update/release.go,
+~.plans/tasks-cli-234-update-changelog.yml
+
+## TASK-015 — 2026-08-14T10:02:35Z
+Added doc comment to runOpts.check noting only update check sets it; parent update always passes false.
+Files: ~neo4j-cli/internal/subcommands/update/update.go
+
+## TASK-016 — 2026-08-14T13:00:00Z
+Split update_test.go along concern boundaries: seam helpers + run harnesses into helpers_test.go, output-format tests into output_test.go. update_test.go trimmed to orchestration/post-swap/metadata only. Mechanical move — no assertions rewritten, tests renamed, or coverage changed. 152 PASS invariant held across all three gates (test, fmt-check, lint). hone-reviewer passed clean.
+Files: ~neo4j-cli/internal/subcommands/update/update_test.go,
++neo4j-cli/internal/subcommands/update/helpers_test.go,
++neo4j-cli/internal/subcommands/update/output_test.go

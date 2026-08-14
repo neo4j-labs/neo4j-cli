@@ -11,6 +11,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `-f, --force` | bool | false | Bypass the package-manager-managed-binary check and proceed with the in-place swap |
+| `--no-changelog` | bool | false | Suppress the changelog printed after a successful update |
 | `--pre-releases` | bool | false | Include alpha/beta/rc tags when looking up the latest release |
 | `--version` | string | - | Update to the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0) |
 
@@ -28,6 +29,9 @@ neo4j-cli update --version v1.1.0 --format json
 
 # Force an in-place swap even on a package-manager-managed binary
 neo4j-cli update --force
+
+# Suppress the changelog printed after a successful update
+neo4j-cli update --no-changelog
 ```
 
 ## neo4j-cli update check

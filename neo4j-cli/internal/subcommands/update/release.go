@@ -73,6 +73,7 @@ type Release struct {
 	TagName    string `json:"tag_name"`
 	Draft      bool   `json:"draft"`
 	Prerelease bool   `json:"prerelease"`
+	Body       string `json:"body"`
 }
 
 // AssetURLs is the pair of URLs needed to fetch + verify a release asset.
@@ -91,26 +92,15 @@ func Latest(ctx context.Context, preReleases bool) (*Release, error) {
 		return nil, err
 	}
 
-	for _, r := range releases {
-		if r.Draft {
-			continue
+	filtered := filterReleases(releases, preReleases)
+	if len(filtered) == 0 {
+		if !preReleases {
+			return nil, ErrNoStableRelease
 		}
-		if !semver.IsValid(r.TagName) {
-			// Skip non-semver tags defensively. The repo convention is vX.Y.Z
-			// but a malformed tag should not break discovery.
-			continue
-		}
-		if !preReleases && semver.Prerelease(r.TagName) != "" {
-			continue
-		}
-		rr := r
-		return &rr, nil
+		return nil, fmt.Errorf("no releases found")
 	}
-
-	if !preReleases {
-		return nil, ErrNoStableRelease
-	}
-	return nil, fmt.Errorf("no releases found")
+	r := filtered[0]
+	return &r, nil
 }
 
 // GetByTag returns the named release, or ErrTagNotFound when the tag does not
@@ -131,6 +121,36 @@ func GetByTag(ctx context.Context, tag string) (*Release, error) {
 		}
 	}
 	return nil, ErrTagNotFound
+}
+
+// ListReleases returns all non-draft releases matching the pre-release filter,
+// newest first (API order). Applies the same three filters Latest uses: skip
+// drafts, skip non-semver tags, skip prereleases unless preReleases is true.
+func ListReleases(ctx context.Context, preReleases bool) ([]Release, error) {
+	releases, err := fetchReleases(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return filterReleases(releases, preReleases), nil
+}
+
+// filterReleases applies the three-check release filter (drafts, non-semver,
+// prereleases) without aliasing the input slice's backing array.
+func filterReleases(releases []Release, preReleases bool) []Release {
+	filtered := make([]Release, 0, len(releases))
+	for _, r := range releases {
+		if r.Draft {
+			continue
+		}
+		if !semver.IsValid(r.TagName) {
+			continue
+		}
+		if !preReleases && semver.Prerelease(r.TagName) != "" {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	return filtered
 }
 
 // fetchReleases hits the GitHub REST API and decodes the response. Honors
