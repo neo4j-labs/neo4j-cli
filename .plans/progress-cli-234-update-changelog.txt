@@ -31,3 +31,6 @@ Decisions:
     listReleasesStubbed flag via defaultListReleases.
   - Lint reported a phantom errcheck issue at ../neo4j-cli-2/; stale golangci-lint cache, cleared
     with `golangci-lint cache clean` (already documented in AGENTS.md).
+
+## REVIEW — 2026-08-14T09:50:05Z
+Added 4 review tasks (task-013..task-016).

@@ -299,3 +299,113 @@ tasks:
       - 'The update package test suite passes with networking blocked'
       - 'The claimed changelog effect is verified against real output assertions, not just described'
     completed_at: '2026-08-14T09:38:45Z'
+
+  - id: task-013
+    title: 'Fix slice aliasing in ListReleases'
+    description: |
+      `ListReleases` in `neo4j-cli/internal/subcommands/update/release.go` builds its result with
+      `filtered := releases[:0]`, which reuses the INPUT slice's backing array. Appending to it while
+      ranging over `releases` overwrites the very elements still being iterated, so the caller's slice
+      is silently mutated. Demonstrated with a draft-first input: `[v3.0.0(draft), v2.0.0, v1.0.0]`
+      returns the correct `[v2.0.0, v1.0.0]` but leaves the input as `[v2.0.0, v1.0.0, v1.0.0]` —
+      one entry replaced, the tail duplicated.
+
+      This is currently latent rather than live: the only production caller passes a freshly decoded
+      slice from `fetchReleases` that nobody else reads afterwards. But it is a trap primed for the
+      next caller — and for tests, where a shared fixture slice passed to `ListReleases` would be
+      corrupted for every subsequent assertion. Replace with
+      `make([]Release, 0, len(releases))`, which costs one allocation on a ≤30-element slice.
+
+      Add a regression test that passes a slice with a leading draft and asserts the INPUT is
+      unchanged after the call — not merely that the output is right, since the current code already
+      returns the right output. (Found during /hone:fix triage, not in the audit.)
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - '`ListReleases` no longer aliases its input backing array'
+      - 'A test passes a draft-leading slice and asserts the caller''s slice is byte-identical afterwards'
+      - 'That test fails if `filtered := releases[:0]` is restored'
+      - '`make test` and `make lint` pass'
+    completed_at: null
+
+  - id: task-014
+    title: 'Extract shared release filter used by Latest and ListReleases'
+    description: |
+      Audit finding 3. `Latest` (release.go:89-115) and `ListReleases` (release.go:140-160) each call
+      `fetchReleases` and then apply the SAME three-check filter: skip drafts, skip
+      `!semver.IsValid(tag)`, skip prereleases unless `preReleases`. The duplicated decision tree is
+      the risk — the two can drift apart, and a future filter change applied to only one of them
+      would make the changelog range disagree with the release actually being installed.
+
+      Extract one helper (e.g. `acceptRelease(r Release, preReleases bool) bool`, or have `Latest`
+      consume `ListReleases`' filtered output and take the head) so the rule exists once. Preserve
+      `Latest`'s exact error contract: `ErrNoStableRelease` when the stable filter empties the list,
+      and the plain `no releases found` error otherwise — `runUpdate` branches on `ErrNoStableRelease`
+      via `errors.Is` to print the `--pre-releases` hint, and `versioncheck` binds `Latest` through a
+      seam, so neither the signature nor the sentinel may change.
+
+      Pure refactor: existing `release_test.go` coverage (stable-only filtering, prerelease
+      acceptance, draft skipping, non-semver skipping, `TestListReleases_*`) is the regression guard
+      and must pass untouched.
+    status: pending
+    source: review
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - 'The three-check filter rule is expressed in exactly one place'
+      - '`Latest` and `GetByTag` signatures unchanged; `ErrNoStableRelease` / `no releases found` behaviour preserved'
+      - 'Existing `release_test.go` tests pass with no edits to their assertions'
+      - '`versioncheck` still compiles and its tests pass'
+    completed_at: null
+
+  - id: task-015
+    title: 'Document runOpts.check field'
+    description: |
+      Audit finding 4. The `check bool` field on `runOpts` (`update.go:154`) carries no doc comment,
+      while its neighbours `bundle`/`skillName` do. `check` is load-bearing — it gates the
+      report-and-exit branch in `runUpdate` and populates `result.check` in the output document — and
+      is set ONLY by the `update check` subcommand in `check.go`; the parent `update` command always
+      leaves it false. Add a one-line comment saying so, matching the surrounding comment density.
+
+      Trivial and comment-only, so no behaviour change and no new test.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - '`runOpts.check` has a doc comment naming `update check` as its only setter'
+      - 'No behaviour change; `make test` and `make fmt-check` pass'
+    completed_at: null
+
+  - id: task-016
+    title: 'Split update_test.go along concern boundaries'
+    description: |
+      Audit finding 2. `update_test.go` is 1845 lines, well past the ~1k threshold, and AGENTS.md
+      calls for shared helpers in `helpers_test.go` with concern-named files alongside. Extract the
+      seam helpers (`withLatest`, `withGetByTag`, `withDetect`, `withSwap`, `withListReleases`,
+      `defaultListReleases`, `listReleasesStubbed`) and the harnesses (`runWithOpts`,
+      `runWithOptsFormat`, `runWithOptsSplit`) into `helpers_test.go`, leaving the orchestration
+      tests behind. Consider a further split of the output-format tests (plain-text goldens, JSON,
+      table/toon, changelog) into an output-named file if the remainder is still oversized.
+
+      Mechanical move only: do NOT rewrite assertions, rename tests, or change coverage. Every test
+      must still exist and still pass. Note `TestMain` currently lives in `main_test.go` and the
+      `httpDoFn` guard must keep working — it is package-scoped, so moving helpers between files in
+      the same package is safe, but verify the guard still trips (a test reaching an unstubbed
+      `listReleasesFn` must still fail loudly).
+
+      The audit explicitly rated this non-blocking and suggested deferring it until the next feature
+      adds tests, so treat it as the lowest-priority item here; it is a large diff with zero
+      behaviour change, which will make the feature diff harder to review.
+    status: pending
+    source: review
+    dependencies:
+      - task-013
+      - task-014
+      - task-015
+    acceptance_criteria:
+      - 'Seam helpers and run harnesses live in `helpers_test.go`; no file in the package exceeds ~1k lines'
+      - 'Every pre-existing test function still exists with unmodified assertions'
+      - '`go test -count=1 ./neo4j-cli/internal/subcommands/update/...` passes with the same test count as before'
+      - 'The `TestMain` network guard still trips on an unstubbed seam'
+    completed_at: null
