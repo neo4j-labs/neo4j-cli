@@ -47,7 +47,7 @@ jobs:
           # github-actions[bot], which requires the paired VERDICT_BOT_LOGIN
           # below. Uncomment BOTH lines together, and revert before merge.
           #
-          github_token: ${{ secrets.GITHUB_TOKEN }} # TEMPORARY: revert before merge
+          # github_token: ${{ secrets.GITHUB_TOKEN }}
 
           additional_permissions: |
             actions: read
@@ -75,5 +75,5 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_KIND: "Conventions review"
           # Paired with the github_token escape hatch above — uncomment both or neither.
-          VERDICT_BOT_LOGIN: "github-actions[bot]" # TEMPORARY: revert before merge
+          # VERDICT_BOT_LOGIN: "github-actions[bot]"
         run: .github/scripts/enforce-claude-verdict.sh

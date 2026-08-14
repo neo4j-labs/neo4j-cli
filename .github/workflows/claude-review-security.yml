@@ -73,7 +73,7 @@ jobs:
           #     this is temporary scaffolding and not the default.
           # Uncomment BOTH this and the VERDICT_BOT_LOGIN line below, together.
           #
-          github_token: ${{ secrets.GITHUB_TOKEN }} # TEMPORARY: revert before merge
+          # github_token: ${{ secrets.GITHUB_TOKEN }}
 
           additional_permissions: |
             actions: read
@@ -111,5 +111,5 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_KIND: "Security review"
           # Paired with the github_token escape hatch above — uncomment both or neither.
-          VERDICT_BOT_LOGIN: "github-actions[bot]" # TEMPORARY: revert before merge
+          # VERDICT_BOT_LOGIN: "github-actions[bot]"
         run: .github/scripts/enforce-claude-verdict.sh
