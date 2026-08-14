@@ -138,6 +138,11 @@ func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[s
 // The "type" value is the canonical v2beta1 tier name — flags.InstanceType.Set
 // has already normalized any legacy v1 alias — because this body is POSTed to
 // the v2beta1 scoped instances endpoint, which rejects the v1 names.
+//
+// graphAnalyticsPlugin (from --graph-analytics-plugin, professional only)
+// maps to the v2beta1 "graph_analytics" enum ("plugin"/"unavailable"), not
+// the v1 "graph_analytics_plugin" bool — the scoped endpoint ignores the
+// latter and silently defaults graph_analytics to "serverless".
 func buildCreateInstanceBody(
 	version string,
 	region string,
@@ -171,7 +176,11 @@ func buildCreateInstanceBody(
 	}
 
 	if _type == "professional" {
-		body["graph_analytics_plugin"] = graphAnalyticsPlugin
+		if graphAnalyticsPlugin {
+			body["graph_analytics"] = "plugin"
+		} else {
+			body["graph_analytics"] = "unavailable"
+		}
 	}
 
 	if customerManagedKeyId != "" {

@@ -126,7 +126,7 @@ func TestCreateProfessionalInstance(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false,"graph_analytics_plugin":false}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false,"graph_analytics":"unavailable"}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -170,7 +170,7 @@ func TestCreateProfessionalInstanceVectorOptimizedGraphAnalyticsPlugin(t *testin
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":true,"graph_analytics_plugin":true}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":true,"graph_analytics":"plugin"}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -293,7 +293,7 @@ func TestCreateAcceptsLegacyInstanceTypeAliases(t *testing.T) {
 			legacyType:       "professional-db",
 			canonicalType:    "professional",
 			extraFlags:       " --region europe-west1 --cloud-provider gcp --memory 4GB",
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false,"graph_analytics_plugin":false}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false,"graph_analytics":"unavailable"}`,
 		},
 		{
 			name:             "enterprise-db is sent as virtual-dedicated-cloud",
