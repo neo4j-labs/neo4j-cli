@@ -1,0 +1,4 @@
+## TASK-001 — 2026-08-14T12:20:25Z
+Created common/skill/mcpenv.go with five MCP env var constants, MCPGates struct, and MCPServerEnv function that always emits all five keys (gates as explicit "true"/"false"). Added mcpenv_test.go covering all 8 gate permutations.
+Files: +common/skill/mcpenv.go, +common/skill/mcpenv_test.go
+Decisions: envBoolStr uses non-conflicting name vs existing boolStr("yes"/"no") in inventory.go
