@@ -167,7 +167,7 @@ func runInstallBundle(a *skill.Agent, binPath string) error {
 
 // runInstallConfig writes the neo4j-cli server entry into the agent's config.
 func runInstallConfig(fs afero.Fs, a *skill.Agent, binPath string) error {
-	return skill.InstallMCPConfig(fs, a, binPath)
+	return skill.InstallMCPConfig(fs, a, binPath, skill.MCPGates{})
 }
 
 // openFile opens a file with the system default handler (macOS open, Windows

@@ -13,8 +13,9 @@ import (
 // MCPConfigEntry describes the server config written into an agent's MCP
 // config file under mcpServers."neo4j-cli".
 type MCPConfigEntry struct {
-	Command string   `json:"command"`
-	Args    []string `json:"args"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     map[string]string `json:"env,omitempty"`
 }
 
 // DefaultMCPConfigArgs are the args written into the neo4j-cli server entry.
@@ -62,7 +63,7 @@ func readMCPCommandPath(fs afero.Fs, a *Agent) string {
 // agent's MCP config file. Reads the existing file (or starts from {}),
 // sets only mcpServers."neo4j-cli", and writes atomically via temp-file +
 // rename, preserving the original file mode. Returns nil.
-func InstallMCPConfig(fs afero.Fs, a *Agent, binPath string) error {
+func InstallMCPConfig(fs afero.Fs, a *Agent, binPath string, gates MCPGates) error {
 	configPath, ok := a.MCPConfigPath()
 	if !ok {
 		return nil
@@ -71,6 +72,7 @@ func InstallMCPConfig(fs afero.Fs, a *Agent, binPath string) error {
 	entry := map[string]any{
 		"command": binPath,
 		"args":    DefaultMCPConfigArgs,
+		"env":     MCPServerEnv(gates),
 	}
 
 	return writeMCPEntry(fs, configPath, "neo4j-cli", entry)

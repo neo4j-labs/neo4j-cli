@@ -47,7 +47,7 @@ func TestWriteMCPConfig_SurgicalMerge(t *testing.T) {
 	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
 
 	// Install neo4j-cli
-	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
+	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli", noGates()))
 
 	// Read back and verify surgical merge
 	raw, err := afero.ReadFile(fs, configPath)
@@ -98,7 +98,7 @@ func TestWriteMCPConfig_AtomicWritePreservesMode(t *testing.T) {
 	require.NoError(t, err)
 	origMode := info.Mode()
 
-	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
+	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli", noGates()))
 
 	info, err = fs.Stat(configPath)
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestWriteMCPConfig_NewFileCreated(t *testing.T) {
 	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
 
 	// No config file exists yet
-	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
+	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli", noGates()))
 
 	raw, err := afero.ReadFile(fs, configPath)
 	require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestMCPList_OrderAndDetection(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, fs.MkdirAll(detectDir, 0755))
 
-	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
+	require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli", noGates()))
 
 	installs := MCPList(fs)
 	require.Len(t, installs, 1, "only claude-desktop is MCP-capable")
@@ -271,7 +271,7 @@ func TestMCPConfig_SurgicalMergeGolden(t *testing.T) {
 	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
 	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
 
-	require.NoError(t, InstallMCPConfig(fs, a, "/opt/homebrew/bin/neo4j-cli"))
+	require.NoError(t, InstallMCPConfig(fs, a, "/opt/homebrew/bin/neo4j-cli", noGates()))
 
 	raw, err := afero.ReadFile(fs, configPath)
 	require.NoError(t, err)
@@ -308,6 +308,7 @@ func TestMCPConfig_SurgicalMergeGolden(t *testing.T) {
 	args, ok := entry["args"].([]any)
 	require.True(t, ok)
 	assert.Equal(t, []any{"mcp", "serve"}, args)
+	assertFullEnv(t, entry, false, false, false)
 }
 
 // TestExtractAgentName exercises extracting the agent name from error messages.
@@ -404,7 +405,7 @@ func TestWriteMCPConfig_CrossPlatform(t *testing.T) {
 			require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
 			require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
 
-			require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli"))
+			require.NoError(t, InstallMCPConfig(fs, a, "/usr/local/bin/neo4j-cli", noGates()))
 
 			raw, err := afero.ReadFile(fs, configPath)
 			require.NoError(t, err)
@@ -431,6 +432,39 @@ func TestWriteMCPConfig_CrossPlatform(t *testing.T) {
 			args, ok := entry["args"].([]any)
 			require.True(t, ok)
 			assert.Equal(t, []any{"mcp", "serve"}, args)
+			assertFullEnv(t, entry, false, false, false)
 		})
 	}
+}
+
+// noGates returns the default all-off gate set for test brevity.
+func noGates() MCPGates { return MCPGates{} }
+
+// assertFullEnv verifies that the neo4j-cli entry's env block has all five
+// keys with the expected gate values and the invariant "1" keys.
+func assertFullEnv(t *testing.T, entry map[string]any, wantWrites, wantAura, wantCredentialWrite bool) {
+	t.Helper()
+	env, ok := entry["env"].(map[string]any)
+	require.True(t, ok, "neo4j-cli entry must have an env block")
+
+	assert.Equal(t, "1", env[EnvMCPFeatureFlag], "%s must always be 1", EnvMCPFeatureFlag)
+	assert.Equal(t, "1", env[EnvMCPManifest], "%s must always be 1", EnvMCPManifest)
+
+	wantWritesStr := "false"
+	if wantWrites {
+		wantWritesStr = "true"
+	}
+	assert.Equal(t, wantWritesStr, env[EnvMCPAllowWrites], "%s", EnvMCPAllowWrites)
+
+	wantAuraStr := "false"
+	if wantAura {
+		wantAuraStr = "true"
+	}
+	assert.Equal(t, wantAuraStr, env[EnvMCPAllowAura], "%s", EnvMCPAllowAura)
+
+	wantCredentialStr := "false"
+	if wantCredentialWrite {
+		wantCredentialStr = "true"
+	}
+	assert.Equal(t, wantCredentialStr, env[EnvMCPAllowCredentialWrite], "%s", EnvMCPAllowCredentialWrite)
 }
