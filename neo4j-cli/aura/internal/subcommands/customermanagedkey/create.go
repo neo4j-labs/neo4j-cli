@@ -18,9 +18,11 @@ import (
 
 func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
-		region        string
-		name          string
-		instanceType  flags.InstanceType
+		region string
+		name   string
+		// The customer-managed-key endpoint is still v1, so it still takes the
+		// v1 tier names (see flags.LegacyInstanceType).
+		instanceType  flags.LegacyInstanceType
 		cloudProvider flags.CloudProvider
 		keyId         string
 		wait          bool

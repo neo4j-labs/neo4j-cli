@@ -35,7 +35,7 @@ neo4j-cli docker load neo4j-graph-examples/movies --name movies --rw
 neo4j-cli desktop dbms load neo4j-graph-examples/movies --name movies --password <pw> --rw
 
 # ... into a new Aura instance
-neo4j-cli aura instance load neo4j-graph-examples/movies --name movies --type free-db --rw`,
+neo4j-cli aura instance load neo4j-graph-examples/movies --name movies --type free --rw`,
 	}
 
 	cmd.AddCommand(newListCmd(cfg))

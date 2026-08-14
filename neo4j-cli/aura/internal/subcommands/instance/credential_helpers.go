@@ -25,12 +25,15 @@ func baseCredentialName(instanceID, customName string) string {
 }
 
 // databaseName returns the Neo4j database name to use when storing a credential.
-// For free-db instances, the database is named after the username (which Aura
+// For free instances, the database is named after the username (which Aura
 // sets to the tenant-scoped database name) unless the username is "neo4j", in
 // which case the default "neo4j" database is used. For all other instance types
 // the database is always "neo4j".
+//
+// instanceType is the canonical v2beta1 tier name, as normalized by
+// flags.InstanceType.Set.
 func databaseName(instanceType, username string) string {
-	if instanceType == "free-db" && username != "neo4j" {
+	if instanceType == "free" && username != "neo4j" {
 		return username
 	}
 	return "neo4j"

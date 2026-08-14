@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: '`aura instance create`, `deploy` and `load` now accept the Aura tier names the API expects: `--type free`, `professional`, `business-critical` and `virtual-dedicated-cloud`. Previously no value worked — `free-db`/`professional-db`/`enterprise-db` passed the CLI''s own check but were rejected by the API with a `validation_error`, while the names the API asked for were rejected by the CLI as invalid arguments. The former names are still accepted and mapped to their current equivalents; `professional-ds` and `enterprise-ds` no longer exist and are now rejected with a message naming the replacement. `customer-managed-key create --type` is unchanged and still takes the former names.'
+time: 2026-08-13T22:45:00Z

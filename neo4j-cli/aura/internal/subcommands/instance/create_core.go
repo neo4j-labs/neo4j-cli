@@ -33,23 +33,23 @@ type instanceFlags struct {
 
 // validateInstanceFlags is the shared PreRunE body for the create and deploy
 // leaves: it marks the sizing flags required for non-free instances (rejecting
-// them for free-db), validates the version, and enforces the credential-flag
+// them for free), validates the version, and enforces the credential-flag
 // rules. Callers layer their own leaf-specific checks around it (create adds
 // the --graph-analytics-plugin rule, deploy adds the --database system reject).
 func validateInstanceFlags(cmd *cobra.Command, cfg *clicfg.Config, f instanceFlags) error {
-	if f.instanceType != "free-db" {
+	if f.instanceType != "free" {
 		cmd.MarkFlagRequired("memory")         //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 		cmd.MarkFlagRequired("region")         //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 		cmd.MarkFlagRequired("cloud-provider") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 	} else {
 		if f.memory != "" {
-			return fmt.Errorf(`invalid argument "%s" for "--memory" flag: must not be set when "--type" flag is set to "free-db"`, f.memory)
+			return fmt.Errorf(`invalid argument "%s" for "--memory" flag: must not be set when "--type" flag is set to "free"`, f.memory)
 		}
 		if f.region != "" {
-			return fmt.Errorf(`invalid argument "%s" for "--region" flag: must not be set when "--type" flag is set to "free-db"`, f.region)
+			return fmt.Errorf(`invalid argument "%s" for "--region" flag: must not be set when "--type" flag is set to "free"`, f.region)
 		}
 		if f.cloudProvider != "" {
-			return fmt.Errorf(`invalid argument "%s" for "--cloud-provider" flag: must not be set when "--type" flag is set to "free-db"`, f.cloudProvider)
+			return fmt.Errorf(`invalid argument "%s" for "--cloud-provider" flag: must not be set when "--type" flag is set to "free"`, f.cloudProvider)
 		}
 	}
 
@@ -131,9 +131,13 @@ func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[s
 }
 
 // buildCreateInstanceBody assembles the POST /instances request body from the
-// already-validated create flag values and the resolved project id. free-db
+// already-validated create flag values and the resolved project id. free
 // targets ignore the caller's memory/region/cloud-provider/version and use
 // fixed defaults, matching the Aura free-tier contract.
+//
+// The "type" value is the canonical v2beta1 tier name — flags.InstanceType.Set
+// has already normalized any legacy v1 alias — because this body is POSTed to
+// the v2beta1 scoped instances endpoint, which rejects the v1 names.
 func buildCreateInstanceBody(
 	version string,
 	region string,
@@ -155,7 +159,7 @@ func buildCreateInstanceBody(
 		"tenant_id":      resolvedProjectID,
 	}
 
-	if _type == "free-db" {
+	if _type == "free" {
 		body["memory"] = "1GB"
 		body["region"] = "europe-west1"
 		body["cloud_provider"] = "gcp"
@@ -166,7 +170,7 @@ func buildCreateInstanceBody(
 		body["vector_optimized"] = vectorOptimized
 	}
 
-	if _type == "professional-db" {
+	if _type == "professional" {
 		body["graph_analytics_plugin"] = graphAnalyticsPlugin
 	}
 
@@ -180,8 +184,8 @@ func buildCreateInstanceBody(
 // credentialOptions carries the credential-storage flag values used when
 // persisting the new instance's generated credentials.
 type credentialOptions struct {
-	// instanceType is the resolved --type value; it determines the stored
-	// database name for free-db instances.
+	// instanceType is the resolved (canonical) --type value; it determines the
+	// stored database name for free instances.
 	instanceType string
 	// credentialName is the user-supplied --credential-name (may be empty).
 	credentialName string

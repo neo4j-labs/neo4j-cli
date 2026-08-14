@@ -45,12 +45,12 @@ func TestCreateFreeInstanceRequiresRw(t *testing.T) {
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"region": "europe-west1",
-				"type": "free-db",
+				"type": "free",
 				"name": "Instance01"
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID)
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID)
 
 	mockHandler.AssertCalledTimes(0)
 	helper.AssertErr("Error: this command writes; pass --rw to allow it")
@@ -71,19 +71,19 @@ func TestCreateFreeInstance(t *testing.T) {
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"region": "europe-west1",
-				"type": "free-db",
+				"type": "free",
 				"name": "Instance01"
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`)
 
 	helper.AssertErr("")
-	// For free-db with a non-"neo4j" username, the database name stored in credentials is the username.
+	// For free with a non-"neo4j" username, the database name stored in credentials is the username.
 	helper.AssertCredentialsValue("dbms.credentials.0.database-name", "alice123")
 	helper.AssertOutJson(`{
 	  "data": {
@@ -95,7 +95,7 @@ func TestCreateFreeInstance(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "alice123"
 	  }
 	}`)
@@ -116,17 +116,17 @@ func TestCreateProfessionalInstance(t *testing.T) {
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"region": "europe-west1",
-				"type": "professional-db",
+				"type": "professional",
 				"name": "Instance01",
     			"vector_optimized": false
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --rw")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional-db","version":"5","vector_optimized":false,"graph_analytics_plugin":false}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false,"graph_analytics_plugin":false}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -138,7 +138,7 @@ func TestCreateProfessionalInstance(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "professional-db",
+		"type": "professional",
 		"username": "neo4j",
     	"vector_optimized": false
 	  }
@@ -160,17 +160,17 @@ func TestCreateProfessionalInstanceVectorOptimizedGraphAnalyticsPlugin(t *testin
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"region": "europe-west1",
-				"type": "professional-db",
+				"type": "professional",
 				"name": "Instance01",
     			"vector_optimized": true
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --vector-optimized --graph-analytics-plugin --rw")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --vector-optimized --graph-analytics-plugin --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional-db","version":"5","vector_optimized":true,"graph_analytics_plugin":true}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":true,"graph_analytics_plugin":true}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -182,7 +182,7 @@ func TestCreateProfessionalInstanceVectorOptimizedGraphAnalyticsPlugin(t *testin
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "professional-db",
+		"type": "professional",
 		"username": "neo4j",
 		"vector_optimized": true
 	  }
@@ -195,7 +195,7 @@ func TestCreateProfessionalInstanceNoMemory(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --rw")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -209,7 +209,7 @@ func TestCreateInstanceMissingOrg(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --project-id " + testCreateProjectID + " --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -222,7 +222,7 @@ func TestCreateInstanceMissingProject(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -235,7 +235,7 @@ func TestCreateProfessionalInstanceInvalidCloudProvider(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider invalid --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional --memory 1GB --cloud-provider invalid --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -249,7 +249,7 @@ func TestCreateProfessionalInstanceInvalidMemory(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 3GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional --memory 3GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -267,8 +267,82 @@ func TestCreateProfessionalInstanceInvalidInstanceType(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(0)
 
-	helper.AssertErr(`Error: invalid argument "invalid-db" for "--type" flag: must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds"
+	helper.AssertErr(`Error: invalid argument "invalid-db" for "--type" flag: must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud"
 `)
+}
+
+// The v1 tier names are still accepted as input aliases so existing scripts and
+// agent skills keep working, but they must reach the v2beta1 API normalized:
+// a legacy alias and its canonical name have to produce the same request body.
+func TestCreateAcceptsLegacyInstanceTypeAliases(t *testing.T) {
+	tests := []struct {
+		name             string
+		legacyType       string
+		canonicalType    string
+		extraFlags       string
+		expectedPostBody string
+	}{
+		{
+			name:             "free-db is sent as free",
+			legacyType:       "free-db",
+			canonicalType:    "free",
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`,
+		},
+		{
+			name:             "professional-db is sent as professional",
+			legacyType:       "professional-db",
+			canonicalType:    "professional",
+			extraFlags:       " --region europe-west1 --cloud-provider gcp --memory 4GB",
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false,"graph_analytics_plugin":false}`,
+		},
+		{
+			name:             "enterprise-db is sent as virtual-dedicated-cloud",
+			legacyType:       "enterprise-db",
+			canonicalType:    "virtual-dedicated-cloud",
+			extraFlags:       " --region europe-west1 --cloud-provider gcp --memory 16GB",
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"16GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"virtual-dedicated-cloud","version":"5","vector_optimized":false}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Both spellings must hit the API with the canonical name.
+			for _, typeValue := range []string{tt.legacyType, tt.canonicalType} {
+				helper := testutils.NewAuraTestHelper(t)
+				defer helper.Close()
+
+				registerCreateProjectsMock(&helper)
+
+				mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, `{"data": {"id": "db1d1234", "name": "Instance01", "tenant_id": "YOUR_TENANT_ID", "connection_url": "YOUR_CONNECTION_URL", "username": "neo4j", "password": "letMeIn123!"}}`)
+
+				helper.ExecuteCommand("instance create --name Instance01 --type " + typeValue + tt.extraFlags + " --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw")
+
+				mockHandler.AssertCalledTimes(1)
+				mockHandler.AssertCalledWithMethod(http.MethodPost)
+				mockHandler.AssertCalledWithBody(tt.expectedPostBody)
+			}
+		})
+	}
+}
+
+// The v2beta1 API has no AuraDS tier, so the DS names are rejected locally with
+// guidance rather than being forwarded for the API to reject.
+func TestCreateRejectsRetiredDataScienceInstanceTypes(t *testing.T) {
+	for _, dsType := range []string{"professional-ds", "enterprise-ds"} {
+		t.Run(dsType, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
+
+			helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type " + dsType + " --memory 1GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+
+			mockHandler.AssertCalledTimes(0)
+
+			helper.AssertErr(`Error: invalid argument "` + dsType + `" for "--type" flag: AuraDS instance types are no longer offered; create a "professional" or "virtual-dedicated-cloud" instance instead, and configure graph analytics separately
+`)
+		})
+	}
 }
 
 func TestCreateProfessionalInstanceInvalidVersion(t *testing.T) {
@@ -277,7 +351,7 @@ func TestCreateProfessionalInstanceInvalidVersion(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --version 6 --rw")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional --memory 1GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --version 6 --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -291,11 +365,11 @@ func TestCreateFreeInstanceWithMemory(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --memory 1GB --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --memory 1GB --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
-	helper.AssertErr(`Error: invalid argument "1GB" for "--memory" flag: must not be set when "--type" flag is set to "free-db"
+	helper.AssertErr(`Error: invalid argument "1GB" for "--memory" flag: must not be set when "--type" flag is set to "free"
 `)
 }
 
@@ -305,11 +379,11 @@ func TestCreateFreeInstanceWithRegion(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
-	helper.AssertErr(`Error: invalid argument "europe-west1" for "--region" flag: must not be set when "--type" flag is set to "free-db"
+	helper.AssertErr(`Error: invalid argument "europe-west1" for "--region" flag: must not be set when "--type" flag is set to "free"
 `)
 }
 
@@ -319,11 +393,11 @@ func TestCreateFreeInstanceWithCloudProvider(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
-	helper.AssertErr(`Error: invalid argument "gcp" for "--cloud-provider" flag: must not be set when "--type" flag is set to "free-db"
+	helper.AssertErr(`Error: invalid argument "gcp" for "--cloud-provider" flag: must not be set when "--type" flag is set to "free"
 `)
 }
 
@@ -333,11 +407,11 @@ func TestCreateFreeInstanceWithGraphAnalyticsPlugin(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --graph-analytics-plugin --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --graph-analytics-plugin --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
-	helper.AssertErr(`Error: "--graph-analytics-plugin" flag can only be set when "--type" flag is set to "professional-db"
+	helper.AssertErr(`Error: "--graph-analytics-plugin" flag can only be set when "--type" flag is set to "professional"
 `)
 }
 
@@ -387,7 +461,7 @@ func TestCreateInstanceError(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(createInstancesPath, testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --rw")
+			helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --rw")
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -413,16 +487,16 @@ func TestInstanceWithCmkId(t *testing.T) {
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"region": "europe-west1",
-				"type": "enterprise-db",
+				"type": "virtual-dedicated-cloud",
 				"name": "Instance01"
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type enterprise-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 16GB --customer-managed-key-id UUID_OF_YOUR_KEY --rw")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type virtual-dedicated-cloud --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 16GB --customer-managed-key-id UUID_OF_YOUR_KEY --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"16GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"enterprise-db","version":"5","customer_managed_key_id":"UUID_OF_YOUR_KEY","vector_optimized":false}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"16GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"virtual-dedicated-cloud","version":"5","customer_managed_key_id":"UUID_OF_YOUR_KEY","vector_optimized":false}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -434,7 +508,7 @@ func TestInstanceWithCmkId(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "enterprise-db",
+		"type": "virtual-dedicated-cloud",
 		"username": "neo4j"
 	  }
 	} `)
@@ -457,16 +531,16 @@ func TestCreateFreeInstanceWithDefaultWorkspace(t *testing.T) {
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"region": "europe-west1",
-				"type": "free-db",
+				"type": "free",
 				"name": "Instance01"
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -478,7 +552,7 @@ func TestCreateFreeInstanceWithDefaultWorkspace(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	  }
 	}`)
@@ -499,7 +573,7 @@ func TestCreateFreeInstanceWithWait(t *testing.T) {
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"region": "europe-west1",
-				"type": "free-db",
+				"type": "free",
 				"name": "Instance01"
 			}
 		}`)
@@ -516,11 +590,11 @@ func TestCreateFreeInstanceWithWait(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --wait --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --wait --rw")
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)
-	createMock.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`)
+	createMock.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`)
 
 	getMock.AssertCalledTimes(2)
 	getMock.AssertCalledWithMethod(http.MethodGet)
@@ -536,7 +610,7 @@ func TestCreateFreeInstanceWithWait(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	}
 }
@@ -566,7 +640,7 @@ func TestCreateFreeInstanceWithWait_StdoutIsValidJSON(t *testing.T) {
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"region": "europe-west1",
-				"type": "free-db",
+				"type": "free",
 				"name": "Instance01"
 			}
 		}`)
@@ -583,7 +657,7 @@ func TestCreateFreeInstanceWithWait_StdoutIsValidJSON(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --wait --rw --format json")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --wait --rw --format json")
 
 	helper.AssertOutIsValidJSON()
 }
@@ -597,25 +671,25 @@ func TestCreateCredentialFlagValidation(t *testing.T) {
 	}{
 		{
 			name:        "credential-name and no-credential-storage are mutually exclusive",
-			command:     "instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myname --no-credential-storage --rw",
+			command:     "instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myname --no-credential-storage --rw",
 			expectedErr: `Error: "--credential-name" and "--no-credential-storage" cannot be used together`,
 			wantHTTP:    0,
 		},
 		{
 			name:        "explicit empty credential-name is rejected",
-			command:     `instance create --name Instance01 --type free-db --organization-id ` + testCreateOrgID + ` --project-id ` + testCreateProjectID + ` --credential-name "" --rw`,
+			command:     `instance create --name Instance01 --type free --organization-id ` + testCreateOrgID + ` --project-id ` + testCreateProjectID + ` --credential-name "" --rw`,
 			expectedErr: `Error: invalid argument "" for "--credential-name" flag: name must not be empty`,
 			wantHTTP:    0,
 		},
 		{
 			name:        "valid flags proceed to HTTP call",
-			command:     "instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
+			command:     "instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
 			expectedErr: "",
 			wantHTTP:    1,
 		},
 		{
 			name:        "credential-name without no-credential-storage proceeds to HTTP call",
-			command:     "instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myname --rw",
+			command:     "instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myname --rw",
 			expectedErr: "",
 			wantHTTP:    1,
 		},
@@ -639,7 +713,7 @@ func TestCreateCredentialFlagValidation(t *testing.T) {
 					"tenant_id": "YOUR_TENANT_ID",
 					"cloud_provider": "gcp",
 					"region": "europe-west1",
-					"type": "free-db",
+					"type": "free",
 					"name": "Instance01"
 				}
 			}`)
@@ -676,7 +750,7 @@ func TestCreatePreRunERejectsNilDbms(t *testing.T) {
 	cmd := instance.NewCreateCmd(cfg)
 	// Set required flags so PreRunE reaches the Dbms-nil check (not an earlier guard).
 	require.NoError(t, cmd.Flags().Set("name", "Instance01"))
-	require.NoError(t, cmd.Flags().Set("type", "free-db"))
+	require.NoError(t, cmd.Flags().Set("type", "free"))
 
 	err = cmd.PreRunE(cmd, nil)
 	require.EqualError(t, err, `credential storage is not available; use --no-credential-storage to skip storing credentials locally`)
@@ -692,7 +766,7 @@ const createAPIResponse = `{
 		"tenant_id": "YOUR_TENANT_ID",
 		"cloud_provider": "gcp",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"name": "Instance01"
 	}
 }`
@@ -704,7 +778,7 @@ func TestCreateDefaultCredentialStorage(t *testing.T) {
 	registerCreateProjectsMock(&helper)
 	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	helper.AssertErr("")
 
@@ -725,7 +799,7 @@ func TestCreateDefaultCredentialStorage(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	  }
 	}`)
@@ -742,24 +816,24 @@ func TestCreateDatabaseNameStorage(t *testing.T) {
 		wantDatabaseName string
 	}{
 		{
-			name:             "free-db with non-neo4j username stores username as database-name",
-			instanceType:     "free-db",
+			name:             "free with non-neo4j username stores username as database-name",
+			instanceType:     "free",
 			apiUsername:      "tenant-user-abc",
-			command:          "instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw",
+			command:          "instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw",
 			wantDatabaseName: "tenant-user-abc",
 		},
 		{
-			name:             "free-db with neo4j username stores neo4j as database-name",
-			instanceType:     "free-db",
+			name:             "free with neo4j username stores neo4j as database-name",
+			instanceType:     "free",
 			apiUsername:      "neo4j",
-			command:          "instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw",
+			command:          "instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw",
 			wantDatabaseName: "neo4j",
 		},
 		{
-			name:             "professional-db always stores neo4j as database-name regardless of username",
-			instanceType:     "professional-db",
+			name:             "professional always stores neo4j as database-name regardless of username",
+			instanceType:     "professional",
 			apiUsername:      "tenant-user-abc",
-			command:          "instance create --region europe-west1 --name Instance01 --type professional-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --rw",
+			command:          "instance create --region europe-west1 --name Instance01 --type professional --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --cloud-provider gcp --memory 4GB --rw",
 			wantDatabaseName: "neo4j",
 		},
 	}
@@ -814,7 +888,7 @@ func TestCreateCollisionResolution(t *testing.T) {
 	registerCreateProjectsMock(&helper)
 	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --rw")
 
 	helper.AssertErr("")
 
@@ -833,7 +907,7 @@ func TestCreateCollisionResolution(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	  }
 	}`)
@@ -846,7 +920,7 @@ func TestCreateCustomCredentialName(t *testing.T) {
 	registerCreateProjectsMock(&helper)
 	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myinstance --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myinstance --rw")
 
 	helper.AssertErr("")
 
@@ -863,7 +937,7 @@ func TestCreateCustomCredentialName(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	  }
 	}`)
@@ -888,7 +962,7 @@ func TestCreateCustomCredentialNameCollision(t *testing.T) {
 	registerCreateProjectsMock(&helper)
 	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myinstance --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --credential-name myinstance --rw")
 
 	helper.AssertErr("")
 
@@ -905,7 +979,7 @@ func TestCreateCustomCredentialNameCollision(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	  }
 	}`)
@@ -918,7 +992,7 @@ func TestCreateNoCredentialStorage(t *testing.T) {
 	registerCreateProjectsMock(&helper)
 	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw")
 
 	helper.AssertErr("")
 
@@ -935,7 +1009,7 @@ func TestCreateNoCredentialStorage(t *testing.T) {
 		"password": "letMeIn123!",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	  }
 	}`)
@@ -948,7 +1022,7 @@ func TestCreateNoCredentialPrint(t *testing.T) {
 	registerCreateProjectsMock(&helper)
 	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-print --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-print --rw")
 
 	helper.AssertErr("")
 
@@ -965,7 +1039,7 @@ func TestCreateNoCredentialPrint(t *testing.T) {
 		"name": "Instance01",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	  }
 	}`)
@@ -978,7 +1052,7 @@ func TestCreateNoCredentialStorageAndNoPrint(t *testing.T) {
 	registerCreateProjectsMock(&helper)
 	helper.NewRequestHandlerMock(createInstancesPath, http.StatusAccepted, createAPIResponse)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --no-credential-print --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --no-credential-print --rw")
 
 	helper.AssertErr("")
 
@@ -994,7 +1068,7 @@ func TestCreateNoCredentialStorageAndNoPrint(t *testing.T) {
 		"name": "Instance01",
 		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
-		"type": "free-db",
+		"type": "free",
 		"username": "neo4j"
 	  }
 	}`)
@@ -1020,7 +1094,7 @@ func TestCreateCredentialStoredBeforeWait(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --wait --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --wait --rw")
 
 	helper.AssertErrContainsStrings([]string{
 		"Waiting for instance to be ready...",
@@ -1041,30 +1115,30 @@ func TestCreateDefaultNameGeneration(t *testing.T) {
 	}{
 		{
 			name:    "no existing instances generates Instance01",
-			command: "instance create --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
+			command: "instance create --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
 			listResponseBody: `{
 				"data": []
 			}`,
 			listCalledTimes:  1,
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`,
 		},
 		{
 			name:    "Instance01 already exists generates Instance02",
-			command: "instance create --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
+			command: "instance create --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
 			listResponseBody: `{
 				"data": [
 					{"id": "abc123", "name": "Instance01", "tenant_id": "YOUR_TENANT_ID"}
 				]
 			}`,
 			listCalledTimes:  1,
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance02","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance02","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`,
 		},
 		{
 			name:             "explicit --name skips the list GET call",
-			command:          "instance create --name MyInstance --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
+			command:          "instance create --name MyInstance --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
 			listResponseBody: `{"data": []}`,
 			listCalledTimes:  0,
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"MyInstance","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"MyInstance","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`,
 		},
 	}
 
@@ -1085,7 +1159,7 @@ func TestCreateDefaultNameGeneration(t *testing.T) {
 					"tenant_id": "YOUR_TENANT_ID",
 					"cloud_provider": "gcp",
 					"region": "europe-west1",
-					"type": "free-db",
+					"type": "free",
 					"name": "Instance01"
 				}
 			}`)
@@ -1117,7 +1191,7 @@ func TestCreateDefaultNameListAPIError(t *testing.T) {
 	}`)
 	postMock := helper.NewRequestHandlerMock("POST "+createInstancesPath, http.StatusAccepted, `{"data": {}}`)
 
-	helper.ExecuteCommand("instance create --type free-db --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw")
+	helper.ExecuteCommand("instance create --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw")
 
 	listMock.AssertCalledTimes(1)
 	postMock.AssertCalledTimes(0)

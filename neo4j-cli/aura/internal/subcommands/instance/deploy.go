@@ -139,11 +139,11 @@ func NewDeployCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "deploy",
 		Short:       "Creates a new Aura instance and clones a local database into it",
-		Example: `# Deploy a local Docker container's neo4j database into a new free-db Aura instance
-neo4j-cli aura instance deploy --rw --from-docker my-local-neo4j --type free-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+		Example: `# Deploy a local Docker container's neo4j database into a new free Aura instance
+neo4j-cli aura instance deploy --rw --from-docker my-local-neo4j --type free --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
-# Deploy a Neo4j Desktop 2 DBMS database into a new professional-db instance on AWS
-neo4j-cli aura instance deploy --rw --from-desktop dbms-1234 --database movies --type professional-db --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111`,
+# Deploy a Neo4j Desktop 2 DBMS database into a new professional instance on AWS
+neo4j-cli aura instance deploy --rw --from-desktop dbms-1234 --database movies --type professional --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111`,
 		Long: `This subcommand creates a new Aura instance and clones a local Neo4j database into it.
 
 The source database can come from a local Neo4j Docker container managed by 'neo4j-cli docker' (--from-docker) or from a DBMS managed by a local Neo4j Desktop 2 install (--from-desktop). Exactly one source must be specified.
@@ -266,7 +266,7 @@ The command waits for the instance to be ready and for the data load to finish b
 	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes.")
 	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01).")
 
-	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds".`)
+	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud". The former names "free-db", "professional-db", and "enterprise-db" are still accepted.`)
 	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, `The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp".`)
