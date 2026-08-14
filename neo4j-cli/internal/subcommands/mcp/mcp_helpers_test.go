@@ -21,6 +21,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp"
 	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -78,21 +79,34 @@ func runApp(t *testing.T, mcpEnabled bool, args ...string) (stdout, stderr *byte
 	return stdout, stderr, err
 }
 
-// openTestBundle generates a test .mcpb and returns its zip reader.
+// openTestBundle generates a test .mcpb with all gates off and returns its zip reader.
 func openTestBundle(t *testing.T) (string, *zip.ReadCloser) {
 	t.Helper()
+	return openTestBundleWithGates(t, skill.MCPGates{})
+}
+
+// openTestBundleWithGates generates a test .mcpb with the given gates and
+// returns its zip reader.
+func openTestBundleWithGates(t *testing.T, gates skill.MCPGates) (string, *zip.ReadCloser) {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.mcpb")
-	err := mcp.GenerateBundle(path)
+	err := mcp.GenerateBundle(path, gates)
 	require.NoError(t, err)
 	r, err := zip.OpenReader(path)
 	require.NoError(t, err)
 	return path, r
 }
 
-// readTestManifest generates a test .mcpb and returns the decoded manifest.
+// readTestManifest generates a test .mcpb (all gates off) and returns the decoded manifest.
 func readTestManifest(t *testing.T) (string, map[string]any) {
 	t.Helper()
-	path, r := openTestBundle(t)
+	return readTestManifestWithGates(t, skill.MCPGates{})
+}
+
+// readTestManifestWithGates generates a test .mcpb with the given gates and returns the decoded manifest.
+func readTestManifestWithGates(t *testing.T, gates skill.MCPGates) (string, map[string]any) {
+	t.Helper()
+	path, r := openTestBundleWithGates(t, gates)
 	defer func() { _ = r.Close() }()
 	data := readZipFile(t, r, "manifest.json")
 	var manifest map[string]any
@@ -133,6 +147,36 @@ func newMCPInstallFixture(t *testing.T, detected bool) (*bytes.Buffer, *bytes.Bu
 	root.SetErr(stderr)
 
 	return stdout, stderr, root
+}
+
+// newMCPInstallFixtureFS is newMCPInstallFixture plus the backing filesystem,
+// so a caller can read back what a command actually wrote to the agent config.
+func newMCPInstallFixtureFS(t *testing.T, detected bool) (afero.Fs, *cobra.Command, *bytes.Buffer, *bytes.Buffer) {
+	t.Helper()
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+
+	if detected {
+		t.Setenv("HOME", "/Users/test")
+		a := skill.FindAgent("claude-desktop")
+		require.NotNil(t, a)
+		claudeDir, ok := a.DetectPath()
+		require.True(t, ok)
+		require.NoError(t, fs.MkdirAll(claudeDir, 0755))
+	}
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	for name := range clicfg.Registry {
+		cfg.Flags.SetForTest(name, true)
+	}
+	root := app.NewCmd(cfg)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+
+	return fs, root, stdout, stderr
 }
 
 // runMCPApp is like runApp but uses the MCP-install fixture if detected.

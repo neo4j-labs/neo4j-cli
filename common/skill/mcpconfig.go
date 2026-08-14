@@ -13,8 +13,9 @@ import (
 // MCPConfigEntry describes the server config written into an agent's MCP
 // config file under mcpServers."neo4j-cli".
 type MCPConfigEntry struct {
-	Command string   `json:"command"`
-	Args    []string `json:"args"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     map[string]string `json:"env,omitempty"`
 }
 
 // DefaultMCPConfigArgs are the args written into the neo4j-cli server entry.
@@ -33,6 +34,7 @@ func MCPList(fs afero.Fs) []AgentInstall {
 		// config; we store it so check can compare against the current binary.
 		if installed {
 			row.InstalledVersion = readMCPCommandPath(fs, a)
+			row.InstalledHasMCPManifest = readMCPConfigEnv(fs, a)
 		}
 		out = append(out, row)
 	}
@@ -58,11 +60,27 @@ func readMCPCommandPath(fs afero.Fs, a *Agent) string {
 	return cmd
 }
 
+// readMCPConfigEnv reports whether the neo4j-cli entry's env block has the
+// manifest marker (NEO4J_CLI_MCP_MANIFEST=1). Returns false when the entry,
+// the env block, or the config file is absent or unparseable.
+func readMCPConfigEnv(fs afero.Fs, a *Agent) bool {
+	entry, found := readMCPConfigServerEntry(fs, a)
+	if !found {
+		return false
+	}
+	env, _ := entry["env"].(map[string]any)
+	if env == nil {
+		return false
+	}
+	marker, _ := env[EnvMCPManifest].(string)
+	return marker == "1"
+}
+
 // InstallMCPConfig surgically merges the neo4j-cli server entry into the
 // agent's MCP config file. Reads the existing file (or starts from {}),
 // sets only mcpServers."neo4j-cli", and writes atomically via temp-file +
 // rename, preserving the original file mode. Returns nil.
-func InstallMCPConfig(fs afero.Fs, a *Agent, binPath string) error {
+func InstallMCPConfig(fs afero.Fs, a *Agent, binPath string, gates MCPGates) error {
 	configPath, ok := a.MCPConfigPath()
 	if !ok {
 		return nil
@@ -71,6 +89,7 @@ func InstallMCPConfig(fs afero.Fs, a *Agent, binPath string) error {
 	entry := map[string]any{
 		"command": binPath,
 		"args":    DefaultMCPConfigArgs,
+		"env":     MCPServerEnv(gates),
 	}
 
 	return writeMCPEntry(fs, configPath, "neo4j-cli", entry)

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/mcp/server"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -83,9 +84,9 @@ func TestResolveGates_ManifestMarkerGating(t *testing.T) {
 	assert.False(t, gates.AllowCredentialWrite, "cred write gate closed without marker")
 
 	// Marker absent: even with gate env vars set, gates stay closed.
-	t.Setenv(envMCPAllowWrites, "true")
-	t.Setenv(envMCPAllowAura, "true")
-	t.Setenv(envMCPAllowCredentialWrite, "true")
+	t.Setenv(skill.EnvMCPAllowWrites, "true")
+	t.Setenv(skill.EnvMCPAllowAura, "true")
+	t.Setenv(skill.EnvMCPAllowCredentialWrite, "true")
 	gates = resolveGates("false", "false", "false", false)
 	assert.False(t, gates.WriteAllowed, "write gate closed despite env without marker")
 	assert.False(t, gates.AllowAura, "aura gate closed despite env without marker")
@@ -95,9 +96,9 @@ func TestResolveGates_ManifestMarkerGating(t *testing.T) {
 // TestResolveGates_MarkerUnlocksEnv verifies that when the manifest marker IS
 // present, env-var fallback opens gates.
 func TestResolveGates_MarkerUnlocksEnv(t *testing.T) {
-	t.Setenv(envMCPAllowWrites, "true")
-	t.Setenv(envMCPAllowAura, "true")
-	t.Setenv(envMCPAllowCredentialWrite, "true")
+	t.Setenv(skill.EnvMCPAllowWrites, "true")
+	t.Setenv(skill.EnvMCPAllowAura, "true")
+	t.Setenv(skill.EnvMCPAllowCredentialWrite, "true")
 
 	gates := resolveGates("false", "false", "false", true)
 	assert.True(t, gates.WriteAllowed, "write gate opened by env with marker")
@@ -117,7 +118,7 @@ func TestResolveGates_MarkerUnsetEnvDefaultsToClosed(t *testing.T) {
 // TestResolveGates_FlagsTakePriority verifies that explicit flags (true) are
 // authoritative — the env fallback is never consulted when the flag is set.
 func TestResolveGates_FlagsTakePriority(t *testing.T) {
-	t.Setenv(envMCPAllowWrites, "false")
+	t.Setenv(skill.EnvMCPAllowWrites, "false")
 
 	// Flag set to true; env is false but should not be consulted.
 	gates := resolveGates("true", "false", "false", true)
@@ -136,14 +137,14 @@ func TestResolveGates_FlagFalseUnsetEnv(t *testing.T) {
 // TestManifestMarkerEnvConstant verifies the marker constant name is stable and
 // defaults to absent when not set.
 func TestManifestMarkerEnvConstant(t *testing.T) {
-	assert.Equal(t, "NEO4J_CLI_MCP_MANIFEST", envManifestMarker,
+	assert.Equal(t, "NEO4J_CLI_MCP_MANIFEST", skill.EnvMCPManifest,
 		"marker constant must match the well-known env var name")
-	assert.False(t, envBool(envManifestMarker), "marker must be false when not set")
+	assert.False(t, envBool(skill.EnvMCPManifest), "marker must be false when not set")
 }
 
 // TestGateEnvVarConstants verifies the gate env-var constant names are stable.
 func TestGateEnvVarConstants(t *testing.T) {
-	assert.Equal(t, "NEO4J_CLI_MCP_ALLOW_WRITES", envMCPAllowWrites)
-	assert.Equal(t, "NEO4J_CLI_MCP_ALLOW_AURA", envMCPAllowAura)
-	assert.Equal(t, "NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE", envMCPAllowCredentialWrite)
+	assert.Equal(t, "NEO4J_CLI_MCP_ALLOW_WRITES", skill.EnvMCPAllowWrites)
+	assert.Equal(t, "NEO4J_CLI_MCP_ALLOW_AURA", skill.EnvMCPAllowAura)
+	assert.Equal(t, "NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE", skill.EnvMCPAllowCredentialWrite)
 }

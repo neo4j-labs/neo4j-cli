@@ -15,18 +15,20 @@ import (
 
 // mcpCheckResultRow is the JSON shape emitted by mcp check.
 type mcpCheckResultRow struct {
-	Agent            string `json:"agent"`
-	InstalledCommand string `json:"installed_command"`
-	CurrentCommand   string `json:"current_command"`
-	Status           string `json:"status"`
+	Agent             string `json:"agent"`
+	InstalledCommand  string `json:"installed_command"`
+	CurrentCommand    string `json:"current_command"`
+	HasMCPEnvManifest bool   `json:"has_mcp_env_manifest"`
+	Status            string `json:"status"`
 }
 
 func (r mcpCheckResultRow) asArrayRow() map[string]any {
 	return map[string]any{
-		"agent":             r.Agent,
-		"installed_command": r.InstalledCommand,
-		"current_command":   r.CurrentCommand,
-		"status":            r.Status,
+		"agent":                r.Agent,
+		"installed_command":    r.InstalledCommand,
+		"current_command":      r.CurrentCommand,
+		"has_mcp_env_manifest": r.HasMCPEnvManifest,
+		"status":               r.Status,
 	}
 }
 
@@ -35,9 +37,11 @@ func newCheckCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "check",
 		Short: "Check installed MCP servers for drift",
 		Long: "Inspects every MCP-capable agent and compares the neo4j-cli " +
-			"server entry's command path against the current binary path. Columns: " +
-			"agent, installed_command (path in config), current_command (this binary's " +
-			"path), status where status is ok | drift | not-installed. " +
+			"server entry's command path and env block against the current binary. " +
+			"Columns: agent, installed_command (path in config), current_command (this " +
+			"binary's path), has_mcp_env_manifest (whether the env block has the " +
+			"manifest marker), status where status is ok | drift | not-installed. " +
+			"Drift includes a changed binary path or a missing manifest env marker. " +
 			"Exits non-zero when any installed entry has drifted.",
 		Example: `# Check MCP install state for drift (table)
 neo4j-cli mcp check
@@ -71,14 +75,15 @@ func runCheckCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
 			continue
 		}
 		status := "ok"
-		if inst.InstalledVersion != currentBin {
+		if inst.InstalledVersion != currentBin || !inst.InstalledHasMCPManifest {
 			status = "drift"
 		}
 		rows = append(rows, mcpCheckResultRow{
-			Agent:            inst.Agent.Name,
-			InstalledCommand: inst.InstalledVersion,
-			CurrentCommand:   currentBin,
-			Status:           status,
+			Agent:             inst.Agent.Name,
+			InstalledCommand:  inst.InstalledVersion,
+			CurrentCommand:    currentBin,
+			HasMCPEnvManifest: inst.InstalledHasMCPManifest,
+			Status:            status,
 		})
 	}
 
@@ -87,7 +92,7 @@ func runCheckCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
 		return nil
 	}
 
-	commonoutput.PrintBodyMap(cmd, cfg, rows, []string{"agent", "installed_command", "current_command", "status"})
+	commonoutput.PrintBodyMap(cmd, cfg, rows, []string{"agent", "installed_command", "current_command", "has_mcp_env_manifest", "status"})
 
 	drift := 0
 	for _, r := range rows {

@@ -1,0 +1,465 @@
+feature: cli-236-mcp-install-env-block
+prd: ./prd-cli-236-mcp-install-env-block.md
+created_at: 2026-08-14T12:12:24Z
+updated_at: 2026-08-14T14:35:01Z
+
+# CORE INVARIANT, referenced by several tasks below.
+#
+# The whole chain must stay intact or the gates stay dead:
+#
+#   mcp install writes env
+#     -> Claude Desktop spawns `neo4j-cli mcp serve` with that env
+#     -> serveRun reads envBool(envManifestMarker)            (serve.go:161)
+#     -> resolveGates consults the 3 gate vars ONLY if marker  (serve.go:117-135)
+#     -> server.Gates reaches allow.go, which is what
+#        neo4j_cli_run_write and the gated:* policies check
+#
+# Break any link and the current dead-gate behaviour is restored, silently and
+# with every unit test still green. task-010 is the only proof that matters.
+#
+# SUPERSEDED PLAN DETAIL: the source plan said to key the --rw implication off
+# cmd.Flags().Changed("rw"). That is WRONG and the PRD corrects it.
+# RequireWriteAccess (common/flags/flags.go:118-143) only WAIVES the write gate
+# by returning nil - it never mutates the flag. With Changed, an explicit
+# --rw=false would enable all three gates. Use the flag VALUE. See task-004.
+
+tasks:
+  - id: task-001
+    title: 'Add common/skill/mcpenv.go with shared env constants and MCPServerEnv'
+    description: |
+      Create common/skill/mcpenv.go defining the five MCP env var names as exported
+      constants: EnvMCPFeatureFlag (NEO4J_CLI_FLAG_MCP_SERVER), EnvMCPManifest
+      (NEO4J_CLI_MCP_MANIFEST), EnvMCPAllowWrites (NEO4J_CLI_MCP_ALLOW_WRITES),
+      EnvMCPAllowAura (NEO4J_CLI_MCP_ALLOW_AURA) and EnvMCPAllowCredentialWrite
+      (NEO4J_CLI_MCP_ALLOW_CREDENTIAL_WRITE). Also export
+      `type MCPGates struct{ AllowWrites, AllowAura, AllowCredentialWrite bool }`
+      and `func MCPServerEnv(g MCPGates) map[string]string`.
+
+      Today these five names exist twice - as consts in mcp/serve.go:59-64 and as
+      string literals in mcp/manifest.go:158-164. Adding a third copy in mcpconfig.go
+      would guarantee drift, which is why this file comes first. It mirrors how
+      common/clicfg/credentials/env_spec.go single-sources the credential env names.
+
+      The file MUST live under common/ - the internal-package rule forbids common/*
+      importing neo4j-cli/internal/*, and both serve.go and manifest.go already
+      import common/skill.
+
+      MCPServerEnv always emits ALL FIVE keys. EnvMCPFeatureFlag and EnvMCPManifest
+      are always "1"; the three gates are the literal strings "true" or "false".
+      Writing a gate explicitly as "false" instead of omitting it is load-bearing,
+      not stylistic: the config env block overrides the environment Desktop
+      inherited, so an explicit "false" neutralises a stale
+      NEO4J_CLI_MCP_ALLOW_WRITES=true left in a login shell rc - exposure that
+      setting NEO4J_CLI_MCP_MANIFEST=1 would otherwise newly create. Document that
+      reasoning on MCPServerEnv so nobody later "tidies" it into omitempty.
+
+      Add common/skill/mcpenv_test.go covering every gate combination.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - 'common/skill/mcpenv.go exists with the five exported constants, MCPGates and MCPServerEnv'
+      - 'MCPServerEnv returns exactly 5 keys for every one of the 8 gate combinations'
+      - 'Feature-flag and manifest keys are always "1"; gates are literal "true"/"false"'
+      - 'A doc comment on MCPServerEnv explains why gates-off emits "false" rather than omitting the key'
+      - 'The file carries the Neo4j copyright header and go test ./common/skill/... passes'
+    completed_at: 2026-08-14T12:20:25Z
+
+  - id: task-002
+    title: 'Refactor serve.go and manifest.go onto the shared constants'
+    description: |
+      Point both existing consumers at the task-001 constants so the names have one
+      definition. In neo4j-cli/internal/subcommands/mcp/serve.go, drop the five local
+      consts at lines 59-64 and reference the common/skill ones. envBool and
+      resolveGates behaviour must be unchanged - this is a pure rename of the source
+      of the string, not a semantic change.
+
+      In neo4j-cli/internal/subcommands/mcp/manifest.go:158-164, build the Env map
+      KEYS from the same constants while retaining the `${user_config.*}` template
+      VALUES. Only the values differ between the manifest form and the config form;
+      the names come from one place.
+
+      This task is where the byte-identical requirement bites. manifest_test.go must
+      pass COMPLETELY UNCHANGED - do not edit it to accommodate the refactor. Its
+      existing assertions (name "neo4j-cli", display_name "Neo4j CLI", and the env
+      assertions at lines 91 and 97) are the regression guard proving the refactor
+      changed no manifest bytes. If a manifest test fails, the refactor is wrong.
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - 'serve.go declares no MCP env var name literal of its own; resolveGates logic is untouched'
+      - 'manifest.go builds its Env keys from the shared constants, keeping ${user_config.*} values'
+      - 'manifest_test.go passes with ZERO edits to that file'
+      - 'A repo-wide grep for NEO4J_CLI_MCP_ALLOW / NEO4J_CLI_MCP_MANIFEST / NEO4J_CLI_FLAG_MCP_SERVER finds the literals only in common/skill/mcpenv.go and tests'
+      - 'go test ./neo4j-cli/internal/subcommands/mcp/... passes'
+    status: completed
+    completed_at: 2026-08-14T12:30:00Z
+
+  - id: task-003
+    title: 'Write the env block in InstallMCPConfig and update the six test call sites'
+    description: |
+      In common/skill/mcpconfig.go, give MCPConfigEntry (line 15, currently declared
+      but unused) an `Env map[string]string` field with json tag `env,omitempty`, so
+      the documented shape keeps matching what is actually written. Change
+      InstallMCPConfig to take an MCPGates parameter and add
+      `"env": MCPServerEnv(gates)` to the entry map at lines 71-74.
+
+      Everything else in this file stays exactly as it is: the surgical merge, the
+      atomic temp-file plus rename, file-mode preservation, and the "neo4j-cli"
+      server key. RemoveMCPConfig needs no change - it deletes the whole entry,
+      env included.
+
+      Six functions in common/skill/mcpconfig_test.go call InstallMCPConfig (lines
+      50, 101, 121, 215, 274, 407) and all need the new signature; a small helper for
+      the default all-off gates keeps the diff readable. Extend the golden merge test
+      (TestMCPConfig_SurgicalMergeGolden) and the cross-platform table test
+      (TestWriteMCPConfig_CrossPlatform) to assert the FULL env map - including that
+      gates-off writes "false" and that the manifest and feature-flag keys are always
+      "1". Keep asserting that the pre-existing neo4j-data-modeling sibling entry and
+      the unrelated top-level keys survive; that is the whole point of the surgical
+      merge and it must not regress.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - 'MCPConfigEntry has Env map[string]string with json tag env,omitempty'
+      - 'InstallMCPConfig accepts MCPGates and writes the 5-key env block into the entry'
+      - 'All six existing InstallMCPConfig call sites compile and pass'
+      - 'Golden merge and cross-platform tests assert the full env map, including "false" gate values'
+      - 'Tests still assert the neo4j-data-modeling sibling entry and unrelated top-level keys survive'
+      - 'RemoveMCPConfig is unchanged and its idempotency tests still pass'
+    completed_at: 2026-08-14T12:30:22Z
+
+  - id: task-004
+    title: 'Add the three gate flags to mcp install with value-based --rw resolution'
+    description: |
+      In neo4j-cli/internal/subcommands/mcp/install.go add three boolean flags, all
+      defaulting false: --allow-writes, --allow-aura, --allow-credential-write. Reuse
+      the existing constants server.AllowAuraFlag and server.AllowCredentialWriteFlag
+      (server/allow.go:35-36) for the latter two rather than inventing new literals -
+      this is the same vocabulary `mcp serve` and the manifest user_config already use.
+
+      Resolution rule: if ANY of the three --allow-* flags is explicitly passed
+      (cmd.Flags().Changed), use the three literal flag values as-is. Otherwise all
+      three take the VALUE of --rw, via ParseBool(cmd.Flag("rw").Value.String()).
+
+      Use the VALUE, not Changed. The source plan said Changed, on the premise that
+      EnforceWriteGate auto-SETS --rw in an interactive terminal. It does not:
+      RequireWriteAccess (common/flags/flags.go:118-143) only waives the requirement
+      by returning nil, and nothing in the repo mutates the flag (grep for Set("rw")
+      outside tests returns nothing). Changed and value agree everywhere EXCEPT an
+      explicit --rw=false, where Changed would enable all three gates - the exact
+      opposite of what was typed.
+
+      Target matrix:
+        --rw                              -> writes Y  aura Y  cred Y
+        --rw=false                        -> writes N  aura N  cred N
+        interactive, no --rw in argv      -> writes N  aura N  cred N
+        --rw --allow-writes               -> writes Y  aura N  cred N
+        --rw --allow-aura --allow-writes  -> writes Y  aura Y  cred N
+        --allow-aura (no --rw)            -> writes N  aura Y  cred N
+
+      Thread the resolved gates through runInstallCmd -> runInstallOne ->
+      runInstallConfig -> InstallMCPConfig. In --bundle mode the three flags have no
+      effect (the manifest wires the Desktop toggles instead); say so in each flag
+      usage string.
+
+      Add a table-driven test with one row per matrix line, asserting the env values
+      actually written to the fixture config. The --rw=false and interactive rows are
+      the ones that fail if someone reverts to Changed - do not omit them. Use
+      newMCPInstallFixture (mcp_helpers_test.go:106), which already seeds HOME and the
+      derived detect dir over a MemMapFs; derive the config path via
+      skill.FindAgent("claude-desktop").MCPConfigPath(), never a hardcoded darwin path
+      ($APP_SUPPORT differs per GOOS).
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - 'Three flags exist on mcp install, default false, reusing server.AllowAuraFlag and server.AllowCredentialWriteFlag'
+      - 'Gate resolution reads the --rw flag VALUE via ParseBool, never cmd.Flags().Changed("rw")'
+      - 'An explicit --allow-* flag overrides the --rw implication for all three gates'
+      - 'A table-driven test covers all six matrix rows and asserts the written env values'
+      - 'The --rw=false row and the interactive no---rw row both assert all three gates are "false"'
+      - 'TestInstall_HasAgentAndBundleFlags is extended to cover the three new flags'
+    completed_at: 2026-08-14T12:44:27Z
+
+  - id: task-005
+    title: 'Make the documented open-failure fallback real and report the actual method'
+    description: |
+      install.go's Long already promises that install "falls back to config write on
+      other platforms when the open command is unavailable" (lines 49-51), but
+      runInstallBundle returns a fatal error when openFile fails (lines 162-164). The
+      documented behaviour does not exist. Make it exist.
+
+      runInstallOne currently returns only error, and both callers DERIVE method from
+      the useBundle flag (`method := "config"; if useBundle { method = "mcpb" }` at
+      install.go:108-111 and 128-131) - so a fallback could not be reported truthfully
+      even if it happened. Change runInstallOne to return the method actually used
+      alongside its error, and delete both derivations.
+
+      In runInstallBundle, when openFile fails: fall back to runInstallConfig with the
+      same gates, return method "config", and surface the generated .mcpb path so the
+      user can open it by hand. If the fallback ALSO fails, return the original fatal
+      error - the open failure is the more useful diagnosis.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - 'runInstallOne returns the method actually used, not a value derived from useBundle'
+      - 'Both `method := "config"; if useBundle` derivations are removed from install.go'
+      - 'openFile failure falls back to the config write with the same gates and reports method config'
+      - 'The .mcpb path is surfaced to the user on fallback'
+      - 'When the fallback also fails, the original open error is returned'
+      - 'A test covers the fallback path with a stubbed openFile failure'
+    completed_at: 2026-08-14T13:05:00Z
+
+  - id: task-006
+    title: 'Report a missing manifest marker as drift in mcp check'
+    description: |
+      Anyone who ran mcp install before this change has a gate-dead entry and no
+      signal that anything is wrong. runCheckCmd
+      (neo4j-cli/internal/subcommands/mcp/check.go:69-83) currently compares only the
+      command path. Also report drift when the installed entry's env block lacks
+      NEO4J_CLI_MCP_MANIFEST, so the existing remediation - "run `neo4j-cli mcp
+      install` to refresh" - heals it.
+
+      This needs a small read helper alongside readMCPCommandPath
+      (common/skill/mcpconfig.go:52), e.g. readMCPConfigEnv, reusing
+      readMCPConfigServerEntry. Keep its error-free contract: an absent, unparseable
+      or inaccessible file reads as "not installed", not an error. Carry one extra
+      field on AgentInstall and, if surfaced, on mcpCheckResultRow.
+
+      Output field names stay snake_case (CLI-127, gate:
+      common/output/casing_gate_test.go). The existing remediation message and the
+      non-zero exit on drift are unchanged - only the set of conditions that count as
+      drift grows.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - 'An installed entry with no env block, or an env block lacking the manifest marker, reports drift'
+      - 'A freshly written entry from the new install path reports ok'
+      - 'mcp check still exits non-zero when any drift is detected'
+      - 'readMCPConfigEnv reuses readMCPConfigServerEntry and returns no error for absent/unparseable files'
+      - 'Any new output field name is snake_case and the casing gate passes'
+    completed_at: 2026-08-14T13:14:54Z
+
+  - id: task-007
+    title: 'Document the implication rule, the flags, and the config-vs-bundle difference'
+    description: |
+      Rewrite install.go's Long to tell the truth about both methods. It must cover:
+      the --rw implication rule and the per-flag override; each of the three flags and
+      the capability it unlocks; that --rw carries two distinct meanings here
+      (permission to modify your own config file, and by implication the server's
+      capability set); and what each method actually yields.
+
+      Be explicit about the difference config mode CANNOT close: config mode writes
+      mcpServers."neo4j-cli" with a hand-editable env block, while --bundle registers
+      a Desktop extension named "Neo4j CLI" whose settings screen exposes the same
+      gates as toggles. The display name and settings screen are .mcpb-only features a
+      mcpServers entry cannot have - state that plainly rather than leaving a user to
+      discover it. Also correct the fallback sentence to match what task-005 built.
+
+      Keep the Example block flush-left (skill render.go TrimSpaces only the first
+      line) with at least two invocations, a `# comment` per invocation, the
+      neo4j-cli prefix, and --rw on writes - including one example of the subset form
+      such as `--rw --allow-writes`. Gate: TestAllLeafCommands_HaveExamples.
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - 'Long documents the --rw implication rule and that an explicit --allow-* overrides it'
+      - 'Long names all three flags and the capability each unlocks'
+      - 'Long states that the display name and settings screen are bundle-only, not available in config mode'
+      - 'The stale fallback sentence now matches the implemented behaviour'
+      - 'Example is flush-left with >=2 invocations, a # comment each, and one subset-form example'
+      - 'TestAllLeafCommands_HaveExamples passes'
+    completed_at: 2026-08-14T14:05:00Z
+
+  - id: task-008
+    title: 'Add the Patch changelog entry'
+    description: |
+      Add one changelog entry via `changie new --projects neo4j-cli --kind Patch
+      --body <body>` (non-interactive). If changie is unavailable, hand-author
+      .changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml with project, kind,
+      body and an RFC3339 time, body single-quoted.
+
+      The body describes ONLY the observable user-facing effect, never the internal
+      mechanics: mcp install now writes an env block so write, Aura and credential
+      access actually work for Claude Desktop - a typed --rw enables all three, or
+      scope them with the new --allow-writes, --allow-aura and
+      --allow-credential-write flags; previously these were unreachable without
+      --bundle. Also note that mcp check now flags a pre-existing gate-less entry as
+      drift.
+
+      Kind is Patch, confirmed with the user: the headline is a fix (the capability
+      was unreachable), and the new flags exist to serve that fix.
+
+      Verify the claim before writing it - diff the actual asserted env map from
+      task-003 rather than describing what the code was supposed to do.
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - 'Exactly one new file under .changes/unreleased/ with kind Patch'
+      - 'The body states only observable effects: working gates, the three new flags, the mcp check drift signal'
+      - 'The body mentions no internal mechanics (no mcpenv.go, no constant refactor)'
+      - 'Every claim in the body is verified against an actual test assertion'
+    completed_at: 2026-08-14T15:26:16Z
+
+  - id: task-009
+    title: 'Run the full gate suite and confirm no policy.golden or bundle drift'
+    description: |
+      Run the repo gates: `make test`, `make fmt-check`, `make lint` - all three must
+      pass. fmt-check runs gofmt -l . and fails on any output.
+
+      Then confirm the two generated artifacts did NOT drift. No command is added or
+      renamed by this feature, and the mcp subtree is flag-gated (gen/main.go builds
+      the tree over an empty MemMapFs with flags off), so both
+      neo4j-cli/internal/subcommands/mcp/server/testdata/policy.golden and the
+      committed skill bundle should be untouched. Confirm rather than assume: run
+      `make generate-check` on a clean tree with any NEO4J_CLI_FLAG_* unset in the
+      shell, since env binding still applies and a stray flag var would drift the
+      bundle.
+
+      If either artifact does drift, stop and work out why before regenerating - an
+      unexpected diff here means the change touched the command surface in a way this
+      feature did not intend.
+    status: completed
+    dependencies:
+      - task-002
+      - task-006
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - 'make test, make fmt-check and make lint all pass'
+      - 'git diff shows NO change to mcp/server/testdata/policy.golden'
+      - 'make generate-check is clean on a committed tree with NEO4J_CLI_FLAG_* unset'
+      - 'manifest_test.go is still unmodified relative to main'
+    completed_at: 2026-08-14T13:30:49Z
+
+  - id: task-010
+    title: 'Verify end-to-end against real Claude Desktop'
+    description: |
+      Unit tests cannot prove this feature works - every link in the chain from the
+      written env to server.Gates can break with the suite still green. This is the
+      only check that matters.
+
+      Back up the real config first; it holds a genuine neo4j-data-modeling entry that
+      must survive the surgical merge:
+
+        make build
+        cp ~/Library/Application\ Support/Claude/claude_desktop_config.json /tmp/cdc.bak
+        ./bin/neo4j-cli mcp install --agent claude-desktop --rw
+        # inspect: neo4j-cli entry has the 5-key env block; neo4j-data-modeling intact
+        ./bin/neo4j-cli mcp check --format json     # expect status ok
+
+      Then restart Claude Desktop and confirm a write tool call actually succeeds - it
+      cannot today, which is the whole point of the feature. Also confirm the
+      connector appears and starts, proving NEO4J_CLI_FLAG_MCP_SERVER=1 in the env
+      block does its job.
+
+      Finally check `./bin/neo4j-cli mcp remove --agent claude-desktop --rw` cleans up.
+      Restore from /tmp/cdc.bak if anything looks wrong.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - 'The written entry has all five env keys with gates "true" after a typed --rw'
+      - 'The pre-existing neo4j-data-modeling entry and unrelated top-level keys survive'
+      - 'mcp check reports ok for the freshly written entry'
+      - 'After a Desktop restart the connector starts and a write tool call SUCCEEDS (it fails today)'
+      - 'mcp remove cleans the entry back out and the real config is left intact'
+    completed_at: 2026-08-14T13:37:38Z
+
+  - id: task-011
+    title: 'Seed manifest user_config defaults from the resolved gate flags'
+    description: |
+      `mcp install --bundle` ignores the three gate flags entirely. runInstallBundle
+      (install.go:210) receives `gates skill.MCPGates` but only uses them in the
+      openFile-failure FALLBACK path - the actual bundle generation calls
+      GenerateBundle(bundlePath) (manifest.go:82), which takes no gates parameter at
+      all. So newManifest(binPath) always emits user_config defaults of
+      `Default: false` for allow_writes / allow_aura / allow_credential_write no
+      matter what the user typed, and `--bundle --rw` produces a Desktop extension
+      whose config UI shows all three toggles OFF. The user hit this testing locally.
+
+      This was a deliberate design decision, not an oversight: install.go's Long
+      currently asserts "With --bundle these flags have no effect -- the settings
+      screen controls the gates instead." That claim is the wrong call and must be
+      REPLACED, not defended. If you type --rw, the toggles should arrive on.
+
+      Decision: seed the manifest's user_config Defaults from the resolved gates.
+      `--bundle --rw` -> all three toggles ON; `--bundle --rw --allow-writes` ->
+      writes ON, other two off. They stay user-editable in the settings screen
+      afterward, so this changes the STARTING state only.
+
+      Thread gates into GenerateBundle(path) and newManifest(binPath) and use them
+      for the three boolean Default: fields. Keep the ${user_config.*} template
+      VALUES in Server.MCPConfig.Env exactly as they are - those read the toggles at
+      runtime and must not become literals. Only the user_config Defaults change.
+      runInstallBundle passes its existing `gates` through.
+
+      `mcp bundle` (bundle.go) also calls GenerateBundle and has no gate flags today.
+      Prefer consistency with `mcp install`: give it the same three flags so a
+      hand-generated bundle can be seeded the same way, unless something in the repo
+      makes that wrong - in which case pass all-false explicitly and say why.
+
+      manifest_test.go must now be updated. It has been the byte-identical regression
+      guard for this whole feature (task-002 forbade touching it), but the defaults
+      becoming gate-dependent is exactly the intended change here, so editing it is
+      legitimate THIS TIME. Keep its existing assertions on name, display_name and
+      the env template values intact - those must still not drift - and add coverage
+      that the three user_config defaults track the passed gates. Update the
+      openTestBundle / readTestManifest helpers in mcp_helpers_test.go if the
+      signature change reaches them.
+    status: completed
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - 'GenerateBundle and newManifest take gates; runInstallBundle passes its resolved gates through'
+      - '--bundle --rw yields user_config defaults true/true/true; --bundle --rw --allow-writes yields true/false/false'
+      - 'Server.MCPConfig.Env still holds the ${user_config.*} template strings, unchanged'
+      - 'manifest_test.go still asserts name "neo4j-cli", display_name "Neo4j CLI" and the env template values'
+      - 'New test coverage asserts the three user_config defaults track the passed gates'
+      - 'mcp bundle behaviour is implemented deliberately (same flags, or all-false with a stated reason)'
+    completed_at: 2026-08-14T14:35:01Z
+
+  - id: task-012
+    title: 'Correct the install Long text and the changelog for bundle-mode gates'
+    description: |
+      install.go's Long claims "With --bundle these flags have no effect -- the
+      settings screen controls the gates instead." After task-011 that is false.
+      Replace it with what actually happens: the flags seed the initial toggle state
+      in the extension's settings screen, which still controls the gates afterward.
+      Do not merely soften the sentence - a reader must come away knowing that
+      --bundle --rw arrives with the toggles on.
+
+      Keep the rest of the Long accurate: the --rw implication rule, the three flags
+      and what each unlocks, the config-vs-bundle difference, and the permanent
+      limitation that config mode has no display name or settings screen. Keep the
+      Example block flush-left with >=2 invocations, a `# comment` per invocation,
+      the neo4j-cli prefix and --rw on writes (gate:
+      TestAllLeafCommands_HaveExamples). If `mcp bundle` gained flags in task-011,
+      its own Long and Example need the same treatment.
+
+      Then handle the changelog. .changes/unreleased/neo4j-cli-Patch-20260814-152616.yaml
+      already describes the config-mode env block and the three flags. Judge whether
+      amending that body to also cover bundle-mode seeding is more appropriate than
+      adding a second entry - one coherent user-facing statement is usually better
+      than two fragments describing one feature. Per AGENTS.md the body states only
+      observable user-facing impact, never internal mechanics, and every claim must
+      be verified against a real test assertion rather than described from intent.
+    status: completed
+    source: review
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - 'The "these flags have no effect with --bundle" claim is gone from install.go Long'
+      - 'Long states that the flags seed the initial toggle state and the settings screen still controls them'
+      - 'Example blocks remain flush-left and TestAllLeafCommands_HaveExamples passes'
+      - 'The changelog covers bundle-mode seeding, as one coherent entry rather than two fragments'
+      - 'Every changelog claim is verified against a test assertion, not intent'
+    completed_at: 2026-08-14T14:35:01Z
