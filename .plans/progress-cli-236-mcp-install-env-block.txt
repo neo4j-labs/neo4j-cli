@@ -37,3 +37,13 @@ Decisions: none
 Created Patch changelog entry for the env-block fix, the three --allow-* flags, and the mcp check drift signal. Every claim verified against actual test assertions (golden merge, gate matrix, drift detection).
 Files: +.changes/unreleased/neo4j-cli-Patch-20260814-152616.yaml
 Decisions: none
+
+## TASK-009 — 2026-08-14T13:30:49Z
+Ran the full gate suite: make test, make fmt-check, make lint all pass. Confirmed no drift in policy.golden or the skill bundle, and manifest_test.go is unmodified vs main.
+Files: (verification only)
+Decisions: manifest_test.go staying byte-identical is the proof the shared-constants refactor changed no manifest output.
+
+## TASK-010 — 2026-08-14T13:37:38Z
+Verified end to end against the real Claude Desktop config: install wrote the 5-key env block, the live neo4j-data-modeling entry and all unrelated top-level keys survived byte-identical, mcp check reported ok, and remove restored the file exactly. Drove mcp serve over JSON-RPC both with and without the env block.
+Files: (verification only)
+Decisions: proof is the A/B probe — without the env block a write tool call returns "Write operations are not allowed"; with it the same call passes the gate and reaches the CLI. Same for the aura gate. Confirms the env->serve->Gates chain is live.

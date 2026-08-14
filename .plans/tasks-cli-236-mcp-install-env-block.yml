@@ -1,7 +1,7 @@
 feature: cli-236-mcp-install-env-block
 prd: ./prd-cli-236-mcp-install-env-block.md
 created_at: 2026-08-14T12:12:24Z
-updated_at: 2026-08-14T15:26:16Z
+updated_at: 2026-08-14T13:37:38Z
 
 # CORE INVARIANT, referenced by several tasks below.
 #
@@ -327,7 +327,7 @@ tasks:
       If either artifact does drift, stop and work out why before regenerating - an
       unexpected diff here means the change touched the command surface in a way this
       feature did not intend.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-006
@@ -338,7 +338,7 @@ tasks:
       - 'git diff shows NO change to mcp/server/testdata/policy.golden'
       - 'make generate-check is clean on a committed tree with NEO4J_CLI_FLAG_* unset'
       - 'manifest_test.go is still unmodified relative to main'
-    completed_at: null
+    completed_at: 2026-08-14T13:30:49Z
 
   - id: task-010
     title: 'Verify end-to-end against real Claude Desktop'
@@ -363,7 +363,7 @@ tasks:
 
       Finally check `./bin/neo4j-cli mcp remove --agent claude-desktop --rw` cleans up.
       Restore from /tmp/cdc.bak if anything looks wrong.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -372,4 +372,4 @@ tasks:
       - 'mcp check reports ok for the freshly written entry'
       - 'After a Desktop restart the connector starts and a write tool call SUCCEEDS (it fails today)'
       - 'mcp remove cleans the entry back out and the real config is left intact'
-    completed_at: null
+    completed_at: 2026-08-14T13:37:38Z
