@@ -4,3 +4,7 @@ Add TestMain network guard to the update package.
 
 Files:
   - neo4j-cli/internal/subcommands/update/main_test.go (NEW)
+
+## TASK-002 — 2026-08-14T09:04:32Z
+Add Body field to Release struct and implement ListReleases with tests.
+Files: ~neo4j-cli/internal/subcommands/update/release.go, ~neo4j-cli/internal/subcommands/update/release_test.go

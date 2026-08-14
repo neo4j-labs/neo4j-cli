@@ -73,6 +73,7 @@ type Release struct {
 	TagName    string `json:"tag_name"`
 	Draft      bool   `json:"draft"`
 	Prerelease bool   `json:"prerelease"`
+	Body       string `json:"body"`
 }
 
 // AssetURLs is the pair of URLs needed to fetch + verify a release asset.
@@ -131,6 +132,31 @@ func GetByTag(ctx context.Context, tag string) (*Release, error) {
 		}
 	}
 	return nil, ErrTagNotFound
+}
+
+// ListReleases returns all non-draft releases matching the pre-release filter,
+// newest first (API order). Applies the same three filters Latest uses: skip
+// drafts, skip non-semver tags, skip prereleases unless preReleases is true.
+func ListReleases(ctx context.Context, preReleases bool) ([]Release, error) {
+	releases, err := fetchReleases(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := releases[:0]
+	for _, r := range releases {
+		if r.Draft {
+			continue
+		}
+		if !semver.IsValid(r.TagName) {
+			continue
+		}
+		if !preReleases && semver.Prerelease(r.TagName) != "" {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	return filtered, nil
 }
 
 // fetchReleases hits the GitHub REST API and decodes the response. Honors
