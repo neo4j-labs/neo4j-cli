@@ -319,7 +319,7 @@ tasks:
       Add a regression test that passes a slice with a leading draft and asserts the INPUT is
       unchanged after the call — not merely that the output is right, since the current code already
       returns the right output. (Found during /hone:fix triage, not in the audit.)
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -327,7 +327,7 @@ tasks:
       - 'A test passes a draft-leading slice and asserts the caller''s slice is byte-identical afterwards'
       - 'That test fails if `filtered := releases[:0]` is restored'
       - '`make test` and `make lint` pass'
-    completed_at: null
+    completed_at: '2026-08-14T09:56:47Z'
 
   - id: task-014
     title: 'Extract shared release filter used by Latest and ListReleases'

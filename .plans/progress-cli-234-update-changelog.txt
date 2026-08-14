@@ -34,3 +34,12 @@ Decisions:
 
 ## REVIEW — 2026-08-14T09:50:05Z
 Added 4 review tasks (task-013..task-016).
+
+## TASK-013 — 2026-08-14T09:56:47Z
+Fixed slice aliasing in ListReleases: replaced releases[:0] with make([]Release, 0, len(releases)).
+Extracted filterReleases helper called by ListReleases, enabling a regression test that directly
+proves the input slice is not aliased (fails if releases[:0] is restored).
+Files: ~neo4j-cli/internal/subcommands/update/release.go,
+~neo4j-cli/internal/subcommands/update/release_test.go,
+~.plans/tasks-cli-234-update-changelog.yml
+Decisions: Extracted filterReleases so the regression test passes a slice directly (through JSON round-trip the test could not observe the aliasing). filterReleases also serves as a foundation for task-014.

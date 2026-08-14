@@ -553,6 +553,22 @@ func TestListReleases_SkipsNonSemverTags(t *testing.T) {
 	assert.Equal(t, "v0.0.5", got[0].TagName)
 }
 
+func TestFilterReleases_InputNotAliased(t *testing.T) {
+	input := []Release{
+		{TagName: "v3.0.0", Draft: true},
+		{TagName: "v2.0.0", Draft: false},
+		{TagName: "v1.0.0", Draft: false},
+	}
+	inputCopy := make([]Release, len(input))
+	copy(inputCopy, input)
+
+	got := filterReleases(input, false)
+	require.Len(t, got, 2)
+	assert.Equal(t, "v2.0.0", got[0].TagName)
+	assert.Equal(t, "v1.0.0", got[1].TagName)
+	assert.Equal(t, inputCopy, input, "filterReleases must not alias its input backing array")
+}
+
 // TestLatest_HostInURLNotInError ensures the API URL host (where the token
 // is sent as a Bearer header) does not accidentally appear with the token in
 // any error message — it's belt-and-suspenders alongside the explicit

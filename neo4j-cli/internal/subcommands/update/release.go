@@ -142,8 +142,13 @@ func ListReleases(ctx context.Context, preReleases bool) ([]Release, error) {
 	if err != nil {
 		return nil, err
 	}
+	return filterReleases(releases, preReleases), nil
+}
 
-	filtered := releases[:0]
+// filterReleases applies the three-check release filter (drafts, non-semver,
+// prereleases) without aliasing the input slice's backing array.
+func filterReleases(releases []Release, preReleases bool) []Release {
+	filtered := make([]Release, 0, len(releases))
 	for _, r := range releases {
 		if r.Draft {
 			continue
@@ -156,7 +161,7 @@ func ListReleases(ctx context.Context, preReleases bool) ([]Release, error) {
 		}
 		filtered = append(filtered, r)
 	}
-	return filtered, nil
+	return filtered
 }
 
 // fetchReleases hits the GitHub REST API and decodes the response. Honors
