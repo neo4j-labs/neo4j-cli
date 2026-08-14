@@ -1,7 +1,7 @@
 feature: cli-236-mcp-install-env-block
 prd: ./prd-cli-236-mcp-install-env-block.md
 created_at: 2026-08-14T12:12:24Z
-updated_at: 2026-08-14T13:37:38Z
+updated_at: 2026-08-14T14:35:01Z
 
 # CORE INVARIANT, referenced by several tasks below.
 #
@@ -415,7 +415,7 @@ tasks:
       that the three user_config defaults track the passed gates. Update the
       openTestBundle / readTestManifest helpers in mcp_helpers_test.go if the
       signature change reaches them.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -425,7 +425,7 @@ tasks:
       - 'manifest_test.go still asserts name "neo4j-cli", display_name "Neo4j CLI" and the env template values'
       - 'New test coverage asserts the three user_config defaults track the passed gates'
       - 'mcp bundle behaviour is implemented deliberately (same flags, or all-false with a stated reason)'
-    completed_at: null
+    completed_at: 2026-08-14T14:35:01Z
 
   - id: task-012
     title: 'Correct the install Long text and the changelog for bundle-mode gates'
@@ -452,7 +452,7 @@ tasks:
       than two fragments describing one feature. Per AGENTS.md the body states only
       observable user-facing impact, never internal mechanics, and every claim must
       be verified against a real test assertion rather than described from intent.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-011
@@ -462,4 +462,4 @@ tasks:
       - 'Example blocks remain flush-left and TestAllLeafCommands_HaveExamples passes'
       - 'The changelog covers bundle-mode seeding, as one coherent entry rather than two fragments'
       - 'Every changelog claim is verified against a test assertion, not intent'
-    completed_at: null
+    completed_at: 2026-08-14T14:35:01Z

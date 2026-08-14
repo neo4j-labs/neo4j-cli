@@ -79,21 +79,34 @@ func runApp(t *testing.T, mcpEnabled bool, args ...string) (stdout, stderr *byte
 	return stdout, stderr, err
 }
 
-// openTestBundle generates a test .mcpb and returns its zip reader.
+// openTestBundle generates a test .mcpb with all gates off and returns its zip reader.
 func openTestBundle(t *testing.T) (string, *zip.ReadCloser) {
 	t.Helper()
+	return openTestBundleWithGates(t, skill.MCPGates{})
+}
+
+// openTestBundleWithGates generates a test .mcpb with the given gates and
+// returns its zip reader.
+func openTestBundleWithGates(t *testing.T, gates skill.MCPGates) (string, *zip.ReadCloser) {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.mcpb")
-	err := mcp.GenerateBundle(path)
+	err := mcp.GenerateBundle(path, gates)
 	require.NoError(t, err)
 	r, err := zip.OpenReader(path)
 	require.NoError(t, err)
 	return path, r
 }
 
-// readTestManifest generates a test .mcpb and returns the decoded manifest.
+// readTestManifest generates a test .mcpb (all gates off) and returns the decoded manifest.
 func readTestManifest(t *testing.T) (string, map[string]any) {
 	t.Helper()
-	path, r := openTestBundle(t)
+	return readTestManifestWithGates(t, skill.MCPGates{})
+}
+
+// readTestManifestWithGates generates a test .mcpb with the given gates and returns the decoded manifest.
+func readTestManifestWithGates(t *testing.T, gates skill.MCPGates) (string, map[string]any) {
+	t.Helper()
+	path, r := openTestBundleWithGates(t, gates)
 	defer func() { _ = r.Close() }()
 	data := readZipFile(t, r, "manifest.json")
 	var manifest map[string]any

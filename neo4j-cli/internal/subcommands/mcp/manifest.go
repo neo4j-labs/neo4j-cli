@@ -79,13 +79,17 @@ type mcpbCompatibility struct {
 // to path. The manifest embeds this binary's absolute path so the connector
 // points at the generating CLI. task-016 reuses this function to write into the
 // user cache dir rather than duplicating manifest construction.
-func GenerateBundle(path string) error {
+//
+// gates seed the user_config Defaults for allow_writes / allow_aura /
+// allow_credential_write, so a generated bundle arrives with the intended
+// toggle state. The defaults are still user-editable in the settings screen.
+func GenerateBundle(path string, gates skill.MCPGates) error {
 	binPath, err := os.Executable()
 	if err != nil {
 		return err
 	}
 
-	manifest := newManifest(binPath)
+	manifest := newManifest(binPath, gates)
 	manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return err
@@ -129,7 +133,13 @@ func GenerateBundle(path string) error {
 // newManifest builds the manifest.json content. The icon field is deliberately
 // omitted — the repo ships no image assets and third-party logo mirrors are
 // not acceptable provenance for a committed brand asset (REQ-F-038a).
-func newManifest(binPath string) *mcpbManifest {
+//
+// gates seed the user_config Defaults for the three capability toggles. The
+// Server.MCPConfig.Env block keeps ${user_config.*} template values (read at
+// runtime by the spawned server) while the Defaults here are write-once — the
+// two look inconsistent until you know the templates are evaluated per-invocation
+// and the defaults are a starting state only.
+func newManifest(binPath string, gates skill.MCPGates) *mcpbManifest {
 	tools := make([]map[string]string, 0, len(server.ToolDefinitions()))
 	for _, t := range server.ToolDefinitions() {
 		tools = append(tools, map[string]string{"name": t.Name})
@@ -177,19 +187,19 @@ func newManifest(binPath string) *mcpbManifest {
 			},
 			"allow_writes": {
 				Type:        "boolean",
-				Default:     false,
+				Default:     gates.AllowWrites,
 				Title:       "Allow writes",
 				Description: "Let the assistant modify your databases. Off by default.",
 			},
 			"allow_aura": {
 				Type:        "boolean",
-				Default:     false,
+				Default:     gates.AllowAura,
 				Title:       "Allow Aura provisioning",
 				Description: "Let the assistant create, modify and delete Aura instances. Off by default.",
 			},
 			"allow_credential_write": {
 				Type:        "boolean",
-				Default:     false,
+				Default:     gates.AllowCredentialWrite,
 				Title:       "Allow credential management",
 				Description: "Let the assistant add and remove stored credentials. Off by default.",
 			},

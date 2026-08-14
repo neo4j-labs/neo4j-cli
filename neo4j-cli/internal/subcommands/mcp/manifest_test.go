@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/neo4j/cli/common/skill"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -256,6 +257,49 @@ func TestGenerateBundle_READMEHasPrivacyPolicy(t *testing.T) {
 	content := readZipFile(t, r, "README.md")
 	assert.Contains(t, string(content), "Privacy Policy")
 	assert.Contains(t, string(content), "neo4j.com/privacy-policy")
+}
+
+// TestGenerateBundle_GateDefaultsTrackPassedGates verifies that the three
+// user_config boolean fields (allow_writes, allow_aura, allow_credential_write)
+// have Default values matching the passed MCPGates, not hardcoded false.
+func TestGenerateBundle_GateDefaultsTrackPassedGates(t *testing.T) {
+	tests := []struct {
+		name   string
+		gates  skill.MCPGates
+		writes bool
+		aura   bool
+		cred   bool
+	}{
+		{"all off", skill.MCPGates{}, false, false, false},
+		{"all on", skill.MCPGates{AllowWrites: true, AllowAura: true, AllowCredentialWrite: true}, true, true, true},
+		{"writes only", skill.MCPGates{AllowWrites: true}, true, false, false},
+		{"aura only", skill.MCPGates{AllowAura: true}, false, true, false},
+		{"cred only", skill.MCPGates{AllowCredentialWrite: true}, false, false, true},
+		{"writes+aura", skill.MCPGates{AllowWrites: true, AllowAura: true}, true, true, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, manifest := readTestManifestWithGates(t, tt.gates)
+			uc, ok := manifest["user_config"].(map[string]any)
+			require.True(t, ok)
+
+			aw, ok := uc["allow_writes"].(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, tt.writes, aw["default"],
+				"allow_writes default should be %v", tt.writes)
+
+			aa, ok := uc["allow_aura"].(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, tt.aura, aa["default"],
+				"allow_aura default should be %v", tt.aura)
+
+			ac, ok := uc["allow_credential_write"].(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, tt.cred, ac["default"],
+				"allow_credential_write default should be %v", tt.cred)
+		})
+	}
 }
 
 // TestGenerateBundle_ValidatedSchema runs the bundle through the full

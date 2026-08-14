@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Patch
-body: '`mcp install` now writes an env block, so write / Aura / credential access actually works with Claude Desktop in config mode (previously unreachable without --bundle). A typed `--rw` enables all three gates; the new `--allow-writes`, `--allow-aura`, and `--allow-credential-write` flags scope them individually. `mcp check` now reports a pre-existing entry without the env block as drift.'
+body: '`mcp install` now writes an env block, so write / Aura / credential access actually works with Claude Desktop in config mode (previously unreachable without --bundle). A typed `--rw` enables all three gates; the new `--allow-writes`, `--allow-aura`, and `--allow-credential-write` flags scope them individually. In bundle mode the flags seed the extension settings toggles instead of being ignored. `mcp check` reports a pre-existing entry without the env block as drift.'
 time: 2026-08-14T15:26:16.568949+02:00

@@ -50,3 +50,13 @@ Decisions: proof is the A/B probe — without the env block a write tool call re
 
 ## REVIEW — 2026-08-14T14:19:03Z
 Added 2 review tasks (task-011..task-012).
+
+## TASK-011 — 2026-08-14T14:35:01Z
+Threaded gates into GenerateBundle/newManifest; added the three --allow-* flags to mcp bundle; new test asserts user_config defaults track passed gates. Env template values unchanged.
+Files: ~manifest.go, ~manifest_test.go, ~mcp_helpers_test.go, ~install.go, ~bundle.go
+Decisions: bundle.go replicates the same three flags as install.go and reuses resolveInstallGates to match install's behaviour.
+
+## TASK-012 — 2026-08-14T14:35:01Z
+Corrected install.go Long and flag usage strings to say flags seed bundle toggle state instead of having no effect; made bundle.go Example flush-left; amended changelog to cover bundle-mode seeding.
+Files: ~install.go, ~bundle.go, ~.changes/unreleased/neo4j-cli-Patch-20260814-152616.yaml
+Decisions: dropped the "(no effect with --bundle)" parenthetical from flag usage strings rather than adding a longer one; the Long covers both modes.

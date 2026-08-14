@@ -67,8 +67,9 @@ func newInstallCmd(cfg *clicfg.Config) *cobra.Command {
 			"--rw lets this command modify your config file, and by implication " +
 			"enables all three capabilities above. Naming any single " +
 			"--allow-* flag switches to explicit mode: only the capabilities you " +
-			"name are enabled. With --bundle these flags have no effect -- the " +
-			"settings screen controls the gates instead.\n\n" +
+			"name are enabled. In bundle mode the flags seed the initial toggle " +
+			"state in the extension's settings screen, which still controls the " +
+			"gates afterward.\n\n" +
 			"If opening the bundle file fails for any reason, install falls back to " +
 			"the config write and reports the method it actually used.\n\n" +
 			"Use --agent <name> (case-insensitive) to scope to one agent, or omit " +
@@ -97,11 +98,11 @@ neo4j-cli mcp install --agent claude-desktop --format json --rw`,
 	cmd.Flags().BoolVar(&installAll, "all", false, "Install into every detected MCP agent.")
 	cmd.Flags().BoolVar(&useBundle, "bundle", false, "Generate a .mcpb bundle and open it instead of writing the config directly.")
 	cmd.Flags().Bool("allow-writes", false,
-		"Allow write operations through MCP server (no effect with --bundle)")
+		"Allow write operations through MCP server")
 	cmd.Flags().Bool(server.AllowAuraFlag, false,
-		"Allow Aura resource operations through MCP server (no effect with --bundle)")
+		"Allow Aura resource operations through MCP server")
 	cmd.Flags().Bool(server.AllowCredentialWriteFlag, false,
-		"Allow credential writes through MCP server (no effect with --bundle)")
+		"Allow credential writes through MCP server")
 	return cmd
 }
 
@@ -217,7 +218,7 @@ func runInstallBundle(a *skill.Agent, binPath string, fs afero.Fs, gates skill.M
 		return "", clierr.NewFatalError("cannot create bundle directory: %s", err.Error())
 	}
 	bundlePath := filepath.Join(bundleDir, "neo4j-cli.mcpb")
-	if err := GenerateBundle(bundlePath); err != nil {
+	if err := GenerateBundle(bundlePath, gates); err != nil {
 		return "", clierr.NewFatalError("cannot generate MCP bundle: %s", err.Error())
 	}
 	if err := openFileFn(bundlePath); err != nil {
