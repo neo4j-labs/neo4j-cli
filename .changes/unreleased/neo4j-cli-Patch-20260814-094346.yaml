@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Patch
-body: 'instance create/deploy/load: --graph-analytics-plugin on a professional instance now actually enables the GDS plugin (graph_analytics: plugin). Previously the flag was silently ignored by the v2beta1 API and every professional instance defaulted to graph_analytics: serverless regardless of the flag.'
+body: 'instance create/deploy/load: --graph-analytics-plugin on a professional instance now actually enables the GDS plugin (graph_analytics: plugin). Previously the flag was silently ignored by the v2beta1 API and every professional instance defaulted to graph_analytics: serverless regardless of the flag. --region help text and the create Long description no longer point to the removed project get configuration-discovery output.'
 time: 2026-08-14T09:43:46.532195+01:00

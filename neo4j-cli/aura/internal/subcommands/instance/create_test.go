@@ -126,7 +126,7 @@ func TestCreateProfessionalInstance(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false,"graph_analytics":"unavailable"}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -293,7 +293,7 @@ func TestCreateAcceptsLegacyInstanceTypeAliases(t *testing.T) {
 			legacyType:       "professional-db",
 			canonicalType:    "professional",
 			extraFlags:       " --region europe-west1 --cloud-provider gcp --memory 4GB",
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false,"graph_analytics":"unavailable"}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false}`,
 		},
 		{
 			name:             "enterprise-db is sent as virtual-dedicated-cloud",
