@@ -17,3 +17,13 @@ Decisions: install.go passed a zero-value MCPGates as a placeholder, replaced in
 Added --allow-writes/--allow-aura/--allow-credential-write to mcp install and resolveInstallGates, which reads --rw by VALUE and the --allow-* flags by Changed. Matrix test covers all 6 rows; a new end-to-end test asserts the env block actually written to the agent config.
 Files: ~neo4j-cli/internal/subcommands/mcp/install.go, ~neo4j-cli/internal/subcommands/mcp/install_test.go, ~neo4j-cli/internal/subcommands/mcp/mcp_helpers_test.go, +neo4j-cli/internal/subcommands/mcp/export_test.go
 Decisions: --rw read by VALUE not Changed — RequireWriteAccess only waives the gate, never sets the flag, so Changed would enable all three gates on an explicit --rw=false. Matrix test alone tests resolution in isolation; added newMCPInstallFixtureFS + an end-to-end test because the flags-to-disk wiring is what actually decides whether Desktop can write.
+
+## TASK-005 — 2026-08-14T13:05:00Z
+runInstallOne now returns the method actually used instead of deriving it from useBundle; runInstallBundle falls back to the config write when openFile fails, surfacing the .mcpb path. Added an openFileFn test seam.
+Files: ~neo4j-cli/internal/subcommands/mcp/install.go, ~neo4j-cli/internal/subcommands/mcp/install_test.go, ~neo4j-cli/internal/subcommands/mcp/export_test.go
+Decisions: when both open and the config fallback fail, the ORIGINAL open error is returned — it names the actual cause.
+
+## TASK-006 — 2026-08-14T13:14:54Z
+mcp check now reports drift when an installed entry's env block lacks the manifest marker, so pre-existing gate-dead installs get a signal. Added readMCPConfigEnv plus InstalledHasMCPManifest on AgentInstall.
+Files: ~neo4j-cli/internal/subcommands/mcp/check.go, ~neo4j-cli/internal/subcommands/mcp/check_test.go, ~common/skill/mcpconfig.go, ~common/skill/mcpconfig_test.go, ~common/skill/installer.go
+Decisions: path drift and env drift both report the single "drift" status — the remediation (mcp install refresh) is identical for both.

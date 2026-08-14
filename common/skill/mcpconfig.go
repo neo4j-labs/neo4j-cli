@@ -34,6 +34,7 @@ func MCPList(fs afero.Fs) []AgentInstall {
 		// config; we store it so check can compare against the current binary.
 		if installed {
 			row.InstalledVersion = readMCPCommandPath(fs, a)
+			row.InstalledHasMCPManifest = readMCPConfigEnv(fs, a)
 		}
 		out = append(out, row)
 	}
@@ -57,6 +58,22 @@ func readMCPCommandPath(fs afero.Fs, a *Agent) string {
 	}
 	cmd, _ := entry["command"].(string)
 	return cmd
+}
+
+// readMCPConfigEnv reports whether the neo4j-cli entry's env block has the
+// manifest marker (NEO4J_CLI_MCP_MANIFEST=1). Returns false when the entry,
+// the env block, or the config file is absent or unparseable.
+func readMCPConfigEnv(fs afero.Fs, a *Agent) bool {
+	entry, found := readMCPConfigServerEntry(fs, a)
+	if !found {
+		return false
+	}
+	env, _ := entry["env"].(map[string]any)
+	if env == nil {
+		return false
+	}
+	marker, _ := env[EnvMCPManifest].(string)
+	return marker == "1"
 }
 
 // InstallMCPConfig surgically merges the neo4j-cli server entry into the

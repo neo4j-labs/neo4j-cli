@@ -220,6 +220,7 @@ func TestMCPList_OrderAndDetection(t *testing.T) {
 	assert.True(t, installs[0].Detected)
 	assert.True(t, installs[0].Installed)
 	assert.Equal(t, "/usr/local/bin/neo4j-cli", installs[0].InstalledVersion)
+	assert.True(t, installs[0].InstalledHasMCPManifest, "fresh install must have manifest env marker")
 }
 
 func TestMCPList_NotDetected(t *testing.T) {
@@ -435,6 +436,105 @@ func TestWriteMCPConfig_CrossPlatform(t *testing.T) {
 			assertFullEnv(t, entry, false, false, false)
 		})
 	}
+}
+
+func TestReadMCPConfigEnv(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	t.Setenv("HOME", "/Users/test")
+
+	a := &Agent{
+		Name:      "claude-desktop",
+		MCPConfig: "$APP_SUPPORT/Claude/claude_desktop_config.json",
+	}
+	configPath, ok := a.MCPConfigPath()
+	require.True(t, ok)
+	require.NoError(t, fs.MkdirAll(filepath.Dir(configPath), 0755))
+
+	t.Run("no config file", func(t *testing.T) {
+		assert.False(t, readMCPConfigEnv(fs, a), "absent file -> false")
+	})
+
+	// Write config with neo4j-cli entry but no env block
+	t.Run("no env block", func(t *testing.T) {
+		fs2 := afero.NewMemMapFs()
+		t.Setenv("HOME", "/Users/test")
+		cp, ok := a.MCPConfigPath()
+		require.True(t, ok)
+		require.NoError(t, fs2.MkdirAll(filepath.Dir(cp), 0755))
+		config := map[string]any{
+			"mcpServers": map[string]any{
+				"neo4j-cli": map[string]any{
+					"command": "/usr/local/bin/neo4j-cli",
+					"args":    []any{"mcp", "serve"},
+				},
+			},
+		}
+		data, err := json.MarshalIndent(config, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, afero.WriteFile(fs2, cp, data, 0644))
+		assert.False(t, readMCPConfigEnv(fs2, a), "entry without env -> false")
+	})
+
+	t.Run("env block missing manifest marker", func(t *testing.T) {
+		fs2 := afero.NewMemMapFs()
+		t.Setenv("HOME", "/Users/test")
+		cp, ok := a.MCPConfigPath()
+		require.True(t, ok)
+		require.NoError(t, fs2.MkdirAll(filepath.Dir(cp), 0755))
+		config := map[string]any{
+			"mcpServers": map[string]any{
+				"neo4j-cli": map[string]any{
+					"command": "/usr/local/bin/neo4j-cli",
+					"args":    []any{"mcp", "serve"},
+					"env": map[string]any{
+						"NEO4J_CLI_FLAG_MCP_SERVER": "1",
+					},
+				},
+			},
+		}
+		data, err := json.MarshalIndent(config, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, afero.WriteFile(fs2, cp, data, 0644))
+		assert.False(t, readMCPConfigEnv(fs2, a), "env without manifest marker -> false")
+	})
+
+	t.Run("env block with manifest marker", func(t *testing.T) {
+		fs2 := afero.NewMemMapFs()
+		t.Setenv("HOME", "/Users/test")
+		cp, ok := a.MCPConfigPath()
+		require.True(t, ok)
+		require.NoError(t, fs2.MkdirAll(filepath.Dir(cp), 0755))
+		config := map[string]any{
+			"mcpServers": map[string]any{
+				"neo4j-cli": map[string]any{
+					"command": "/usr/local/bin/neo4j-cli",
+					"args":    []any{"mcp", "serve"},
+					"env": map[string]any{
+						EnvMCPManifest: "1",
+					},
+				},
+			},
+		}
+		data, err := json.MarshalIndent(config, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, afero.WriteFile(fs2, cp, data, 0644))
+		assert.True(t, readMCPConfigEnv(fs2, a), "env with manifest marker -> true")
+	})
+
+	t.Run("entry absent", func(t *testing.T) {
+		fs2 := afero.NewMemMapFs()
+		t.Setenv("HOME", "/Users/test")
+		cp, ok := a.MCPConfigPath()
+		require.True(t, ok)
+		require.NoError(t, fs2.MkdirAll(filepath.Dir(cp), 0755))
+		config := map[string]any{
+			"mcpServers": map[string]any{"other-tool": map[string]any{"command": "/x"}},
+		}
+		data, err := json.MarshalIndent(config, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, afero.WriteFile(fs2, cp, data, 0644))
+		assert.False(t, readMCPConfigEnv(fs2, a), "no neo4j-cli entry -> false")
+	})
 }
 
 // noGates returns the default all-off gate set for test brevity.

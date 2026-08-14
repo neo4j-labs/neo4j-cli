@@ -49,10 +49,11 @@ var frontmatterRe = regexp.MustCompile(`(?s)\A---\r?\n(.*?)\r?\n---(\r?\n|\z)`)
 
 // AgentInstall describes the per-agent state surfaced by List.
 type AgentInstall struct {
-	Agent            *Agent
-	Detected         bool   // DetectDir exists on disk
-	Installed        bool   // SKILL.md present in this agent's skills dir
-	InstalledVersion string // value of the `version:` frontmatter line, "" if not installed or unparseable
+	Agent                   *Agent
+	Detected                bool   // DetectDir exists on disk
+	Installed               bool   // SKILL.md present in this agent's skills dir
+	InstalledVersion        string // value of the `version:` frontmatter line, "" if not installed or unparseable
+	InstalledHasMCPManifest bool   // MCP-only: env block in config has NEO4J_CLI_MCP_MANIFEST=1
 }
 
 // Install copies `src.FS` into each target agent's skills directory under
