@@ -48,3 +48,7 @@ Decisions: Extracted filterReleases so the regression test passes a slice direct
 Pointed Latest at the shared filterReleases helper, removing the only duplicated inlined three-check loop.
 Files: ~neo4j-cli/internal/subcommands/update/release.go,
 ~.plans/tasks-cli-234-update-changelog.yml
+
+## TASK-015 — 2026-08-14T10:02:35Z
+Added doc comment to runOpts.check noting only update check sets it; parent update always passes false.
+Files: ~neo4j-cli/internal/subcommands/update/update.go

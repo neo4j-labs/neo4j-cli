@@ -151,6 +151,8 @@ neo4j-cli update --no-changelog`,
 // exported API.
 type runOpts struct {
 	preReleases bool
+	// check is set only by `update check` (check.go). When true, runUpdate
+	// prints version info and returns before reaching the swap path.
 	check       bool
 	version     string
 	force       bool

@@ -369,13 +369,13 @@ tasks:
       leaves it false. Add a one-line comment saying so, matching the surrounding comment density.
 
       Trivial and comment-only, so no behaviour change and no new test.
-    status: in_progress
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
       - '`runOpts.check` has a doc comment naming `update check` as its only setter'
       - 'No behaviour change; `make test` and `make fmt-check` pass'
-    completed_at: null
+    completed_at: '2026-08-14T10:02:35Z'
 
   - id: task-016
     title: 'Split update_test.go along concern boundaries'
