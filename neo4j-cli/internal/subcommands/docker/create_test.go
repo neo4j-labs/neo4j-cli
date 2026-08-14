@@ -1633,9 +1633,9 @@ func TestCreate_NoPrintPassword_DefaultStillRendersPassword(t *testing.T) {
 
 // TestCreate_NoPrintPassword_StoresCredentialForRecovery — CLI-161. With
 // --no-print-password set alone, the generated password is omitted from
-// stdout but the dbms credential is still persisted under the chosen name,
-// so `neo4j-cli credential dbms get <name>` recovers it. This is the
-// documented recovery contract.
+// stdout but the dbms credential is still persisted under the chosen name
+// so that `query` and `admin --credential <name>` can connect without the
+// plaintext.
 func TestCreate_NoPrintPassword_StoresCredentialForRecovery(t *testing.T) {
 	expectedPassword := stubRandSource(t)
 
@@ -1645,7 +1645,7 @@ func TestCreate_NoPrintPassword_StoresCredentialForRecovery(t *testing.T) {
 		"stdout must NOT contain the generated password substring; got: %q", stdout)
 
 	cred, err := cfg.Credentials.Dbms.Get("dev")
-	require.NoError(t, err, "credential must be persisted so `credential dbms get` can recover the password")
+	require.NoError(t, err, "credential must be persisted so that `query` and `admin --credential <name>` can connect without the plaintext")
 	assert.Equal(t, "neo4j", cred.Username)
 	assert.Equal(t, expectedPassword, cred.Password,
 		"stored credential must carry the generated password verbatim")

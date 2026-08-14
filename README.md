@@ -321,7 +321,15 @@ neo4j-cli docker start dev --wait --rw
 neo4j-cli docker delete dev --force --rw
 ```
 
-Heads up: the generated password is part of the standard `create` output. Redirects (`> file`) and pipes (`| tee`, `| jq`) will capture it. Pass `--password <s>` to choose the password yourself, `--no-print-password` to keep the stored credential but suppress the password from stdout (recover later with `neo4j-cli credential dbms get <name>`), or `--no-store-credential` if you want neither a stored credential nor the rendered password.
+Heads up: the generated password is part of the standard `create` output. Redirects (`> file`) and pipes (`| tee`, `| jq`) will capture it. Pass `--password <s>` to choose the password yourself, `--no-print-password` to keep the stored credential but suppress the password from stdout (the stored credential still connects via `--credential <name>` — no plaintext needed; the password is not readable through the CLI), or `--no-store-credential` if you want neither a stored credential nor the rendered password.
+
+To set a known password, reset it then resync the stored credential:
+
+```sh
+neo4j-cli admin user set-password neo4j --new-password <s> --credential <name> --rw
+neo4j-cli credential dbms remove <name>
+neo4j-cli credential dbms add --name <name> --uri neo4j://localhost:7687 --username neo4j --password <s> --rw
+```
 
 #### Persisting data across container deletes
 
