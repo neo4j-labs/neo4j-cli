@@ -62,7 +62,7 @@ neo4j-cli aura instance create --rw --name my-gcp-instance --type professional -
 
 Region identifiers follow each cloud provider's own naming convention: AWS uses identifiers such as us-east-1, Azure uses identifiers such as eastus, and GCP uses identifiers such as us-central1.
 
-If you're unsure of possible configurations, run 'project get' to discover the full list of supported configurations for your project. The output lists every valid combination of --cloud-provider, --region, --type, and --memory.
+If you're unsure of possible configurations, run 'neo4j-cli aura api v1/tenants/<project-id>' to discover the full list of supported configurations for your project. The output's instance_configurations array lists every valid combination of --cloud-provider, --region, --type, and --memory.
 
 Creating an instance is an asynchronous operation that can be waited for with --wait. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
 
@@ -137,7 +137,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().StringVar(&version, versionFlag, "5", "The Neo4j version of the instance.")
 
-	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'project get' to see the full list of supported regions for your project.")
+	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'neo4j-cli aura api v1/tenants/<project-id>' to see the full list of supported regions for your project.")
 
 	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes.")
 
