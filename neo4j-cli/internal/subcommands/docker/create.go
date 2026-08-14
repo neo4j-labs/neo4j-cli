@@ -142,8 +142,12 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"inside the container. Paths support `~` and environment-variable expansion and are resolved to absolute " +
 			"paths; missing directories are created at mode 0o755. All three volume flags are incompatible with " +
 			"--ephemeral. " +
-			"Pass --no-print-password to omit the generated password from stdout output; retrieve it later via " +
-			"`neo4j-cli credential dbms get <name>`.",
+			"Pass --no-print-password to omit the generated password from stdout output. " +
+			"The stored credential still connects via `--credential <name>` (no plaintext needed). " +
+			"The password is not readable through the CLI. " +
+			"To set a known password, run " +
+			"`admin user set-password neo4j --new-password <s> --credential <name> --rw`, " +
+			"then resync the stored credential with `credential dbms remove <name>` plus `credential dbms add`.",
 		Example: `# Create an enterprise container with auto-generated password and store a dbms credential
 neo4j-cli docker create --name dev --rw
 
@@ -433,7 +437,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().IntVar(&httpPort, httpPortFlag, 7474, "Host port to publish for the HTTP browser (container 7474). Auto-incremented along with --bolt-port if taken.")
 	cmd.Flags().StringVar(&password, passwordFlag, "", "Neo4j password. When empty, a 16-byte base64 URL-safe password is generated.")
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
-	cmd.Flags().BoolVar(&noPrintPassword, noPrintPasswordFlag, false, "Don't include the generated password in stdout output. Retrieve later via `neo4j-cli credential dbms get <name>`.")
+	cmd.Flags().BoolVar(&noPrintPassword, noPrintPasswordFlag, false, "Omit the generated password from stdout output. The stored credential still connects via --credential <name> (the password is not CLI-readable).")
 	cmd.Flags().BoolVar(&ephemeral, ephemeralFlag, false, "Run with `docker run --rm`; skip credential persistence and emit a .env blob consumable by `query --env`.")
 	cmd.Flags().StringVar(&envOutFile, envOutFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout. Writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path is replaced by a regular file.")
 	cmd.Flags().StringVar(&dataDir, dataDirFlag, "", "Host directory to bind-mount at /data inside the container. Empty = no mount (data lives in the container layer and is lost on delete). Path supports `~` and environment-variable expansion; resolved to an absolute path; created at mode 0o755 if missing. Incompatible with --ephemeral.")
