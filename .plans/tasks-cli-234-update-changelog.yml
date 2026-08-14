@@ -348,7 +348,7 @@ tasks:
       Pure refactor: existing `release_test.go` coverage (stable-only filtering, prerelease
       acceptance, draft skipping, non-semver skipping, `TestListReleases_*`) is the regression guard
       and must pass untouched.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-013
@@ -357,7 +357,7 @@ tasks:
       - '`Latest` and `GetByTag` signatures unchanged; `ErrNoStableRelease` / `no releases found` behaviour preserved'
       - 'Existing `release_test.go` tests pass with no edits to their assertions'
       - '`versioncheck` still compiles and its tests pass'
-    completed_at: null
+    completed_at: '2026-08-14T10:00:48Z'
 
   - id: task-015
     title: 'Document runOpts.check field'
@@ -369,7 +369,7 @@ tasks:
       leaves it false. Add a one-line comment saying so, matching the surrounding comment density.
 
       Trivial and comment-only, so no behaviour change and no new test.
-    status: pending
+    status: in_progress
     source: review
     dependencies: []
     acceptance_criteria:

@@ -43,3 +43,8 @@ Files: ~neo4j-cli/internal/subcommands/update/release.go,
 ~neo4j-cli/internal/subcommands/update/release_test.go,
 ~.plans/tasks-cli-234-update-changelog.yml
 Decisions: Extracted filterReleases so the regression test passes a slice directly (through JSON round-trip the test could not observe the aliasing). filterReleases also serves as a foundation for task-014.
+
+## TASK-014 — 2026-08-14T10:00:48Z
+Pointed Latest at the shared filterReleases helper, removing the only duplicated inlined three-check loop.
+Files: ~neo4j-cli/internal/subcommands/update/release.go,
+~.plans/tasks-cli-234-update-changelog.yml

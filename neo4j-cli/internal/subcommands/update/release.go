@@ -92,26 +92,15 @@ func Latest(ctx context.Context, preReleases bool) (*Release, error) {
 		return nil, err
 	}
 
-	for _, r := range releases {
-		if r.Draft {
-			continue
+	filtered := filterReleases(releases, preReleases)
+	if len(filtered) == 0 {
+		if !preReleases {
+			return nil, ErrNoStableRelease
 		}
-		if !semver.IsValid(r.TagName) {
-			// Skip non-semver tags defensively. The repo convention is vX.Y.Z
-			// but a malformed tag should not break discovery.
-			continue
-		}
-		if !preReleases && semver.Prerelease(r.TagName) != "" {
-			continue
-		}
-		rr := r
-		return &rr, nil
+		return nil, fmt.Errorf("no releases found")
 	}
-
-	if !preReleases {
-		return nil, ErrNoStableRelease
-	}
-	return nil, fmt.Errorf("no releases found")
+	r := filtered[0]
+	return &r, nil
 }
 
 // GetByTag returns the named release, or ErrTagNotFound when the tag does not
