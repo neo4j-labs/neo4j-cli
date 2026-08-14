@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Aura commands now report the API''s own error message and a non-zero exit code for HTTP 413, 415, 422 and other previously unhandled statuses, instead of a "please report an issue" message with a success exit code. A 4xx or 5xx whose body is empty or not JSON now also keeps its status-class exit code rather than reporting a generic internal failure.'
-time: 2026-08-13T11:35:00Z

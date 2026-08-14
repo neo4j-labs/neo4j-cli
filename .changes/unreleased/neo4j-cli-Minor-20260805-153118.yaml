@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: The `aura instance list` output now includes an `organization_id` field alongside `project_id`, so the owning organization of each instance is visible without a separate lookup.
-time: 2026-08-05T15:31:18.034383+02:00
