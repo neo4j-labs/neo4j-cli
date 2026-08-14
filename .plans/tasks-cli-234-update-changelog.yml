@@ -1,7 +1,7 @@
 feature: cli-234-update-changelog
 prd: ./prd-cli-234-update-changelog.md
 created_at: 2026-08-14T08:45:39Z
-updated_at: 2026-08-14T08:45:39Z
+updated_at: '2026-08-14T09:38:45Z'
 
 tasks:
   - id: task-001
@@ -66,14 +66,14 @@ tasks:
       leading `## Release notes` heading, which would otherwise sit redundantly beneath our own
       `## <tag>` header. Colocate `changelog_test.go` with table-driven cases. (REQ-F-005,
       REQ-F-006, REQ-NF-005)
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - '`changelog.go` exists with unexported `releaseNotesEntry`, `changelogURL` const, and cap const'
       - 'A body with a `---` separator is trimmed to the part above it, with a leading `## Release notes` heading stripped'
       - 'A boilerplate-only body (no `---`, or blank remainder) returns the full original body'
       - '`releaseNotesEntry` is unexported and `common/output/casing_gate_test.go` needs no new allowlist entry'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-004
     title: 'Implement changelogForRange with 3-entry cap and elided flag'
@@ -89,7 +89,7 @@ tasks:
       the full-changelog link. A downgrade (`target` older than `current`) yields an empty range by
       construction — no special-case branch. Extend `changelog_test.go`. (REQ-F-003, REQ-F-004,
       REQ-F-005, REQ-F-012, REQ-NF-003)
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -99,7 +99,7 @@ tasks:
       - 'A `current` absent from the supplied releases sets `elided` true (stale-binary case)'
       - 'Empty-body releases are skipped without consuming a cap slot; a downgrade range returns zero entries'
       - 'Prereleases are included or excluded consistently with the `preReleases` filtering already applied by `ListReleases`'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-005
     title: 'Implement printChangelog with StripControl and link line'
@@ -116,7 +116,7 @@ tasks:
       the PLAIN-TEXT path is the one needing the explicit call. Extend `changelog_test.go` with an
       ANSI/C0-laden body case and a case asserting the link line appears ONLY when `elided`.
       (REQ-F-007, REQ-F-005, REQ-NF-001)
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -125,7 +125,7 @@ tasks:
       - 'A body containing ANSI escapes and C0 bytes is neutralised in the rendered output'
       - 'The `Full changelog:` line appears when `elided` is true and is absent when false'
       - 'Output is written through the passed `*cobra.Command` so tests can capture it'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-006
     title: 'Add listReleasesFn seam, --no-changelog flag, and test-helper defaults'
@@ -143,7 +143,7 @@ tasks:
       (line 129) — one edit each, all 48 sites inherit it — and add a `withListReleases(t, fn)` helper
       for tests that DO want a changelog. `update check` must NOT gain the flag (REQ-F-013).
       (REQ-F-008, REQ-F-014, REQ-NF-002)
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -152,7 +152,7 @@ tasks:
       - '`withListReleases` exists and follows the existing `withLatest` save/restore + `t.Cleanup` pattern'
       - 'The `Example:` block is flush-left with a `#` comment per invocation and passes `TestAllLeafCommands_HaveExamples`'
       - 'All 48 existing stub sites pass with no per-test edits'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-007
     title: 'Wire changelog into runUpdate plain-text success path'
@@ -170,7 +170,7 @@ tasks:
       `refreshSkillBundles` convention (`update.go:569`), leave `releaseNotes` empty, and keep
       `updated: true` with exit code 0. Never fetch when `--no-changelog` is set.
       (REQ-F-003, REQ-F-007, REQ-F-011, REQ-F-012)
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -181,7 +181,7 @@ tasks:
       - 'A `listReleasesFn` error produces a stderr warning, empty `releaseNotes`, `updated: true`, and exit code 0'
       - '`--no-changelog` skips the fetch entirely (assert via a seam that records invocation)'
       - 'A downgrade via `--version <older>` prints no changelog'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-008
     title: 'Add release_notes and changelog_url to JSON and toon output only'
@@ -196,7 +196,7 @@ tasks:
       reads `AsArray` + `fields` (line 114). Multi-line 3 KB markdown in a grid cell is unreadable,
       hence table omits it. Both fields must be absent under `--no-changelog`.
       (REQ-F-009, REQ-F-010)
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -204,7 +204,7 @@ tasks:
       - '`--format toon` includes `release_notes` without any format-specific branch in the update package'
       - '`--format table` omits both fields and renders an intact grid'
       - '`AsArray` and `fieldOrder` are unchanged; both fields are absent under `--no-changelog`'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-009
     title: 'Update the byte-for-byte golden test and add output-format tests'
@@ -220,7 +220,7 @@ tasks:
       absent under table. Also cover the multi-version range (3 entries, no link) versus the
       stale-binary case (3 entries plus link) end-to-end through `runUpdate`.
       (REQ-F-004, REQ-F-005, REQ-F-009, REQ-F-010)
-    status: pending
+    status: completed
     dependencies:
       - task-007
       - task-008
@@ -229,7 +229,7 @@ tasks:
       - 'A `--no-changelog` golden case reproduces the pre-feature 3-line output byte-for-byte'
       - 'JSON, toon, and table format tests assert the REQ-F-010 split'
       - 'A 3-entry no-link case and a stale-binary with-link case are both covered end-to-end'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-010
     title: 'Add body field to the e2e release fixtures'
@@ -242,14 +242,14 @@ tasks:
 
       Purely additive; nothing currently asserts the absence of a `body` field. Verify with
       `go test -tags=e2e_seams -count=1 ./test/e2e/...`. (REQ-F-006, verification step 4)
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - 'Both fixture files have a `body` on every entry, shaped like a real release body with a `---` separator'
       - '`go test -tags=e2e_seams -count=1 ./test/e2e/...` passes'
       - 'The fixture body exercises the `trimReleaseBody` path (boilerplate is dropped in output)'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-011
     title: 'Regenerate the skill bundle for the new flag'
@@ -264,7 +264,7 @@ tasks:
       hand is futile (generate overwrites). `policy.golden` needs NO update: it was verified to index
       command paths and gates (`update  deny`, `update check  deny`), not flags — so no new command
       means no golden diff. (PRD Gates section)
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -272,7 +272,7 @@ tasks:
       - '`TestGenerator_RoundTrip` passes'
       - '`neo4j-cli/internal/subcommands/mcp/server/testdata/policy.golden` is unchanged'
       - '`make generate-check` reports no drift on a clean tree'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'
 
   - id: task-012
     title: 'Add changie entry and run the final gates'
@@ -288,7 +288,7 @@ tasks:
       REQ-NF-002 holds by running `go test -count=1 ./neo4j-cli/internal/subcommands/update/...`
       with networking blocked — it must pass, proving no test reaches api.github.com.
       (PRD Gates + Verification sections)
-    status: pending
+    status: completed
     dependencies:
       - task-009
       - task-010
@@ -298,4 +298,4 @@ tasks:
       - '`make test`, `make fmt-check`, and `make lint` all pass'
       - 'The update package test suite passes with networking blocked'
       - 'The claimed changelog effect is verified against real output assertions, not just described'
-    completed_at: null
+    completed_at: '2026-08-14T09:38:45Z'

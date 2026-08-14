@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: '`neo4j-cli update` now prints the release notes for the versions between the old and new version after a successful update, newest first and capped at the 3 most recent (with a link to the full changelog when older releases are omitted). Pass `--no-changelog` to suppress it. `--format json` and `--format toon` gain a `release_notes` field, plus `changelog_url` when releases were omitted; `--format table` is unchanged.'
+time: 2026-08-14T11:30:47.541636+02:00

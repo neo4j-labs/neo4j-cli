@@ -1,10 +1,33 @@
-## TASK-001 — 2026-08-14T13:30:00Z
-
-Add TestMain network guard to the update package.
-
-Files:
-  - neo4j-cli/internal/subcommands/update/main_test.go (NEW)
+## TASK-001 — 2026-08-14T09:00:02Z
+Add TestMain network guard to the update package: default httpDoFn fails loudly on unstubbed network calls.
+Files: +neo4j-cli/internal/subcommands/update/main_test.go
 
 ## TASK-002 — 2026-08-14T09:04:32Z
 Add Body field to Release struct and implement ListReleases with tests.
 Files: ~neo4j-cli/internal/subcommands/update/release.go, ~neo4j-cli/internal/subcommands/update/release_test.go
+
+## TASK-003..012 — 2026-08-14T09:38:45Z
+Remaining tasks landed in one pass: changelog.go (releaseNotesEntry, trimReleaseBody, changelogForRange with
+3-entry cap + elided, printChangelog with StripControl), update.go wiring (listReleasesFn seam,
+--no-changelog flag, releaseNotes/releaseNotesElided on updateResult, release_notes + changelog_url in
+MarshalJSON only), output-format tests, e2e fixture bodies, regenerated skill bundle, changie entry.
+Files: +neo4j-cli/internal/subcommands/update/changelog.go,
++neo4j-cli/internal/subcommands/update/changelog_test.go,
+~neo4j-cli/internal/subcommands/update/update.go,
+~neo4j-cli/internal/subcommands/update/update_test.go,
+~neo4j-cli/internal/skill/bundle/references/update.md,
+~test/e2e/release_fixture/testdata/releases-stable-head.json,
+~test/e2e/release_fixture/testdata/releases-pre-release-head.json,
++.changes/unreleased/neo4j-cli-Minor-20260814-113047.yaml
+Decisions:
+  - release_notes lives in MarshalJSON only, NOT AsArray/fieldOrder — printToon marshals via
+    MarshalJSON while printTable reads AsArray, so json+toon get the field and table omits it with
+    no format-sniffing branch (REQ-F-010).
+  - Fixed two defects found while verifying this batch: (a) listReleasesFn was called with a
+    hardcoded false, so `update --pre-releases` onto an alpha tag filtered that tag out of its own
+    changelog — now threads opts.preReleases, locked by
+    TestRunUpdate_Changelog_PropagatesPreReleases; (b) the runWithOpts* helpers unconditionally
+    overwrote listReleasesFn, silently discarding any withListReleases stub — now gated on a
+    listReleasesStubbed flag via defaultListReleases.
+  - Lint reported a phantom errcheck issue at ../neo4j-cli-2/; stale golangci-lint cache, cleared
+    with `golangci-lint cache clean` (already documented in AGENTS.md).

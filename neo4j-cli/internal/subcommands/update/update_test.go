@@ -40,6 +40,38 @@ func withGetByTag(t *testing.T, fn func(ctx context.Context, tag string) (*Relea
 	t.Cleanup(func() { getByTagFn = prev })
 }
 
+// listReleasesStubbed records whether the current test installed its own
+// listReleasesFn via withListReleases. The runWithOpts* helpers default the
+// seam to an empty list so the ~48 pre-changelog tests never reach the network
+// (REQ-NF-002), but that default must NOT clobber an explicit per-test stub —
+// the helpers run after it.
+var listReleasesStubbed bool
+
+// withListReleases swaps the listReleasesFn seam.
+func withListReleases(t *testing.T, fn func(ctx context.Context, preReleases bool) ([]Release, error)) {
+	t.Helper()
+	prev := listReleasesFn
+	prevStubbed := listReleasesStubbed
+	listReleasesFn = fn
+	listReleasesStubbed = true
+	t.Cleanup(func() {
+		listReleasesFn = prev
+		listReleasesStubbed = prevStubbed
+	})
+}
+
+// defaultListReleases points the seam at an empty list unless the test already
+// stubbed it. Called by the runWithOpts* helpers.
+func defaultListReleases(t *testing.T) {
+	t.Helper()
+	if listReleasesStubbed {
+		return
+	}
+	prev := listReleasesFn
+	listReleasesFn = func(ctx context.Context, preReleases bool) ([]Release, error) { return nil, nil }
+	t.Cleanup(func() { listReleasesFn = prev })
+}
+
 // withDetect swaps the detectFn seam.
 func withDetect(t *testing.T, fn func() (InstallMethod, string, error)) {
 	t.Helper()
@@ -116,6 +148,8 @@ func runWithOptsFormat(t *testing.T, current string, opts runOpts, format string
 	cmd.SetOut(out)
 	cmd.SetErr(out)
 
+	defaultListReleases(t)
+
 	err = runUpdate(context.Background(), cmd, cfg, opts)
 	return out.String(), err
 }
@@ -137,6 +171,8 @@ func runWithOptsSplit(t *testing.T, current string, opts runOpts, format string)
 	stderrBuf := &bytes.Buffer{}
 	cmd.SetOut(stdoutBuf)
 	cmd.SetErr(stderrBuf)
+
+	defaultListReleases(t)
 
 	err = runUpdate(context.Background(), cmd, cfg, opts)
 	return stdoutBuf.String(), stderrBuf.String(), err
@@ -841,6 +877,254 @@ func TestPlainTextOutput_GoldenSuccess(t *testing.T) {
 			assert.Equal(t, tc.want, out, "plain-text output must be byte-for-byte equal to the reference")
 		})
 	}
+}
+
+// TestPlainTextOutput_WithChangelog asserts that changelog entries appear in
+// plain-text output after a successful update when release data is available.
+func TestPlainTextOutput_WithChangelog(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v1.1.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return nil
+	})
+	withListReleases(t, func(ctx context.Context, preReleases bool) ([]Release, error) {
+		return []Release{
+			{TagName: "v1.1.0", Body: "Release notes for v1.1.0"},
+			{TagName: "v1.0.0", Body: "Initial release"},
+		}, nil
+	})
+
+	// Inline setup to avoid runWithOptsFormat stubbing listReleasesFn.
+	cfgJSON := `{"format":"default"}`
+	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v1.0.0", clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, nil, "")
+	out := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+
+	err = runUpdate(context.Background(), cmd, cfg, runOpts{})
+	require.NoError(t, err)
+
+	want := "Current version: v1.0.0\n" +
+		"Checking for updates to latest version...\n" +
+		"Successfully updated from v1.0.0 to v1.1.0\n" +
+		"## v1.1.0\n" +
+		"\n" +
+		"Release notes for v1.1.0\n"
+	assert.Equal(t, want, out.String())
+}
+
+// TestPlainTextOutput_NoChangelogFlag asserts that --no-changelog suppresses
+// the changelog even when release data is available.
+func TestPlainTextOutput_NoChangelogFlag(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v1.1.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return nil
+	})
+	withListReleases(t, func(ctx context.Context, preReleases bool) ([]Release, error) {
+		return []Release{
+			{TagName: "v1.1.0", Body: "Release notes for v1.1.0"},
+			{TagName: "v1.0.0", Body: "Initial release"},
+		}, nil
+	})
+
+	cfgJSON := `{"format":"default"}`
+	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v1.0.0", clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, nil, "")
+	out := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+
+	err = runUpdate(context.Background(), cmd, cfg, runOpts{noChangelog: true})
+	require.NoError(t, err)
+
+	// Must NOT include changelog entries.
+	want := "Current version: v1.0.0\n" +
+		"Checking for updates to latest version...\n" +
+		"Successfully updated from v1.0.0 to v1.1.0\n"
+	assert.Equal(t, want, out.String())
+}
+
+// TestRunUpdate_Changelog_PropagatesPreReleases pins that the --pre-releases
+// flag reaches the changelog fetch. With a hardcoded false, an
+// `update --pre-releases` landing on an alpha tag would filter that very tag
+// out of its own changelog and print nothing.
+func TestRunUpdate_Changelog_PropagatesPreReleases(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v1.2.0-alpha.1"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return nil
+	})
+	gotPreReleases := false
+	withListReleases(t, func(ctx context.Context, preReleases bool) ([]Release, error) {
+		gotPreReleases = preReleases
+		return []Release{
+			{TagName: "v1.2.0-alpha.1", Prerelease: true, Body: "Alpha notes"},
+			{TagName: "v1.1.0", Body: "Stable notes"},
+		}, nil
+	})
+
+	out, err := runWithOpts(t, "v1.1.0", runOpts{preReleases: true})
+	require.NoError(t, err)
+	assert.True(t, gotPreReleases, "--pre-releases must propagate to the changelog fetch")
+	assert.Contains(t, out, "## v1.2.0-alpha.1", "the pre-release tag being installed must appear in its own changelog")
+	assert.Contains(t, out, "Alpha notes")
+}
+
+// TestJSONOutput_WithChangelog asserts that release_notes (and changelog_url
+// when elided) appear in the JSON output after a successful update.
+func TestJSONOutput_WithChangelog(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v1.5.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return nil
+	})
+	// 5 releases in range, so only 3 appear — elided = true → changelog_url set.
+	withListReleases(t, func(ctx context.Context, preReleases bool) ([]Release, error) {
+		return []Release{
+			{TagName: "v1.5.0", Body: "Release five"},
+			{TagName: "v1.4.0", Body: "Release four"},
+			{TagName: "v1.3.0", Body: "Release three"},
+			{TagName: "v1.2.0", Body: "Release two"},
+			{TagName: "v1.1.0", Body: "Release one"},
+			{TagName: "v1.0.0", Body: "Current release"},
+		}, nil
+	})
+
+	cfgJSON := `{"format":"json"}`
+	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v1.0.0", clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, nil, "")
+	out := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+
+	err = runUpdate(context.Background(), cmd, cfg, runOpts{})
+	require.NoError(t, err)
+
+	var doc struct {
+		Updated      bool `json:"updated"`
+		ReleaseNotes []struct {
+			Version string `json:"version"`
+			Notes   string `json:"notes"`
+		} `json:"release_notes"`
+		ChangelogURL string `json:"changelog_url"`
+	}
+	require.NoError(t, json.Unmarshal(out.Bytes(), &doc))
+
+	// Binary was updated
+	assert.True(t, doc.Updated)
+
+	// Three release_notes entries, newest first
+	require.Len(t, doc.ReleaseNotes, 3)
+	assert.Equal(t, "v1.5.0", doc.ReleaseNotes[0].Version)
+	assert.Equal(t, "Release five", doc.ReleaseNotes[0].Notes)
+	assert.Equal(t, "v1.4.0", doc.ReleaseNotes[1].Version)
+	assert.Equal(t, "v1.3.0", doc.ReleaseNotes[2].Version)
+
+	// Elided → changelog_url populated
+	assert.Equal(t, "https://github.com/neo4j-labs/neo4j-cli/releases", doc.ChangelogURL)
+}
+
+// TestJSONOutput_WithChangelog_NotElided asserts that when <=3 entries,
+// changelog_url is absent (omitempty).
+func TestJSONOutput_WithChangelog_NotElided(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v1.1.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return nil
+	})
+	withListReleases(t, func(ctx context.Context, preReleases bool) ([]Release, error) {
+		return []Release{
+			{TagName: "v1.1.0", Body: "Release one"},
+			{TagName: "v1.0.0", Body: "Current release"},
+		}, nil
+	})
+
+	cfgJSON := `{"format":"json"}`
+	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v1.0.0", clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, nil, "")
+	out := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+
+	err = runUpdate(context.Background(), cmd, cfg, runOpts{})
+	require.NoError(t, err)
+
+	var doc struct {
+		Updated      bool `json:"updated"`
+		ReleaseNotes []struct {
+			Version string `json:"version"`
+			Notes   string `json:"notes"`
+		} `json:"release_notes"`
+		ChangelogURL string `json:"changelog_url"`
+	}
+	require.NoError(t, json.Unmarshal(out.Bytes(), &doc))
+
+	assert.True(t, doc.Updated)
+	require.Len(t, doc.ReleaseNotes, 1)
+	assert.Equal(t, "v1.1.0", doc.ReleaseNotes[0].Version)
+
+	// Not elided — changelog_url must be empty/absent.
+	assert.Empty(t, doc.ChangelogURL)
+}
+
+// TestPrintableUpdateResult_AsArray_NoChangelogFields asserts that the
+// table/toon AsArray shape does NOT include release_notes or changelog_url.
+func TestPrintableUpdateResult_AsArray_NoChangelogFields(t *testing.T) {
+	p := printableUpdateResult{r: updateResult{
+		current:       "v1.0.0",
+		latest:        "v1.1.0",
+		updated:       true,
+		channel:       "stable",
+		installMethod: "binary",
+		releaseNotes: []releaseNotesEntry{
+			{tag: "v1.1.0", body: "Release body"},
+		},
+		releaseNotesElided: false,
+	}}
+	rows := p.AsArray()
+	require.Len(t, rows, 1)
+	// The six base fields must be present.
+	assert.Equal(t, "v1.0.0", rows[0]["current"])
+	assert.Equal(t, "v1.1.0", rows[0]["latest"])
+	// Changelog-specific fields must NOT leak into AsArray.
+	_, hasRN := rows[0]["release_notes"]
+	_, hasCU := rows[0]["changelog_url"]
+	assert.False(t, hasRN, "release_notes must not appear in AsArray (table/toon)")
+	assert.False(t, hasCU, "changelog_url must not appear in AsArray (table/toon)")
 }
 
 // parseJSONOutput parses an update-command JSON document into a typed struct.

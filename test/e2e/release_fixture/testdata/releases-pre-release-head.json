@@ -2,11 +2,13 @@
   {
     "tag_name": "v9.9.1-alpha.1",
     "draft": false,
-    "prerelease": true
+    "prerelease": true,
+    "body": "Alpha release body"
   },
   {
     "tag_name": "v9.9.0",
     "draft": false,
-    "prerelease": false
+    "prerelease": false,
+    "body": "## Release notes\n\n### Highlights\n- Feature X\n- Bug fix Y\n\n---\n\n## Versions\n- v9.9.0"
   }
 ]
