@@ -174,12 +174,14 @@ func RawStatusError(res *RawResponse) error {
 	return clierr.NewUpstreamError("%s", detail)
 }
 
-// scrubbedBodyTrunc renders an upstream response body for embedding in an
+// ScrubbedBodyTrunc renders an upstream response body for embedding in an
 // error message: RedactText + StripControl, bounded twice. The generous outer
 // cut avoids costly regex passes on multi-megabyte error pages, and keeps
 // redaction safe — a secret split by it is dropped by the final one. Returns
-// "" when the body has no printable content.
-func scrubbedBodyTrunc(body []byte) string {
+// "" when the body has no printable content. Exported so command packages
+// outside api can surface upstream bodies through *clierr.CLIError messages
+// without duplicating redaction logic.
+func ScrubbedBodyTrunc(body []byte) string {
 	raw := strings.TrimSpace(scrub(truncateBytes(string(body), rawErrorBodyLimit*16)))
 	return truncateBytes(raw, rawErrorBodyLimit)
 }
@@ -194,7 +196,7 @@ func rawErrorDetail(res *RawResponse) string {
 		status = strings.TrimSpace(fmt.Sprintf("%d %s", res.StatusCode, http.StatusText(res.StatusCode)))
 	}
 
-	body := scrubbedBodyTrunc(res.Body)
+	body := ScrubbedBodyTrunc(res.Body)
 	if body == "" {
 		return fmt.Sprintf("aura api request failed with status %s", status)
 	}

@@ -8,13 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
-	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/output"
 )
 
@@ -49,10 +47,10 @@ type ServerError struct {
 // upstreamDetail describes a response whose body did not match ErrorResponse —
 // the normal case on v2beta1, where every documented 4xx/5xx except two billing
 // 400s declares a description with no content schema. The body always goes
-// through scrubbedBodyTrunc: the panic this replaced interpolated resBody raw,
+// through ScrubbedBodyTrunc: the panic this replaced interpolated resBody raw,
 // so a secret echoed back by the API could reach stdout.
 func upstreamDetail(statusCode int, resBody []byte) string {
-	if body := scrubbedBodyTrunc(resBody); body != "" {
+	if body := ScrubbedBodyTrunc(resBody); body != "" {
 		return fmt.Sprintf("upstream error [status %d]: %s", statusCode, body)
 	}
 	return fmt.Sprintf("upstream error [status %d] with no response body", statusCode)
@@ -504,7 +502,12 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	err := json.Unmarshal(resBody, &errorResponse)
 	if err != nil {
-		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in %s", statusCode, clievents.RedactArgs(os.Args[1:]), clierr.IssuesURL).WithSuggestion(authSuggestion)
+		body := ScrubbedBodyTrunc(resBody)
+		msg := fmt.Sprintf("unexpected error [status %d]", statusCode)
+		if body != "" {
+			msg = fmt.Sprintf("%s: %s", msg, body)
+		}
+		return clierr.NewAuthError("%s", msg).WithSuggestion(authSuggestion)
 	}
 
 	messages := []string{}
@@ -514,7 +517,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	_, err = cfg.Credentials.Aura.ClearAccessToken(credential)
 	if err != nil {
-		messages = append(messages, fmt.Sprintf("Request failed authorization - attempted to clear the access token but encountered an error, please report an issue in %s", clierr.IssuesURL))
+		messages = append(messages, "Request failed authorization - the local access token could not be cleared")
 	} else {
 		messages = append(messages, "Request failed authorization - access token has been cleared and will be refreshed on next request - please retry the command")
 	}
