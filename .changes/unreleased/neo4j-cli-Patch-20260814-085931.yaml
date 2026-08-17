@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Updated `docker create --no-print-password` help text to no longer reference a credential-read command that does not exist. Now explains how to use the stored credential via `--credential <name>` and how to reset the password with `admin user set-password` plus a credential resync.'
-time: 2026-08-14T08:59:31Z
