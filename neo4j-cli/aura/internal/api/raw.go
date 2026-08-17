@@ -184,6 +184,15 @@ func scrubbedBodyTrunc(body []byte) string {
 	return truncateBytes(raw, rawErrorBodyLimit)
 }
 
+// ScrubbedBodyTrunc renders an upstream response body for embedding in an
+// error message: RedactText + StripControl + size bounds (same as the
+// internal scrubbedBodyTrunc). Exported so command packages outside api can
+// surface upstream bodies through *clierr.CLIError messages without
+// duplicating redaction logic.
+func ScrubbedBodyTrunc(body []byte) string {
+	return scrubbedBodyTrunc(body)
+}
+
 // rawErrorDetail renders the status line and the upstream body as one message
 // line. Both halves pass through scrub (RedactText then StripControl) because
 // both are upstream-controlled: the reason phrase is not filtered by net/http,

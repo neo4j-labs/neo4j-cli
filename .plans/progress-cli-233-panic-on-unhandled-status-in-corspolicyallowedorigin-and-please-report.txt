@@ -1,0 +1,5 @@
+# Progress — cli-233-panic-on-unhandled-status-in-corspolicyallowedorigin-and-please-report
+
+## TASK-001 — 2026-08-17T08:40:26Z
+Added exported api.ScrubbedBodyTrunc wrapper in raw.go delegating to scrubbedBodyTrunc so command packages outside api can surface upstream bodies through *clierr.CLIError messages without duplicating redaction logic. Internal call sites unchanged; upstreamDetail not exported.
+Files: ~neo4j-cli/aura/internal/api/raw.go
