@@ -98,7 +98,7 @@ tasks:
     title: "Fold ScrubbedBodyTrunc identity wrapper + empty-body guard"
     description: |
       Review finding (blocker, missed code-judo): api.ScrubbedBodyTrunc in neo4j-cli/aura/internal/api/raw.go is a pure passthrough wrapper around the unexported scrubbedBodyTrunc — two names for one function, one identity-wrapper layer. The task deliberately kept the two internal call sites (response.go:~505, raw.go:~206) on scrubbedBodyTrunc, so the exported surface is an alias the reader must discover is identical. There is no load-bearing distinction (the 'bounded twice' doc applies to both) and no internal-package-rule constraint forcing an unexported twin. Fix: rename scrubbedBodyTrunc → ScrubbedBodyTrunc, fold the behavior doc ('bounded twice', RedactText + StripControl) onto the exported name, update the two internal call sites to call ScrubbedBodyTrunc directly, and delete the wrapper. The exported surface stays identical; concept count drops by one. While in this pass, also fix the related nit at response.go:~505 (formatAuthorizationError unparseable branch): the new format 'unexpected error [status %d]: %s' has no empty-body guard, so a body that scrubs/truncates to empty yields a dangling ': '. Mirror rawErrorDetail (raw.go:~206-210) which appends ': %s' only when the body is non-empty. Build a small inline guard (compute the scrubbed body once; format with the ': %s' suffix only when non-empty) rather than calling ScrubbedBodyTrunc twice. Verify the existing formatAuthorizationError tests still pass; add/adjust a test case for the empty-body 401 path if none covers it.
-    status: pending
+    status: in_progress
     dependencies: []
     acceptance_criteria:
       - "scrubbedBodyTrunc renamed to ScrubbedBodyTrunc (exported) in raw.go with the behavior doc folded onto it; the identity wrapper deleted"
@@ -112,7 +112,8 @@ tasks:
     title: "Tighten changelog wording: drop 'typed' mechanics word"
     description: |
       Review finding (nit): the changelog body in .changes/unreleased/*.yaml uses 'typed upstream error (exit 8)' — the '(exit 8)' part is the observable effect, but 'typed' is borderline internal mechanics. Per AGENTS.md changelog guidance the body should describe only the observable user-facing impact. Tighten 'typed upstream error (exit 8)' to 'a clear error (exit 8)'. Edit the existing unreleased changelog file in place; do not create a new one.
-    status: pending
+    status: completed
+    completed_at: 2026-08-17T09:54:16Z
     dependencies: []
     acceptance_criteria:
       - "Changelog body reads 'a clear error (exit 8)' instead of 'typed upstream error (exit 8)'"

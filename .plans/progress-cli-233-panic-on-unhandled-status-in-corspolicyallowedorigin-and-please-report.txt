@@ -26,3 +26,7 @@ Files: +.changes/unreleased/neo4j-cli-Patch-20260817-110046.yaml
 
 ## REVIEW — 2026-08-17T09:51:31Z
 Added 2 review tasks (task-007..task-008).
+
+## TASK-008 — 2026-08-17T09:54:16Z
+Tightened changelog wording in .changes/unreleased/neo4j-cli-Patch-20260817-110046.yaml per review finding: body now reads "return a clear error (exit 8)" instead of "return a typed upstream error (exit 8)", dropping the borderline-internal 'typed' mechanics word per AGENTS.md changelog guidance. Only the body changed; project/kind/time fields byte-identical; YAML validated via python3 yaml.safe_load (valid, no quoting/structure change). No other fields touched; no new changelog file created. Reviewer: LGTM, no changes required.
+Files: ~.changes/unreleased/neo4j-cli-Patch-20260817-110046.yaml
