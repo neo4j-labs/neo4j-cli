@@ -65,7 +65,8 @@ tasks:
     title: "Add formatAuthorizationError wording tests in response_test.go"
     description: |
       In neo4j-cli/aura/internal/api/response_test.go (internal package api), extend TestHandleResponseError_ExitCodeMapping table: add wantMsgOmit:'please report' to the 401 row (~148) and to the 403-malformed row (~281, also add wantMsgContain:'403'). Add two focused direct-call tests reusing newAuthFixture (:109): TestFormatAuthorizationError_UnparseableBody_NoReportIssue (body '<html>gateway 502\n</html>', 401, assert code 4, NotContains 'please report', NotContains 'running CLI with args', Contains '401', Suggestion==authSuggestion) and TestFormatAuthorizationError_ClearAccessTokenFailure_NoReportIssue (parseable body, credential Name:'missing-cred' so ClearAccessToken fails deterministically, assert code 4, NotContains 'please report', Contains 'could not be cleared', Suggestion==authSuggestion).
-    status: in_progress
+    status: completed
+    completed_at: 2026-08-17T08:49:31Z
     dependencies:
       - task-003
     acceptance_criteria:

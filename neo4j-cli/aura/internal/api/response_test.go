@@ -103,19 +103,20 @@ func TestHandleResponseError_ReadAllFailure(t *testing.T) {
 // mapping defined in REQ-F-004. Each subtest feeds a synthetic *http.Response
 // to handleResponseError and asserts the returned error extracts a *CLIError
 // with the expected Code via errors.As (working through any %w wrapping).
-func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
-	// Build a minimal real cfg + credential for the 401/403/formatAuthorizationError
-	// paths that touch cfg.Credentials.Aura.ClearAccessToken.
-	newAuthFixture := func(t *testing.T) (*clicfg.Config, *credentials.AuraCredential) {
-		t.Helper()
-		fs, err := testfs.GetTestFs("{}", `{"aura":{"default-credential":"x","credentials":[{"name":"x","client-id":"id","client-secret":"secret"}]}}`)
-		require.NoError(t, err)
-		cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-		cred, err := cfg.Credentials.Aura.GetDefault()
-		require.NoError(t, err)
-		return cfg, cred
-	}
+// newAuthFixture builds a minimal real cfg + credential for the
+// 401/403/formatAuthorizationError paths that touch
+// cfg.Credentials.Aura.ClearAccessToken.
+func newAuthFixture(t *testing.T) (*clicfg.Config, *credentials.AuraCredential) {
+	t.Helper()
+	fs, err := testfs.GetTestFs("{}", `{"aura":{"default-credential":"x","credentials":[{"name":"x","client-id":"id","client-secret":"secret"}]}}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cred, err := cfg.Credentials.Aura.GetDefault()
+	require.NoError(t, err)
+	return cfg, cred
+}
 
+func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 	headerWithRetry := func(v string) http.Header {
 		h := http.Header{}
 		h.Set("Retry-After", v)
@@ -150,6 +151,7 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			body:           `{"errors":[{"message":"token invalid"}]}`,
 			wantCode:       4,
 			usesAuthCfg:    true,
+			wantMsgOmit:    "please report",
 			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
 		},
 		{
@@ -282,6 +284,8 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			statusCode:     http.StatusForbidden,
 			body:           `<<<not-json>>>`,
 			wantCode:       4,
+			wantMsgOmit:    "please report",
+			wantMsgContain: "403",
 			wantSuggestion: authSuggestion,
 		},
 		{
@@ -482,6 +486,38 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFormatAuthorizationError_UnparseableBody_NoReportIssue locks the
+// unparseable 401/403 body branch: the reworded message reflects the status
+// and scrubbed body, and must not carry the removed please-report-an-issue
+// framing or the "running CLI with args" os.Args interpolation.
+func TestFormatAuthorizationError_UnparseableBody_NoReportIssue(t *testing.T) {
+	cfg, _ := newAuthFixture(t)
+	err := formatAuthorizationError([]byte("<html>gateway 502\n</html>"), http.StatusUnauthorized, nil, cfg)
+	var ce *clierr.CLIError
+	require.ErrorAs(t, err, &ce)
+	assert.Equal(t, 4, ce.Code)
+	assert.NotContains(t, ce.Error(), "please report")
+	assert.NotContains(t, ce.Error(), "running CLI with args")
+	assert.Contains(t, ce.Error(), "401")
+	assert.Equal(t, authSuggestion, ce.Suggestion)
+}
+
+// TestFormatAuthorizationError_ClearAccessTokenFailure_NoReportIssue locks the
+// ClearAccessToken-failure branch: a credential missing from the store makes
+// the token-clear deterministic, and the reworded message surfaces the "could
+// not be cleared" wording without the please-report-an-issue framing.
+func TestFormatAuthorizationError_ClearAccessTokenFailure_NoReportIssue(t *testing.T) {
+	cfg, _ := newAuthFixture(t)
+	parseable := []byte(`{"errors":[{"message":"Invalid token"}]}`)
+	err := formatAuthorizationError(parseable, http.StatusUnauthorized, &credentials.AuraCredential{Name: "missing-cred"}, cfg)
+	var ce *clierr.CLIError
+	require.ErrorAs(t, err, &ce)
+	assert.Equal(t, 4, ce.Code)
+	assert.NotContains(t, ce.Error(), "please report")
+	assert.Contains(t, ce.Error(), "could not be cleared")
+	assert.Equal(t, authSuggestion, ce.Suggestion)
 }
 
 // TestParseResourceFromRequest exercises the URL-path -> (resourceType,
