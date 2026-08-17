@@ -1,0 +1,89 @@
+feature: cli-233-panic-on-unhandled-status-in-corspolicyallowedorigin-and-please-report
+prd: ./prd-cli-233-panic-on-unhandled-status-in-corspolicyallowedorigin-and-please-report.md
+created_at: 2026-08-17T08:34:49Z
+updated_at: 2026-08-17T08:34:49Z
+
+tasks:
+  - id: task-001
+    title: "Export api.ScrubbedBodyTrunc wrapper in raw.go"
+    description: |
+      Add a thin exported wrapper around the existing unexported scrubbedBodyTrunc in neo4j-cli/aura/internal/api/raw.go so command packages outside api can surface upstream bodies through *clierr.CLIError messages without duplicating redaction logic. The wrapper delegates to scrubbedBodyTrunc; internal call sites (response.go:55, raw.go:197) keep calling scrubbedBodyTrunc directly and are unchanged. Include the doc comment per AGENTS.md conventions. Do not export upstreamDetail.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "api.ScrubbedBodyTrunc(body []byte) string exists in raw.go and delegates to scrubbedBodyTrunc"
+      - "Internal call sites in response.go and raw.go are unchanged (still call scrubbedBodyTrunc directly)"
+      - "Doc comment explains it is exported so command packages outside api avoid duplicating redaction logic"
+      - "go build ./neo4j-cli/aura/internal/api/... passes"
+
+  - id: task-002
+    title: "Replace getExistingOrigins panics with typed *clierr.CLIError returns"
+    description: |
+      In neo4j-cli/aura/internal/subcommands/graphql/corspolicy/allowedorigin/utils.go, replace both panic statements in getExistingOrigins with typed *clierr.CLIError returns via the function's existing ([]string, error) return. Status branch (line 43-45, latent 2xx!=200): return clierr.NewUpstreamError with the status and api.ScrubbedBodyTrunc(getResBody). Unmarshal branch (line 48-51, body-leak): return clierr.NewUpstreamError with api.ScrubbedBodyTrunc(getResBody), dropping err.Error() (raw body snippet). Remove now-unused imports os and clievents. Both callers (add.go:62, remove.go:66) already return err.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "grep -n panic utils.go returns zero hits"
+      - "Status branch returns NewUpstreamError (exit 8) with status and ScrubbedBodyTrunc(getResBody)"
+      - "Unmarshal branch returns NewUpstreamError (exit 8) with ScrubbedBodyTrunc(getResBody); err.Error() not interpolated"
+      - "os and clievents imports removed; encoding/json, fmt, net/http, clicfg, clierr, api retained"
+      - "go build ./neo4j-cli/aura/internal/subcommands/graphql/corspolicy/allowedorigin/... passes"
+
+  - id: task-003
+    title: "Reword formatAuthorizationError to drop please-report-an-issue"
+    description: |
+      In neo4j-cli/aura/internal/api/response.go, reword both branches of formatAuthorizationError that carry the please-report-an-issue framing. Line 507 (unparseable 401/403 body): replace the os.Args/RedactArgs/IssuesURL interpolation with the scrubbed body via scrubbedBodyTrunc(resBody), keeping NewAuthError (exit 4) and authSuggestion. Line 517 (ClearAccessToken failure): reword to 'Request failed authorization - the local access token could not be cleared', keeping the prefix consistent with the success sibling at line 519; do not surface the raw ClearAccessToken error value. Remove now-unused imports os and clievents from response.go (verified line 507 was their only use).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Line 507 returns NewAuthError with status and scrubbedBodyTrunc(resBody); no os.Args, no IssuesURL, no 'please report'"
+      - "Line 517 message is 'Request failed authorization - the local access token could not be cleared'; no 'please report'; raw err not surfaced"
+      - "NewAuthError (exit 4) and authSuggestion retained on both branches"
+      - "os and clievents imports removed from response.go; remaining imports compile"
+      - "grep -rn 'please report an issue in' neo4j-cli/aura returns zero matches"
+
+  - id: task-004
+    title: "Add NoPanic test for getExistingOrigins via add command"
+    description: |
+      Add a new test file neo4j-cli/aura/internal/subcommands/graphql/corspolicy/allowedorigin/get_existing_origins_error_test.go in external package allowedorigin_test. Drive the add command through testutils.AuraTestHelper with ExecuteCommandE wrapped in assert.NotPanics. Table over three cases: 202 + {} (status branch), 204 + empty (status branch), 200 + 'not valid json' (unmarshal branch). Mock order: registerProjectsMock, /v1/instances/{id} with tenant_id==projectID, /v1beta5/instances/{id}/data-apis/graphql/{dataApiId} per-row. Assert errors.As into *clierr.CLIError, ce.Code in clierr.Codes, NotContains 'please report', and the relevant status/body fragment. Reuse helpers from helpers_test.go.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "New file get_existing_origins_error_test.go in package allowedorigin_test"
+      - "Table covers 202+{}, 204+empty, 200+'not valid json'"
+      - "Each case wrapped in assert.NotPanics around ExecuteCommandE"
+      - "Asserts errors.As into *clierr.CLIError, ce.Code in clierr.Codes, NotContains 'please report'"
+      - "202/204 cases assert the status digit; 200-malformed asserts 'not valid json'"
+      - "go test ./neo4j-cli/aura/internal/subcommands/graphql/corspolicy/allowedorigin/... passes"
+
+  - id: task-005
+    title: "Add formatAuthorizationError wording tests in response_test.go"
+    description: |
+      In neo4j-cli/aura/internal/api/response_test.go (internal package api), extend TestHandleResponseError_ExitCodeMapping table: add wantMsgOmit:'please report' to the 401 row (~148) and to the 403-malformed row (~281, also add wantMsgContain:'403'). Add two focused direct-call tests reusing newAuthFixture (:109): TestFormatAuthorizationError_UnparseableBody_NoReportIssue (body '<html>gateway 502\n</html>', 401, assert code 4, NotContains 'please report', NotContains 'running CLI with args', Contains '401', Suggestion==authSuggestion) and TestFormatAuthorizationError_ClearAccessTokenFailure_NoReportIssue (parseable body, credential Name:'missing-cred' so ClearAccessToken fails deterministically, assert code 4, NotContains 'please report', Contains 'could not be cleared', Suggestion==authSuggestion).
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "401 row in TestHandleResponseError_ExitCodeMapping gains wantMsgOmit 'please report' and passes"
+      - "403-malformed row gains wantMsgOmit 'please report' and wantMsgContain '403' and passes"
+      - "TestFormatAuthorizationError_UnparseableBody_NoReportIssue asserts code 4, no 'please report', no 'running CLI with args', contains '401', Suggestion==authSuggestion"
+      - "TestFormatAuthorizationError_ClearAccessTokenFailure_NoReportIssue uses credential Name 'missing-cred', asserts code 4, no 'please report', contains 'could not be cleared', Suggestion==authSuggestion"
+      - "go test ./neo4j-cli/aura/internal/api/... passes"
+
+  - id: task-006
+    title: "Add changie entry and run final gates"
+    description: |
+      Add a changie Patch entry describing only the observable user-facing effect: graphql cors-policy allowed-origin add/remove now return a typed upstream error (exit 8) instead of panicking on unexpected 2xx status or malformed CORS body, and authorization failure messages no longer say 'please report an issue'. Use non-interactive: changie new --projects neo4j-cli --kind Patch --body <body>. Then run final gates: make test, make fmt-check, make lint, and go test -tags=e2e_exitcodes -count=1 ./test/e2e/exitcodes/... as a regression guard. Confirm no skill-bundle drift (no Long/Example changed) and no MCP policy golden change (no command added/renamed).
+    status: pending
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "Changie Patch entry exists under .changes/unreleased/ describing only observable effect (no panic/helper/internal mentions)"
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+      - "go test -tags=e2e_exitcodes -count=1 ./test/e2e/exitcodes/... passes (suite untouched)"
+      - "No skill-bundle regeneration needed (no Long/Example changed); no MCP policy golden change"
