@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: graphql cors-policy allowed-origin add/remove now return a typed upstream error (exit 8) instead of panicking when the data API responds with an unexpected 2xx status or a malformed CORS policy body, and authorization failure messages no longer say 'please report an issue'.
+time: 2026-08-17T11:00:46.045727+02:00

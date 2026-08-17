@@ -81,7 +81,8 @@ tasks:
     title: "Add changie entry and run final gates"
     description: |
       Add a changie Patch entry describing only the observable user-facing effect: graphql cors-policy allowed-origin add/remove now return a typed upstream error (exit 8) instead of panicking on unexpected 2xx status or malformed CORS body, and authorization failure messages no longer say 'please report an issue'. Use non-interactive: changie new --projects neo4j-cli --kind Patch --body <body>. Then run final gates: make test, make fmt-check, make lint, and go test -tags=e2e_exitcodes -count=1 ./test/e2e/exitcodes/... as a regression guard. Confirm no skill-bundle drift (no Long/Example changed) and no MCP policy golden change (no command added/renamed).
-    status: pending
+    status: completed
+    completed_at: 2026-08-17T09:04:39Z
     dependencies:
       - task-004
       - task-005
