@@ -24,7 +24,7 @@ import (
 // the API in the response body does not survive into the error message, which
 // is persisted by the tee-on-failure path. The secret now arrives in the body
 // rather than os.Args; every status that reaches upstreamDetail must run the
-// body through scrubbedBodyTrunc (RedactText + StripControl).
+// body through ScrubbedBodyTrunc (RedactText + StripControl).
 func TestHandleResponseError_RedactsBodySecrets(t *testing.T) {
 	const secret = "S3CR3T-VALUE-DO-NOT-LOG"
 
@@ -501,6 +501,20 @@ func TestFormatAuthorizationError_UnparseableBody_NoReportIssue(t *testing.T) {
 	assert.NotContains(t, ce.Error(), "please report")
 	assert.NotContains(t, ce.Error(), "running CLI with args")
 	assert.Contains(t, ce.Error(), "401")
+	assert.Equal(t, authSuggestion, ce.Suggestion)
+}
+
+// TestFormatAuthorizationError_EmptyBody_NoDanglingColon locks the empty-body
+// 401 path: a body that scrubs to empty must not leave a dangling ': ' after
+// the status, mirroring rawErrorDetail's non-empty guard.
+func TestFormatAuthorizationError_EmptyBody_NoDanglingColon(t *testing.T) {
+	cfg, _ := newAuthFixture(t)
+	err := formatAuthorizationError([]byte(""), http.StatusUnauthorized, nil, cfg)
+	var ce *clierr.CLIError
+	require.ErrorAs(t, err, &ce)
+	assert.Equal(t, 4, ce.Code)
+	assert.Contains(t, ce.Error(), "401")
+	assert.NotContains(t, ce.Error(), ": ")
 	assert.Equal(t, authSuggestion, ce.Suggestion)
 }
 

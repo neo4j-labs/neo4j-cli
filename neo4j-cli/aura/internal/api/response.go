@@ -47,10 +47,10 @@ type ServerError struct {
 // upstreamDetail describes a response whose body did not match ErrorResponse —
 // the normal case on v2beta1, where every documented 4xx/5xx except two billing
 // 400s declares a description with no content schema. The body always goes
-// through scrubbedBodyTrunc: the panic this replaced interpolated resBody raw,
+// through ScrubbedBodyTrunc: the panic this replaced interpolated resBody raw,
 // so a secret echoed back by the API could reach stdout.
 func upstreamDetail(statusCode int, resBody []byte) string {
-	if body := scrubbedBodyTrunc(resBody); body != "" {
+	if body := ScrubbedBodyTrunc(resBody); body != "" {
 		return fmt.Sprintf("upstream error [status %d]: %s", statusCode, body)
 	}
 	return fmt.Sprintf("upstream error [status %d] with no response body", statusCode)
@@ -502,7 +502,12 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	err := json.Unmarshal(resBody, &errorResponse)
 	if err != nil {
-		return clierr.NewAuthError("unexpected error [status %d]: %s", statusCode, scrubbedBodyTrunc(resBody)).WithSuggestion(authSuggestion)
+		body := ScrubbedBodyTrunc(resBody)
+		msg := fmt.Sprintf("unexpected error [status %d]", statusCode)
+		if body != "" {
+			msg = fmt.Sprintf("%s: %s", msg, body)
+		}
+		return clierr.NewAuthError("%s", msg).WithSuggestion(authSuggestion)
 	}
 
 	messages := []string{}
