@@ -50,7 +50,8 @@ tasks:
     title: "Add NoPanic test for getExistingOrigins via add command"
     description: |
       Add a new test file neo4j-cli/aura/internal/subcommands/graphql/corspolicy/allowedorigin/get_existing_origins_error_test.go in external package allowedorigin_test. Drive the add command through testutils.AuraTestHelper with ExecuteCommandE wrapped in assert.NotPanics. Table over three cases: 202 + {} (status branch), 204 + empty (status branch), 200 + 'not valid json' (unmarshal branch). Mock order: registerProjectsMock, /v1/instances/{id} with tenant_id==projectID, /v1beta5/instances/{id}/data-apis/graphql/{dataApiId} per-row. Assert errors.As into *clierr.CLIError, ce.Code in clierr.Codes, NotContains 'please report', and the relevant status/body fragment. Reuse helpers from helpers_test.go.
-    status: pending
+    status: completed
+    completed_at: 2026-08-17T08:57:04Z
     dependencies:
       - task-002
     acceptance_criteria:
