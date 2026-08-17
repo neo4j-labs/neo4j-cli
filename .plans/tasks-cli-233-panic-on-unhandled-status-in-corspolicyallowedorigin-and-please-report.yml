@@ -35,7 +35,8 @@ tasks:
     title: "Reword formatAuthorizationError to drop please-report-an-issue"
     description: |
       In neo4j-cli/aura/internal/api/response.go, reword both branches of formatAuthorizationError that carry the please-report-an-issue framing. Line 507 (unparseable 401/403 body): replace the os.Args/RedactArgs/IssuesURL interpolation with the scrubbed body via scrubbedBodyTrunc(resBody), keeping NewAuthError (exit 4) and authSuggestion. Line 517 (ClearAccessToken failure): reword to 'Request failed authorization - the local access token could not be cleared', keeping the prefix consistent with the success sibling at line 519; do not surface the raw ClearAccessToken error value. Remove now-unused imports os and clievents from response.go (verified line 507 was their only use).
-    status: in_progress
+    status: completed
+    completed_at: 2026-08-17T08:45:00Z
     dependencies: []
     acceptance_criteria:
       - "Line 507 returns NewAuthError with status and scrubbedBodyTrunc(resBody); no os.Args, no IssuesURL, no 'please report'"

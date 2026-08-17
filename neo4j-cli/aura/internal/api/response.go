@@ -8,13 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
-	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/output"
 )
 
@@ -504,7 +502,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	err := json.Unmarshal(resBody, &errorResponse)
 	if err != nil {
-		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in %s", statusCode, clievents.RedactArgs(os.Args[1:]), clierr.IssuesURL).WithSuggestion(authSuggestion)
+		return clierr.NewAuthError("unexpected error [status %d]: %s", statusCode, scrubbedBodyTrunc(resBody)).WithSuggestion(authSuggestion)
 	}
 
 	messages := []string{}
@@ -514,7 +512,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	_, err = cfg.Credentials.Aura.ClearAccessToken(credential)
 	if err != nil {
-		messages = append(messages, fmt.Sprintf("Request failed authorization - attempted to clear the access token but encountered an error, please report an issue in %s", clierr.IssuesURL))
+		messages = append(messages, "Request failed authorization - the local access token could not be cleared")
 	} else {
 		messages = append(messages, "Request failed authorization - access token has been cleared and will be refreshed on next request - please retry the command")
 	}
