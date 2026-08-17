@@ -21,7 +21,8 @@ tasks:
     title: "Replace getExistingOrigins panics with typed *clierr.CLIError returns"
     description: |
       In neo4j-cli/aura/internal/subcommands/graphql/corspolicy/allowedorigin/utils.go, replace both panic statements in getExistingOrigins with typed *clierr.CLIError returns via the function's existing ([]string, error) return. Status branch (line 43-45, latent 2xx!=200): return clierr.NewUpstreamError with the status and api.ScrubbedBodyTrunc(getResBody). Unmarshal branch (line 48-51, body-leak): return clierr.NewUpstreamError with api.ScrubbedBodyTrunc(getResBody), dropping err.Error() (raw body snippet). Remove now-unused imports os and clievents. Both callers (add.go:62, remove.go:66) already return err.
-    status: pending
+    status: completed
+    completed_at: 2026-08-17T08:47:20Z
     dependencies:
       - task-001
     acceptance_criteria:
@@ -64,7 +65,7 @@ tasks:
     title: "Add formatAuthorizationError wording tests in response_test.go"
     description: |
       In neo4j-cli/aura/internal/api/response_test.go (internal package api), extend TestHandleResponseError_ExitCodeMapping table: add wantMsgOmit:'please report' to the 401 row (~148) and to the 403-malformed row (~281, also add wantMsgContain:'403'). Add two focused direct-call tests reusing newAuthFixture (:109): TestFormatAuthorizationError_UnparseableBody_NoReportIssue (body '<html>gateway 502\n</html>', 401, assert code 4, NotContains 'please report', NotContains 'running CLI with args', Contains '401', Suggestion==authSuggestion) and TestFormatAuthorizationError_ClearAccessTokenFailure_NoReportIssue (parseable body, credential Name:'missing-cred' so ClearAccessToken fails deterministically, assert code 4, NotContains 'please report', Contains 'could not be cleared', Suggestion==authSuggestion).
-    status: pending
+    status: in_progress
     dependencies:
       - task-003
     acceptance_criteria:

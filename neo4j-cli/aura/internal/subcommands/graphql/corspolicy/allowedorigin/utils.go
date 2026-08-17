@@ -7,11 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
-	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 )
 
@@ -41,13 +39,12 @@ func getExistingOrigins(cfg *clicfg.Config, dataApiId, instanceId string) ([]str
 		return nil, err
 	}
 	if statusCode != http.StatusOK {
-		panic(clierr.NewFatalError("unexpected status code %d running CLI with args %s, please report an issue in %s", statusCode, clievents.RedactArgs(os.Args[1:]), clierr.IssuesURL))
+		return nil, clierr.NewUpstreamError("unexpected status code %d from GraphQL Data API CORS policy response: %s", statusCode, api.ScrubbedBodyTrunc(getResBody))
 	}
 
 	var parsedGetResBody DetailedBody
-	err = json.Unmarshal(getResBody, &parsedGetResBody)
-	if err != nil {
-		panic(err)
+	if err := json.Unmarshal(getResBody, &parsedGetResBody); err != nil {
+		return nil, clierr.NewUpstreamError("could not parse GraphQL Data API CORS policy response: %s", api.ScrubbedBodyTrunc(getResBody))
 	}
 
 	return parsedGetResBody.Data.Security.CorsPolicy.AllowedOrigins, nil
