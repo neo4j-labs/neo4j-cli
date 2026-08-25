@@ -67,9 +67,11 @@ func (r renderResult) AsArray() []map[string]any {
 //	{columns, rows, truncated, arrays_truncated}
 //
 // Field order is fixed via struct field order so encoding/json preserves it.
-// The `stats` and `error` keys are additive (omitempty): a successful read
-// stays byte-identical, while an error-placeholder (--continue-on-error) keeps
-// its positional slot and surfaces the failure under `error`.
+// The `stats`, `plan`, `profile`, and `error` keys are additive (omitempty): a
+// successful read stays byte-identical, an EXPLAIN/PROFILE run appends its
+// operator tree under `plan`/`profile` (mutually exclusive, so never both), and
+// an error-placeholder (--continue-on-error) keeps its positional slot and
+// surfaces the failure under `error`.
 func (r renderResult) MarshalJSON() ([]byte, error) {
 	cols := r.columns
 	if cols == nil {
@@ -85,6 +87,8 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 		Truncated       bool             `json:"truncated"`
 		ArraysTruncated int              `json:"arrays_truncated"`
 		Stats           *writeStats      `json:"stats,omitempty"`
+		Plan            *planNode        `json:"plan,omitempty"`
+		Profile         *planNode        `json:"profile,omitempty"`
 		Error           string           `json:"error,omitempty"`
 	}{
 		Columns:         cols,
@@ -92,6 +96,8 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 		Truncated:       r.truncated,
 		ArraysTruncated: r.arraysTruncated,
 		Stats:           r.stats,
+		Plan:            r.plan,
+		Profile:         r.profile,
 		Error:           r.errMsg,
 	})
 }
@@ -119,6 +125,7 @@ func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResul
 	if len(results) == 1 {
 		commonoutput.PrintBodyMap(cmd, cfg, results[0], results[0].columns)
 		renderStatsLines(cmd, cfg, results)
+		renderPlanLines(cmd, cfg, results)
 		return
 	}
 	items := make([]commonoutput.ResponseData, len(results))
@@ -129,6 +136,68 @@ func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResul
 	}
 	commonoutput.PrintBodyMaps(cmd, cfg, items, fields)
 	renderStatsLines(cmd, cfg, results)
+	renderPlanLines(cmd, cfg, results)
+}
+
+// renderPlanLines writes the EXPLAIN/PROFILE operator trees to stdout, but only
+// in table mode — JSON/TOON carry the plan inside the envelope instead (see
+// renderResult.MarshalJSON). A result with no plan tree produces no line, so
+// ordinary reads stay byte-identical to the pre-plan output. With more than one
+// statement the root line of each tree is prefixed "statement N: " to match
+// renderStatsLines' and truncateResult's warning convention; the rest of the
+// tree is left unprefixed.
+func renderPlanLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
+	if commonoutput.ResolveOutput(cmd, cfg) != "table" {
+		return
+	}
+	multi := len(results) > 1
+	for i, r := range results {
+		var tree *planNode
+		profiled := false
+		switch {
+		case r.profile != nil:
+			tree = r.profile
+			profiled = true
+		case r.plan != nil:
+			tree = r.plan
+		default:
+			continue
+		}
+		lines := formatPlanTree(tree, profiled, 0)
+		if multi {
+			lines[0] = fmt.Sprintf("statement %d: %s", i+1, lines[0])
+		}
+		for _, line := range lines {
+			cmd.Println(line)
+		}
+	}
+}
+
+// formatPlanTree renders an operator tree as one line per node, depth-first,
+// indented two spaces per depth level. A node with identifiers is written
+// "<Operator> => ident1, ident2"; one without identifiers is just the operator
+// name. When profiled (the tree came from a PROFILE run) every line additionally
+// carries its gathered metrics as " (rows: N, dbHits: M, time: Tµs)"; an EXPLAIN
+// tree prints none. The profiled flag rides along from which renderResult field
+// the tree came from rather than sniffing whether the metrics are zero, so a
+// legitimately-zero-cost profiled operator still prints its metrics. There is no
+// depth cap: the whole tree is rendered.
+func formatPlanTree(root *planNode, profiled bool, depth int) []string {
+	if root == nil {
+		return nil
+	}
+	line := strings.Repeat("  ", depth) + root.Operator
+	if len(root.Identifiers) > 0 {
+		line += " => " + strings.Join(root.Identifiers, ", ")
+	}
+	if profiled {
+		line += fmt.Sprintf(" (rows: %d, dbHits: %d, time: %dµs)", root.Rows, root.DbHits, root.Time)
+	}
+	lines := []string{line}
+	for i := range root.Children {
+		lines = append(lines, formatPlanTree(&root.Children[i], profiled, depth+1)...)
+	}
+	return lines
 }
 
 // renderStatsLines writes a per-statement write-summary line to stdout, but only
