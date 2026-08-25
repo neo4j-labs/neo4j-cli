@@ -219,16 +219,28 @@ func promptPassword(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 
 // rejectWriteCypher runs an EXPLAIN preflight against the supplied cypher and
 // returns a usage error unless the driver's ResultSummary classifies it as
-// QueryTypeReadOnly. EXPLAIN never mutates state, so it always runs inside
-// ExecuteRead. A statement that already carries an execution mode (EXPLAIN or
-// PROFILE) is sent verbatim — prepending another EXPLAIN would be rejected by
-// the server as conflicting execution modes.
+// QueryTypeReadOnly. EXPLAIN never mutates state, so the preflight always runs
+// inside ExecuteRead.
+//
+// The preflight itself must never execute the user's statement, and neither of
+// the user-selectable execution modes may force it to:
+//
+//   - an EXPLAIN-prefixed statement is skipped entirely — EXPLAIN cannot
+//     mutate, so gating the plan of a write query on the body's QueryType
+//     would be a false positive that forces --rw just to view the plan;
+//   - a PROFILE-prefixed statement is classified via "EXPLAIN " + its body
+//     (the leading PROFILE keyword stripped), because PROFILE executes and use
+//     in the classification step would run the very write being guarded;
+//   - anything else is classified via "EXPLAIN " + cypher unchanged.
 func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[string]any) error {
-	statement := cypher
-	if !statementHasExecutionMode(cypher) {
-		statement = "EXPLAIN " + cypher
+	mode, rest := executionMode(cypher)
+	switch mode {
+	case "EXPLAIN":
+		return nil
+	case "PROFILE":
+		cypher = rest
 	}
-	resp, err := runStatementResponse(cmd.Context(), c, statement, params, true)
+	resp, err := runStatementResponse(cmd.Context(), c, "EXPLAIN "+cypher, params, true)
 	if err != nil {
 		return err
 	}
@@ -238,22 +250,36 @@ func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[st
 	return nil
 }
 
-// statementHasExecutionMode reports whether the statement already starts with
-// an execution-mode keyword (EXPLAIN or PROFILE), case-insensitively and
-// tolerating leading whitespace. A user-written EXPLAIN/PROFILE statement is
-// read-only by construction, so rejectWriteCypher sends it verbatim to the
-// classifier instead of double-prefixing it into the server-rejected
-// "EXPLAIN PROFILE ...".
-func statementHasExecutionMode(cypher string) bool {
-	words := strings.Fields(cypher)
-	if len(words) == 0 {
-		return false
+// executionMode reports the leading execution-mode keyword (EXPLAIN or
+// PROFILE) of cypher, if any, together with the statement remainder after that
+// keyword and its separating whitespace. mode is "" for a statement that
+// carries no execution mode.
+//
+// The match is case-insensitive, tolerates leading whitespace, and honours a
+// word boundary, so "EXPLAINER RETURN 1" and "PROFILED RETURN 1" do not match.
+// rest preserves the original bytes of the body — internal whitespace, casing
+// and trailing content are untouched — because the caller builds the
+// EXPLAIN-classification statement from it.
+func executionMode(cypher string) (mode, rest string) {
+	trimmed := strings.TrimLeft(cypher, " \t\r\n")
+	for _, kw := range []string{"EXPLAIN", "PROFILE"} {
+		if len(trimmed) < len(kw) || !strings.EqualFold(trimmed[:len(kw)], kw) {
+			continue
+		}
+		after := trimmed[len(kw):]
+		if after != "" && isWordByte(after[0]) {
+			continue
+		}
+		return kw, strings.TrimLeft(after, " \t\r\n")
 	}
-	switch strings.ToLower(words[0]) {
-	case "explain", "profile":
-		return true
-	}
-	return false
+	return "", ""
+}
+
+// isWordByte reports whether b is a Cypher word character (letter, digit or
+// underscore). It is used to detect the word boundary between an execution-mode
+// keyword and the statement body so "EXPLAINER"/"PROFILED" never match.
+func isWordByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
 }
 
 // preflightAll runs the rejectWriteCypher write-guard over every statement and
