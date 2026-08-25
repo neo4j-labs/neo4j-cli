@@ -200,7 +200,13 @@ func formatPlanTree(root *planNode, profiled bool, depth int) []string {
 		line += " => " + strings.Join(idents, ", ")
 	}
 	if profiled {
-		line += fmt.Sprintf(" (rows: %d, dbHits: %d, time: %dµs)", root.Rows, root.DbHits, root.Time)
+		// planNode.Time is the server's raw nanosecond count (the driver
+		// copies it off the wire with no conversion — verified against a
+		// live PROFILE). Render it as microseconds so a typical operator's
+		// tens-of-millions value reads as a human-scale number rather than
+		// raw ns. The JSON envelope keeps the raw ns int for machine
+		// consumers; only this terminal rendering converts.
+		line += fmt.Sprintf(" (rows: %d, dbHits: %d, time: %dµs)", root.Rows, root.DbHits, root.Time/1000)
 	}
 	lines := []string{line}
 	for i := range root.Children {

@@ -91,15 +91,20 @@ func statsFromCounters(c neo4j.Counters) *writeStats {
 // driver plan) so callers can nil-check to decide whether to render a plan at
 // all.
 type planNode struct {
-	Operator        string         `json:"operator"`
-	Arguments       map[string]any `json:"arguments,omitempty"`
-	Identifiers     []string       `json:"identifiers,omitempty"`
-	Children        []planNode     `json:"children,omitempty"`
-	Rows            int64          `json:"rows,omitempty"`
-	DbHits          int64          `json:"db_hits,omitempty"`
-	Time            int64          `json:"time,omitempty"`
-	PageCacheHits   int64          `json:"page_cache_hits,omitempty"`
-	PageCacheMisses int64          `json:"page_cache_misses,omitempty"`
+	Operator    string         `json:"operator"`
+	Arguments   map[string]any `json:"arguments,omitempty"`
+	Identifiers []string       `json:"identifiers,omitempty"`
+	Children    []planNode     `json:"children,omitempty"`
+	Rows        int64          `json:"rows,omitempty"`
+	DbHits      int64          `json:"db_hits,omitempty"`
+	// Time is the server's raw nanosecond count for this operator (the driver
+	// copies the wire value with no conversion). The table renderer converts to
+	// µs; the JSON envelope emits the raw ns int for machine consumers. The root
+	// operator's Time is always zero — the driver populates time only for child
+	// operators — so omitempty drops it there.
+	Time            int64 `json:"time,omitempty"`
+	PageCacheHits   int64 `json:"page_cache_hits,omitempty"`
+	PageCacheMisses int64 `json:"page_cache_misses,omitempty"`
 }
 
 // planNodeFromPlan copies a driver Plan into the driver-free planNode, leaving

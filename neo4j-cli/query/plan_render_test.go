@@ -41,16 +41,16 @@ func profiledFixture() *planNode {
 		Identifiers: []string{"x"},
 		Rows:        1,
 		DbHits:      2,
-		Time:        3,
+		Time:        3000,
 		Children: []planNode{
 			{
 				Operator:    "Filter",
 				Identifiers: []string{"n"},
 				Rows:        10,
 				DbHits:      20,
-				Time:        30,
+				Time:        30000,
 				Children: []planNode{
-					{Operator: "NodeByLabelScan", Rows: 100, DbHits: 200, Time: 300},
+					{Operator: "NodeByLabelScan", Rows: 100, DbHits: 200, Time: 300000},
 				},
 			},
 		},
@@ -91,6 +91,32 @@ func TestFormatPlanTree_MetricsSuffixFollowsProfiledFlagNotValues(t *testing.T) 
 		got := formatPlanTree(&planNode{Operator: "ProduceResults", Rows: 7, DbHits: 8, Time: 9}, false, 0)
 		assert.Equal(t, []string{"ProduceResults"}, got)
 	})
+}
+
+// TestFormatPlanTree_TimeConversionFromNanoseconds pins the ns->µs conversion.
+// planNode.Time holds the server's raw nanosecond count (verified against a live
+// PROFILE: a 200k-node scan reports ~19,470,293 for an operator that took ~19.5ms
+// wall-clock). The table renders microseconds, so a realistic tens-of-millions
+// value reads as a human-scale number rather than raw ns. The JSON envelope keeps
+// the raw int (asserted separately).
+func TestFormatPlanTree_TimeConversionFromNanoseconds(t *testing.T) {
+	tests := []struct {
+		name string
+		time int64
+		want string
+	}{
+		{name: "realistic scan", time: 19470293, want: "Op (rows: 1, dbHits: 2, time: 19470µs)"},
+		{name: "sub-microsecond truncates to zero", time: 999, want: "Op (rows: 1, dbHits: 2, time: 0µs)"},
+		{name: "exactly one microsecond", time: 1000, want: "Op (rows: 1, dbHits: 2, time: 1µs)"},
+		{name: "zero", time: 0, want: "Op (rows: 1, dbHits: 2, time: 0µs)"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := formatPlanTree(&planNode{Operator: "Op", Rows: 1, DbHits: 2, Time: tc.time}, true, 0)
+			require.Len(t, got, 1)
+			assert.Equal(t, tc.want, got[0])
+		})
+	}
 }
 
 func TestFormatPlanTree_HonorsStartingDepth(t *testing.T) {
@@ -207,6 +233,10 @@ func TestRenderResults_JSON_CarriesProfile(t *testing.T) {
 	assert.Equal(t, "ProduceResults", got.Profile.Operator)
 	assert.Equal(t, int64(7), got.Profile.DbHits)
 	assert.Equal(t, int64(5), got.Profile.Rows)
+	// The JSON envelope keeps the raw nanosecond int; only the table renderer
+	// converts to µs. Pin the raw value so a future change can't silently
+	// convert the envelope too.
+	assert.Equal(t, int64(11), got.Profile.Time)
 	assert.Len(t, got.Rows, 1, "result rows must still be present alongside the profile")
 	assert.Nil(t, got.Plan)
 	assert.NotContains(t, out, `"plan"`)
@@ -315,7 +345,7 @@ func TestRenderResults_Table_MultiStatementPrefixesRootLine(t *testing.T) {
 		{
 			columns: []string{"b"},
 			rows:    []map[string]any{{"b": "two"}},
-			profile: &planNode{Operator: "P2", Rows: 1, DbHits: 2, Time: 3, Children: []planNode{{Operator: "L2", Rows: 4, DbHits: 5, Time: 6}}},
+			profile: &planNode{Operator: "P2", Rows: 1, DbHits: 2, Time: 3000, Children: []planNode{{Operator: "L2", Rows: 4, DbHits: 5, Time: 6000}}},
 		},
 	})
 
