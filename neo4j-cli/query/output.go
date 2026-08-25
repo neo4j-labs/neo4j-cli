@@ -182,13 +182,22 @@ func renderPlanLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderRes
 // the tree came from rather than sniffing whether the metrics are zero, so a
 // legitimately-zero-cost profiled operator still prints its metrics. There is no
 // depth cap: the whole tree is rendered.
+//
+// Operator and identifier text is passed through commonoutput.StripControl for
+// the same reason formatCell does it: these are server-supplied strings headed
+// for a terminal, and a backtick-quoted Cypher identifier can carry an ANSI
+// escape or other C0 byte. The metrics are integers, so they need no stripping.
 func formatPlanTree(root *planNode, profiled bool, depth int) []string {
 	if root == nil {
 		return nil
 	}
-	line := strings.Repeat("  ", depth) + root.Operator
+	line := strings.Repeat("  ", depth) + commonoutput.StripControl(root.Operator)
 	if len(root.Identifiers) > 0 {
-		line += " => " + strings.Join(root.Identifiers, ", ")
+		idents := make([]string, len(root.Identifiers))
+		for i, ident := range root.Identifiers {
+			idents[i] = commonoutput.StripControl(ident)
+		}
+		line += " => " + strings.Join(idents, ", ")
 	}
 	if profiled {
 		line += fmt.Sprintf(" (rows: %d, dbHits: %d, time: %dµs)", root.Rows, root.DbHits, root.Time)

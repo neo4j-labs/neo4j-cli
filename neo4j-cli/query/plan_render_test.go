@@ -128,6 +128,32 @@ func TestFormatPlanTree_Nil(t *testing.T) {
 	assert.Nil(t, formatPlanTree(nil, false, 0))
 }
 
+// TestFormatPlanTree_StripsControlBytes locks the terminal-safety invariant the
+// rest of the query output already honors (see formatCell): operator and
+// identifier text is server-supplied, and a backtick-quoted Cypher identifier
+// can smuggle an ANSI escape, so neither may reach the terminal raw.
+func TestFormatPlanTree_StripsControlBytes(t *testing.T) {
+	got := formatPlanTree(&planNode{
+		Operator:    "Produce\x1b[31mResults",
+		Identifiers: []string{"n\x1b[0m", "m\x07"},
+		Children: []planNode{{
+			Operator: "NodeByLabelScan\x00",
+		}},
+	}, false, 0)
+
+	// StripControl neutralizes each control byte to '?' rather than deleting it,
+	// so the assertion is that no raw control byte survives to reach the
+	// terminal — the inert "[31m" remainder is harmless without its ESC.
+	require.Len(t, got, 2)
+	for _, line := range got {
+		assert.NotContains(t, line, "\x1b", "ANSI escape reached the rendered line")
+		assert.NotContains(t, line, "\x00")
+		assert.NotContains(t, line, "\x07")
+	}
+	assert.Equal(t, "Produce?[31mResults => n?[0m, m?", got[0])
+	assert.Equal(t, "  NodeByLabelScan?", got[1])
+}
+
 func TestRenderResults_JSON_CarriesExplainPlan(t *testing.T) {
 	cmd, cfg, stdout := newRenderCmd(t, "json")
 	renderResults(cmd, cfg, []renderResult{{
