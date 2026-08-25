@@ -30,6 +30,11 @@ type renderResult struct {
 	truncated       bool
 	arraysTruncated int
 	stats           *writeStats
+	// plan and profile are the driver-free EXPLAIN/PROFILE plan trees (mutually
+	// exclusive), carried through truncateResult so the downstream renderer can
+	// emit them. Both are nil for a non-EXPLAIN/PROFILE run.
+	plan    *planNode
+	profile *planNode
 	// errMsg is set only for an error-placeholder result produced under
 	// --continue-on-error: the statement failed, so it has no columns/rows but
 	// keeps its positional slot in the rendered array. Empty for successes.

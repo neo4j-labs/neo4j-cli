@@ -30,11 +30,15 @@ type conn struct {
 
 // queryResult is the parsed tabular payload of a successful Cypher run. The
 // shape matches what callers (run.go, schema.go) expect: positional rows where
-// each row's order matches Columns.
+// each row's order matches Columns. Plan and Profile are the driver-free
+// EXPLAIN/PROFILE plan trees (mutually exclusive, nil when neither was
+// reported) so renderResult can carry them onward.
 type queryResult struct {
 	Columns []string
 	Rows    [][]any
 	Stats   *writeStats
+	Plan    *planNode
+	Profile *planNode
 }
 
 // writeStats is a driver-free snapshot of the mutation counters reported by a
@@ -147,11 +151,28 @@ func planNodeFromProfile(p neo4j.ProfiledPlan) *planNode {
 	return node
 }
 
+// planFromResponse snapshots the profile-or-plan tree carried by a response
+// into the driver-free planNode, applying the EXPLAIN/PROFILE exclusivity rule
+// both statement paths share: a statement profiles XOR explains, so when the
+// profiled plan is present the profile field is set and the plan left nil, and
+// vice versa. Both come back nil when the statement reported neither (a
+// non-EXPLAIN/PROFILE run).
+func planFromResponse(resp *queryResponse) (plan, profile *planNode) {
+	if resp.Profile != nil {
+		return nil, planNodeFromProfile(resp.Profile)
+	}
+	if resp.Plan != nil {
+		return planNodeFromPlan(resp.Plan), nil
+	}
+	return nil, nil
+}
+
 // queryResponse is the structured envelope around a Cypher response. Backed
-// by the Bolt driver Result + ResultSummary. QueryType is taken straight
-// from ResultSummary.QueryType() and is what the --rw classifier inspects
-// for EXPLAIN preflight runs (QueryTypeReadOnly → safe; everything else
-// requires --rw). The driver also exposes the equivalent (deprecated)
+// by the Bolt driver Result + ResultSummary, it carries the statement's rows,
+// bookmarks, and plan trees. QueryType is taken straight from
+// ResultSummary.QueryType() and is what the --rw classifier inspects for
+// EXPLAIN preflight runs (QueryTypeReadOnly → safe; everything else requires
+// --rw). The driver also exposes the equivalent (deprecated)
 // StatementType() / StatementTypeReadOnly aliases — we use the QueryType
 // names so staticcheck does not flag them.
 type queryResponse struct {
@@ -162,6 +183,12 @@ type queryResponse struct {
 	Bookmarks []string
 	QueryType neo4j.QueryType
 	Counters  neo4j.Counters
+	// Plan and Profile are the raw driver plan trees reported by the
+	// ResultSummary. Both stay nil for an ordinary statement; when a plan is
+	// present the statement profiled XOR explained, so one is set and the other
+	// nil. Snapshot rule in planFromResponse.
+	Plan    neo4j.Plan
+	Profile neo4j.ProfiledPlan
 }
 
 // buildDriverConfigurer returns the closure neo4j.NewDriver applies to its
@@ -300,10 +327,13 @@ func runStatementWithMode(ctx context.Context, c *conn, statement string, params
 		return nil, err
 	}
 
+	plan, profile := planFromResponse(parsed)
 	return &queryResult{
 		Columns: parsed.Data.Fields,
 		Rows:    parsed.Data.Values,
 		Stats:   statsFromCounters(parsed.Counters),
+		Plan:    plan,
+		Profile: profile,
 	}, nil
 }
 
@@ -385,6 +415,8 @@ func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string
 			if summary != nil {
 				resp.QueryType = summary.QueryType()
 				resp.Counters = summary.Counters()
+				resp.Plan = summary.Plan()
+				resp.Profile = summary.Profile()
 			}
 
 			responses = append(responses, resp)
@@ -423,10 +455,13 @@ func runStatementsWithMode(ctx context.Context, c *conn, statements []string, pa
 
 	results := make([]*queryResult, 0, len(parsed))
 	for _, p := range parsed {
+		plan, profile := planFromResponse(p)
 		results = append(results, &queryResult{
 			Columns: p.Data.Fields,
 			Rows:    p.Data.Values,
 			Stats:   statsFromCounters(p.Counters),
+			Plan:    plan,
+			Profile: profile,
 		})
 	}
 	return results, nil

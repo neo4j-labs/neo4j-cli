@@ -183,6 +183,8 @@ func truncateResult(cmd *cobra.Command, res *queryResult, truncOver, maxRows int
 		truncated:       truncated,
 		arraysTruncated: arraysTruncated,
 		stats:           res.Stats,
+		plan:            res.Plan,
+		profile:         res.Profile,
 	}
 }
 

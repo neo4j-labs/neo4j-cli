@@ -4,12 +4,19 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 // fakePlan is a driver-free neo4j.Plan stub. Children holds concrete fakePlan
@@ -167,4 +174,126 @@ func TestPlanNodeJSON(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, `{"operator":"X"}`, string(b))
 	})
+}
+
+// TestRunStatementWithMode_CarriesPlanAndProfile proves the single-statement
+// snapshot step: the seam's Plan/Profile flow into queryResult under the
+// EXPLAIN/PROFILE XOR rule (profile wins when both-should-never-be-set, plan
+// fills the absence), and an ordinary run carries neither.
+func TestRunStatementWithMode_CarriesPlanAndProfile(t *testing.T) {
+	t.Run("EXPLAIN response carries plan, no profile", func(t *testing.T) {
+		withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
+			resp := &queryResponse{}
+			resp.Plan = fakePlan{operator: "ProduceResults"}
+			return resp, nil
+		})
+
+		c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
+		res, err := runStatement(context.Background(), c, "EXPLAIN RETURN 1", nil)
+		require.NoError(t, err)
+		require.NotNil(t, res.Plan)
+		assert.Equal(t, "ProduceResults", res.Plan.Operator)
+		assert.Nil(t, res.Profile)
+	})
+
+	t.Run("PROFILE response carries profile, no plan", func(t *testing.T) {
+		withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
+			resp := &queryResponse{}
+			resp.Profile = fakeProfiledPlan{operator: "ProduceResults", records: 7, dbHits: 3}
+			return resp, nil
+		})
+
+		c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
+		res, err := runStatement(context.Background(), c, "PROFILE RETURN 1", nil)
+		require.NoError(t, err)
+		assert.Nil(t, res.Plan)
+		require.NotNil(t, res.Profile)
+		assert.Equal(t, "ProduceResults", res.Profile.Operator)
+		assert.Equal(t, int64(7), res.Profile.Rows)
+		assert.Equal(t, int64(3), res.Profile.DbHits)
+	})
+
+	t.Run("ordinary run carries neither", func(t *testing.T) {
+		withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
+			return &queryResponse{}, nil
+		})
+
+		c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
+		res, err := runStatement(context.Background(), c, "RETURN 1", nil)
+		require.NoError(t, err)
+		assert.Nil(t, res.Plan)
+		assert.Nil(t, res.Profile)
+	})
+}
+
+// TestRunStatementsWithMode_CarriesPerStatementPlan proves the --atomic batch
+// path applies the snapshot rule per statement: each queryResult carries its own
+// plan or profile, never the first statement's leaked across the batch. The seam
+// keys each response off the statement text so the ordinary run reports neither.
+func TestRunStatementsWithMode_CarriesPerStatementPlan(t *testing.T) {
+	withRunStatementsSeam(t, func(_ context.Context, _ *conn, statements []string, _ map[string]any, _ bool) ([]*queryResponse, error) {
+		resps := make([]*queryResponse, len(statements))
+		for i, statement := range statements {
+			resp := &queryResponse{}
+			switch {
+			case strings.HasPrefix(statement, "EXPLAIN"):
+				resp.Plan = fakePlan{operator: fmt.Sprintf("explain-%d", i)}
+			case strings.HasPrefix(statement, "PROFILE"):
+				resp.Profile = fakeProfiledPlan{operator: fmt.Sprintf("profile-%d", i), records: int64(i)}
+			}
+			resps[i] = resp
+		}
+		return resps, nil
+	})
+
+	c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
+	results, err := runStatementsWithMode(context.Background(), c, []string{"EXPLAIN RETURN 1", "PROFILE RETURN 2", "RETURN 3"}, nil, false)
+	require.NoError(t, err)
+	require.Len(t, results, 3)
+
+	require.NotNil(t, results[0].Plan)
+	assert.Equal(t, "explain-0", results[0].Plan.Operator)
+	assert.Nil(t, results[0].Profile)
+
+	require.NotNil(t, results[1].Profile)
+	assert.Equal(t, "profile-1", results[1].Profile.Operator)
+	assert.Equal(t, int64(1), results[1].Profile.Rows)
+	assert.Nil(t, results[1].Plan)
+
+	assert.Nil(t, results[2].Plan)
+	assert.Nil(t, results[2].Profile)
+}
+
+// TestTruncateResult_CarriesPlanAndProfile proves the copy step: truncateResult
+// forwards the queryResult's plan/profile onto the renderResult unchanged under
+// the same XOR rule, so the downstream renderer can emit them.
+func TestTruncateResult_CarriesPlanAndProfile(t *testing.T) {
+	cmd := &cobra.Command{SilenceUsage: true}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	res := &queryResult{
+		Columns: []string{"n"},
+		Rows:    [][]any{{int64(1)}},
+		Plan:    planNodeFromPlan(fakePlan{operator: "ProduceResults"}),
+	}
+
+	out := truncateResult(cmd, res, 0, 0, false, 1)
+	require.NotNil(t, out.plan)
+	assert.Equal(t, "ProduceResults", out.plan.Operator)
+	assert.Nil(t, out.profile)
+
+	res.Plan = nil
+	res.Profile = planNodeFromProfile(fakeProfiledPlan{operator: "ProduceResults", records: 5})
+	out = truncateResult(cmd, res, 0, 0, false, 1)
+	assert.Nil(t, out.plan)
+	require.NotNil(t, out.profile)
+	assert.Equal(t, "ProduceResults", out.profile.Operator)
+	assert.Equal(t, int64(5), out.profile.Rows)
+
+	res.Plan = nil
+	res.Profile = nil
+	out = truncateResult(cmd, res, 0, 0, false, 1)
+	assert.Nil(t, out.plan)
+	assert.Nil(t, out.profile)
 }
