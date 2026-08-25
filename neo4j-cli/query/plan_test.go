@@ -180,6 +180,66 @@ func TestPlanNodeJSON(t *testing.T) {
 // snapshot step: the seam's Plan/Profile flow into queryResult under the
 // EXPLAIN/PROFILE XOR rule (profile wins when both-should-never-be-set, plan
 // fills the absence), and an ordinary run carries neither.
+// TestPlanFromResponse pins the branch ORDER of the snapshot rule, which the
+// per-statement tests below cannot: a real PROFILE run reports Plan() AND
+// Profile() both non-nil, so profile has to win. Were the branches flipped,
+// every single-field test would still pass while PROFILE silently degraded to an
+// operator tree with no metrics — so the both-present row is the point of this
+// table, and the distinct operator names are what prove which branch fired.
+func TestPlanFromResponse(t *testing.T) {
+	tests := []struct {
+		name            string
+		plan            neo4j.Plan
+		profile         neo4j.ProfiledPlan
+		wantPlanOp      string
+		wantProfileOp   string
+		wantProfileRows int64
+	}{
+		{
+			name:       "plan only (EXPLAIN)",
+			plan:       fakePlan{operator: "PlanBranch"},
+			wantPlanOp: "PlanBranch",
+		},
+		{
+			name:            "profile only",
+			profile:         fakeProfiledPlan{operator: "ProfileBranch", records: 5},
+			wantProfileOp:   "ProfileBranch",
+			wantProfileRows: 5,
+		},
+		{
+			name:            "both present (PROFILE) — profile wins",
+			plan:            fakePlan{operator: "PlanBranch"},
+			profile:         fakeProfiledPlan{operator: "ProfileBranch", records: 5},
+			wantProfileOp:   "ProfileBranch",
+			wantProfileRows: 5,
+		},
+		{
+			name: "neither (ordinary run)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan, profile := planFromResponse(&queryResponse{Plan: tt.plan, Profile: tt.profile})
+
+			if tt.wantPlanOp == "" {
+				assert.Nil(t, plan)
+			} else {
+				require.NotNil(t, plan)
+				assert.Equal(t, tt.wantPlanOp, plan.Operator)
+			}
+
+			if tt.wantProfileOp == "" {
+				assert.Nil(t, profile)
+			} else {
+				require.NotNil(t, profile)
+				assert.Equal(t, tt.wantProfileOp, profile.Operator)
+				assert.Equal(t, tt.wantProfileRows, profile.Rows)
+			}
+		})
+	}
+}
+
 func TestRunStatementWithMode_CarriesPlanAndProfile(t *testing.T) {
 	t.Run("EXPLAIN response carries plan, no profile", func(t *testing.T) {
 		withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
