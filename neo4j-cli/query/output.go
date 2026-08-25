@@ -152,15 +152,8 @@ func renderPlanLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderRes
 	}
 	multi := len(results) > 1
 	for i, r := range results {
-		var tree *planNode
-		profiled := false
-		switch {
-		case r.profile != nil:
-			tree = r.profile
-			profiled = true
-		case r.plan != nil:
-			tree = r.plan
-		default:
+		tree, profiled := r.planInfo()
+		if tree == nil {
 			continue
 		}
 		lines := formatPlanTree(tree, profiled, 0)
@@ -171,6 +164,23 @@ func renderPlanLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderRes
 			cmd.Println(line)
 		}
 	}
+}
+
+// planInfo returns the plan tree to render and whether it came from a PROFILE
+// run (in which case formatPlanTree appends per-operator metrics). A PROFILE
+// statement makes the driver report BOTH Plan() and Profile() non-nil; the
+// profile carries the execution metrics, so it wins. An EXPLAIN run reports
+// only Plan(); an ordinary run reports neither. MarshalJSON is not a consumer
+// of this accessor — it emits whichever raw field is set under its own key, so
+// it reads the fields directly.
+func (r renderResult) planInfo() (tree *planNode, profiled bool) {
+	if r.profile != nil {
+		return r.profile, true
+	}
+	if r.plan != nil {
+		return r.plan, false
+	}
+	return nil, false
 }
 
 // formatPlanTree renders an operator tree as one line per node, depth-first,

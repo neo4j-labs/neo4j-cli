@@ -119,6 +119,37 @@ func TestFormatPlanTree_TimeConversionFromNanoseconds(t *testing.T) {
 	}
 }
 
+// TestRenderResult_PlanInfo pins the profile-wins precedence at its single
+// home: a PROFILE run makes the driver report both Plan() and Profile() non-nil,
+// and the profile carries the metrics, so it must win. A copy returned instead
+// of the stored pointer would still pass a non-nil check, so the assertion uses
+// require.Same for pointer identity.
+func TestRenderResult_PlanInfo(t *testing.T) {
+	t.Run("profile wins when both present", func(t *testing.T) {
+		plan := &planNode{Operator: "PlanBranch"}
+		profile := &planNode{Operator: "ProfileBranch", Rows: 1}
+		r := renderResult{plan: plan, profile: profile}
+		tree, profiled := r.planInfo()
+		require.Same(t, profile, tree, "profile must win and be the stored pointer, not a copy")
+		assert.True(t, profiled)
+	})
+
+	t.Run("plan when profile absent", func(t *testing.T) {
+		plan := &planNode{Operator: "PlanBranch"}
+		r := renderResult{plan: plan}
+		tree, profiled := r.planInfo()
+		require.Same(t, plan, tree)
+		assert.False(t, profiled)
+	})
+
+	t.Run("neither yields nil", func(t *testing.T) {
+		r := renderResult{}
+		tree, profiled := r.planInfo()
+		assert.Nil(t, tree)
+		assert.False(t, profiled)
+	})
+}
+
 func TestFormatPlanTree_HonorsStartingDepth(t *testing.T) {
 	tree := &planNode{Operator: "Root", Children: []planNode{{Operator: "Leaf"}}}
 	got := formatPlanTree(tree, false, 2)
