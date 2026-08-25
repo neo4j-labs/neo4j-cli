@@ -39,5 +39,8 @@ test-api/
 # agent worktree scratch (Claude Code isolated worktrees)
 /.claude/worktrees/
 
+# gbuild feature graphs + node checkpoints (agent planning scratch)
+/.gbuild/
+
 # macOS Finder metadata
 .DS_Store
