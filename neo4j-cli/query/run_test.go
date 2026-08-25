@@ -646,6 +646,49 @@ func TestRejectWriteCypher_QueryTypeClassifier(t *testing.T) {
 	}
 }
 
+// TestStatementHasExecutionMode covers the prefix-detection helper that keeps
+// rejectWriteCypher from double-prefixing an already-moded statement. Either
+// Cypher execution-mode keyword (EXPLAIN or PROFILE) counts, in any case and
+// past leading whitespace; a bare statement or a word that merely starts with
+// the keyword (EXPLAINER) does not.
+func TestStatementHasExecutionMode(t *testing.T) {
+	tests := []struct {
+		name   string
+		cypher string
+		want   bool
+	}{
+		{name: "explain", cypher: "EXPLAIN RETURN 1", want: true},
+		{name: "profile", cypher: "PROFILE RETURN 1", want: true},
+		{name: "lowercase profile", cypher: "profile return 1", want: true},
+		{name: "leading whitespace", cypher: "  EXPLAIN RETURN 1", want: true},
+		{name: "bare statement", cypher: "RETURN 1", want: false},
+		{name: "explainer is not explain", cypher: "EXPLAINER RETURN 1", want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, statementHasExecutionMode(tc.cypher))
+		})
+	}
+}
+
+// TestRejectWriteCypher_AlreadyModedStatementSentVerbatim locks the contract
+// that the write-guard sends a statement carrying its own execution mode
+// (PROFILE) verbatim to the classifier. Prefacing it with EXPLAIN would fail
+// on the server with "Can't specify multiple conflicting values for execution
+// mode" even though PROFILE is read-only.
+func TestRejectWriteCypher_AlreadyModedStatementSentVerbatim(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["PROFILE RETURN 1"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.install(t)
+
+	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.QueryScope))
+	cmd.SetContext(context.Background())
+	err := rejectWriteCypher(cmd, &conn{}, "PROFILE RETURN 1", nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"PROFILE RETURN 1"}, r.calls)
+	assert.NotContains(t, r.calls, "EXPLAIN PROFILE RETURN 1")
+}
+
 func TestRunQuery_RowLimitTruncates_TableOutput(t *testing.T) {
 	r := newSeamRouter()
 	rows := make([][]any, 10)

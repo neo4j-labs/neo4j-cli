@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/cobra"
@@ -217,9 +218,15 @@ func promptPassword(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 // rejectWriteCypher runs an EXPLAIN preflight against the supplied cypher and
 // returns a usage error unless the driver's ResultSummary classifies it as
 // QueryTypeReadOnly. EXPLAIN never mutates state, so it always runs inside
-// ExecuteRead.
+// ExecuteRead. A statement that already carries an execution mode (EXPLAIN or
+// PROFILE) is sent verbatim — prepending another EXPLAIN would be rejected by
+// the server as conflicting execution modes.
 func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[string]any) error {
-	resp, err := runStatementResponse(cmd.Context(), c, "EXPLAIN "+cypher, params, true)
+	statement := cypher
+	if !statementHasExecutionMode(cypher) {
+		statement = "EXPLAIN " + cypher
+	}
+	resp, err := runStatementResponse(cmd.Context(), c, statement, params, true)
 	if err != nil {
 		return err
 	}
@@ -227,6 +234,24 @@ func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[st
 		return clierr.NewUsageError("this command writes; pass --rw to allow it")
 	}
 	return nil
+}
+
+// statementHasExecutionMode reports whether the statement already starts with
+// an execution-mode keyword (EXPLAIN or PROFILE), case-insensitively and
+// tolerating leading whitespace. A user-written EXPLAIN/PROFILE statement is
+// read-only by construction, so rejectWriteCypher sends it verbatim to the
+// classifier instead of double-prefixing it into the server-rejected
+// "EXPLAIN PROFILE ...".
+func statementHasExecutionMode(cypher string) bool {
+	words := strings.Fields(cypher)
+	if len(words) == 0 {
+		return false
+	}
+	switch strings.ToLower(words[0]) {
+	case "explain", "profile":
+		return true
+	}
+	return false
 }
 
 // preflightAll runs the rejectWriteCypher write-guard over every statement and
