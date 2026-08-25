@@ -79,6 +79,74 @@ func statsFromCounters(c neo4j.Counters) *writeStats {
 	}
 }
 
+// planNode is a driver-free snapshot of one node in a statement's EXPLAIN or
+// PROFILE plan tree, as reported by ResultSummary.Plan()/Profile(). Both plan
+// shapes share this tree type: the profile-only metrics (rows, db_hits, time,
+// page cache) stay zero for a plain EXPLAIN plan. It is nil when there is no
+// plan to report (planNodeFromPlan/planNodeFromProfile return nil for a nil
+// driver plan) so callers can nil-check to decide whether to render a plan at
+// all.
+type planNode struct {
+	Operator        string         `json:"operator"`
+	Arguments       map[string]any `json:"arguments,omitempty"`
+	Identifiers     []string       `json:"identifiers,omitempty"`
+	Children        []planNode     `json:"children,omitempty"`
+	Rows            int64          `json:"rows,omitempty"`
+	DbHits          int64          `json:"db_hits,omitempty"`
+	Time            int64          `json:"time,omitempty"`
+	PageCacheHits   int64          `json:"page_cache_hits,omitempty"`
+	PageCacheMisses int64          `json:"page_cache_misses,omitempty"`
+}
+
+// planNodeFromPlan copies a driver Plan into the driver-free planNode, leaving
+// every profile-only metric zero (this is the EXPLAIN shape where the plan was
+// never executed so no cost data exists). Recurses over Children() so the whole
+// tree is snapshotted. A nil plan yields nil — an EXPLAIN run without a plan
+// (or a non-EXPLAIN run) reports nothing.
+func planNodeFromPlan(p neo4j.Plan) *planNode {
+	if p == nil {
+		return nil
+	}
+	node := &planNode{
+		Operator:    p.Operator(),
+		Arguments:   p.Arguments(),
+		Identifiers: p.Identifiers(),
+	}
+	for _, child := range p.Children() {
+		if c := planNodeFromPlan(child); c != nil {
+			node.Children = append(node.Children, *c)
+		}
+	}
+	return node
+}
+
+// planNodeFromProfile copies a driver ProfiledPlan into the driver-free
+// planNode, carrying the profile-only metrics (rows, db_hits, time, page cache)
+// alongside the operator/arguments/identifiers both shapes share. Recurses over
+// Children() so the whole tree is snapshotted. A nil profiled plan yields nil —
+// a run without profiling reports nothing.
+func planNodeFromProfile(p neo4j.ProfiledPlan) *planNode {
+	if p == nil {
+		return nil
+	}
+	node := &planNode{
+		Operator:        p.Operator(),
+		Arguments:       p.Arguments(),
+		Identifiers:     p.Identifiers(),
+		Rows:            p.Records(),
+		DbHits:          p.DbHits(),
+		Time:            p.Time(),
+		PageCacheHits:   p.PageCacheHits(),
+		PageCacheMisses: p.PageCacheMisses(),
+	}
+	for _, child := range p.Children() {
+		if c := planNodeFromProfile(child); c != nil {
+			node.Children = append(node.Children, *c)
+		}
+	}
+	return node
+}
+
 // queryResponse is the structured envelope around a Cypher response. Backed
 // by the Bolt driver Result + ResultSummary. QueryType is taken straight
 // from ResultSummary.QueryType() and is what the --rw classifier inspects
