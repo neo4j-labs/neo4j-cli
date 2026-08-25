@@ -212,6 +212,68 @@ func TestRenderResults_JSON_CarriesProfile(t *testing.T) {
 	assert.NotContains(t, out, `"plan"`)
 }
 
+// TestRenderResults_Toon_CarriesPlanAndProfile covers the toon half of the
+// envelope claim. Toon reaches the plan through the same MarshalJSON path the
+// JSON tests exercise, but that is coverage by construction — nothing otherwise
+// asserts the tree actually survives into a rendered toon document, and toon is
+// the default format under an agent harness, so agents are the primary consumer
+// of this output. Also pins that the table-only side-channel stays out of toon.
+func TestRenderResults_Toon_CarriesPlanAndProfile(t *testing.T) {
+	tests := []struct {
+		name        string
+		result      renderResult
+		wantKey     string
+		wantMetric  string
+		unwantedKey string
+	}{
+		{
+			name: "explain plan",
+			result: renderResult{
+				columns: []string{"n"},
+				plan: &planNode{
+					Operator:    "ProduceResults",
+					Identifiers: []string{"x"},
+					Children:    []planNode{{Operator: "NodeByLabelScan"}},
+				},
+			},
+			wantKey:     "plan",
+			unwantedKey: "profile",
+		},
+		{
+			name: "profile with metrics",
+			result: renderResult{
+				columns: []string{"n"},
+				rows:    []map[string]any{{"n": float64(1)}},
+				profile: &planNode{Operator: "ProduceResults", Rows: 5, DbHits: 7, Time: 11},
+			},
+			wantKey:     "profile",
+			wantMetric:  "db_hits",
+			unwantedKey: "plan",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cfg, stdout := newRenderCmd(t, "toon")
+			renderResults(cmd, cfg, []renderResult{tt.result})
+
+			out := stdout.String()
+			var v any
+			require.Error(t, json.Unmarshal([]byte(out), &v), "toon output must not be valid JSON")
+
+			assert.Contains(t, out, tt.wantKey)
+			assert.Contains(t, out, "ProduceResults")
+			if tt.wantMetric != "" {
+				assert.Contains(t, out, tt.wantMetric)
+			}
+			assert.NotContains(t, out, tt.unwantedKey)
+			// The table-mode operator tree must not leak into toon.
+			assert.NotContains(t, out, " => ")
+			assert.NotContains(t, out, "dbHits: ")
+		})
+	}
+}
+
 func TestRenderResults_Table_ExplainPrintsIndentedTree(t *testing.T) {
 	cmd, cfg, stdout := newRenderCmd(t, "table")
 	renderResults(cmd, cfg, []renderResult{{plan: planFixture()}})
