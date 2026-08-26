@@ -121,6 +121,90 @@ func TestRedactPlanArguments_ProfileRoute(t *testing.T) {
 	assert.Contains(t, out, "***")
 }
 
+// TestRedactPlanArguments_ScrubsStringSlices proves the shared gap both
+// recursive walkers had — a []string Arguments value was passed through
+// untouched — is closed at the single WalkStrings site: every string element,
+// including a secret, is scrubbed.
+func TestRedactPlanArguments_ScrubsStringSlices(t *testing.T) {
+	node := planNodeFromPlan(fakePlan{
+		operator: "Filter",
+		arguments: map[string]any{
+			"StringsArg": []string{"token = x", "plain"},
+		},
+	})
+	require.NotNil(t, node)
+
+	b, err := json.Marshal(node)
+	require.NoError(t, err)
+	out := string(b)
+	assert.NotContains(t, out, "token = x", "the secret []string element must be scrubbed")
+	assert.Contains(t, out, "***", "the scrub placeholder must replace the secret element")
+	assert.Contains(t, out, "plain", "non-secret slice elements must survive")
+}
+
+// TestRedactPlanArguments_NeutralizesControlBytes proves the redaction pass
+// applies the StripControl half of the Scrub combo itself, so server-supplied
+// string leaves carrying terminal control bytes (ANSI escapes, NUL) are
+// neutralized at the source instead of being left for the encoding/json escape
+// or TOON's post-marshal backstop.
+func TestRedactPlanArguments_NeutralizesControlBytes(t *testing.T) {
+	t.Run("escape embedded after a secret is swallowed by the redaction", func(t *testing.T) {
+		node := planNodeFromPlan(fakePlan{
+			operator: "Filter",
+			arguments: map[string]any{
+				"Details": "n.password = 'hunter2'\x1b[2J",
+			},
+		})
+		require.NotNil(t, node)
+
+		b, err := json.Marshal(node)
+		require.NoError(t, err)
+		out := string(b)
+		assert.NotContains(t, out, "hunter2", "the literal secret must never reach serialized output")
+		assert.NotContains(t, out, "\x1b", "the raw ESC byte must not survive the redaction pass")
+		assert.Contains(t, out, "***", "the secret value must be replaced by the redaction placeholder")
+	})
+
+	t.Run("escape in plain prose is stripped by the Scrub combo", func(t *testing.T) {
+		// RedactText does not rewrite this leaf (no secret shape), so the ESC can
+		// only be gone because the combo's StripControl half fired at the source.
+		node := planNodeFromPlan(fakePlan{
+			operator: "Filter",
+			arguments: map[string]any{
+				"planner\x00note": "prose\x1b[2J",
+			},
+		})
+		require.NotNil(t, node)
+
+		b, err := json.Marshal(node)
+		require.NoError(t, err)
+		out := string(b)
+		assert.NotContains(t, out, "\x1b", "the raw ESC byte must be neutralized by StripControl")
+		assert.NotContains(t, out, "\x00", "the raw NUL byte must be neutralized by StripControl")
+		assert.Contains(t, out, "prose?", "the plain-text leaf must survive with the control byte replaced by ?")
+	})
+}
+
+// TestRedactPlanArguments_StripsControlBytesFromMapKeys proves WalkStrings
+// applies the scrub leaf to map keys too, preserving stripControlDeep's key
+// behaviour now shared by the redaction pass.
+func TestRedactPlanArguments_StripsControlBytesFromMapKeys(t *testing.T) {
+	node := planNodeFromPlan(fakePlan{
+		operator: "Filter",
+		arguments: map[string]any{
+			"Details\x1b[2J": "keep",
+		},
+	})
+	require.NotNil(t, node)
+
+	b, err := json.Marshal(node)
+	require.NoError(t, err)
+	out := string(b)
+	assert.NotContains(t, out, "Details\x1b", "a control byte in an Arguments map key must be neutralized")
+	assert.Contains(t, out, "Details?[2J", "the key must survive with the control byte replaced by ?")
+	assert.Contains(t, out, "keep", "the key's value must survive")
+}
+
 // TestRedactPlanArguments_NilAndEmpty pins the degenerate inputs: a nil map
 // stays nil and an empty map becomes an empty (non-nil) map without panicking.
 func TestRedactPlanArguments_NilAndEmpty(t *testing.T) {

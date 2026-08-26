@@ -267,6 +267,50 @@ func TestStripControl(t *testing.T) {
 	}
 }
 
+func TestWalkStrings(t *testing.T) {
+	f := func(s string) string { return "[" + s + "]" }
+
+	t.Run("string leaf", func(t *testing.T) {
+		assert.Equal(t, "[abc]", WalkStrings("abc", f))
+	})
+
+	t.Run("map recurses values and rewrites keys", func(t *testing.T) {
+		got := WalkStrings(map[string]any{"a": "x", "n": map[string]any{"b": "y"}}, f)
+		want := map[string]any{"[a]": "[x]", "[n]": map[string]any{"[b]": "[y]"}}
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("[]any recurses into a new slice without mutating input", func(t *testing.T) {
+		src := []any{"x", map[string]any{"k": "y"}, []any{"z"}}
+		got := WalkStrings(src, f)
+		assert.Equal(t, []any{"[x]", map[string]any{"[k]": "[y]"}, []any{"[z]"}}, got)
+		assert.Equal(t, []any{"x", map[string]any{"k": "y"}, []any{"z"}}, src, "input slice must not be mutated")
+	})
+
+	t.Run("[]string rewrites every element", func(t *testing.T) {
+		assert.Equal(t, []string{"[x]", "[y]"}, WalkStrings([]string{"x", "y"}, f))
+	})
+
+	t.Run("non-string scalars pass through unchanged", func(t *testing.T) {
+		for _, v := range []any{11.0, 5, true, nil} {
+			assert.Equal(t, v, WalkStrings(v, f))
+		}
+	})
+
+	t.Run("map input is not mutated", func(t *testing.T) {
+		src := map[string]any{"Details": "p.password = 'hunter2'"}
+		_ = WalkStrings(src, f)
+		assert.Equal(t, map[string]any{"Details": "p.password = 'hunter2'"}, src)
+	})
+}
+
+func TestStripControlDeepHandlesStringSlices(t *testing.T) {
+	// WalkStrings (stripControlDeep's engine) added []string coverage; pin it so
+	// the encoding/json shapes handled by printToonValue keep pace.
+	got := stripControlDeep([]string{"foo\x1b[2J", "plain"})
+	assert.Equal(t, []string{"foo?[2J", "plain"}, got)
+}
+
 func TestResolveOutput_Toon(t *testing.T) {
 	// ResolveOutput must return "toon" when cfg.Global.Format() is "toon",
 	// regardless of TTY state.

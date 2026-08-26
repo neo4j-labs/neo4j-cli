@@ -16,6 +16,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clievents"
+	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
@@ -109,45 +110,25 @@ type planNode struct {
 }
 
 // redactPlanArguments copies a driver Plan/Profile Arguments map with every
-// string leaf passed through clievents.RedactText, so a secret a user embeds
-// literally in a Cypher predicate (e.g. `p.password = 'hunter2'`, which the
-// planner echoes under "Details") never reaches the serialized JSON/TOON
-// envelope or the tee-on-failure buffer. Non-string values (float, int, bool,
-// nil) are copied unchanged; nested map[string]any and []any aggregates are
-// walked recursively so string leaves inside them are scrubbed too. The input
-// map is not mutated. A nil map returns nil, an empty map returns an empty map.
+// string leaf (and every map key) passed through the Scrub combo —
+// clievents.RedactText then commonoutput.StripControl — so a secret a user
+// embeds literally in a Cypher predicate (e.g. `p.password = 'hunter2'`, which
+// the planner echoes under "Details") never reaches the serialized JSON/TOON
+// envelope or the tee-on-failure buffer, and server-supplied control bytes are
+// neutralized at the source rather than left for downstream backstops.
+// Non-string scalars (float, int, bool, nil) are copied unchanged; nested
+// map[string]any, []any and []string aggregates are walked recursively via
+// WalkStrings so string leaves inside them are scrubbed too. The input map is
+// not mutated. A nil map returns nil, an empty map returns an empty map.
 func redactPlanArguments(args map[string]any) map[string]any {
 	if args == nil {
 		return nil
 	}
-	out := make(map[string]any, len(args))
-	for k, v := range args {
-		out[k] = redactPlanValue(v)
-	}
+	walked := commonoutput.WalkStrings(args, func(s string) string {
+		return commonoutput.StripControl(clievents.RedactText(s))
+	})
+	out, _ := walked.(map[string]any)
 	return out
-}
-
-// redactPlanValue redacts a single Arguments value, recursing into map and
-// slice aggregates so every string leaf passes through RedactText.
-func redactPlanValue(v any) any {
-	switch t := v.(type) {
-	case string:
-		return clievents.RedactText(t)
-	case map[string]any:
-		m := make(map[string]any, len(t))
-		for k, val := range t {
-			m[k] = redactPlanValue(val)
-		}
-		return m
-	case []any:
-		s := make([]any, len(t))
-		for i, val := range t {
-			s[i] = redactPlanValue(val)
-		}
-		return s
-	default:
-		return v
-	}
 }
 
 // planNodeFromPlan copies a driver Plan into the driver-free planNode, leaving
