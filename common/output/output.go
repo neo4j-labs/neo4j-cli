@@ -351,27 +351,42 @@ func printToonValue(cmd *cobra.Command, values any) {
 	cmd.Println(string(toonBytes))
 }
 
-// stripControlDeep recursively applies StripControl to every string value and
-// map key in the shapes produced by encoding/json unmarshal-to-any. Numbers,
-// bools and nil are returned unchanged.
-func stripControlDeep(v any) any {
+// WalkStrings returns a copy of v with f applied to every string leaf and
+// every map key. It handles the shapes encoding/json unmarshals into any
+// (string, map[string]any, []any, []string) and returns non-string scalars
+// unchanged. It never mutates the caller's input.
+func WalkStrings(v any, f func(string) string) any {
 	switch val := v.(type) {
 	case string:
-		return StripControl(val)
+		return f(val)
 	case map[string]any:
 		out := make(map[string]any, len(val))
 		for k, item := range val {
-			out[StripControl(k)] = stripControlDeep(item)
+			out[f(k)] = WalkStrings(item, f)
 		}
 		return out
 	case []any:
+		out := make([]any, len(val))
 		for i, item := range val {
-			val[i] = stripControlDeep(item)
+			out[i] = WalkStrings(item, f)
 		}
-		return val
+		return out
+	case []string:
+		out := make([]string, len(val))
+		for i, item := range val {
+			out[i] = f(item)
+		}
+		return out
 	default:
 		return v
 	}
+}
+
+// stripControlDeep applies StripControl to every string value and map key in
+// the shapes produced by encoding/json unmarshal-to-any. Numbers, bools and
+// nil are returned unchanged.
+func stripControlDeep(v any) any {
+	return WalkStrings(v, StripControl)
 }
 
 func getNestedField(v map[string]any, subFields []string) string {

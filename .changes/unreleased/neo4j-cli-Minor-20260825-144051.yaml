@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'query now shows the execution plan for EXPLAIN and PROFILE statements: --format json/toon carry it as a plan or profile object, and --format table prints it as an indented operator tree (PROFILE also reporting per-operator rows, dbHits and time). EXPLAIN of a statement that writes no longer requires --rw (EXPLAIN never executes); PROFILE of a statement that writes is still refused without --rw.'
+time: 2026-08-25T14:40:51.500764+02:00

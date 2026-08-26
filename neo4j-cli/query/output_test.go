@@ -25,6 +25,8 @@ type decodedResult struct {
 	Rows            []map[string]any `json:"rows"`
 	Truncated       bool             `json:"truncated"`
 	ArraysTruncated int              `json:"arrays_truncated"`
+	Plan            *planNode        `json:"plan,omitempty"`
+	Profile         *planNode        `json:"profile,omitempty"`
 	Error           string           `json:"error"`
 }
 

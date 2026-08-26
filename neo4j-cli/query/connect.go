@@ -15,6 +15,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commondebug "github.com/neo4j/cli/common/debug"
+	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
@@ -30,11 +32,15 @@ type conn struct {
 
 // queryResult is the parsed tabular payload of a successful Cypher run. The
 // shape matches what callers (run.go, schema.go) expect: positional rows where
-// each row's order matches Columns.
+// each row's order matches Columns. Plan and Profile are the driver-free
+// EXPLAIN/PROFILE plan trees (mutually exclusive, nil when neither was
+// reported) so renderResult can carry them onward.
 type queryResult struct {
 	Columns []string
 	Rows    [][]any
 	Stats   *writeStats
+	Plan    *planNode
+	Profile *planNode
 }
 
 // writeStats is a driver-free snapshot of the mutation counters reported by a
@@ -79,11 +85,122 @@ func statsFromCounters(c neo4j.Counters) *writeStats {
 	}
 }
 
+// planNode is a driver-free snapshot of one node in a statement's EXPLAIN or
+// PROFILE plan tree, as reported by ResultSummary.Plan()/Profile(). Both plan
+// shapes share this tree type: the profile-only metrics (rows, db_hits, time,
+// page cache) stay zero for a plain EXPLAIN plan. It is nil when there is no
+// plan to report (planNodeFromPlan/planNodeFromProfile return nil for a nil
+// driver plan) so callers can nil-check to decide whether to render a plan at
+// all.
+type planNode struct {
+	Operator    string         `json:"operator"`
+	Arguments   map[string]any `json:"arguments,omitempty"`
+	Identifiers []string       `json:"identifiers,omitempty"`
+	Children    []planNode     `json:"children,omitempty"`
+	Rows        int64          `json:"rows,omitempty"`
+	DbHits      int64          `json:"db_hits,omitempty"`
+	// Time is the server's raw nanosecond count for this operator (the driver
+	// copies the wire value with no conversion). The table renderer converts to
+	// µs; the JSON envelope emits the raw ns int for machine consumers. The root
+	// operator's Time is always zero — the driver populates time only for child
+	// operators — so omitempty drops it there.
+	Time            int64 `json:"time,omitempty"`
+	PageCacheHits   int64 `json:"page_cache_hits,omitempty"`
+	PageCacheMisses int64 `json:"page_cache_misses,omitempty"`
+}
+
+// redactPlanArguments copies a driver Plan/Profile Arguments map with every
+// string leaf (and every map key) passed through commondebug.Scrub — the
+// single-sourced redact-then-strip combo (clievents.RedactText then
+// commonoutput.StripControl) — so a secret a user embeds literally in a Cypher
+// predicate (e.g. `p.password = 'hunter2'`, which the planner echoes under
+// "Details") never reaches the serialized JSON/TOON envelope or the
+// tee-on-failure buffer, and server-supplied control bytes are neutralized at
+// the source rather than left for downstream backstops.
+// Non-string scalars (float, int, bool, nil) are copied unchanged; nested
+// map[string]any, []any and []string aggregates are walked recursively via
+// WalkStrings so string leaves inside them are scrubbed too. The input map is
+// not mutated. A nil map returns nil, an empty map returns an empty map.
+func redactPlanArguments(args map[string]any) map[string]any {
+	if args == nil {
+		return nil
+	}
+	return commonoutput.WalkStrings(args, commondebug.Scrub).(map[string]any)
+}
+
+// planNodeFromPlan copies a driver Plan into the driver-free planNode, leaving
+// every profile-only metric zero (this is the EXPLAIN shape where the plan was
+// never executed so no cost data exists). Arguments are routed through
+// redactPlanArguments so no raw driver string survives serialization. Recurses
+// over Children() so the whole tree is snapshotted. A nil plan yields nil — an
+// EXPLAIN run without a plan (or a non-EXPLAIN run) reports nothing.
+func planNodeFromPlan(p neo4j.Plan) *planNode {
+	if p == nil {
+		return nil
+	}
+	node := &planNode{
+		Operator:    p.Operator(),
+		Arguments:   redactPlanArguments(p.Arguments()),
+		Identifiers: p.Identifiers(),
+	}
+	for _, child := range p.Children() {
+		if c := planNodeFromPlan(child); c != nil {
+			node.Children = append(node.Children, *c)
+		}
+	}
+	return node
+}
+
+// planNodeFromProfile copies a driver ProfiledPlan into the driver-free
+// planNode, carrying the profile-only metrics (rows, db_hits, time, page cache)
+// alongside the operator/arguments/identifiers both shapes share. Arguments are
+// routed through redactPlanArguments so no raw driver string survives
+// serialization. Recurses over Children() so the whole tree is snapshotted. A
+// nil profiled plan yields nil — a run without profiling reports nothing.
+func planNodeFromProfile(p neo4j.ProfiledPlan) *planNode {
+	if p == nil {
+		return nil
+	}
+	node := &planNode{
+		Operator:        p.Operator(),
+		Arguments:       redactPlanArguments(p.Arguments()),
+		Identifiers:     p.Identifiers(),
+		Rows:            p.Records(),
+		DbHits:          p.DbHits(),
+		Time:            p.Time(),
+		PageCacheHits:   p.PageCacheHits(),
+		PageCacheMisses: p.PageCacheMisses(),
+	}
+	for _, child := range p.Children() {
+		if c := planNodeFromProfile(child); c != nil {
+			node.Children = append(node.Children, *c)
+		}
+	}
+	return node
+}
+
+// planFromResponse snapshots the profile-or-plan tree carried by a response
+// into the driver-free planNode, applying the EXPLAIN/PROFILE exclusivity rule
+// both statement paths share: a statement profiles XOR explains, so when the
+// profiled plan is present the profile field is set and the plan left nil, and
+// vice versa. Both come back nil when the statement reported neither (a
+// non-EXPLAIN/PROFILE run).
+func planFromResponse(resp *queryResponse) (plan, profile *planNode) {
+	if resp.Profile != nil {
+		return nil, planNodeFromProfile(resp.Profile)
+	}
+	if resp.Plan != nil {
+		return planNodeFromPlan(resp.Plan), nil
+	}
+	return nil, nil
+}
+
 // queryResponse is the structured envelope around a Cypher response. Backed
-// by the Bolt driver Result + ResultSummary. QueryType is taken straight
-// from ResultSummary.QueryType() and is what the --rw classifier inspects
-// for EXPLAIN preflight runs (QueryTypeReadOnly → safe; everything else
-// requires --rw). The driver also exposes the equivalent (deprecated)
+// by the Bolt driver Result + ResultSummary, it carries the statement's rows,
+// bookmarks, and plan trees. QueryType is taken straight from
+// ResultSummary.QueryType() and is what the --rw classifier inspects for
+// EXPLAIN preflight runs (QueryTypeReadOnly → safe; everything else requires
+// --rw). The driver also exposes the equivalent (deprecated)
 // StatementType() / StatementTypeReadOnly aliases — we use the QueryType
 // names so staticcheck does not flag them.
 type queryResponse struct {
@@ -94,6 +211,12 @@ type queryResponse struct {
 	Bookmarks []string
 	QueryType neo4j.QueryType
 	Counters  neo4j.Counters
+	// Plan and Profile are the raw driver plan trees reported by the
+	// ResultSummary. Both stay nil for an ordinary statement; when a plan is
+	// present the statement profiled XOR explained, so one is set and the other
+	// nil. Snapshot rule in planFromResponse.
+	Plan    neo4j.Plan
+	Profile neo4j.ProfiledPlan
 }
 
 // buildDriverConfigurer returns the closure neo4j.NewDriver applies to its
@@ -232,10 +355,13 @@ func runStatementWithMode(ctx context.Context, c *conn, statement string, params
 		return nil, err
 	}
 
+	plan, profile := planFromResponse(parsed)
 	return &queryResult{
 		Columns: parsed.Data.Fields,
 		Rows:    parsed.Data.Values,
 		Stats:   statsFromCounters(parsed.Counters),
+		Plan:    plan,
+		Profile: profile,
 	}, nil
 }
 
@@ -317,6 +443,8 @@ func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string
 			if summary != nil {
 				resp.QueryType = summary.QueryType()
 				resp.Counters = summary.Counters()
+				resp.Plan = summary.Plan()
+				resp.Profile = summary.Profile()
 			}
 
 			responses = append(responses, resp)
@@ -355,10 +483,13 @@ func runStatementsWithMode(ctx context.Context, c *conn, statements []string, pa
 
 	results := make([]*queryResult, 0, len(parsed))
 	for _, p := range parsed {
+		plan, profile := planFromResponse(p)
 		results = append(results, &queryResult{
 			Columns: p.Data.Fields,
 			Rows:    p.Data.Values,
 			Stats:   statsFromCounters(p.Counters),
+			Plan:    plan,
+			Profile: profile,
 		})
 	}
 	return results, nil

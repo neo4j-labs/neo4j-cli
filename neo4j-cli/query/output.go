@@ -30,6 +30,11 @@ type renderResult struct {
 	truncated       bool
 	arraysTruncated int
 	stats           *writeStats
+	// plan and profile are the driver-free EXPLAIN/PROFILE plan trees (mutually
+	// exclusive), carried through truncateResult so the downstream renderer can
+	// emit them. Both are nil for a non-EXPLAIN/PROFILE run.
+	plan    *planNode
+	profile *planNode
 	// errMsg is set only for an error-placeholder result produced under
 	// --continue-on-error: the statement failed, so it has no columns/rows but
 	// keeps its positional slot in the rendered array. Empty for successes.
@@ -62,9 +67,11 @@ func (r renderResult) AsArray() []map[string]any {
 //	{columns, rows, truncated, arrays_truncated}
 //
 // Field order is fixed via struct field order so encoding/json preserves it.
-// The `stats` and `error` keys are additive (omitempty): a successful read
-// stays byte-identical, while an error-placeholder (--continue-on-error) keeps
-// its positional slot and surfaces the failure under `error`.
+// The `stats`, `plan`, `profile`, and `error` keys are additive (omitempty): a
+// successful read stays byte-identical, an EXPLAIN/PROFILE run appends its
+// operator tree under `plan`/`profile` (mutually exclusive, so never both), and
+// an error-placeholder (--continue-on-error) keeps its positional slot and
+// surfaces the failure under `error`.
 func (r renderResult) MarshalJSON() ([]byte, error) {
 	cols := r.columns
 	if cols == nil {
@@ -80,6 +87,8 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 		Truncated       bool             `json:"truncated"`
 		ArraysTruncated int              `json:"arrays_truncated"`
 		Stats           *writeStats      `json:"stats,omitempty"`
+		Plan            *planNode        `json:"plan,omitempty"`
+		Profile         *planNode        `json:"profile,omitempty"`
 		Error           string           `json:"error,omitempty"`
 	}{
 		Columns:         cols,
@@ -87,6 +96,8 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 		Truncated:       r.truncated,
 		ArraysTruncated: r.arraysTruncated,
 		Stats:           r.stats,
+		Plan:            r.plan,
+		Profile:         r.profile,
 		Error:           r.errMsg,
 	})
 }
@@ -113,7 +124,7 @@ func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows [
 func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
 	if len(results) == 1 {
 		commonoutput.PrintBodyMap(cmd, cfg, results[0], results[0].columns)
-		renderStatsLines(cmd, cfg, results)
+		renderSideChannels(cmd, cfg, results)
 		return
 	}
 	items := make([]commonoutput.ResponseData, len(results))
@@ -123,19 +134,112 @@ func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResul
 		fields[i] = r.columns
 	}
 	commonoutput.PrintBodyMaps(cmd, cfg, items, fields)
-	renderStatsLines(cmd, cfg, results)
+	renderSideChannels(cmd, cfg, results)
 }
 
-// renderStatsLines writes a per-statement write-summary line to stdout, but only
-// in table mode — JSON/TOON carry the stats inside the envelope instead. A
-// result with no mutations (nil stats) produces no line, so reads stay
-// byte-identical. With more than one statement each line is prefixed
-// "statement N: " to match truncateResult's warning convention.
-func renderStatsLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
+// renderSideChannels writes the table-only supplementary lines (write counters
+// then the EXPLAIN/PROFILE operator trees) that follow the result table. It
+// guards the table-mode check once and computes the multi-statement prefix once,
+// then delegates per-result line emission to the stats and plan helpers.
+func renderSideChannels(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
 	if commonoutput.ResolveOutput(cmd, cfg) != "table" {
 		return
 	}
 	multi := len(results) > 1
+	renderStatsLines(cmd, results, multi)
+	renderPlanLines(cmd, results, multi)
+}
+
+// renderPlanLines writes the EXPLAIN/PROFILE operator trees to stdout. It only
+// emits in table mode — the table-mode check and the multi-statement flag were
+// already resolved by the caller (renderSideChannels), so they are not repeated
+// here (JSON/TOON carry the plan inside the envelope instead, see
+// renderResult.MarshalJSON). A result with no plan tree produces no line, so
+// ordinary reads stay byte-identical to the pre-plan output. With more than one
+// statement the root line of each tree is prefixed "statement N: " to match
+// renderStatsLines' and truncateResult's warning convention; the rest of the
+// tree is left unprefixed.
+func renderPlanLines(cmd *cobra.Command, results []renderResult, multi bool) {
+	for i, r := range results {
+		tree, profiled := r.planInfo()
+		if tree == nil {
+			continue
+		}
+		lines := formatPlanTree(tree, profiled, 0)
+		if multi {
+			lines[0] = fmt.Sprintf("statement %d: %s", i+1, lines[0])
+		}
+		for _, line := range lines {
+			cmd.Println(line)
+		}
+	}
+}
+
+// planInfo returns the plan tree to render and whether it came from a PROFILE
+// run (in which case formatPlanTree appends per-operator metrics). plan and
+// profile are mutually exclusive by construction: planFromResponse in connect.go
+// is the single place that decides precedence (profile wins when both driver
+// fields are non-nil), so here we just return whichever field is set. An EXPLAIN
+// run reports only Plan(); an ordinary run reports neither. MarshalJSON is not a
+// consumer of this accessor — it emits whichever raw field is set under its own
+// key, so it reads the fields directly.
+func (r renderResult) planInfo() (tree *planNode, profiled bool) {
+	if r.profile != nil {
+		return r.profile, true
+	}
+	return r.plan, false
+}
+
+// formatPlanTree renders an operator tree as one line per node, depth-first,
+// indented two spaces per depth level. A node with identifiers is written
+// "<Operator> => ident1, ident2"; one without identifiers is just the operator
+// name. When profiled (the tree came from a PROFILE run) every line additionally
+// carries its gathered metrics as " (rows: N, dbHits: M, time: Tµs)"; an EXPLAIN
+// tree prints none. The profiled flag rides along from which renderResult field
+// the tree came from rather than sniffing whether the metrics are zero, so a
+// legitimately-zero-cost profiled operator still prints its metrics. There is no
+// depth cap: the whole tree is rendered.
+//
+// Operator and identifier text is passed through commonoutput.StripControl for
+// the same reason formatCell does it: these are server-supplied strings headed
+// for a terminal, and a backtick-quoted Cypher identifier can carry an ANSI
+// escape or other C0 byte. The metrics are integers, so they need no stripping.
+func formatPlanTree(root *planNode, profiled bool, depth int) []string {
+	if root == nil {
+		return nil
+	}
+	line := strings.Repeat("  ", depth) + commonoutput.StripControl(root.Operator)
+	if len(root.Identifiers) > 0 {
+		idents := make([]string, len(root.Identifiers))
+		for i, ident := range root.Identifiers {
+			idents[i] = commonoutput.StripControl(ident)
+		}
+		line += " => " + strings.Join(idents, ", ")
+	}
+	if profiled {
+		// planNode.Time is the server's raw nanosecond count (the driver
+		// copies it off the wire with no conversion — verified against a
+		// live PROFILE). Render it as microseconds so a typical operator's
+		// tens-of-millions value reads as a human-scale number rather than
+		// raw ns. The JSON envelope keeps the raw ns int for machine
+		// consumers; only this terminal rendering converts.
+		line += fmt.Sprintf(" (rows: %d, dbHits: %d, time: %dµs)", root.Rows, root.DbHits, root.Time/1000)
+	}
+	lines := []string{line}
+	for i := range root.Children {
+		lines = append(lines, formatPlanTree(&root.Children[i], profiled, depth+1)...)
+	}
+	return lines
+}
+
+// renderStatsLines writes a per-statement write-summary line to stdout. It only
+// emits in table mode — the table-mode check and the multi-statement flag were
+// already resolved by the caller (renderSideChannels), so they are not repeated
+// here (JSON/TOON carry the stats inside the envelope instead). A result with no
+// mutations (nil stats) produces no line, so reads stay byte-identical. With
+// more than one statement each line is prefixed "statement N: " to match
+// truncateResult's warning convention.
+func renderStatsLines(cmd *cobra.Command, results []renderResult, multi bool) {
 	for i, r := range results {
 		if r.stats == nil {
 			continue

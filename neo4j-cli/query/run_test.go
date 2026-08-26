@@ -646,6 +646,171 @@ func TestRejectWriteCypher_QueryTypeClassifier(t *testing.T) {
 	}
 }
 
+// TestExecutionMode locks the contract of the executionMode helper: it reports
+// WHICH leading keyword (EXPLAIN or PROFILE) matched — case-insensitively,
+// tolerating leading whitespace and honouring a word boundary — together with
+// the statement body after the keyword and its separating whitespace. The body
+// must be preserved byte-for-byte (internal whitespace untouched) because the
+// write-guard rebuilds its EXPLAIN-classification statement from it.
+func TestExecutionMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		cypher   string
+		wantMode string
+		wantRest string
+	}{
+		{name: "explain", cypher: "EXPLAIN RETURN 1", wantMode: "EXPLAIN", wantRest: "RETURN 1"},
+		{name: "profile", cypher: "PROFILE RETURN 1", wantMode: "PROFILE", wantRest: "RETURN 1"},
+		{name: "mixed case", cypher: "PrOfIlE RETURN 1", wantMode: "PROFILE", wantRest: "RETURN 1"},
+		{name: "lowercase", cypher: "profile return 1", wantMode: "PROFILE", wantRest: "return 1"},
+		{name: "leading whitespace", cypher: "  \tEXPLAIN RETURN 1", wantMode: "EXPLAIN", wantRest: "RETURN 1"},
+		{name: "internal whitespace preserved", cypher: "PROFILE MATCH (n)   RETURN  n", wantMode: "PROFILE", wantRest: "MATCH (n)   RETURN  n"},
+		{name: "bare keyword no body", cypher: "EXPLAIN", wantMode: "EXPLAIN", wantRest: ""},
+		{name: "bare keyword trailing whitespace", cypher: "PROFILE  ", wantMode: "PROFILE", wantRest: ""},
+		{name: "empty", cypher: "", wantMode: "", wantRest: ""},
+		{name: "whitespace only", cypher: "   \n", wantMode: "", wantRest: ""},
+		{name: "explainer is not explain", cypher: "EXPLAINER RETURN 1", wantMode: "", wantRest: ""},
+		{name: "profiled is not profile", cypher: "PROFILED RETURN 1", wantMode: "", wantRest: ""},
+		{name: "mid-statement keyword ignored", cypher: "RETURN 1 EXPLAIN", wantMode: "", wantRest: ""},
+		{name: "bare statement", cypher: "RETURN 1", wantMode: "", wantRest: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mode, rest := executionMode(tc.cypher)
+			assert.Equal(t, tc.wantMode, mode)
+			assert.Equal(t, tc.wantRest, rest)
+		})
+	}
+}
+
+// TestRejectWriteCypher_ProfileClassifiedViaExplainBody rewrites the old
+// "already-moded statement sent verbatim for classification" contract. A
+// PROFILE statement carries its own execution mode, but PROFILE EXECUTES —
+// sending it verbatim as the write-guard's classification step would run the
+// very write the guard is meant to block. The guard must instead classify
+// "EXPLAIN " + the body (leading PROFILE keyword stripped), and r.calls must
+// never contain the raw PROFILE statement.
+func TestRejectWriteCypher_ProfileClassifiedViaExplainBody(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN MATCH (n)   RETURN  n"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.install(t)
+
+	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.QueryScope))
+	cmd.SetContext(context.Background())
+	err := rejectWriteCypher(cmd, &conn{}, "PROFILE MATCH (n)   RETURN  n", nil)
+	require.NoError(t, err)
+	// Classification must be EXPLAIN of the body with internal whitespace
+	// preserved — the raw PROFILE statement is never sent for classification.
+	assert.Equal(t, []string{"EXPLAIN MATCH (n)   RETURN  n"}, r.calls)
+	assert.NotContains(t, r.calls, "PROFILE", "the raw PROFILE statement must never be sent for classification")
+	assert.True(t, r.readOnlyCalls["EXPLAIN MATCH (n)   RETURN  n"], "preflight must use ExecuteRead")
+}
+
+// TestRejectWriteCypher_ExplainSkipsClassification verifies that an
+// EXPLAIN-prefixed statement triggers NO classification round trip at all: the
+// guard passes it through (EXPLAIN cannot mutate, so forcing --rw just to view
+// a write plan would be a false positive) with an empty r.calls.
+func TestRejectWriteCypher_ExplainSkipsClassification(t *testing.T) {
+	r := newSeamRouter()
+	r.install(t)
+
+	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.QueryScope))
+	cmd.SetContext(context.Background())
+	err := rejectWriteCypher(cmd, &conn{}, "EXPLAIN MATCH (n)   RETURN  n", nil)
+	require.NoError(t, err)
+	assert.Empty(t, r.calls, "no classification round trip may be issued for an EXPLAIN-prefixed statement")
+}
+
+// TestRunQuery_ExplainWriteWithoutRwSkipsGateEntirely runs an EXPLAIN of a
+// write statement through the full command WITHOUT --rw and locks acceptance:
+// the gate passes it without a classification round trip and the verbatim
+// EXPLAIN statement is the only statement ever sent (the router's
+// onUnexpected default would fail the test on any extra call).
+func TestRunQuery_ExplainWriteWithoutRwSkipsGateEntirely(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN CREATE (n)"] = makeQueryResponse([]string{}, [][]any{})
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"EXPLAIN CREATE (n)",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"EXPLAIN CREATE (n)"}, r.calls,
+		"the verbatim EXPLAIN statement must be the only call — no classification and no --rw requirement")
+	assert.True(t, r.readOnlyCalls["EXPLAIN CREATE (n)"], "EXPLAIN execution must use ExecuteRead")
+}
+
+// TestRunQuery_ProfileWriteWithoutRwBlockedWithoutExecuting locks acceptance
+// for a write-bearing PROFILE statement without --rw: the guard classifies via
+// "EXPLAIN "+body, returns the --rw usage error, and the raw PROFILE statement
+// is never sent (which would have executed the write).
+func TestRunQuery_ProfileWriteWithoutRwBlockedWithoutExecuting(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN CREATE (n)"] = makeExplainResponse(neo4j.QueryTypeReadWrite)
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"PROFILE CREATE (n)",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "this command writes; pass --rw to allow it")
+	assert.Equal(t, []string{"EXPLAIN CREATE (n)"}, r.calls)
+	assert.NotContains(t, r.calls, "PROFILE CREATE (n)",
+		"the raw PROFILE statement must never be sent — it would execute the write as the classification step")
+	assert.Empty(t, h.stdout.String(), "write-gate rejection must not print output")
+}
+
+// TestRunQuery_ProfileReadWithoutRwClassifiesViaExplain locks acceptance for a
+// read-bearing PROFILE statement without --rw: the preflight classifies
+// "EXPLAIN "+body (never the raw PROFILE statement), the verbatim PROFILE
+// statement then executes read-only, and the command succeeds.
+func TestRunQuery_ProfileReadWithoutRwClassifiesViaExplain(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN MATCH (n) RETURN n"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.resp["PROFILE MATCH (n) RETURN n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"PROFILE MATCH (n) RETURN n",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"EXPLAIN MATCH (n) RETURN n", "PROFILE MATCH (n) RETURN n"}, r.calls)
+	assert.True(t, r.readOnlyCalls["EXPLAIN MATCH (n) RETURN n"], "classification must use ExecuteRead")
+	assert.True(t, r.readOnlyCalls["PROFILE MATCH (n) RETURN n"], "read-only PROFILE execution must use ExecuteRead")
+}
+
+// TestRunQuery_Atomic_ProfileWriteWithoutRwBlocked verifies the --atomic path
+// inherits the fix through preflightAll: a write-bearing PROFILE statement is
+// blocked by the per-statement guard before any batch transaction opens, so the
+// raw PROFILE statement is never sent.
+func TestRunQuery_Atomic_ProfileWriteWithoutRwBlocked(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN CREATE (n)"] = makeExplainResponse(neo4j.QueryTypeReadWrite)
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--atomic",
+		"PROFILE CREATE (n)",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "this command writes; pass --rw to allow it")
+	assert.Equal(t, []string{"EXPLAIN CREATE (n)"}, r.calls)
+	assert.NotContains(t, r.calls, "PROFILE CREATE (n)",
+		"the raw PROFILE statement must never be sent on the atomic path either")
+}
+
 func TestRunQuery_RowLimitTruncates_TableOutput(t *testing.T) {
 	r := newSeamRouter()
 	rows := make([][]any, 10)
