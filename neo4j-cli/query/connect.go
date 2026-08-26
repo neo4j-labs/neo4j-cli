@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
@@ -107,18 +108,61 @@ type planNode struct {
 	PageCacheMisses int64 `json:"page_cache_misses,omitempty"`
 }
 
+// redactPlanArguments copies a driver Plan/Profile Arguments map with every
+// string leaf passed through clievents.RedactText, so a secret a user embeds
+// literally in a Cypher predicate (e.g. `p.password = 'hunter2'`, which the
+// planner echoes under "Details") never reaches the serialized JSON/TOON
+// envelope or the tee-on-failure buffer. Non-string values (float, int, bool,
+// nil) are copied unchanged; nested map[string]any and []any aggregates are
+// walked recursively so string leaves inside them are scrubbed too. The input
+// map is not mutated. A nil map returns nil, an empty map returns an empty map.
+func redactPlanArguments(args map[string]any) map[string]any {
+	if args == nil {
+		return nil
+	}
+	out := make(map[string]any, len(args))
+	for k, v := range args {
+		out[k] = redactPlanValue(v)
+	}
+	return out
+}
+
+// redactPlanValue redacts a single Arguments value, recursing into map and
+// slice aggregates so every string leaf passes through RedactText.
+func redactPlanValue(v any) any {
+	switch t := v.(type) {
+	case string:
+		return clievents.RedactText(t)
+	case map[string]any:
+		m := make(map[string]any, len(t))
+		for k, val := range t {
+			m[k] = redactPlanValue(val)
+		}
+		return m
+	case []any:
+		s := make([]any, len(t))
+		for i, val := range t {
+			s[i] = redactPlanValue(val)
+		}
+		return s
+	default:
+		return v
+	}
+}
+
 // planNodeFromPlan copies a driver Plan into the driver-free planNode, leaving
 // every profile-only metric zero (this is the EXPLAIN shape where the plan was
-// never executed so no cost data exists). Recurses over Children() so the whole
-// tree is snapshotted. A nil plan yields nil — an EXPLAIN run without a plan
-// (or a non-EXPLAIN run) reports nothing.
+// never executed so no cost data exists). Arguments are routed through
+// redactPlanArguments so no raw driver string survives serialization. Recurses
+// over Children() so the whole tree is snapshotted. A nil plan yields nil — an
+// EXPLAIN run without a plan (or a non-EXPLAIN run) reports nothing.
 func planNodeFromPlan(p neo4j.Plan) *planNode {
 	if p == nil {
 		return nil
 	}
 	node := &planNode{
 		Operator:    p.Operator(),
-		Arguments:   p.Arguments(),
+		Arguments:   redactPlanArguments(p.Arguments()),
 		Identifiers: p.Identifiers(),
 	}
 	for _, child := range p.Children() {
@@ -131,16 +175,17 @@ func planNodeFromPlan(p neo4j.Plan) *planNode {
 
 // planNodeFromProfile copies a driver ProfiledPlan into the driver-free
 // planNode, carrying the profile-only metrics (rows, db_hits, time, page cache)
-// alongside the operator/arguments/identifiers both shapes share. Recurses over
-// Children() so the whole tree is snapshotted. A nil profiled plan yields nil —
-// a run without profiling reports nothing.
+// alongside the operator/arguments/identifiers both shapes share. Arguments are
+// routed through redactPlanArguments so no raw driver string survives
+// serialization. Recurses over Children() so the whole tree is snapshotted. A
+// nil profiled plan yields nil — a run without profiling reports nothing.
 func planNodeFromProfile(p neo4j.ProfiledPlan) *planNode {
 	if p == nil {
 		return nil
 	}
 	node := &planNode{
 		Operator:        p.Operator(),
-		Arguments:       p.Arguments(),
+		Arguments:       redactPlanArguments(p.Arguments()),
 		Identifiers:     p.Identifiers(),
 		Rows:            p.Records(),
 		DbHits:          p.DbHits(),
