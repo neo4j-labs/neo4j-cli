@@ -124,8 +124,7 @@ func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows [
 func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
 	if len(results) == 1 {
 		commonoutput.PrintBodyMap(cmd, cfg, results[0], results[0].columns)
-		renderStatsLines(cmd, cfg, results)
-		renderPlanLines(cmd, cfg, results)
+		renderSideChannels(cmd, cfg, results)
 		return
 	}
 	items := make([]commonoutput.ResponseData, len(results))
@@ -135,22 +134,32 @@ func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResul
 		fields[i] = r.columns
 	}
 	commonoutput.PrintBodyMaps(cmd, cfg, items, fields)
-	renderStatsLines(cmd, cfg, results)
-	renderPlanLines(cmd, cfg, results)
+	renderSideChannels(cmd, cfg, results)
 }
 
-// renderPlanLines writes the EXPLAIN/PROFILE operator trees to stdout, but only
-// in table mode — JSON/TOON carry the plan inside the envelope instead (see
+// renderSideChannels writes the table-only supplementary lines (write counters
+// then the EXPLAIN/PROFILE operator trees) that follow the result table. It
+// guards the table-mode check once and computes the multi-statement prefix once,
+// then delegates per-result line emission to the stats and plan helpers.
+func renderSideChannels(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
+	if commonoutput.ResolveOutput(cmd, cfg) != "table" {
+		return
+	}
+	multi := len(results) > 1
+	renderStatsLines(cmd, results, multi)
+	renderPlanLines(cmd, results, multi)
+}
+
+// renderPlanLines writes the EXPLAIN/PROFILE operator trees to stdout. It only
+// emits in table mode — the table-mode check and the multi-statement flag were
+// already resolved by the caller (renderSideChannels), so they are not repeated
+// here (JSON/TOON carry the plan inside the envelope instead, see
 // renderResult.MarshalJSON). A result with no plan tree produces no line, so
 // ordinary reads stay byte-identical to the pre-plan output. With more than one
 // statement the root line of each tree is prefixed "statement N: " to match
 // renderStatsLines' and truncateResult's warning convention; the rest of the
 // tree is left unprefixed.
-func renderPlanLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
-	if commonoutput.ResolveOutput(cmd, cfg) != "table" {
-		return
-	}
-	multi := len(results) > 1
+func renderPlanLines(cmd *cobra.Command, results []renderResult, multi bool) {
 	for i, r := range results {
 		tree, profiled := r.planInfo()
 		if tree == nil {
@@ -223,16 +232,14 @@ func formatPlanTree(root *planNode, profiled bool, depth int) []string {
 	return lines
 }
 
-// renderStatsLines writes a per-statement write-summary line to stdout, but only
-// in table mode — JSON/TOON carry the stats inside the envelope instead. A
-// result with no mutations (nil stats) produces no line, so reads stay
-// byte-identical. With more than one statement each line is prefixed
-// "statement N: " to match truncateResult's warning convention.
-func renderStatsLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
-	if commonoutput.ResolveOutput(cmd, cfg) != "table" {
-		return
-	}
-	multi := len(results) > 1
+// renderStatsLines writes a per-statement write-summary line to stdout. It only
+// emits in table mode — the table-mode check and the multi-statement flag were
+// already resolved by the caller (renderSideChannels), so they are not repeated
+// here (JSON/TOON carry the stats inside the envelope instead). A result with no
+// mutations (nil stats) produces no line, so reads stay byte-identical. With
+// more than one statement each line is prefixed "statement N: " to match
+// truncateResult's warning convention.
+func renderStatsLines(cmd *cobra.Command, results []renderResult, multi bool) {
 	for i, r := range results {
 		if r.stats == nil {
 			continue
