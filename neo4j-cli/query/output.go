@@ -167,20 +167,18 @@ func renderPlanLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderRes
 }
 
 // planInfo returns the plan tree to render and whether it came from a PROFILE
-// run (in which case formatPlanTree appends per-operator metrics). A PROFILE
-// statement makes the driver report BOTH Plan() and Profile() non-nil; the
-// profile carries the execution metrics, so it wins. An EXPLAIN run reports
-// only Plan(); an ordinary run reports neither. MarshalJSON is not a consumer
-// of this accessor — it emits whichever raw field is set under its own key, so
-// it reads the fields directly.
+// run (in which case formatPlanTree appends per-operator metrics). plan and
+// profile are mutually exclusive by construction: planFromResponse in connect.go
+// is the single place that decides precedence (profile wins when both driver
+// fields are non-nil), so here we just return whichever field is set. An EXPLAIN
+// run reports only Plan(); an ordinary run reports neither. MarshalJSON is not a
+// consumer of this accessor — it emits whichever raw field is set under its own
+// key, so it reads the fields directly.
 func (r renderResult) planInfo() (tree *planNode, profiled bool) {
 	if r.profile != nil {
 		return r.profile, true
 	}
-	if r.plan != nil {
-		return r.plan, false
-	}
-	return nil, false
+	return r.plan, false
 }
 
 // formatPlanTree renders an operator tree as one line per node, depth-first,
