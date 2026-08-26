@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clievents"
+	commondebug "github.com/neo4j/cli/common/debug"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
@@ -110,12 +110,13 @@ type planNode struct {
 }
 
 // redactPlanArguments copies a driver Plan/Profile Arguments map with every
-// string leaf (and every map key) passed through the Scrub combo —
-// clievents.RedactText then commonoutput.StripControl — so a secret a user
-// embeds literally in a Cypher predicate (e.g. `p.password = 'hunter2'`, which
-// the planner echoes under "Details") never reaches the serialized JSON/TOON
-// envelope or the tee-on-failure buffer, and server-supplied control bytes are
-// neutralized at the source rather than left for downstream backstops.
+// string leaf (and every map key) passed through commondebug.Scrub — the
+// single-sourced redact-then-strip combo (clievents.RedactText then
+// commonoutput.StripControl) — so a secret a user embeds literally in a Cypher
+// predicate (e.g. `p.password = 'hunter2'`, which the planner echoes under
+// "Details") never reaches the serialized JSON/TOON envelope or the
+// tee-on-failure buffer, and server-supplied control bytes are neutralized at
+// the source rather than left for downstream backstops.
 // Non-string scalars (float, int, bool, nil) are copied unchanged; nested
 // map[string]any, []any and []string aggregates are walked recursively via
 // WalkStrings so string leaves inside them are scrubbed too. The input map is
@@ -124,11 +125,7 @@ func redactPlanArguments(args map[string]any) map[string]any {
 	if args == nil {
 		return nil
 	}
-	walked := commonoutput.WalkStrings(args, func(s string) string {
-		return commonoutput.StripControl(clievents.RedactText(s))
-	})
-	out, _ := walked.(map[string]any)
-	return out
+	return commonoutput.WalkStrings(args, commondebug.Scrub).(map[string]any)
 }
 
 // planNodeFromPlan copies a driver Plan into the driver-free planNode, leaving
