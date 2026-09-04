@@ -1182,7 +1182,7 @@
           </div>
           <div>
             <p>Provision a new Aura instance.</p>
-            <div class="step-cmd" data-copy="neo4j-cli aura instance create --name &quot;movies-dev&quot; --type free-db --organization-id &lt;org-id&gt; --project-id &lt;project-id&gt; --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Create a free Aura instance called movies-dev</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli aura instance create --name <span style="color:var(--code-string)">"movies-dev"</span> --type <span style="color:var(--code-keyword)">free-db</span> ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+            <div class="step-cmd" data-copy="neo4j-cli aura instance create --name &quot;movies-dev&quot; --type free --organization-id &lt;org-id&gt; --project-id &lt;project-id&gt; --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Create a free Aura instance called movies-dev</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli aura instance create --name <span style="color:var(--code-string)">"movies-dev"</span> --type <span style="color:var(--code-keyword)">free</span> ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
           </div>
         </div>
 
@@ -1300,7 +1300,7 @@
 
 <span class="comment"># create a free instance (scoped by the workspace default)</span>
 <span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> <span class="string">"movies-dev"</span> <span class="flag">--rw</span> \
-    <span class="flag">--type</span> <span class="keyword">free-db</span>
+    <span class="flag">--type</span> <span class="keyword">free</span>
 
 <span class="info">▸</span> instance creating… (may take ~60s)
 <span class="ok">✓</span> movies-dev (<span class="string">f1ab2c34</span>) · <span class="keyword">free</span> · <span class="info">us-east-1</span> · <span class="ok">running</span>
@@ -1847,12 +1847,13 @@
 <span class="prompt">$</span> neo4j-cli aura workspace use &lt;org-id&gt;/&lt;project-id&gt; <span class="flag">--rw</span>   <span class="comment"># pin default scope</span>
 <span class="prompt">$</span> neo4j-cli aura instance list <span class="flag">--format</span> table
 <span class="prompt">$</span> neo4j-cli aura instance get &lt;id&gt;
-<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> my-db <span class="flag">--type</span> free-db <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> prod <span class="flag">--type</span> professional-db \
+<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> my-db <span class="flag">--type</span> free <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> prod <span class="flag">--type</span> professional \
     <span class="flag">--cloud-provider</span> aws <span class="flag">--region</span> us-east-1 <span class="flag">--memory</span> 4GB \
     <span class="flag">--wait</span> <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli aura instance delete &lt;id&gt; <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli aura instance deploy <span class="flag">--from-docker</span> dev <span class="flag">--type</span> free-db <span class="flag">--rw</span>   <span class="comment"># clone a local DB into a new Aura instance</span></pre>
+<span class="prompt">$</span> neo4j-cli aura instance deploy <span class="flag">--from-docker</span> dev <span class="flag">--type</span> free <span class="flag">--rw</span>   <span class="comment"># clone a local DB into a new Aura instance</span></pre>
+          <p><code>--type</code> takes the Aura tier names <code>free</code>, <code>professional</code>, <code>business-critical</code> and <code>virtual-dedicated-cloud</code>. The former <code>free-db</code> / <code>professional-db</code> / <code>enterprise-db</code> names are still accepted and mapped to their current equivalents.</p>
           <p><code>instance create</code> auto-stores DB credentials as a <code>dbms</code> credential named <code>&lt;instance-id&gt;-default</code> so <code>query</code> connects immediately. Pass <code>--no-credential-storage</code> to skip. <code>--wait</code> polls until the instance status is <code>running</code>; <code>--timeout</code> sets the deadline in seconds (default: 300).</p>
           <p class="ref-sub"><span class="keyword">aura snapshot</span> — on-demand backups and restores:</p>
           <pre><span class="prompt">$</span> neo4j-cli aura snapshot list <span class="flag">--instance-id</span> &lt;id&gt;
@@ -1968,7 +1969,7 @@
           <p class="ref-sub"><span class="keyword">load</span> — the load verb lives on each target's own tree. Datasets are addressed by <code>&lt;owner&gt;/&lt;repo&gt;</code> (e.g. <code>neo4j-graph-examples/movies</code>); <code>--version</code> accepts <code>5</code>, <code>5.26</code>, a calver like <code>2026.04.0</code>, or <code>latest</code>.</p>
           <pre><span class="prompt">$</span> neo4j-cli docker load neo4j-graph-examples/movies <span class="flag">--name</span> movies <span class="flag">--wait</span> <span class="flag">--rw</span>        <span class="comment"># new local container</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms load neo4j-graph-examples/movies <span class="flag">--name</span> movies <span class="flag">--rw</span>          <span class="comment"># new Desktop 2 DBMS</span>
-<span class="prompt">$</span> neo4j-cli aura instance load neo4j-graph-examples/movies <span class="flag">--name</span> movies <span class="flag">--type</span> free-db <span class="flag">--rw</span>   <span class="comment"># new Aura instance</span></pre>
+<span class="prompt">$</span> neo4j-cli aura instance load neo4j-graph-examples/movies <span class="flag">--name</span> movies <span class="flag">--type</span> free <span class="flag">--rw</span>   <span class="comment"># new Aura instance</span></pre>
           <p>Loading into an <strong>existing</strong> target overwrites the <code>--database</code> (default <code>neo4j</code>), which must already exist — pass <code>--force</code> to confirm. <code>aura instance load</code> always creates a <strong>new</strong> instance (a local Docker daemon stages the dump); datasets needing the <code>graph-data-science</code> plugin can't be loaded into Aura.</p>
         </div>
       </div>
