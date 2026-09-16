@@ -118,6 +118,25 @@ diverge — that's the most embarrassing bug this page can ship.
 4. Keep the total to 5 tabs or fewer. More than that, the tab strip
    wraps and the design breaks down — pick what to drop.
 
+### Showing the current CLI version
+
+The current released version is displayed in **three places** in
+`index.html`. On every release sync (`chore(website): sync with vX.Y.Z`),
+bump **all three** to the new tag:
+
+1. **Hero pill** — the `.pill-tag` span at the top of the hero
+   (`<span class="pill-tag" style="text-transform:none">v1.14.0</span>`).
+   The pill links to the GitHub releases page.
+2. **Install hint** — the `latest release <a …>v1.14.0</a>` link inside
+   `.cmd-hint`, directly under the hero install command.
+3. **Footer meta** — `neo4j-cli <a …>v1.14.0</a> · maintained by …`.
+
+All three link to
+`https://github.com/neo4j-labs/neo4j-cli/releases`. Find them quickly
+with `grep -n 'releases">v' index.html`. The version is hardcoded by
+design — the page makes zero runtime third-party requests, so it must
+be updated at release time, not fetched.
+
 ### Changing colors
 
 CSS variables live at the top of the `<style>` block (`:root { ... }`).
