@@ -1870,7 +1870,21 @@
 <span class="prompt">$</span> neo4j-cli aura cmk get &lt;cmk-id&gt;
 <span class="prompt">$</span> neo4j-cli aura cmk create <span class="flag">--name</span> my-key <span class="flag">--provider</span> aws <span class="flag">--key-arn</span> arn:… <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli aura cmk delete &lt;cmk-id&gt; <span class="flag">--rw</span></pre>
-          <p class="ref-sub"><span class="keyword">aura agent</span> — LLM-backed assistants bound to an instance. Leaves: <code>list</code>, <code>get</code>, <code>create</code>, <code>update</code>, <code>replace</code>, <code>delete</code>, <code>invoke</code>. <code>--tools</code> takes a JSON array <code>[{type, name, description, config}]</code> with camelCase types: <code>text2cypher</code>, <code>cypherTemplate</code>, <code>similaritySearch</code>.</p>
+          <p class="ref-sub"><span class="keyword">aura agent</span> — LLM-backed assistants bound to an instance. Seven leaves: <code>list</code>, <code>get</code>, <code>create</code>, <code>update</code>, <code>replace</code>, <code>delete</code>, <code>invoke</code>. Every leaf except <code>list</code> takes the agent id as a <strong>positional argument</strong>:</p>
+          <pre><span class="prompt">$</span> neo4j-cli aura agent list <span class="flag">--format</span> json
+<span class="prompt">$</span> neo4j-cli aura agent get &lt;agent-id&gt;
+<span class="prompt">$</span> neo4j-cli aura agent create <span class="flag">--name</span> docs-bot <span class="flag">--description</span> "Docs assistant" <span class="flag">--dbid</span> &lt;dbid&gt; \
+    <span class="flag">--tools</span> '[{"type":"text2cypher","name":"ask","description":"Answer questions about the graph"}]' <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura agent create <span class="flag">--name</span> docs-bot <span class="flag">--description</span> "Docs assistant" <span class="flag">--dbid</span> &lt;dbid&gt; \
+    <span class="flag">--tools</span> '[…]' <span class="flag">--system-prompt</span> "You are a helpful graph analyst" <span class="flag">--is-mcp-enabled</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura agent update &lt;agent-id&gt; <span class="flag">--description</span> "Updated blurb" <span class="flag">--rw</span>   <span class="comment"># PATCH — sends only the flags you pass</span>
+<span class="prompt">$</span> neo4j-cli aura agent replace &lt;agent-id&gt; <span class="flag">--name</span> docs-bot <span class="flag">--description</span> "Docs assistant" \
+    <span class="flag">--dbid</span> &lt;dbid&gt; <span class="flag">--tools</span> '[…]' <span class="flag">--rw</span>   <span class="comment"># PUT — full object, all four required</span>
+<span class="prompt">$</span> neo4j-cli aura agent invoke &lt;agent-id&gt; <span class="flag">--input</span> "How many movies are there?" <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura agent delete &lt;agent-id&gt; <span class="flag">--rw</span> <span class="flag">--yes</span> <span class="flag">--force</span></pre>
+          <p><code>create</code> and <code>replace</code> both require <code>--name</code>, <code>--description</code>, <code>--dbid</code> (the Aura instance the agent queries), and <code>--tools</code>; <code>update</code> requires none of them and patches only what you supply. Optional on all three: <code>--system-prompt</code>, <code>--is-private</code>, <code>--is-mcp-enabled</code> (exposes the agent over MCP), <code>--enabled</code>.</p>
+          <p><code>--tools</code> takes a JSON array of <code>{type, name, description, config}</code> objects — the <code>type</code> discriminator is <strong>camelCase</strong>: <code>text2cypher</code>, <code>cypherTemplate</code>, <code>similaritySearch</code>. Per-type <code>config</code> shapes are in the <a href="https://neo4j.com/docs/aura/platform/api/specification/?urls.primaryName=Aura%20v2beta1#/agents" target="_blank" rel="noopener">Aura v2beta1 spec</a>.</p>
+          <p><code>invoke</code> under <code>--format json</code> returns the full server response (<code>content</code> blocks, <code>status</code>, <code>end_reason</code>, <code>usage</code>); the default table output prints the joined text followed by a stats line — Status / End reason / Tool calls / Tokens.</p>
         </div>
       </div>
       <!-- END:docs:aura -->
