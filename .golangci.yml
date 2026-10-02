@@ -32,15 +32,11 @@ linters:
           deny:
             - pkg: github.com/neo4j/cli/internal/commands
               desc: service packages must not import command packages
-        # Command trees stay independent. Known exception, tracked for
-        # extraction: aura instance deploy/load drive the docker engine, which
-        # still lives in commands/docker alongside its cobra leaves.
+        # Command trees stay independent: shared logic goes in a service package.
         aura-commands-not-siblings:
           list-mode: lax
           files:
             - "**/internal/commands/aura/**"
-            - "!**/internal/commands/aura/instance/deploy.go"
-            - "!**/internal/commands/aura/instance/load.go"
             - "!$test"
           deny:
             - pkg: github.com/neo4j/cli/internal/commands/docker

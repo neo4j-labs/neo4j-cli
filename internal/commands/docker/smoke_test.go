@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	engine "github.com/neo4j/cli/internal/docker"
 	"net"
 	"os/exec"
 	"strconv"
@@ -268,8 +269,8 @@ func TestSmoke_PortFallback(t *testing.T) {
 
 	var labels map[string]string
 	require.NoError(t, json.Unmarshal(inspectOut, &labels), "docker inspect labels JSON parse failed: %s", string(inspectOut))
-	assert.Equal(t, strconv.Itoa(resolvedBolt), labels[LabelBoltPort], "label %s desync", LabelBoltPort)
-	assert.Equal(t, strconv.Itoa(resolvedHTTP), labels[LabelHTTPPort], "label %s desync", LabelHTTPPort)
+	assert.Equal(t, strconv.Itoa(resolvedBolt), labels[engine.LabelBoltPort], "label %s desync", engine.LabelBoltPort)
+	assert.Equal(t, strconv.Itoa(resolvedHTTP), labels[engine.LabelHTTPPort], "label %s desync", engine.LabelHTTPPort)
 }
 
 // TestSmoke_DebugEmitsToStderr exercises `docker <leaf> --debug` against a
@@ -308,7 +309,7 @@ func TestSmoke_DebugEmitsToStderr(t *testing.T) {
 	// *cobra.Command in scope), NOT cmd.ErrOrStderr(); capture it here.
 	const password = "smoke-pw-do-not-leak"
 	var debugBuf bytes.Buffer
-	SetDebugWriterForTest(t, &debugBuf)
+	engine.SetDebugWriterForTest(t, &debugBuf)
 
 	_, stderr, err := runDockerSubcommand(t, cfg, "create",
 		"--name", name,
@@ -322,8 +323,8 @@ func TestSmoke_DebugEmitsToStderr(t *testing.T) {
 	require.NoError(t, err, "create --debug failed; stderr=%s", stderr)
 
 	debugOut := debugBuf.String()
-	assert.Contains(t, debugOut, debugReqPrefix+"docker run", "trace missing docker invocation; trace=%s", debugOut)
-	assert.Contains(t, debugOut, debugRespPrefix+"exit 0 elapsed", "trace missing exit/elapsed; trace=%s", debugOut)
+	assert.Contains(t, debugOut, engine.DebugReqPrefix+"docker run", "trace missing docker invocation; trace=%s", debugOut)
+	assert.Contains(t, debugOut, engine.DebugRespPrefix+"exit 0 elapsed", "trace missing exit/elapsed; trace=%s", debugOut)
 	// env line lists the injected NAME; the value must never appear.
 	assert.Contains(t, debugOut, "NEO4J_AUTH", "trace missing env name; trace=%s", debugOut)
 	assert.NotContains(t, debugOut, password, "secret password leaked into debug trace; trace=%s", debugOut)

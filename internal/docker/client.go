@@ -66,14 +66,14 @@ func redactString(s string) string {
 	return clievents.RedactText(s)
 }
 
-// dockerClient abstracts the host `docker` CLI. The default execClient shells
+// Client abstracts the host `docker` CLI. The default execClient shells
 // out via os/exec; tests inject a fake (see helpers_test.go). Every method
 // returns a clierr.UsageError when the docker binary is missing from PATH
 // (REQ-F-060) so all leaf commands surface the same install hint.
 //
 // RunArgs / leaf-specific argument plumbing is deferred to the tasks that
 // build the leaves; this interface only fixes the verbs.
-type dockerClient interface {
+type Client interface {
 	// Run shells `docker run -d ...args` and returns the container ID (stdout)
 	// or a typed error including captured stderr (REQ-F-061).
 	Run(ctx context.Context, args []string) (string, error)
@@ -134,7 +134,7 @@ type PsEntry struct {
 	Labels string `json:"Labels"`
 }
 
-// execClient is the default dockerClient that shells out via os/exec.
+// execClient is the default Client that shells out via os/exec.
 // dockerPath is resolved lazily on first use (REQ-F-060) so other neo4j-cli
 // subtrees (aura, query, credential, …) stay usable on hosts without docker
 // installed.
@@ -145,29 +145,31 @@ type execClient struct {
 	debug      bool
 }
 
-// newClient returns the default exec-backed client. When debug is true each
+// NewClient returns the default exec-backed client. When debug is true each
 // docker invocation echoes a redacted [docker-debug] trace to debugW.
-func newClient(debug bool) dockerClient {
+func NewClient(debug bool) Client {
 	return &execClient{debug: debug}
 }
 
-// NewDeployClient returns the default exec-backed dockerClient for callers
+// NewDeployClient returns the default exec-backed Client for callers
 // outside the docker package (e.g. the aura `instance deploy` leaf) that need
 // to pass a client into PushToAura. The concrete client type stays unexported;
-// only this constructor and the dockerClient methods are reachable, preserving
+// only this constructor and the Client methods are reachable, preserving
 // the package's existing test seam.
-func NewDeployClient() dockerClient {
-	return newClient(false)
+func NewDeployClient() Client {
+	return NewClient(false)
 }
 
 // debugW is the destination for --debug diagnostics from the docker package.
-// It defaults to os.Stderr and is overridable in tests via the export_test.go
-// SetDebugWriterForTest seam, mirroring the aura api package.
+// It defaults to os.Stderr and is overridable in tests via SetDebugWriterForTest
+// (testhooks.go), mirroring the aura api package.
 var debugW io.Writer = os.Stderr
 
+// DebugReqPrefix and DebugRespPrefix start every --debug trace line, so tests
+// and log scrapers can recognise them.
 const (
-	debugReqPrefix  = "[docker-debug] > "
-	debugRespPrefix = "[docker-debug] < "
+	DebugReqPrefix  = "[docker-debug] > "
+	DebugRespPrefix = "[docker-debug] < "
 )
 
 // debugInvocation emits the redacted argv about to be exec'd, plus — when env
@@ -175,7 +177,7 @@ const (
 // emitted: secrets travel through the docker process environment, so echoing a
 // value would defeat the whole reason for keeping it out of argv.
 func debugInvocation(args, env []string) {
-	_, _ = fmt.Fprintf(debugW, "%sdocker %s\n", debugReqPrefix, debug.Scrub(strings.Join(redactArgs(args), " ")))
+	_, _ = fmt.Fprintf(debugW, "%sdocker %s\n", DebugReqPrefix, debug.Scrub(strings.Join(redactArgs(args), " ")))
 	if len(env) == 0 {
 		return
 	}
@@ -187,7 +189,7 @@ func debugInvocation(args, env []string) {
 		}
 		names[i] = debug.Scrub(key)
 	}
-	_, _ = fmt.Fprintf(debugW, "%senv %s\n", debugReqPrefix, strings.Join(names, " "))
+	_, _ = fmt.Fprintf(debugW, "%senv %s\n", DebugReqPrefix, strings.Join(names, " "))
 }
 
 // debugResult emits the process exit code and elapsed duration. A nil err is
@@ -201,7 +203,7 @@ func debugResult(err error, elapsed time.Duration) {
 	} else if err == nil {
 		code = 0
 	}
-	_, _ = fmt.Fprintf(debugW, "%sexit %d elapsed %s\n", debugRespPrefix, code, elapsed)
+	_, _ = fmt.Fprintf(debugW, "%sexit %d elapsed %s\n", DebugRespPrefix, code, elapsed)
 }
 
 // resolve performs the cached exec.LookPath("docker") and converts a miss

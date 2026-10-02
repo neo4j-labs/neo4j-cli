@@ -5,6 +5,7 @@ package docker
 
 import (
 	"encoding/json"
+	engine "github.com/neo4j/cli/internal/docker"
 	"strings"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -42,7 +43,7 @@ neo4j-cli docker list --format toon`,
 			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
 
-			entries, err := client.PsAll(ctx, []string{"label=" + LabelManaged + "=true"})
+			entries, err := client.PsAll(ctx, []string{"label=" + engine.LabelManaged + "=true"})
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
@@ -55,17 +56,17 @@ neo4j-cli docker list --format toon`,
 				// through to docker, but unit tests against fakeDockerClient
 				// do not honour docker-side filters, so the contract needs to
 				// hold here too.
-				if labels[LabelManaged] != "true" {
+				if labels[engine.LabelManaged] != "true" {
 					continue
 				}
 				rows = append(rows, map[string]any{
 					"name":      firstName(entry.Names),
 					"status":    entry.Status,
-					"edition":   labels[LabelEdition],
-					"version":   labels[LabelVersion],
-					"bolt_port": labels[LabelBoltPort],
-					"http_port": labels[LabelHTTPPort],
-					"ephemeral": labels[LabelEphemeral] == "true",
+					"edition":   labels[engine.LabelEdition],
+					"version":   labels[engine.LabelVersion],
+					"bolt_port": labels[engine.LabelBoltPort],
+					"http_port": labels[engine.LabelHTTPPort],
+					"ephemeral": labels[engine.LabelEphemeral] == "true",
 				})
 			}
 

@@ -167,3 +167,16 @@ func WaitForBoltTCP(ctx context.Context, host string, port int, timeout time.Dur
 		}
 	}
 }
+
+// DefaultWaitTimeout is the fixed budget for the post-`docker run` Bolt
+// readiness probe when --wait is passed. The contract pins this at 60s — there
+// is intentionally no --wait-timeout flag.
+const DefaultWaitTimeout = 60 * time.Second
+
+// waitTimeout and waitForBoltFn are the seams the new-container loader uses for
+// its readiness probe; tests shrink the timeout and swap in a fake prober via
+// the exported test hooks.
+var (
+	waitTimeout   = DefaultWaitTimeout
+	waitForBoltFn = WaitForBolt
+)

@@ -6,6 +6,7 @@ package docker
 import (
 	"errors"
 	"fmt"
+	engine "github.com/neo4j/cli/internal/docker"
 	"strconv"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -20,7 +21,7 @@ import (
 // WaitForBoltTCP; tests substitute a deterministic fake so the fallback path
 // can be exercised without a real socket. Held alongside waitForBoltFn so the
 // test-swap surface stays adjacent to the consumer.
-var waitForBoltTCPFn = WaitForBoltTCP
+var waitForBoltTCPFn = engine.WaitForBoltTCP
 
 // newStartCmd builds the `neo4j-cli docker start <name>` leaf (REQ-F-040).
 // It shells `docker start <name>` via the dockerClient seam after verifying
@@ -83,7 +84,7 @@ neo4j-cli docker start dev --wait --rw`,
 			container, err := client.Inspect(ctx, name)
 			if err != nil {
 				cmd.SilenceUsage = true
-				if errors.Is(err, ErrNotFound) {
+				if errors.Is(err, engine.ErrNotFound) {
 					return unknownContainerError(name)
 				}
 				return err

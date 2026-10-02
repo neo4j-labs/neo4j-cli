@@ -17,12 +17,12 @@ import (
 // rendered password is assertable.
 var randSource io.Reader = rand.Reader
 
-// generatedPasswordBytes is the byte length consumed from randSource before
+// GeneratedPasswordBytes is the byte length consumed from randSource before
 // base64-URL-safe encoding without padding. 16 bytes → 22 base64 characters,
 // which is well above the entropy floor for a local Bolt password.
-const generatedPasswordBytes = 16
+const GeneratedPasswordBytes = 16
 
-// generatePassword is the SINGLE place a Neo4j password is minted for a local
+// GeneratePassword is the SINGLE place a Neo4j password is minted for a local
 // container: `docker create` (no --password) and LoadDumpIntoNewContainer
 // (`docker load`, and `aura instance load`, which stages through an ephemeral
 // container) both route through it. The funnel exists so the registration below
@@ -47,8 +47,8 @@ const generatedPasswordBytes = 16
 // already exists via clievents.RedactArgs. This is deliberately asymmetric with
 // the desktop leaves (desktop/dbms/create.go, desktop/connection/create.go and
 // update.go), which DO register operator-supplied passwords.
-func generatePassword() (string, error) {
-	buf := make([]byte, generatedPasswordBytes)
+func GeneratePassword() (string, error) {
+	buf := make([]byte, GeneratedPasswordBytes)
 	if _, err := io.ReadFull(randSource, buf); err != nil {
 		return "", fmt.Errorf("docker: generate password: %w", err)
 	}

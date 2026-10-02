@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	engine "github.com/neo4j/cli/internal/docker"
 	"strings"
 	"testing"
 
@@ -23,7 +24,7 @@ import (
 // the provided container fixtures. Returns the fake (for call assertions),
 // stdout (for output assertions), stderr (for parity with other leaves),
 // and the execution error.
-func runGet(t *testing.T, args string, containers map[string]Container) (*fakeDockerClient, string, string, error) {
+func runGet(t *testing.T, args string, containers map[string]engine.Container) (*engine.FakeClient, string, string, error) {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -33,12 +34,12 @@ func runGet(t *testing.T, args string, containers map[string]Container) (*fakeDo
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	for name, c := range containers {
 		fake.Containers[name] = c
 	}
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	cmd := NewCmd(cfg)
@@ -60,8 +61,8 @@ func runGet(t *testing.T, args string, containers map[string]Container) (*fakeDo
 // managedContainer is a small fixture builder for the `get` tests so each
 // case names only the values it cares about. The Managed flag mirrors the
 // `org.neo4j.cli.managed=true` label set by `create`.
-func managedContainer(name, edition, version, boltPort, httpPort, image string, ephemeral bool, status string) Container {
-	return Container{
+func managedContainer(name, edition, version, boltPort, httpPort, image string, ephemeral bool, status string) engine.Container {
+	return engine.Container{
 		Name:      name,
 		Status:    status,
 		Edition:   edition,
@@ -77,7 +78,7 @@ func managedContainer(name, edition, version, boltPort, httpPort, image string, 
 func TestGet_ManagedContainer_RendersAllNineFields(t *testing.T) {
 	// REQ-F-031: `get` renders the seven `list` columns plus uri and image
 	// for a single container. Confirm via JSON so the assertion is exact.
-	containers := map[string]Container{
+	containers := map[string]engine.Container{
 		"dev": managedContainer("dev", "enterprise", "5.20", "7687", "7474", "neo4j:5.20-enterprise", false, "Up 5 minutes"),
 	}
 
@@ -105,7 +106,7 @@ func TestGet_ManagedContainer_RendersAllNineFields(t *testing.T) {
 func TestGet_URIDerivedFromBoltPortLabel(t *testing.T) {
 	// REQ-F-031: uri = neo4j://localhost:<bolt-port>; assert with a
 	// non-default bolt port so the formatter is exercised.
-	containers := map[string]Container{
+	containers := map[string]engine.Container{
 		"local": managedContainer("local", "community", "latest", "7689", "7476", "neo4j:latest", false, "Up 1 minute"),
 	}
 	_, stdout, _, err := runGet(t, "local --format json", containers)
@@ -118,7 +119,7 @@ func TestGet_URIDerivedFromBoltPortLabel(t *testing.T) {
 }
 
 func TestGet_EphemeralContainer_RendersAsTrue(t *testing.T) {
-	containers := map[string]Container{
+	containers := map[string]engine.Container{
 		"tmp": managedContainer("tmp", "enterprise", "latest", "7687", "7474", "neo4j:latest-enterprise", true, "Up 30 seconds"),
 	}
 	_, stdout, _, err := runGet(t, "tmp --format json", containers)
@@ -148,7 +149,7 @@ func TestGet_UnmanagedContainer_UnknownError(t *testing.T) {
 	// label is still treated as unknown — same error, no rendered fields.
 	// Mark Managed=false explicitly via a direct fixture so the contract
 	// hits the in-leaf gate (not just the fake's not-found branch).
-	containers := map[string]Container{
+	containers := map[string]engine.Container{
 		"someones-postgres": {
 			Name:    "someones-postgres",
 			Status:  "Up 1 day",
@@ -182,7 +183,7 @@ func TestGet_TooManyArgs_CobraUsageError(t *testing.T) {
 }
 
 func TestGet_FormatTable_RendersAllNineColumnsAndRow(t *testing.T) {
-	containers := map[string]Container{
+	containers := map[string]engine.Container{
 		"dev": managedContainer("dev", "enterprise", "5.20", "7687", "7474", "neo4j:5.20-enterprise", false, "Up 5 minutes"),
 	}
 	_, stdout, _, err := runGet(t, "dev --format table", containers)
@@ -203,12 +204,12 @@ func TestGet_DaemonError_Propagated(t *testing.T) {
 	// see the real cause instead of a misleading unknown-name message.
 	// Drive via a fake InspectFn returning the canonical "Cannot connect
 	// to the Docker daemon" string so the assertion is on stable wording.
-	fake := newFakeDockerClient()
-	fake.InspectFn = func(ctx context.Context, name string) (Container, error) {
-		return Container{}, fmt.Errorf("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
+	fake := engine.NewFakeClient()
+	fake.InspectFn = func(ctx context.Context, name string) (engine.Container, error) {
+		return engine.Container{}, fmt.Errorf("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
 	}
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	fs, fsErr := testfs.GetTestFs(`{}`, `{

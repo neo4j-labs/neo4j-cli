@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	engine "github.com/neo4j/cli/internal/docker"
 	"strings"
 	"testing"
 
@@ -25,12 +26,12 @@ import (
 // `stdin` knob so the prompt cases can drive y/N/empty input. The TTY
 // signal is controlled separately via withStdinIsTerminal.
 type deleteSetup struct {
-	fake *fakeDockerClient
+	fake *engine.FakeClient
 	cfg  *clicfg.Config
 	cmd  *cmdHandle
 }
 
-func newDeleteSetup(t *testing.T, containers map[string]Container, creds map[string]string, stdin string) *deleteSetup {
+func newDeleteSetup(t *testing.T, containers map[string]engine.Container, creds map[string]string, stdin string) *deleteSetup {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -40,12 +41,12 @@ func newDeleteSetup(t *testing.T, containers map[string]Container, creds map[str
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	for name, c := range containers {
 		fake.Containers[name] = c
 	}
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	for name, pass := range creds {
@@ -87,8 +88,8 @@ func withStdinIsTerminal(t *testing.T, isTTY bool) {
 	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return isTTY }))
 }
 
-func managedContainerForDelete(name string) Container {
-	return Container{
+func managedContainerForDelete(name string) engine.Container {
+	return engine.Container{
 		Name:     name,
 		Status:   "Up 2 hours",
 		Edition:  "enterprise",
@@ -109,7 +110,7 @@ func TestDelete_ConfirmGate(t *testing.T) {
 		ResourceLabel: "docker",
 		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
 			s := newDeleteSetup(t,
-				map[string]Container{"dev": managedContainerForDelete("dev")},
+				map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 				map[string]string{"dev": "secret"},
 				stdin,
 			)
@@ -123,7 +124,7 @@ func TestDelete_TTY_YesUppercase_Confirms(t *testing.T) {
 	// `Y` (uppercase) also confirms; case-insensitive match.
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 		map[string]string{"dev": "secret"},
 		"Y\n",
 	)
@@ -136,7 +137,7 @@ func TestDelete_TTY_Yes_Word_Confirms(t *testing.T) {
 	// Full word `yes` also confirms.
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 		map[string]string{"dev": "secret"},
 		"yes\n",
 	)
@@ -149,7 +150,7 @@ func TestDelete_TTY_EmptyLine_DefaultsToCancel(t *testing.T) {
 	// Empty line (user pressed Enter) is the default N → cancel.
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 		map[string]string{"dev": "secret"},
 		"\n",
 	)
@@ -164,7 +165,7 @@ func TestDelete_TTY_EmptyLine_DefaultsToCancel(t *testing.T) {
 func TestDelete_NonTTY_OnlyForce_Exit2(t *testing.T) {
 	withStdinIsTerminal(t, false)
 	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 		map[string]string{"dev": "secret"},
 		"",
 	)
@@ -183,7 +184,7 @@ func TestDelete_NonTTY_OnlyForce_Exit2(t *testing.T) {
 func TestDelete_NonTTY_OnlyYes_Exit2(t *testing.T) {
 	withStdinIsTerminal(t, false)
 	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 		map[string]string{"dev": "secret"},
 		"",
 	)
@@ -202,7 +203,7 @@ func TestDelete_TTY_BothFlags_SkipsPromptAndRemoves(t *testing.T) {
 	// stdin, no prompt is written to stderr.
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 		map[string]string{"dev": "secret"},
 		"", // stdin must not be read at all
 	)
@@ -219,7 +220,7 @@ func TestDelete_NonManagedContainer_UnknownError(t *testing.T) {
 	// label gets the unknown-name usage error; no RemoveForce call.
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t,
-		map[string]Container{
+		map[string]engine.Container{
 			"someones-postgres": {
 				Name:    "someones-postgres",
 				Status:  "Up 2 hours",
@@ -256,7 +257,7 @@ func TestDelete_ContainerExists_CredentialMissing_StillSucceeds(t *testing.T) {
 	// stored" (--no-store-credential) or "credential already removed" path.
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 		nil, // no credential stored
 		"y\n",
 	)
@@ -273,7 +274,7 @@ func TestDelete_DockerRemoveError_Surfaced(t *testing.T) {
 	// container is the safer default.
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]engine.Container{"dev": managedContainerForDelete("dev")},
 		map[string]string{"dev": "secret"},
 		"y\n",
 	)
@@ -316,8 +317,8 @@ func TestDelete_InspectDaemonError_Propagated(t *testing.T) {
 	// misleading "no managed container" message. RemoveForce must NOT fire.
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t, nil, nil, "y\n")
-	s.fake.InspectFn = func(_ context.Context, _ string) (Container, error) {
-		return Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
+	s.fake.InspectFn = func(_ context.Context, _ string) (engine.Container, error) {
+		return engine.Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
 	}
 
 	err := s.cmd.run("dev --yes --force")

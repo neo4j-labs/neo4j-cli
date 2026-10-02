@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	engine "github.com/neo4j/cli/internal/docker"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ import (
 // Returns the fake (for call assertions), stderr/stdout buffers, and the cmd
 // ready to be Execute()d via a separate args set in each table case.
 type startSetup struct {
-	fake      *fakeDockerClient
+	fake      *engine.FakeClient
 	cfg       *clicfg.Config
 	cmd       *cmdHandle
 	credAdded bool
@@ -35,7 +36,7 @@ type cmdHandle struct {
 	run      func(args string) error
 }
 
-func newStartSetup(t *testing.T, containers map[string]Container, creds map[string]string) *startSetup {
+func newStartSetup(t *testing.T, containers map[string]engine.Container, creds map[string]string) *startSetup {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -45,12 +46,12 @@ func newStartSetup(t *testing.T, containers map[string]Container, creds map[stri
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	for name, c := range containers {
 		fake.Containers[name] = c
 	}
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	credAdded := false
@@ -116,8 +117,8 @@ func withStartShortWaitTimeout(t *testing.T, d time.Duration) {
 	t.Cleanup(func() { waitTimeout = orig })
 }
 
-func managedRunningContainer(name string) Container {
-	return Container{
+func managedRunningContainer(name string) engine.Container {
+	return engine.Container{
 		Name:     name,
 		Status:   "Exited (0) 5 seconds ago",
 		Edition:  "enterprise",
@@ -132,7 +133,7 @@ func managedRunningContainer(name string) Container {
 func TestStart_HappyPath_NoWait(t *testing.T) {
 	// REQ-F-040: a managed container is started via dockerClient.Start exactly
 	// once. No --wait → no readiness probe, no narration.
-	s := newStartSetup(t, map[string]Container{
+	s := newStartSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainer("dev"),
 	}, nil)
 
@@ -159,7 +160,7 @@ func TestStart_MissingContainer_UnknownError(t *testing.T) {
 func TestStart_UnmanagedContainer_UnknownError(t *testing.T) {
 	// REQ-F-043: a container that exists in Docker but lacks the managed
 	// label is still treated as unknown. The Start call must not fire.
-	s := newStartSetup(t, map[string]Container{
+	s := newStartSetup(t, map[string]engine.Container{
 		"someones-postgres": {
 			Name:    "someones-postgres",
 			Status:  "Exited (0) 5 seconds ago",
@@ -192,7 +193,7 @@ func TestStart_Wait_HappyPath(t *testing.T) {
 		return nil
 	})
 
-	s := newStartSetup(t, map[string]Container{
+	s := newStartSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainer("dev"),
 	}, map[string]string{"dev": "secretpw"})
 
@@ -216,7 +217,7 @@ func TestStart_Wait_Timeout_ReturnsErrorNoTearDown(t *testing.T) {
 		return errors.New("container started but Bolt did not become ready within 50ms; check 'docker logs <name>'")
 	})
 
-	s := newStartSetup(t, map[string]Container{
+	s := newStartSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainer("dev"),
 	}, map[string]string{"dev": "secretpw"})
 
@@ -248,7 +249,7 @@ func TestStart_Wait_TCPFallback_HappyPath(t *testing.T) {
 		return nil
 	})
 
-	s := newStartSetup(t, map[string]Container{
+	s := newStartSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainer("dev"),
 	}, nil)
 
@@ -274,7 +275,7 @@ func TestStart_Wait_TCPFallback_Timeout_NoTearDown(t *testing.T) {
 		return errors.New("container started but TCP port 7687 did not open within " + timeout.String() + "; check 'docker logs <name>'")
 	})
 
-	s := newStartSetup(t, map[string]Container{
+	s := newStartSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainer("dev"),
 	}, nil)
 
@@ -294,7 +295,7 @@ func TestStart_Wait_UnparseableBoltPort_Error(t *testing.T) {
 	// container itself is fine; the operator can re-run without --wait.
 	bad := managedRunningContainer("dev")
 	bad.BoltPort = "not-a-port"
-	s := newStartSetup(t, map[string]Container{"dev": bad}, nil)
+	s := newStartSetup(t, map[string]engine.Container{"dev": bad}, nil)
 
 	err := s.cmd.run("dev --wait")
 	require.Error(t, err)
@@ -307,7 +308,7 @@ func TestStart_DockerStartError_Surfaced(t *testing.T) {
 	// dockerClient.Start failure (daemon returned non-zero) is surfaced
 	// verbatim — REQ-F-061 wraps stderr in a clierr.UsageError upstream so
 	// the leaf only needs to silence cobra's usage banner and return.
-	s := newStartSetup(t, map[string]Container{
+	s := newStartSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainer("dev"),
 	}, nil)
 	s.fake.StartFn = func(_ context.Context, _ string) error {
@@ -345,8 +346,8 @@ func TestStart_InspectDaemonError_Propagated(t *testing.T) {
 	// propagates verbatim — the operator must see the real cause, not a
 	// misleading "no managed container" message. Start must NOT fire.
 	s := newStartSetup(t, nil, nil)
-	s.fake.InspectFn = func(_ context.Context, _ string) (Container, error) {
-		return Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
+	s.fake.InspectFn = func(_ context.Context, _ string) (engine.Container, error) {
+		return engine.Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
 	}
 
 	err := s.cmd.run("dev")

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	engine "github.com/neo4j/cli/internal/docker"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,12 +24,12 @@ import (
 // a fake dockerClient. Mirrors startSetup so stop tests follow the same
 // shape as start tests for grep-discoverability.
 type stopSetup struct {
-	fake *fakeDockerClient
+	fake *engine.FakeClient
 	cfg  *clicfg.Config
 	cmd  *cmdHandle
 }
 
-func newStopSetup(t *testing.T, containers map[string]Container) *stopSetup {
+func newStopSetup(t *testing.T, containers map[string]engine.Container) *stopSetup {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -38,12 +39,12 @@ func newStopSetup(t *testing.T, containers map[string]Container) *stopSetup {
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	for name, c := range containers {
 		fake.Containers[name] = c
 	}
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	out := bytes.NewBuffer(nil)
@@ -90,8 +91,8 @@ func withShortStopWaitTimeout(t *testing.T, d time.Duration) {
 	t.Cleanup(func() { waitTimeout = orig })
 }
 
-func managedRunningContainerForStop(name string) Container {
-	return Container{
+func managedRunningContainerForStop(name string) engine.Container {
+	return engine.Container{
 		Name:     name,
 		Status:   "Up 2 hours",
 		Edition:  "enterprise",
@@ -107,7 +108,7 @@ func managedRunningContainerForStop(name string) Container {
 func TestStop_HappyPath_NoWait(t *testing.T) {
 	// REQ-F-040: a managed container is stopped via dockerClient.Stop exactly
 	// once. No --wait → no Inspect poll, no narration.
-	s := newStopSetup(t, map[string]Container{
+	s := newStopSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainerForStop("dev"),
 	})
 
@@ -134,7 +135,7 @@ func TestStop_MissingContainer_UnknownError(t *testing.T) {
 func TestStop_UnmanagedContainer_UnknownError(t *testing.T) {
 	// REQ-F-043: a container that exists in Docker but lacks the managed
 	// label is still treated as unknown. The Stop call must not fire.
-	s := newStopSetup(t, map[string]Container{
+	s := newStopSetup(t, map[string]engine.Container{
 		"someones-postgres": {
 			Name:    "someones-postgres",
 			Status:  "Up 2 hours",
@@ -154,7 +155,7 @@ func TestStop_DockerStopError_Surfaced(t *testing.T) {
 	// dockerClient.Stop failure (daemon returned non-zero) is surfaced
 	// verbatim — REQ-F-061 wraps stderr in a clierr.UsageError upstream so
 	// the leaf only needs to silence cobra's usage banner and return.
-	s := newStopSetup(t, map[string]Container{
+	s := newStopSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainerForStop("dev"),
 	})
 	s.fake.StopFn = func(_ context.Context, _ string) error {
@@ -174,11 +175,11 @@ func TestStop_Wait_HappyPath_ExitsAfterPolls(t *testing.T) {
 	withShortPollInterval(t, 1*time.Millisecond)
 	withShortStopWaitTimeout(t, 2*time.Second)
 
-	s := newStopSetup(t, map[string]Container{
+	s := newStopSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainerForStop("dev"),
 	})
 	var inspectCount int32
-	s.fake.InspectFn = func(_ context.Context, name string) (Container, error) {
+	s.fake.InspectFn = func(_ context.Context, name string) (engine.Container, error) {
 		n := atomic.AddInt32(&inspectCount, 1)
 		c := managedRunningContainerForStop(name)
 		// Call 1 is the pre-flight managed check; the poll loop starts at
@@ -206,11 +207,11 @@ func TestStop_Wait_HappyPath_EphemeralCleanedUpAfterStop(t *testing.T) {
 	withShortPollInterval(t, 1*time.Millisecond)
 	withShortStopWaitTimeout(t, 2*time.Second)
 
-	s := newStopSetup(t, map[string]Container{
+	s := newStopSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainerForStop("dev"),
 	})
 	var inspectCount int32
-	s.fake.InspectFn = func(_ context.Context, name string) (Container, error) {
+	s.fake.InspectFn = func(_ context.Context, name string) (engine.Container, error) {
 		n := atomic.AddInt32(&inspectCount, 1)
 		if n == 1 {
 			// Pre-flight: return the managed running container.
@@ -221,7 +222,7 @@ func TestStop_Wait_HappyPath_EphemeralCleanedUpAfterStop(t *testing.T) {
 		// error fallback in inspectExited is still tested elsewhere; this
 		// case exercises the primary errors.Is path the production client
 		// surfaces.
-		return Container{}, fmt.Errorf("%w: %s", ErrNotFound, name)
+		return engine.Container{}, fmt.Errorf("%w: %s", engine.ErrNotFound, name)
 	}
 
 	require.NoError(t, s.cmd.run("dev --wait"))
@@ -250,10 +251,10 @@ func TestStop_Wait_Timeout_ReturnsError(t *testing.T) {
 	withShortPollInterval(t, 1*time.Millisecond)
 	withShortStopWaitTimeout(t, 30*time.Millisecond)
 
-	s := newStopSetup(t, map[string]Container{
+	s := newStopSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainerForStop("dev"),
 	})
-	s.fake.InspectFn = func(_ context.Context, name string) (Container, error) {
+	s.fake.InspectFn = func(_ context.Context, name string) (engine.Container, error) {
 		// Inspect always reports the container as still running so the
 		// poll loop never sees an exit and the deadline trips first.
 		return managedRunningContainerForStop(name), nil
@@ -275,16 +276,16 @@ func TestStop_Wait_TransientInspectError_RetriesUntilTimeout(t *testing.T) {
 	withShortPollInterval(t, 1*time.Millisecond)
 	withShortStopWaitTimeout(t, 30*time.Millisecond)
 
-	s := newStopSetup(t, map[string]Container{
+	s := newStopSetup(t, map[string]engine.Container{
 		"dev": managedRunningContainerForStop("dev"),
 	})
 	var inspectCount int32
-	s.fake.InspectFn = func(_ context.Context, name string) (Container, error) {
+	s.fake.InspectFn = func(_ context.Context, name string) (engine.Container, error) {
 		n := atomic.AddInt32(&inspectCount, 1)
 		if n == 1 {
 			return managedRunningContainerForStop(name), nil
 		}
-		return Container{}, errors.New("Error response from daemon: connection reset")
+		return engine.Container{}, errors.New("Error response from daemon: connection reset")
 	}
 
 	err := s.cmd.run("dev --wait")
@@ -319,8 +320,8 @@ func TestStop_InspectDaemonError_Propagated(t *testing.T) {
 	// cause, not a misleading "no managed container" message. Stop must
 	// NOT fire.
 	s := newStopSetup(t, nil)
-	s.fake.InspectFn = func(_ context.Context, _ string) (Container, error) {
-		return Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
+	s.fake.InspectFn = func(_ context.Context, _ string) (engine.Container, error) {
+		return engine.Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
 	}
 
 	err := s.cmd.run("dev")

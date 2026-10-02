@@ -6,6 +6,7 @@ package docker
 import (
 	"bytes"
 	"encoding/json"
+	engine "github.com/neo4j/cli/internal/docker"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ import (
 // runList drives the `docker list` leaf against the fake docker client with
 // the given pre-populated PsEntries. Returns the fake (for filter assertions),
 // stdout (for output assertions) and the execution error.
-func runList(t *testing.T, args string, entries []PsEntry) (*fakeDockerClient, string, error) {
+func runList(t *testing.T, args string, entries []engine.PsEntry) (*engine.FakeClient, string, error) {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -30,10 +31,10 @@ func runList(t *testing.T, args string, entries []PsEntry) (*fakeDockerClient, s
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	fake.PsEntries = entries
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	cmd := NewCmd(cfg)
@@ -58,12 +59,12 @@ func runList(t *testing.T, args string, entries []PsEntry) (*fakeDockerClient, s
 // `neo4j-cli docker create`.
 func managedLabels(edition, version, boltPort, httpPort, ephemeral string) string {
 	return strings.Join([]string{
-		LabelManaged + "=true",
-		LabelEdition + "=" + edition,
-		LabelVersion + "=" + version,
-		LabelBoltPort + "=" + boltPort,
-		LabelHTTPPort + "=" + httpPort,
-		LabelEphemeral + "=" + ephemeral,
+		engine.LabelManaged + "=true",
+		engine.LabelEdition + "=" + edition,
+		engine.LabelVersion + "=" + version,
+		engine.LabelBoltPort + "=" + boltPort,
+		engine.LabelHTTPPort + "=" + httpPort,
+		engine.LabelEphemeral + "=" + ephemeral,
 	}, ",")
 }
 
@@ -74,7 +75,7 @@ func TestList_PassesManagedLabelFilterToDocker(t *testing.T) {
 	fake, _, err := runList(t, "", nil)
 	require.NoError(t, err)
 	require.Len(t, fake.PsAllCalls, 1)
-	assert.Equal(t, []string{"label=" + LabelManaged + "=true"}, fake.PsAllCalls[0])
+	assert.Equal(t, []string{"label=" + engine.LabelManaged + "=true"}, fake.PsAllCalls[0])
 }
 
 func TestList_EmptyResult_FormatJson_RendersEmptyArray(t *testing.T) {
@@ -106,7 +107,7 @@ func TestList_EmptyResult_FormatTable_RendersHeaderOnly(t *testing.T) {
 }
 
 func TestList_OneManagedRunning_RendersAllSevenFields(t *testing.T) {
-	entries := []PsEntry{
+	entries := []engine.PsEntry{
 		{
 			ID:     "abc123",
 			Names:  "dev",
@@ -135,7 +136,7 @@ func TestList_OneManagedRunning_RendersAllSevenFields(t *testing.T) {
 }
 
 func TestList_EphemeralLabel_RendersAsBoolTrue(t *testing.T) {
-	entries := []PsEntry{
+	entries := []engine.PsEntry{
 		{
 			Names:  "tmp",
 			Status: "Up 30 seconds",
@@ -154,7 +155,7 @@ func TestList_EphemeralLabel_RendersAsBoolTrue(t *testing.T) {
 func TestList_OneManagedOneUnmanaged_FiltersUnmanaged(t *testing.T) {
 	// Even if docker (or a misbehaving test seam) hands us an unmanaged
 	// container, the in-Go filter must drop it so REQ-F-020 holds.
-	entries := []PsEntry{
+	entries := []engine.PsEntry{
 		{
 			Names:  "dev",
 			Status: "Up 1 hour",
@@ -184,7 +185,7 @@ func TestList_OneManagedOneUnmanaged_FiltersUnmanaged(t *testing.T) {
 }
 
 func TestList_TwoManaged_RunningAndExited_BothRendered(t *testing.T) {
-	entries := []PsEntry{
+	entries := []engine.PsEntry{
 		{
 			Names:  "running-one",
 			Status: "Up 10 minutes",
@@ -213,7 +214,7 @@ func TestList_StripsLeadingSlashFromName(t *testing.T) {
 	// The docker daemon historically prepends "/" to container names; the
 	// `{{json .}}` format usually elides it, but defending against it here
 	// keeps the rendered output predictable across daemon versions.
-	entries := []PsEntry{
+	entries := []engine.PsEntry{
 		{
 			Names:  "/dev",
 			Status: "Up 1 minute",
@@ -230,7 +231,7 @@ func TestList_StripsLeadingSlashFromName(t *testing.T) {
 }
 
 func TestList_FormatTable_RendersAllSevenColumnsAndRow(t *testing.T) {
-	entries := []PsEntry{
+	entries := []engine.PsEntry{
 		{
 			Names:  "dev",
 			Status: "Up 5 minutes",

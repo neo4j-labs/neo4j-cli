@@ -5,6 +5,7 @@ package docker
 
 import (
 	"errors"
+	engine "github.com/neo4j/cli/internal/docker"
 	"strings"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -64,7 +65,7 @@ neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format
 			// verbatim so the operator can fix the real cause.
 			container, err := client.Inspect(ctx, name)
 			if err != nil {
-				if errors.Is(err, ErrNotFound) {
+				if errors.Is(err, engine.ErrNotFound) {
 					return unknownContainerError(name)
 				}
 				return err

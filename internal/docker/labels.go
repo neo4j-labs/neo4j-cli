@@ -52,9 +52,9 @@ type Container struct {
 	Running bool `json:"-"`
 }
 
-// Inspect is a thin convenience over dockerClient.Inspect so leaves (`get`,
+// Inspect is a thin convenience over Client.Inspect so leaves (`get`,
 // `start`, `stop`, `delete`) can fetch the metadata view in one call. The
 // concrete parsing lives in client.go's parseInspectOutput.
-func Inspect(ctx context.Context, c dockerClient, name string) (Container, error) {
+func Inspect(ctx context.Context, c Client, name string) (Container, error) {
 	return c.Inspect(ctx, name)
 }

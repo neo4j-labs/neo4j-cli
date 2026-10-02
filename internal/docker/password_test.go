@@ -25,7 +25,7 @@ func (errReader) Read([]byte) (int, error) { return 0, errRandSource }
 func TestGeneratePassword_RegistersSecretValueForRedaction(t *testing.T) {
 	expected := stubRandSource(t)
 
-	pw, err := generatePassword()
+	pw, err := GeneratePassword()
 	require.NoError(t, err)
 	require.Equal(t, expected, pw)
 
@@ -44,7 +44,7 @@ func TestGeneratePassword_RegistersSecretValueForRedaction(t *testing.T) {
 func TestGeneratePassword_RandSourceError_Wrapped(t *testing.T) {
 	setRandSource(t, errReader{})
 
-	pw, err := generatePassword()
+	pw, err := GeneratePassword()
 	require.Error(t, err)
 	assert.Empty(t, pw)
 	assert.ErrorIs(t, err, errRandSource)

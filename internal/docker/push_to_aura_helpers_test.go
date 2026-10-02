@@ -61,7 +61,7 @@ func TestPushToAura_HappyPath_Ordering(t *testing.T) {
 	require.NoError(t, cfg.Credentials.Dbms.Add("dev", "neo4j", "srcpw", "neo4j", "neo4j://localhost:7687"))
 
 	starts := stubStopStartFn(t, nil)
-	fake := newFakeDockerClient()
+	fake := NewFakeClient()
 
 	err := PushToAura(context.Background(), cfg, fake, "dev", "neo4j", AuraTarget{
 		URI:      "neo4j+s://abc.databases.neo4j.io",
@@ -121,7 +121,7 @@ func TestPushToAura_StartRunsWhenUploadFails(t *testing.T) {
 	starts := stubStopStartFn(t, nil)
 
 	uploadErr := errors.New("boom: upload failed")
-	fake := newFakeDockerClient()
+	fake := NewFakeClient()
 	fake.ExecFn = func(_ context.Context, _ string, args []string) (string, error) {
 		if len(args) >= 3 && args[2] == "upload" {
 			return "", uploadErr
@@ -153,7 +153,7 @@ func TestPushToAura_MissingCredential_UsageError(t *testing.T) {
 	// No credential seeded for "dev".
 
 	starts := stubStopStartFn(t, nil)
-	fake := newFakeDockerClient()
+	fake := NewFakeClient()
 
 	err := PushToAura(context.Background(), cfg, fake, "dev", "neo4j", AuraTarget{
 		URI:      "neo4j+s://abc.databases.neo4j.io",
@@ -182,7 +182,7 @@ func TestPushToAura_InjectionDatabaseName_Rejected(t *testing.T) {
 			require.NoError(t, cfg.Credentials.Dbms.Add("dev", "neo4j", "srcpw", "neo4j", "neo4j://localhost:7687"))
 
 			starts := stubStopStartFn(t, nil)
-			fake := newFakeDockerClient()
+			fake := NewFakeClient()
 
 			err := PushToAura(context.Background(), cfg, fake, "dev", name, AuraTarget{
 				URI:      "neo4j+s://abc.databases.neo4j.io",
@@ -209,7 +209,7 @@ func TestPushToAura_TargetPasswordAbsentFromArgvOnError(t *testing.T) {
 	// non-zero exit. Because the secret now travels via env (not argv), the
 	// echoed argv cannot contain it at all — no redaction is even required.
 	const secret = "supersecret-aura-pw"
-	fake := newFakeDockerClient()
+	fake := NewFakeClient()
 	fake.ExecFn = func(_ context.Context, name string, args []string) (string, error) {
 		if len(args) >= 3 && args[2] == "upload" {
 			return "", errors.New(redactString("docker exec " + name + " " + strings.Join(args, " ")))

@@ -6,13 +6,12 @@ package docker
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	engine "github.com/neo4j/cli/internal/docker"
 	"io"
 	"testing"
 )
 
 // repeatingReader is a deterministic io.Reader that cycles a fixed byte slice,
-// used to seed the password-byte generation seam (the password entropy seam).
+// used to seed the password-byte generation seam (randSource).
 type repeatingReader struct {
 	buf []byte
 }
@@ -24,7 +23,7 @@ func (r repeatingReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// stubRandSource installs a deterministic the password entropy seam for the duration of t and
+// stubRandSource installs a deterministic randSource for the duration of t and
 // returns the exact password generatePassword will mint while it is installed.
 //
 // The bytes are derived from t.Name() — which the testing package makes unique
@@ -41,16 +40,18 @@ func stubRandSource(t *testing.T) string {
 	t.Helper()
 
 	sum := sha256.Sum256([]byte(t.Name()))
-	buf := sum[:engine.GeneratedPasswordBytes]
+	buf := sum[:GeneratedPasswordBytes]
 	setRandSource(t, repeatingReader{buf: buf})
 
 	return base64.RawURLEncoding.EncodeToString(buf)
 }
 
 // setRandSource installs r as the password-byte seam for the duration of t.
-// the password entropy seam is package-global, so callers must not t.Parallel().
+// randSource is package-global, so callers must not t.Parallel().
 func setRandSource(t *testing.T, r io.Reader) {
 	t.Helper()
 
-	engine.SetRandSourceForTest(t, r)
+	orig := randSource
+	randSource = r
+	t.Cleanup(func() { randSource = orig })
 }

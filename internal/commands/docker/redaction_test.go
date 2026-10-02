@@ -5,6 +5,7 @@ package docker
 
 import (
 	"encoding/json"
+	engine "github.com/neo4j/cli/internal/docker"
 	"testing"
 
 	"github.com/neo4j/cli/internal/clievents"
@@ -161,7 +162,7 @@ func TestCreate_ExplicitPassword_NotRegisteredAsSecret(t *testing.T) {
 func TestLoad_NewContainer_GeneratedPassword_ScrubbedFromRedactedCapture(t *testing.T) {
 	expectedPassword := stubRandSource(t)
 
-	fake := newFakeDockerClient() // Inspect default-misses → ErrNotFound → new path
+	fake := engine.NewFakeClient() // Inspect default-misses → ErrNotFound → new path
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	_, stdout, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies --format table")

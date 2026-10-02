@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	engine "github.com/neo4j/cli/internal/docker"
 	"strings"
 	"time"
 
@@ -32,6 +33,10 @@ import (
 // Unlike `start --wait` (which polls Bolt readiness) `stop --wait` does NOT
 // need a stored dbms credential — the running-state check is a metadata-only
 // query against the daemon, not an authenticated Bolt session.
+// pollInterval is how often `stop --wait` re-inspects the container for exit.
+// Tests shrink it to keep the wait path fast.
+var pollInterval = 500 * time.Millisecond
+
 func newStopCmd(cfg *clicfg.Config) *cobra.Command {
 	_ = cfg // reserved for future use (credential cleanup is delete's job, not stop's)
 	var wait bool
@@ -67,7 +72,7 @@ neo4j-cli docker stop dev --wait --rw`,
 			container, err := client.Inspect(ctx, name)
 			if err != nil {
 				cmd.SilenceUsage = true
-				if errors.Is(err, ErrNotFound) {
+				if errors.Is(err, engine.ErrNotFound) {
 					return unknownContainerError(name)
 				}
 				return err
@@ -111,7 +116,7 @@ neo4j-cli docker stop dev --wait --rw`,
 // The first probe fires immediately so a container that has already exited
 // (e.g. `docker stop` finished synchronously) returns without sleeping for
 // pollInterval first.
-func waitForExit(ctx context.Context, client dockerClient, name string, timeout time.Duration) error {
+func waitForExit(ctx context.Context, client engine.Client, name string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	probeCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
@@ -143,11 +148,11 @@ func waitForExit(ctx context.Context, client dockerClient, name string, timeout 
 // (ephemeral `--rm` cleaned up after exit). Any other Inspect error is
 // treated as transient — the poll loop will keep retrying within the
 // deadline.
-func inspectExited(ctx context.Context, client dockerClient, name string) bool {
+func inspectExited(ctx context.Context, client engine.Client, name string) bool {
 	c, err := client.Inspect(ctx, name)
 	if err != nil {
 		// Primary: typed sentinel wrapped by execClient.Inspect.
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, engine.ErrNotFound) {
 			return true
 		}
 		// Defensive: a test fake or future client variant might return a

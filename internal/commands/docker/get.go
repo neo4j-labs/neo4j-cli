@@ -6,6 +6,7 @@ package docker
 import (
 	"errors"
 	"fmt"
+	engine "github.com/neo4j/cli/internal/docker"
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
@@ -55,7 +56,7 @@ neo4j-cli docker get dev --format toon`,
 				// (daemon down, permission denied, rootless misconfig, …)
 				// propagate verbatim so the operator can fix the real cause
 				// instead of chasing a phantom container.
-				if errors.Is(err, ErrNotFound) {
+				if errors.Is(err, engine.ErrNotFound) {
 					return unknownContainerError(name)
 				}
 				return err

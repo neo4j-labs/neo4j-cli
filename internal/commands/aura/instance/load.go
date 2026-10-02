@@ -14,8 +14,8 @@ import (
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
-	"github.com/neo4j/cli/internal/commands/docker"
 	"github.com/neo4j/cli/internal/dataset"
+	"github.com/neo4j/cli/internal/docker"
 	"github.com/spf13/cobra"
 )
 

@@ -4,13 +4,11 @@
 package docker
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"net"
+	engine "github.com/neo4j/cli/internal/docker"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -31,30 +29,10 @@ import (
 // package's seams (clientFactory, randSource, listenerFactory, waitForBoltFn).
 var homeDirFn = os.UserHomeDir
 
-// maxNameSuffix caps the auto-suffix walk for name-collision resolution
-// (REQ-F-014). The contract is `<name>-1` … `<name>-99`; exceeding it is
-// almost certainly operator error (stale containers piling up) and we
-// surface that explicitly rather than spinning forever.
-const maxNameSuffix = 99
-
-// maxPortOffset caps the port-pair fallback walk (REQ-F-002). Parity with
-// `maxNameSuffix=99`: 100 offsets (0..99) is enough headroom for everyday
-// collisions but not so high that exhaustion silently hides a deeper bug
-// (e.g. stale containers piling up on the host).
-const maxPortOffset = 100
-
 // clientFactory is the injectable seam for the dockerClient used by leaves.
 // Production wires the exec-backed client (client.go newClient); tests swap
 // in a fakeDockerClient (helpers_test.go) without touching the leaf code.
-var clientFactory = newClient
-
-// listenerFactory is the injectable seam for the port-conflict pre-flight
-// (REQ-F-013). Production binds an ephemeral TCP listener on the requested
-// host port (closing immediately on success); tests swap in a fake that
-// returns sentinel errors keyed by port so we never touch the network.
-var listenerFactory = func(port int) (net.Listener, error) {
-	return net.Listen("tcp", fmt.Sprintf(":%d", port))
-}
+var clientFactory = engine.NewClient
 
 // waitTimeout is the fixed budget for the post-`docker run` Bolt readiness
 // probe when --wait is passed (REQ-F-018). The contract pins this at 60s for
@@ -66,16 +44,7 @@ var waitTimeout = 60 * time.Second
 // probe when --wait is set. Production wires WaitForBolt directly; tests swap
 // in a deterministic fake so the wait path can be exercised without standing
 // up a real Bolt endpoint.
-var waitForBoltFn = WaitForBolt
-
-// versionPattern is the package-level allowlist for `--version` values flowing
-// into the docker image tag (REQ-F-002). Compiled once via regexp.MustCompile
-// per the in-repo precompiled-regex idiom (see internal/skill/installer.go:32).
-// Accepts digit-dot sequences with an optional `-enterprise` suffix
-// (covers semver `5`, `5.20`, `5.20.0`, calver `2026.04`, and the redundant
-// `-enterprise` suffix that the edition branch in create.go strips before
-// re-applying) plus the bare literal `latest`.
-var versionPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*(-enterprise)?$|^latest$`)
+var waitForBoltFn = engine.WaitForBolt
 
 // newCreateCmd builds the `neo4j-cli docker create` leaf. The leaf performs
 // the port-conflict pre-flight (REQ-F-013) and the name-collision auto-suffix
@@ -181,7 +150,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// The canonical form is reassigned to the outer `version` so the
 			// image-construction block, LabelVersion label, and output row
 			// all see the trimmed / -enterprise-stripped value.
-			canonicalVersion, err := validateVersion(version)
+			canonicalVersion, err := engine.ValidateVersion(version)
 			if err != nil {
 				return err
 			}
@@ -251,7 +220,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				return clierr.NewUsageError("--%s and --%s must be different (got %d for both)", boltPortFlag, httpPortFlag, boltPort)
 			}
 			reqBoltPort, reqHTTPPort := boltPort, httpPort
-			resolvedBolt, resolvedHTTP, err := findFreePortPair(reqBoltPort, reqHTTPPort)
+			resolvedBolt, resolvedHTTP, err := engine.FindFreePortPair(reqBoltPort, reqHTTPPort)
 			if err != nil {
 				return err
 			}
@@ -266,7 +235,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// requested name when free; otherwise try <name>-1 … <name>-99.
 			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
-			chosenName, err := resolveContainerName(ctx, client, cfg, name)
+			chosenName, err := engine.ResolveContainerName(ctx, client, cfg, name)
 			if err != nil {
 				return err
 			}
@@ -278,7 +247,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// (see generatePassword in password.go).
 			resolvedPassword := password
 			if resolvedPassword == "" {
-				resolvedPassword, err = generatePassword()
+				resolvedPassword, err = engine.GeneratePassword()
 				if err != nil {
 					return err
 				}
@@ -291,7 +260,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			//   - enterprise + "latest" → neo4j:enterprise        (Docker Hub does NOT publish neo4j:latest-enterprise)
 			image := "neo4j:" + version
 			if edition == "enterprise" {
-				image = enterpriseImage(version)
+				image = engine.EnterpriseImage(version)
 			}
 
 			// Build the docker run argv. Order matters for tests asserting
@@ -337,12 +306,12 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			if ephemeral {
 				ephemeralLabelValue = "true"
 			}
-			argv = append(argv, "--label", LabelManaged+"=true")
-			argv = append(argv, "--label", LabelEdition+"="+edition)
-			argv = append(argv, "--label", LabelVersion+"="+version)
-			argv = append(argv, "--label", LabelBoltPort+"="+strconv.Itoa(boltPort))
-			argv = append(argv, "--label", LabelHTTPPort+"="+strconv.Itoa(httpPort))
-			argv = append(argv, "--label", LabelEphemeral+"="+ephemeralLabelValue)
+			argv = append(argv, "--label", engine.LabelManaged+"=true")
+			argv = append(argv, "--label", engine.LabelEdition+"="+edition)
+			argv = append(argv, "--label", engine.LabelVersion+"="+version)
+			argv = append(argv, "--label", engine.LabelBoltPort+"="+strconv.Itoa(boltPort))
+			argv = append(argv, "--label", engine.LabelHTTPPort+"="+strconv.Itoa(httpPort))
+			argv = append(argv, "--label", engine.LabelEphemeral+"="+ephemeralLabelValue)
 			argv = append(argv, image)
 
 			if _, err := client.RunWithEnv(ctx, argv, []string{"NEO4J_AUTH=neo4j/" + resolvedPassword}); err != nil {
@@ -448,17 +417,6 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	return cmd
 }
 
-// enterpriseImage maps a Neo4j version token to the enterprise Docker image tag.
-// "latest" → neo4j:enterprise (Docker Hub does NOT publish neo4j:latest-enterprise);
-// any explicit version → neo4j:<version>-enterprise. Shared by docker create and the
-// docker load loader so the tag scheme cannot drift between them.
-func enterpriseImage(version string) string {
-	if version == "latest" {
-		return "neo4j:enterprise"
-	}
-	return "neo4j:" + version + "-enterprise"
-}
-
 // renderEnvFile builds the .env blob consumed by `neo4j-cli query --env <path>`
 // (REQ-F-017). The variable names mirror internal/commands/query/connect.go so the
 // blob is a drop-in for the existing flow. A trailing newline keeps `cat`-style
@@ -554,99 +512,6 @@ func (s singleRow) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.AsArray())
 }
 
-// portFree binds and immediately releases a TCP listener on the given host
-// port via the listenerFactory seam. Returns true when the port is free
-// (i.e. the listener bound successfully); false otherwise. On success the
-// listener is closed before returning so the real `docker run` call can
-// claim the port a moment later.
-func portFree(port int) bool {
-	ln, err := listenerFactory(port)
-	if err != nil {
-		return false
-	}
-	_ = ln.Close()
-	return true
-}
-
-// findFreePortPair walks the port-pair fallback loop (REQ-F-001..007).
-// Starting from (boltStart, httpStart) it tries offsets 0..maxPortOffset-1,
-// returning the first pair where BOTH ports bind successfully. The same
-// offset is applied to both ports so the operator's bolt/http delta is
-// preserved across the fallback. On exhaustion a clierr.UsageError points
-// the operator at --bolt-port / --http-port so they can pin a free pair
-// explicitly.
-func findFreePortPair(boltStart, httpStart int) (int, int, error) {
-	for offset := 0; offset < maxPortOffset; offset++ {
-		bolt := boltStart + offset
-		http := httpStart + offset
-		if portFree(bolt) && portFree(http) {
-			return bolt, http, nil
-		}
-	}
-	return 0, 0, clierr.NewUsageError(
-		"could not find a free port pair starting at %d/%d after %d attempts; pass --bolt-port / --http-port",
-		boltStart, httpStart, maxPortOffset,
-	)
-}
-
-// resolveContainerName implements the REQ-F-014 name-collision contract.
-// It enumerates existing names from docker (all containers, managed or
-// not — docker enforces global container-name uniqueness) and from the
-// stored dbms credentials, then returns the requested name when free or
-// the first non-colliding `<name>-<i>` suffix in 1..maxNameSuffix.
-// Returns a clierr.UsageError when every suffix in that range is taken
-// so the operator gets a clear "pick a different --name" hint.
-func resolveContainerName(ctx context.Context, client dockerClient, cfg *clicfg.Config, requested string) (string, error) {
-	used, err := collectUsedNames(ctx, client, cfg)
-	if err != nil {
-		return "", err
-	}
-	if _, taken := used[requested]; !taken {
-		return requested, nil
-	}
-	for i := 1; i <= maxNameSuffix; i++ {
-		candidate := fmt.Sprintf("%s-%d", requested, i)
-		if _, taken := used[candidate]; !taken {
-			return candidate, nil
-		}
-	}
-	return "", clierr.NewUsageError(
-		"could not find a free name for %q after trying %s-1 through %s-%d; pass --name <other>",
-		requested, requested, requested, maxNameSuffix,
-	)
-}
-
-// collectUsedNames merges docker container names (from PsAll, unfiltered so
-// unmanaged containers count too) with stored dbms credential names into a
-// single set used for collision detection. The set is conservative: any
-// PsEntry.Names value gets split on `,` and trimmed because Docker emits
-// multi-name entries as a comma-separated string.
-func collectUsedNames(ctx context.Context, client dockerClient, cfg *clicfg.Config) (map[string]struct{}, error) {
-	used := map[string]struct{}{}
-
-	entries, err := client.PsAll(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	for _, entry := range entries {
-		for _, n := range strings.Split(entry.Names, ",") {
-			n = strings.TrimSpace(n)
-			if n != "" {
-				used[n] = struct{}{}
-			}
-		}
-	}
-
-	if cfg != nil && cfg.Credentials != nil && cfg.Credentials.Dbms != nil {
-		for _, cred := range cfg.Credentials.Dbms.List() {
-			if cred != nil && cred.Name != "" {
-				used[cred.Name] = struct{}{}
-			}
-		}
-	}
-	return used, nil
-}
-
 // expandHostPath resolves a user-supplied host directory string into an
 // absolute path. The expansion order:
 //  1. `~` or `~/...` at the start of the path resolves to the operator's
@@ -681,30 +546,6 @@ func expandHostPath(s string) (string, error) {
 		return "", fmt.Errorf("resolve absolute path: %w", err)
 	}
 	return abs, nil
-}
-
-// validateVersion enforces the `--version` allowlist (REQ-F-001..005) before
-// the value flows into the docker image tag at create.go's image-construction
-// block. The contract:
-//   - TrimSpace the input before matching so `--version " 5.20 "` is accepted
-//     and the trimmed value flows downstream unchanged.
-//   - Regex-match against versionPattern. On miss return a clierr.UsageError
-//     that names BOTH the expected format and the ORIGINAL (untrimmed) input
-//     so the operator sees exactly what they passed.
-//   - On hit, strip any trailing `-enterprise` suffix. The image-construction
-//     block re-appends `-enterprise` when --edition enterprise, so leaving
-//     the suffix in place would yield e.g. `neo4j:5.20-enterprise-enterprise`
-//     (unpublished tag, broken pull). Stripping makes the suffix harmless in
-//     both editions: enterprise re-adds it, community drops it.
-func validateVersion(version string) (string, error) {
-	trimmed := strings.TrimSpace(version)
-	if !versionPattern.MatchString(trimmed) {
-		return "", clierr.NewUsageError(
-			"invalid argument %q for \"--version\" flag: must match digits/dots with optional -enterprise suffix (e.g. 5.20, 5.20.0, 5.20-enterprise, latest)",
-			version,
-		)
-	}
-	return strings.TrimSuffix(trimmed, "-enterprise"), nil
 }
 
 // resolveHostDir expands a `--data-dir` / `--logs-dir` / `--import-dir` flag

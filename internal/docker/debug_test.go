@@ -25,10 +25,10 @@ func TestDebugInvocation_ScrubsArgvAndEmitsEnvNamesOnly(t *testing.T) {
 
 	out := buf.String()
 
-	assert.Contains(t, out, debugReqPrefix+"docker ")
+	assert.Contains(t, out, DebugReqPrefix+"docker ")
 	assert.Contains(t, out, "run -d -e NEO4J_AUTH=*** neo4j:enterprise")
 	// env line lists NAMES only.
-	assert.Contains(t, out, debugReqPrefix+"env NEO4J_AUTH NEO4J_PLUGINS")
+	assert.Contains(t, out, DebugReqPrefix+"env NEO4J_AUTH NEO4J_PLUGINS")
 	// secret values from argv and env must never reach the terminal.
 	assert.NotContains(t, out, "s3cr3t")
 	assert.NotContains(t, out, "p4ssw0rd")
@@ -44,8 +44,8 @@ func TestDebugInvocation_NoEnvOmitsEnvLine(t *testing.T) {
 	debugInvocation([]string{"ps", "-a"}, nil)
 
 	out := buf.String()
-	assert.Contains(t, out, debugReqPrefix+"docker ps -a")
-	assert.NotContains(t, out, debugReqPrefix+"env")
+	assert.Contains(t, out, DebugReqPrefix+"docker ps -a")
+	assert.NotContains(t, out, DebugReqPrefix+"env")
 }
 
 func TestDebugResult_ExitAndElapsedShape(t *testing.T) {
@@ -70,7 +70,7 @@ func TestDebugResult_ExitAndElapsedShape(t *testing.T) {
 			debugResult(tc.err, 5*time.Millisecond)
 
 			out := buf.String()
-			assert.Contains(t, out, debugRespPrefix+tc.wantCode)
+			assert.Contains(t, out, DebugRespPrefix+tc.wantCode)
 			assert.Contains(t, out, "5ms")
 		})
 	}
@@ -82,8 +82,8 @@ func TestRunEnv_DebugOffEmitsNothing(t *testing.T) {
 
 	// A non-debug client never invokes the emit helpers; runEnv's guarded
 	// blocks are skipped before any docker lookup, so the buffer stays empty.
-	require.False(t, newClient(false).(*execClient).debug)
-	require.True(t, newClient(true).(*execClient).debug)
+	require.False(t, NewClient(false).(*execClient).debug)
+	require.True(t, NewClient(true).(*execClient).debug)
 
 	assert.Empty(t, buf.String())
 }

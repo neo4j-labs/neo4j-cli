@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	engine "github.com/neo4j/cli/internal/docker"
 	"net"
 	"os"
 	"path/filepath"
@@ -52,15 +53,13 @@ func stubListenerFactory(t *testing.T, occupied ...int) (calls *[]int) {
 		busy[p] = true
 	}
 	var probed []int
-	orig := listenerFactory
-	listenerFactory = func(port int) (net.Listener, error) {
+	engine.SetListenerFactoryForTest(t, func(port int) (net.Listener, error) {
 		probed = append(probed, port)
 		if busy[port] {
 			return nil, fmt.Errorf("fakeListener: port %d is occupied (test stub)", port)
 		}
 		return fakeListener{}, nil
-	}
-	t.Cleanup(func() { listenerFactory = orig })
+	})
 	return &probed
 }
 
@@ -74,7 +73,7 @@ func stubListenerFactory(t *testing.T, occupied ...int) (calls *[]int) {
 // port-conflict pre-flight (REQ-F-013) never touches real sockets — keeping
 // the package's tests hermetic per AGENTS.md "Hermetic Test Notes". Tests
 // that need to simulate an occupied port use runCreateWithOccupiedPorts.
-func runCreate(t *testing.T, args string) (*fakeDockerClient, *clicfg.Config, string, error) {
+func runCreate(t *testing.T, args string) (*engine.FakeClient, *clicfg.Config, string, error) {
 	t.Helper()
 	return runCreateWithOccupiedPorts(t, args)
 }
@@ -96,7 +95,7 @@ func shlexQuote(s string) string {
 // listenerFactory that simulates the given ports as already-bound. It
 // exists so port-conflict cases can drive the pre-flight deterministically
 // without ever opening a real socket.
-func runCreateWithOccupiedPorts(t *testing.T, args string, occupiedPorts ...int) (*fakeDockerClient, *clicfg.Config, string, error) {
+func runCreateWithOccupiedPorts(t *testing.T, args string, occupiedPorts ...int) (*engine.FakeClient, *clicfg.Config, string, error) {
 	t.Helper()
 	fake, cfg, stdout, _, err := runCreateWithOccupiedPortsAndStderr(t, args, occupiedPorts...)
 	return fake, cfg, stdout, err
@@ -106,7 +105,7 @@ func runCreateWithOccupiedPorts(t *testing.T, args string, occupiedPorts ...int)
 // additionally surfaces stderr. The port-fallback path narrates the resolved
 // pair on stderr (REQ-F-004), so any test that asserts that narration — or
 // its absence on the happy path — needs the stderr buffer.
-func runCreateWithOccupiedPortsAndStderr(t *testing.T, args string, occupiedPorts ...int) (*fakeDockerClient, *clicfg.Config, string, string, error) {
+func runCreateWithOccupiedPortsAndStderr(t *testing.T, args string, occupiedPorts ...int) (*engine.FakeClient, *clicfg.Config, string, string, error) {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -116,9 +115,9 @@ func runCreateWithOccupiedPortsAndStderr(t *testing.T, args string, occupiedPort
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t, occupiedPorts...)
@@ -141,7 +140,7 @@ func runCreateWithOccupiedPortsAndStderr(t *testing.T, args string, occupiedPort
 
 // runArgv returns the recorded argv from the fake client's first Run call.
 // Tests use it to assert -p / -e / --label / image shape.
-func runArgv(t *testing.T, fake *fakeDockerClient) []string {
+func runArgv(t *testing.T, fake *engine.FakeClient) []string {
 	t.Helper()
 	require.Len(t, fake.RunCalls, 1, "expected exactly one docker run invocation")
 	return fake.RunCalls[0]
@@ -189,12 +188,12 @@ func TestCreate_HappyPath_StoresCredentialAndSetsExpectedArgs(t *testing.T) {
 		"argv missing license env: %v", argv)
 	// All six required labels present.
 	for _, lbl := range []string{
-		LabelManaged + "=true",
-		LabelEdition + "=enterprise",
-		LabelVersion + "=latest",
-		LabelBoltPort + "=7687",
-		LabelHTTPPort + "=7474",
-		LabelEphemeral + "=false",
+		engine.LabelManaged + "=true",
+		engine.LabelEdition + "=enterprise",
+		engine.LabelVersion + "=latest",
+		engine.LabelBoltPort + "=7687",
+		engine.LabelHTTPPort + "=7474",
+		engine.LabelEphemeral + "=false",
 	} {
 		assert.True(t, containsPair(argv, "--label", lbl), "argv missing label %q: %v", lbl, argv)
 	}
@@ -228,7 +227,7 @@ func TestCreate_CommunityEdition_NoLicenseEnvAndPlainImageTag(t *testing.T) {
 		assert.False(t, strings.HasPrefix(a, "NEO4J_ACCEPT_LICENSE_AGREEMENT"),
 			"community edition must not pass NEO4J_ACCEPT_LICENSE_AGREEMENT; argv=%v", argv)
 	}
-	assert.True(t, containsPair(argv, "--label", LabelEdition+"=community"))
+	assert.True(t, containsPair(argv, "--label", engine.LabelEdition+"=community"))
 	assert.Equal(t, "neo4j:latest", argv[len(argv)-1], "community image must NOT carry -enterprise suffix")
 }
 
@@ -443,9 +442,9 @@ func TestCreate_PortPreflight_ProbesBoltThenHTTP_OnSuccess(t *testing.T) {
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	probed := stubListenerFactory(t)
@@ -512,8 +511,8 @@ func TestCreate_AutoPortFallback_PreservesOffset(t *testing.T) {
 // must name the requested start pair, the cap, and the flag hints — and
 // docker run must NOT be invoked.
 func TestCreate_AutoPortFallback_Exhausted(t *testing.T) {
-	occupied := make([]int, 0, 2*maxPortOffset)
-	for i := 0; i < maxPortOffset; i++ {
+	occupied := make([]int, 0, 2*engine.MaxPortOffset)
+	for i := 0; i < engine.MaxPortOffset; i++ {
 		occupied = append(occupied, 7687+i)
 		occupied = append(occupied, 7474+i)
 	}
@@ -544,7 +543,7 @@ func TestCreate_AutoPortFallback_NoNarrationOnHappyPath(t *testing.T) {
 // dbms credential store before the command runs. Used by name-collision tests
 // (REQ-F-014) so they can assert auto-suffix behaviour against deterministic
 // state without leaking real docker / credential I/O.
-func runCreateWithSeed(t *testing.T, args string, dockerNames []string, credentialNames []string) (*fakeDockerClient, *clicfg.Config, string, string, error) {
+func runCreateWithSeed(t *testing.T, args string, dockerNames []string, credentialNames []string) (*engine.FakeClient, *clicfg.Config, string, string, error) {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -561,12 +560,12 @@ func runCreateWithSeed(t *testing.T, args string, dockerNames []string, credenti
 		require.NoError(t, cfg.Credentials.Dbms.Add(n, "neo4j", "pw", "neo4j", fmt.Sprintf("neo4j://localhost:%d", 7700+i)))
 	}
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	for _, n := range dockerNames {
-		fake.PsEntries = append(fake.PsEntries, PsEntry{Names: n})
+		fake.PsEntries = append(fake.PsEntries, engine.PsEntry{Names: n})
 	}
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -668,14 +667,14 @@ func TestCreate_NameCollision_Cascading_WalksPastDockerAndCredential(t *testing.
 func TestCreate_NameCollision_All99Taken_ReturnsUsageError(t *testing.T) {
 	// docker has "dev"; credentials hold "dev-1" through "dev-99". No free
 	// suffix in the documented range → usage error, no docker run executed.
-	credentialNames := make([]string, 0, maxNameSuffix)
-	for i := 1; i <= maxNameSuffix; i++ {
+	credentialNames := make([]string, 0, engine.MaxNameSuffix)
+	for i := 1; i <= engine.MaxNameSuffix; i++ {
 		credentialNames = append(credentialNames, fmt.Sprintf("dev-%d", i))
 	}
 	fake, _, _, _, err := runCreateWithSeed(t, "--name dev --no-store-credential", []string{"dev"}, credentialNames)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dev-1")
-	assert.Contains(t, err.Error(), fmt.Sprintf("dev-%d", maxNameSuffix))
+	assert.Contains(t, err.Error(), fmt.Sprintf("dev-%d", engine.MaxNameSuffix))
 	assert.Empty(t, fake.RunCalls, "docker run must not execute when no free name is available")
 }
 
@@ -724,9 +723,9 @@ func TestCreate_Wait_HappyPath_SucceedsAndNarrates(t *testing.T) {
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -780,9 +779,9 @@ func TestCreate_Wait_Timeout_ReturnsErrorAndLeavesContainerRunning(t *testing.T)
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -833,7 +832,7 @@ func TestCreate_NoWait_DoesNotInvokeBoltProbe(t *testing.T) {
 // It mirrors runCreate but exposes stderr (where the env-file write narration
 // lands) and returns the cfg.Fs() handle so tests can stat / read any
 // file written via the afero seam.
-func runCreateForEphemeral(t *testing.T, args string) (*fakeDockerClient, *clicfg.Config, afero.Fs, string, string, error) {
+func runCreateForEphemeral(t *testing.T, args string) (*engine.FakeClient, *clicfg.Config, afero.Fs, string, string, error) {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -843,9 +842,9 @@ func runCreateForEphemeral(t *testing.T, args string) (*fakeDockerClient, *clicf
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -875,10 +874,10 @@ func TestCreate_Ephemeral_HappyPath_EmitsEnvBlobAndSkipsCredential(t *testing.T)
 	// docker run argv carries --rm and label ephemeral=true.
 	argv := runArgv(t, fake)
 	assert.Contains(t, argv, "--rm", "ephemeral must add --rm to docker run argv: %v", argv)
-	assert.True(t, containsPair(argv, "--label", LabelEphemeral+"=true"),
+	assert.True(t, containsPair(argv, "--label", engine.LabelEphemeral+"=true"),
 		"argv missing ephemeral=true label: %v", argv)
 	// Sanity: ephemeral=false label must NOT be present.
-	assert.False(t, containsPair(argv, "--label", LabelEphemeral+"=false"),
+	assert.False(t, containsPair(argv, "--label", engine.LabelEphemeral+"=false"),
 		"argv must not carry ephemeral=false when --ephemeral: %v", argv)
 
 	// No credential was stored — ephemeral leaves no on-disk footprint.
@@ -905,7 +904,7 @@ func TestCreate_Ephemeral_EnvOutFile_WritesFileAndStaysSilent(t *testing.T) {
 	// --rm + ephemeral label still applied.
 	argv := runArgv(t, fake)
 	assert.Contains(t, argv, "--rm")
-	assert.True(t, containsPair(argv, "--label", LabelEphemeral+"=true"))
+	assert.True(t, containsPair(argv, "--label", engine.LabelEphemeral+"=true"))
 
 	// No credential persisted.
 	assert.Empty(t, cfg.Credentials.Dbms.List())
@@ -981,9 +980,9 @@ func TestCreate_Ephemeral_EnvOutFile_ChmodsPreexistingFileTo0600(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "-rw-r--r--", pre.Mode().Perm().String(), "preflight: file must be seeded at 0o644")
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -1031,9 +1030,9 @@ func TestCreate_PortPreflight_EqualPorts_SkipsListenCalls(t *testing.T) {
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	probed := stubListenerFactory(t)
@@ -1364,9 +1363,9 @@ func TestCreate_DataDir_PreexistingDir_NoCreatedInfoLine(t *testing.T) {
 	require.NoError(t, fs.MkdirAll(hostPath, 0o755))
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 	stubListenerFactory(t)
 
@@ -1497,9 +1496,9 @@ func TestCreate_Ephemeral_EnvOutFile_RenameFailure_NoTempLeftover(t *testing.T) 
 	wrapped := &renameFailFs{Fs: mem, err: sentinel}
 	cfg := clicfg.NewConfig(wrapped, "test", clicfg.GlobalScope)
 
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -1580,7 +1579,7 @@ func TestCreate_VersionValidation(t *testing.T) {
 			argv := runArgv(t, fake)
 			assert.Equal(t, tc.wantImage, argv[len(argv)-1],
 				"image tag (last argv token) must be canonical; got argv=%v", argv)
-			assert.True(t, containsPair(argv, "--label", LabelVersion+"="+tc.wantVersion),
+			assert.True(t, containsPair(argv, "--label", engine.LabelVersion+"="+tc.wantVersion),
 				"LabelVersion must carry canonical version %q; argv=%v", tc.wantVersion, argv)
 		})
 	}

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	engine "github.com/neo4j/cli/internal/docker"
 	"os"
 	"path/filepath"
 	"slices"
@@ -45,7 +46,7 @@ type loadDeps struct {
 // runLoad builds the docker parent with the load leaf wired, swaps every seam
 // the leaf touches (dataset resolve/download, docker client, listener factory,
 // bolt wait) for deterministic fakes, and executes `docker load <args>`.
-func runLoad(t *testing.T, fake *fakeDockerClient, deps *loadDeps, args string) (*clicfg.Config, string, string, error) {
+func runLoad(t *testing.T, fake *engine.FakeClient, deps *loadDeps, args string) (*clicfg.Config, string, string, error) {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -56,13 +57,13 @@ func runLoad(t *testing.T, fake *fakeDockerClient, deps *loadDeps, args string) 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
 
-	origResolve, origDownload, origWait := resolveDatasetFn, downloadDatasetFn, waitForBoltFn
-	t.Cleanup(func() { resolveDatasetFn, downloadDatasetFn, waitForBoltFn = origResolve, origDownload, origWait })
+	origResolve, origDownload := resolveDatasetFn, downloadDatasetFn
+	t.Cleanup(func() { resolveDatasetFn, downloadDatasetFn = origResolve, origDownload })
 
 	deps.resolveGot = &struct {
 		ownerRepo string
@@ -89,10 +90,10 @@ func runLoad(t *testing.T, fake *fakeDockerClient, deps *loadDeps, args string) 
 		require.NoError(t, os.WriteFile(path, []byte("dump"), 0o600))
 		return path, func() {}, nil
 	}
-	waitForBoltFn = func(_ context.Context, _, _, _ string, _ time.Duration) error {
+	engine.SetWaitForBoltForTest(t, func(_ context.Context, _, _, _ string, _ time.Duration) error {
 		called = true
 		return deps.waitErr
-	}
+	})
 
 	cmd := NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -121,7 +122,7 @@ func moviesSpec() dataset.Spec {
 }
 
 func TestLoad_NewContainer_LoadsAndCreates(t *testing.T) {
-	fake := newFakeDockerClient() // Inspect default-misses → ErrNotFound → new path
+	fake := engine.NewFakeClient() // Inspect default-misses → ErrNotFound → new path
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	cfg, stdout, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies")
@@ -139,9 +140,9 @@ func TestLoad_NewContainer_LoadsAndCreates(t *testing.T) {
 	// override, no -c shell script) so neo4j-admin runs as the neo4j user.
 	assert.NotContains(t, loader, "--entrypoint")
 	assert.NotContains(t, loader, "-c")
-	assert.Contains(t, loaderStr, "neo4j-admin database load neo4j --from-path="+loaderImportDir+" --overwrite-destination=true")
+	assert.Contains(t, loaderStr, "neo4j-admin database load neo4j --from-path="+engine.LoaderImportDir+" --overwrite-destination=true")
 	assert.Contains(t, loaderStr, ":/data")
-	assert.Contains(t, loaderStr, ":"+loaderImportDir+":ro")
+	assert.Contains(t, loaderStr, ":"+engine.LoaderImportDir+":ro")
 	// The default entrypoint enforces the enterprise license gate, so the loader
 	// must accept it via -e or neo4j-admin never runs.
 	assert.Contains(t, loaderStr, "NEO4J_ACCEPT_LICENSE_AGREEMENT=eval")
@@ -175,7 +176,7 @@ func TestLoad_NewContainer_LoadsAndCreates(t *testing.T) {
 }
 
 func TestLoad_NewContainer_WaitUsesWaitForBolt(t *testing.T) {
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	_, _, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies --wait")
@@ -184,13 +185,13 @@ func TestLoad_NewContainer_WaitUsesWaitForBolt(t *testing.T) {
 }
 
 func TestLoad_NewContainer_DatabaseOverride(t *testing.T) {
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	_, _, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies --database custom")
 	require.NoError(t, err)
 	loader := strings.Join(fake.RunCalls[0], " ")
-	assert.Contains(t, loader, "neo4j-admin database load custom --from-path="+loaderImportDir+" --overwrite-destination=true")
+	assert.Contains(t, loader, "neo4j-admin database load custom --from-path="+engine.LoaderImportDir+" --overwrite-destination=true")
 }
 
 func TestLoad_NewContainer_ExplicitVersionImageMapping(t *testing.T) {
@@ -205,7 +206,7 @@ func TestLoad_NewContainer_ExplicitVersionImageMapping(t *testing.T) {
 		{name: "calver", version: "2026.04.0", wantImage: "neo4j:2026.04.0-enterprise"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			fake := newFakeDockerClient()
+			fake := engine.NewFakeClient()
 			deps := &loadDeps{resolveSpec: moviesSpec()}
 
 			args := "neo4j-graph-examples/movies --name movies"
@@ -230,7 +231,7 @@ func TestLoad_NewContainer_ExplicitVersionImageMapping(t *testing.T) {
 }
 
 func TestLoad_NewContainer_MaxSizeForwarded(t *testing.T) {
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	_, _, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies --max-size 12345")
@@ -239,8 +240,8 @@ func TestLoad_NewContainer_MaxSizeForwarded(t *testing.T) {
 }
 
 func TestLoad_ExistingContainer_RefusedWithoutForce(t *testing.T) {
-	fake := newFakeDockerClient()
-	fake.Containers["movies"] = Container{Name: "movies", Managed: true, Plugins: []string{"apoc"}}
+	fake := engine.NewFakeClient()
+	fake.Containers["movies"] = engine.Container{Name: "movies", Managed: true, Plugins: []string{"apoc"}}
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	_, _, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies")
@@ -251,8 +252,8 @@ func TestLoad_ExistingContainer_RefusedWithoutForce(t *testing.T) {
 }
 
 func TestLoad_ExistingContainer_ForceOverwrites(t *testing.T) {
-	fake := newFakeDockerClient()
-	fake.Containers["movies"] = Container{Name: "movies", Managed: true, Plugins: []string{"apoc"}}
+	fake := engine.NewFakeClient()
+	fake.Containers["movies"] = engine.Container{Name: "movies", Managed: true, Plugins: []string{"apoc"}}
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	// runLoad seeds an empty credential store, so the existing-container path
@@ -263,18 +264,16 @@ func TestLoad_ExistingContainer_ForceOverwrites(t *testing.T) {
 }
 
 func TestLoad_ExistingContainer_ForceLoadsWithCredential(t *testing.T) {
-	fake := newFakeDockerClient()
-	fake.Containers["movies"] = Container{Name: "movies", Managed: true, Plugins: []string{"apoc"}}
+	fake := engine.NewFakeClient()
+	fake.Containers["movies"] = engine.Container{Name: "movies", Managed: true, Plugins: []string{"apoc"}}
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	// Stop/start over Bolt is a seam; swap it for a recorder.
-	origStopStart := stopStartFn
 	var stmts []string
-	stopStartFn = func(_ context.Context, _, _, _, statement string) error {
+	engine.SetStopStartForTest(t, func(_ context.Context, _, _, _, statement string) error {
 		stmts = append(stmts, statement)
 		return nil
-	}
-	t.Cleanup(func() { stopStartFn = origStopStart })
+	})
 
 	fs, err := testfs.GetTestFs(`{}`, `{
 		"dbms": {"credentials": [], "default-credential": ""},
@@ -285,7 +284,7 @@ func TestLoad_ExistingContainer_ForceLoadsWithCredential(t *testing.T) {
 	require.NoError(t, cfg.Credentials.Dbms.Add("movies", "neo4j", "pw", "neo4j", "neo4j://localhost:7687"))
 
 	origFactory := clientFactory
-	clientFactory = func(bool) dockerClient { return fake }
+	clientFactory = func(bool) engine.Client { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 	stubListenerFactory(t)
 
@@ -321,8 +320,8 @@ func TestLoad_ExistingContainer_ForceLoadsWithCredential(t *testing.T) {
 }
 
 func TestLoad_ExistingContainer_MissingPluginRefused(t *testing.T) {
-	fake := newFakeDockerClient()
-	fake.Containers["movies"] = Container{Name: "movies", Managed: true, Plugins: nil}
+	fake := engine.NewFakeClient()
+	fake.Containers["movies"] = engine.Container{Name: "movies", Managed: true, Plugins: nil}
 	deps := &loadDeps{resolveSpec: moviesSpec()} // requires apoc
 
 	_, _, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies --force")
@@ -332,8 +331,8 @@ func TestLoad_ExistingContainer_MissingPluginRefused(t *testing.T) {
 }
 
 func TestLoad_ExistingContainer_UnmanagedRefused(t *testing.T) {
-	fake := newFakeDockerClient()
-	fake.Containers["other"] = Container{Name: "other", Managed: false}
+	fake := engine.NewFakeClient()
+	fake.Containers["other"] = engine.Container{Name: "other", Managed: false}
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
 	_, _, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name other --force")
@@ -342,7 +341,7 @@ func TestLoad_ExistingContainer_UnmanagedRefused(t *testing.T) {
 }
 
 func TestLoad_ResolveError_Surfaces(t *testing.T) {
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	deps := &loadDeps{resolveErr: errors.New("manifest not found")}
 
 	_, _, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/nope --name x")
@@ -353,9 +352,9 @@ func TestLoad_ResolveError_Surfaces(t *testing.T) {
 }
 
 func TestLoad_InspectOperationalError_Propagates(t *testing.T) {
-	fake := newFakeDockerClient()
-	fake.InspectFn = func(_ context.Context, _ string) (Container, error) {
-		return Container{}, errors.New("docker daemon not running")
+	fake := engine.NewFakeClient()
+	fake.InspectFn = func(_ context.Context, _ string) (engine.Container, error) {
+		return engine.Container{}, errors.New("docker daemon not running")
 	}
 	deps := &loadDeps{resolveSpec: moviesSpec()}
 
@@ -365,7 +364,7 @@ func TestLoad_InspectOperationalError_Propagates(t *testing.T) {
 }
 
 func TestLoad_NewContainer_NoPluginsEmitsEmptyArray(t *testing.T) {
-	fake := newFakeDockerClient()
+	fake := engine.NewFakeClient()
 	spec := moviesSpec()
 	spec.Plugins = nil
 	deps := &loadDeps{resolveSpec: spec}
@@ -376,23 +375,6 @@ func TestLoad_NewContainer_NoPluginsEmitsEmptyArray(t *testing.T) {
 	server := strings.Join(fake.RunCalls[1], " ")
 	assert.NotContains(t, server, "NEO4J_PLUGINS")
 	assert.Contains(t, stdout, "movies")
-}
-
-func TestParseNeo4jPluginsEnv(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		env  []string
-		want []string
-	}{
-		{"present", []string{"FOO=bar", `NEO4J_PLUGINS=["apoc","graph-data-science"]`}, []string{"apoc", "graph-data-science"}},
-		{"absent", []string{"FOO=bar"}, nil},
-		{"empty", []string{"NEO4J_PLUGINS="}, nil},
-		{"unparseable", []string{"NEO4J_PLUGINS=apoc"}, nil},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, parseNeo4jPluginsEnv(tc.env))
-		})
-	}
 }
 
 func TestMissingPlugins(t *testing.T) {

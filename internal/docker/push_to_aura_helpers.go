@@ -22,10 +22,10 @@ import (
 // to quote.
 var databaseNamePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9.-]{0,62}$`)
 
-// validateDatabaseName guards the source --database value before it is
+// ValidateDatabaseName guards the source --database value before it is
 // interpolated into admin Cypher. A name carrying spaces, semicolons, backticks,
 // or any other non-identifier character cannot reach the statement builder.
-func validateDatabaseName(database string) error {
+func ValidateDatabaseName(database string) error {
 	if !databaseNamePattern.MatchString(database) {
 		return clierr.NewUsageError(
 			"invalid database name %q: must start with a letter and contain only letters, digits, dots, or dashes (1-63 characters)",
@@ -85,8 +85,8 @@ var stopStartFn = stopStartDatabase
 // `-e NEO4J_PASSWORD` passthrough flags (NAME only, no =value), so the password
 // never appears in the host docker CLI argv, the in-container neo4j-admin argv,
 // or any redacted stderr echo.
-func PushToAura(ctx context.Context, cfg *clicfg.Config, client dockerClient, containerName, database string, target AuraTarget) error {
-	if err := validateDatabaseName(database); err != nil {
+func PushToAura(ctx context.Context, cfg *clicfg.Config, client Client, containerName, database string, target AuraTarget) error {
+	if err := ValidateDatabaseName(database); err != nil {
 		return err
 	}
 
