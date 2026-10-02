@@ -1,0 +1,36 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package session
+
+import (
+	auraflags "github.com/neo4j/cli/internal/aura/flags"
+	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/spf13/cobra"
+)
+
+func NewCmd(cfg *clicfg.Config) *cobra.Command {
+	var cmd = &cobra.Command{
+		Use:   "session",
+		Short: "Relates to Aura Graph Analytics",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			cfg.Aura.BindBaseUrl(cmd.Flags().Lookup("base-url"))
+
+			cfg.Aura.BindAuthUrl(cmd.Flags().Lookup("auth-url"))
+
+			return nil
+		},
+	}
+
+	cmd.AddCommand(NewCreateCmd(cfg))
+	cmd.AddCommand(NewListCmd(cfg))
+	cmd.AddCommand(NewDeleteCmd(cfg))
+	cmd.AddCommand(NewGetCmd(cfg))
+
+	cmd.PersistentFlags().String("auth-url", "", "")
+	cmd.PersistentFlags().String("base-url", "", "")
+
+	auraflags.RegisterOrgProjectFlags(cmd)
+
+	return cmd
+}

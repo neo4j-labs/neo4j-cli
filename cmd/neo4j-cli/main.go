@@ -10,12 +10,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clierr"
-	"github.com/neo4j/cli/common/clievents"
-	"github.com/neo4j/cli/common/confirm"
-	"github.com/neo4j/cli/common/tee"
-	"github.com/neo4j/cli/neo4j-cli/app"
+	"github.com/neo4j/cli/internal/cli"
+	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/clievents"
+	"github.com/neo4j/cli/internal/confirm"
+	"github.com/neo4j/cli/internal/tee"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -136,14 +136,14 @@ func main() {
 		}
 	}()
 
-	cfg := clicfg.NewConfig(afero.NewOsFs(), app.Version, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewOsFs(), cli.Version, clicfg.GlobalScope)
 
 	// This is fake command that we use to emit startup.
 	// This event allows us to easily measure installation base
 
 	clievents.Emit(cfg.Events, []string{"startup"}, true)
 
-	cmd := app.NewCmd(cfg)
+	cmd := cli.NewCmd(cfg)
 
 	// Capture emitted output into a shared bounded buffer while passing it
 	// through to the real streams, so a failing command can be teed to disk.

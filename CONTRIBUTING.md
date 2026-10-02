@@ -65,13 +65,13 @@ Each binary has a hand-written `<bin>/internal/skill/additions.md` that is inlin
 To add agent-skill support to a new standalone binary:
 
 1. Expose `NewCmd(cfg)` from a `<newcli>/app/app.go` package the generator can import.
-2. Copy `neo4j-cli/internal/skill/` to `<newcli>/internal/skill/`, then edit `description.txt`, `additions.md`, and the import in `gen/main.go`.
+2. Copy `internal/skill/neo4jcli/` to `<newcli>/internal/skill/`, then edit `description.txt`, `additions.md`, and the import in `gen/main.go`.
 3. Mount the subcommand in the binary's entrypoint: `cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "<newcli>"))`.
-4. Run `go run ./<newcli>/internal/skill/gen` to bootstrap `bundle/`, then commit the result. No edits to `common/skill/` are needed.
+4. Run `go run ./<newcli>/internal/skill/gen` to bootstrap `bundle/`, then commit the result. No edits to `internal/skill/` are needed.
 
 ### Feature flags
 
-Opt-in experimental behaviour is gated via the registry at `common/clicfg/flags.go`. Add an entry there, then gate code with `cfg.Flags.Enabled("flag.<area>-<feature>")`. Users can enable a flag via `neo4j-cli config set flag.<area>-<feature> true` or `NEO4J_CLI_FLAG_<AREA>_<FEATURE>=1`. Default to `false`; delete the flag and its gated branch in the same PR on GA. Full convention: [`.agents/feature-flags.md`](.agents/feature-flags.md).
+Opt-in experimental behaviour is gated via the registry at `internal/clicfg/flags.go`. Add an entry there, then gate code with `cfg.Flags.Enabled("flag.<area>-<feature>")`. Users can enable a flag via `neo4j-cli config set flag.<area>-<feature> true` or `NEO4J_CLI_FLAG_<AREA>_<FEATURE>=1`. Default to `false`; delete the flag and its gated branch in the same PR on GA. Full convention: [`.agents/feature-flags.md`](.agents/feature-flags.md).
 
 ### Releasing
 

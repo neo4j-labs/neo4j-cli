@@ -1211,7 +1211,7 @@ func TestPluginList_Empty(t *testing.T) {
 		t.Fatalf("expected empty JSON array; got %q", stdout)
 	}
 
-	// Default format under non-TTY is JSON (see common/output.ResolveOutput);
+	// Default format under non-TTY is JSON (see internal/output.ResolveOutput);
 	// pass `--format table` explicitly to assert the empty-table render with
 	// the column header + `(none)` placeholder. CI runs the e2e suite under
 	// non-TTY, so we must opt INTO table mode to exercise the placeholder.

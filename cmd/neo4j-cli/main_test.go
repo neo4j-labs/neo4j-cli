@@ -12,12 +12,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clierr"
-	"github.com/neo4j/cli/common/confirm"
-	"github.com/neo4j/cli/common/tee"
-	"github.com/neo4j/cli/neo4j-cli/app"
-	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/neo4j/cli/internal/cli"
+	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/confirm"
+	"github.com/neo4j/cli/internal/tee"
+	"github.com/neo4j/cli/internal/testutil/testfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +42,7 @@ func TestCommandSlug(t *testing.T) {
 		{name: "no args falls back to root", args: []string{}, want: "root"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := app.NewCmd(cfg)
+			cmd := cli.NewCmd(cfg)
 			assert.Equal(t, tc.want, commandSlug(cmd, tc.args))
 		})
 	}
@@ -84,7 +84,7 @@ func TestHandleFailure_TeesRedactedAndAttachesPath(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	cmd := app.NewCmd(cfg)
+	cmd := cli.NewCmd(cfg)
 
 	captured := []byte("connecting to neo4j://neo4j:" + secret + "@host\npassword=" + secret + "\n")
 	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, captured, errors.New("boom"))
@@ -109,7 +109,7 @@ func TestHandleFailure_TeeDisabled(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json","tee-enabled":false}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	cmd := app.NewCmd(cfg)
+	cmd := cli.NewCmd(cfg)
 
 	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, []byte("password=hunter2\n"), errors.New("boom"))
 
@@ -129,7 +129,7 @@ func TestHandleFailure_PreservesExitCode(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	cmd := app.NewCmd(cfg)
+	cmd := cli.NewCmd(cfg)
 
 	for _, tc := range []struct {
 		name string
@@ -380,7 +380,7 @@ func TestConfirmCancellation_EndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	cmd := app.NewCmd(cfg)
+	cmd := cli.NewCmd(cfg)
 
 	var stdout, stderr bytes.Buffer
 	cmd.SetOut(&stdout)

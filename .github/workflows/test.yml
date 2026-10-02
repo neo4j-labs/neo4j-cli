@@ -59,7 +59,7 @@ jobs:
             # enterprise image pull; subsequent runs are ~5s.
             - name: Docker smoke tests
               if: matrix.os == 'ubuntu-latest'
-              run: go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...
+              run: go test -tags=smoke -count=1 -v ./internal/commands/docker/...
 
             # Keyring smoke tests — no-daemon group: runs without any session
             # bus, exercising the graceful degradation path (keyring unavailable
@@ -114,7 +114,7 @@ jobs:
 
             - name: HTTPS smoke test (--insecure against real Neo4j)
               if: matrix.os == 'ubuntu-latest'
-              run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...
+              run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./internal/commands/query/...
 
             # Tier-1 e2e: drive the freshly-built binary against a LOCAL
             # fixture server that serves canned `/releases` payloads. Catches
@@ -142,7 +142,7 @@ jobs:
             # reports a newer version. The e2e_seams tag wires the
             # NEO4J_CLI_UPDATE_E2E_API_URL / NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP
             # env vars so the binary talks to the local fixture (see
-            # neo4j-cli/internal/subcommands/update/seams_e2e.go).
+            # internal/commands/update/seams_e2e.go).
             #
             # Live GitHub-API coverage moved to the schema-only live smoke
             # step below: it runs the SAME binary against real
@@ -150,7 +150,7 @@ jobs:
             # enum membership only — no value coupling.
             - name: Build e2e binary (low semver, e2e_seams)
               shell: bash
-              run: go build -tags e2e_seams -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e ./cmd/neo4j-cli
+              run: go build -tags e2e_seams -ldflags='-X github.com/neo4j/cli/internal/cli.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e ./cmd/neo4j-cli
 
             - name: Update --help smoke test
               shell: bash
@@ -316,7 +316,7 @@ jobs:
             # to a relative form when cygpath isn't available (linux/macos).
             - name: Build e2e_seams binary (tier-2)
               shell: bash
-              run: go build -tags e2e_seams -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e2 ./cmd/neo4j-cli
+              run: go build -tags e2e_seams -ldflags='-X github.com/neo4j/cli/internal/cli.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e2 ./cmd/neo4j-cli
 
             - name: Update e2e (tier-2 download + swap)
               shell: bash

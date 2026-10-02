@@ -17,7 +17,7 @@ Gotchas for keeping tests deterministic and isolated from the host machine.
 
 ## Repo-walking gate tests
 
-- For gate tests that auto-discover content (e.g. `common/skill/bundles_test.go` walking every `<bin>/internal/skill/bundle/SKILL.md`), resolve repo root via `runtime.Caller(0)` then `filepath.Walk` from there. Suffix-match paths after `filepath.ToSlash` so Windows runs match. Prune `.git`, `node_modules`, `bin`, `.changes` to keep the walk fast.
+- For gate tests that auto-discover content (e.g. `internal/skill/bundles_test.go` walking every `<bin>/internal/skill/bundle/SKILL.md`), resolve repo root via `runtime.Caller(0)` then `filepath.Walk` from there. Suffix-match paths after `filepath.ToSlash` so Windows runs match. Prune `.git`, `node_modules`, `bin`, `.changes` to keep the walk fast.
 
 ## File perms
 
@@ -25,7 +25,7 @@ Gotchas for keeping tests deterministic and isolated from the host machine.
 
 ## TTY seams (query package)
 
-- Package-level seams (e.g. `stdinIsTTY` at `neo4j-cli/query/run.go`, `stdoutIsTerminal` at `neo4j-cli/query/output.go`) are `var <name> = func(...) ...` declarations production fills with the real impl. `TestMain` in `testseam_test.go` seeds the seam to the most-common assertion (TTY=true) so legacy tests stay green; tests that need the other branch use a `withX(t, val)` helper that swaps and registers `t.Cleanup` to restore.
+- Package-level seams (e.g. `stdinIsTTY` at `internal/commands/query/run.go`, `stdoutIsTerminal` at `internal/commands/query/output.go`) are `var <name> = func(...) ...` declarations production fills with the real impl. `TestMain` in `testseam_test.go` seeds the seam to the most-common assertion (TTY=true) so legacy tests stay green; tests that need the other branch use a `withX(t, val)` helper that swaps and registers `t.Cleanup` to restore.
 
 ## httptest cancellation propagation
 
@@ -40,4 +40,4 @@ Gotchas for keeping tests deterministic and isolated from the host machine.
 
 ## Cobra completion injection
 
-- Cobra lazily injects its built-in `completion` subcommand (and four children) on the FIRST `Execute()` call via `InitDefaultCompletionCmd`. Tests that walk the live cobra tree AND a post-execute artifact (e.g. `agent-context` JSON, skill bundle) must build ONE tree, run `Execute()`, then walk THAT same instance — building a fresh `app.NewCmd` for the walk and a separate one for Execute yields a phantom diff of `[completion, completion bash, completion fish, completion powershell, completion zsh]`.
+- Cobra lazily injects its built-in `completion` subcommand (and four children) on the FIRST `Execute()` call via `InitDefaultCompletionCmd`. Tests that walk the live cobra tree AND a post-execute artifact (e.g. `agent-context` JSON, skill bundle) must build ONE tree, run `Execute()`, then walk THAT same instance — building a fresh `cli.NewCmd` for the walk and a separate one for Execute yields a phantom diff of `[completion, completion bash, completion fish, completion powershell, completion zsh]`.

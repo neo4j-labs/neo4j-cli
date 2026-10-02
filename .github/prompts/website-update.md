@@ -26,13 +26,13 @@ git log --oneline -20
 
 For each commit that looks user-visible (new commands, removed commands, changed flags, changed defaults, new agent support, version bumps), look at the diff:
 ```
-git show <sha> -- README.md AGENTS.md neo4j-cli/app/app.go neo4j-cli/internal/subcommands/ 'neo4j-cli/aura/internal/subcommands/**' 'common/skill/**'
+git show <sha> -- README.md AGENTS.md internal/cli/app.go internal/commands/ 'internal/commands/aura/**' 'internal/skill/**'
 ```
 Focus on changes that affect what a developer reading the page would need to know.
 
 ### 2b. Check for coverage gaps
 
-List every top-level command tree that ships in the binary. The authoritative source is `neo4j-cli/app/app.go` (`cmd.AddCommand(…)` calls) and README.md's command surface. Then compare against:
+List every top-level command tree that ships in the binary. The authoritative source is `internal/cli/app.go` (`cmd.AddCommand(…)` calls) and README.md's command surface. Then compare against:
 - the `data-tab` values in `gh-pages/index.html` (example tabs)
 - the `<!-- BEGIN:docs:<name> -->` markers in the reference accordion
 

@@ -20,7 +20,7 @@ PRIMARY LANGUAGES: [Go]
 
 ## Cobra Command Layout
 
-Strict one-file-per-leaf layout under `neo4j-cli/aura/internal/subcommands/<resource>/` and `common/skill/`. Mirror it for new trees. See [`.agents/cobra.md`](.agents/cobra.md) for flag access/precedence gotchas.
+Strict one-file-per-leaf layout under `internal/commands/aura/<resource>/` and `internal/skill/`. Mirror it for new trees. See [`.agents/cobra.md`](.agents/cobra.md) for flag access/precedence gotchas.
 
 - Parent `<resource>.go` — `NewCmd(cfg, ...)`, persistent flags, `cmd.AddCommand(newXxxCmd(...))` per leaf. ≤80 lines. Name it after the resource (not `command.go`).
 - Leaf `<action>.go` — private constructor (`newInstallCmd(...)`) with the leaf's flags + `RunE`. No leaf bodies in the parent.
@@ -42,45 +42,42 @@ BUILD SYSTEMS: [Go toolchain, Makefile, golangci-lint, GoReleaser, changie]. See
 
 TESTING FRAMEWORKS: [Go testing, testify, afero in-memory FS]. See [`.agents/testing.md`](.agents/testing.md) + [`.agents/hermetic-tests.md`](.agents/hermetic-tests.md).
 
-- Colocated `*_test.go`; CI on ubuntu/windows/macos. Mock HTTP + FS helpers in `neo4j-cli/aura/internal/test/testutils/`. `neo4j-cli/` super-CLI pkg has no tests (known gap).
+- Colocated `*_test.go`; CI on ubuntu/windows/macos. Mock HTTP + FS helpers in `internal/aura/testutils/`. `neo4j-cli/` super-CLI pkg has no tests (known gap).
 - Prefer table-driven tests. Name test files per command (`get_test.go`, not one big `config_test.go`); shared helpers in `helpers_test.go`. The rule is anti-monolith, NOT literal one-file-per-command: a concern-named file aggregating a single cross-command concern is fine and precedented (docker `parsers_test.go`, `debug_test.go`, `redaction_test.go`). Prefer one when the alternative is growing an already-large leaf file.
 - Whole-tree gates (`TestAllLeafCommands_HaveExamples`, `TestInputIdentifiers_AreKebabCase`) build via `agentcontext_test.newAppCmdEveryFlagEnabled` (flips every `clicfg.Registry` flag on) — flag-gated subtrees are invisible to a default-config tree. Extend that helper, never copy a gate per group.
 - **Never `afero.NewOsFs()` in query-package tests** — dev machine has real creds at `~/Library/Preferences/neo4j/cli/credentials.json`. Use `testfs.GetTestFs(...)` (empty creds); for dotenv walk-up write `.env` into memFs + `t.Chdir(tmp)`.
 - `afero.MemMapFs` quirks: no symlink support; `OpenFile` auto-creates missing parent dirs (unlike `OsFs`). Symlink + missing-dir error paths must use `OsFs` + `t.TempDir()`.
-- An EXTERNAL test pkg (e.g. `package api_test`) can import a parent that depends on its package-under-test (`api_test` importing `neo4j-cli/aura`, which imports `aura/internal/api`) — no cycle, external test pkgs compile separately. Lets you drive a full aura command end-to-end while still calling the api pkg's `*_test.go`-only seam (`SetDebugWriterForTest`). Mount the aura tree under a stub `neo4j-cli` root with `cobra.EnableTraverseRunHooks=true`, `--format`/`ComposeRootPersistentPreRunE` on the root (mirrors `app.go`).
+- An EXTERNAL test pkg (e.g. `package api_test`) can import a parent that depends on its package-under-test (`api_test` importing `internal/commands/aura`, which imports `aura/internal/api`) — no cycle, external test pkgs compile separately. Lets you drive a full aura command end-to-end while still calling the api pkg's `*_test.go`-only seam (`SetDebugWriterForTest`). Mount the aura tree under a stub `neo4j-cli` root with `cobra.EnableTraverseRunHooks=true`, `--format`/`ComposeRootPersistentPreRunE` on the root (mirrors `app.go`).
 - Exit-code e2e suite (`test/e2e/exitcodes/`, build tag `e2e_exitcodes`) is outside `make test`; invoke directly with `go test -tags=e2e_exitcodes -count=1 ./test/e2e/exitcodes/...`
 
 ## Architecture
 
 ARCHITECTURE PATTERN: Cobra command tree — one file per leaf, dirs mirror command hierarchy. See [`.agents/architecture.md`](.agents/architecture.md), [`.agents/repo-layout.md`](.agents/repo-layout.md).
 
-One binary: `neo4j-cli` (`cmd/neo4j-cli/main.go`); Aura tree lives under the `aura` subcommand.
+One binary: `neo4j-cli` (`cmd/neo4j-cli/main.go`; tree builder in `internal/cli`); Aura tree lives under the `aura` subcommand.
 
 ```
-neo4j-cli/
-  app/app.go        # cobra tree builder (NewCmd, Version) — importable
-  main.go           # entrypoint; mounts aura, renders clierr
-  query/            # Bolt subsystem (Cypher, :schema, embed, desktop/dotenv connect)
-  internal/
-    skill/          # per-binary skill template (bundle, description.txt, additions.md, gen/)
-    subcommands/    # native leaves (credential, query, docker, dataset, update, agentcontext, ...)
-    dataset/        # example-dataset resolver + downloader
-    desktopclient/  # Neo4j Desktop discovery (mDNS) + REST client
-    skillrefresh/ versioncheck/ quip/
-  aura/
-    aura.go         # root, registers subcommands
-    internal/
-      api/ flags/ output/ skill/
-      subcommands/  # instance, project, organization, credential, config,
-                    # agent, dataapi/graphql, graphanalytics, customermanagedkey, workspace, utils
-common/
-  clicfg/           # config, credentials, project state (OS paths)
-  clicmd/ clierr/ clievents/ agent/ analytics/ configmigrate/
-  confirm/ flags/ output/ tee/ skill/
+cmd/neo4j-cli/main.go   # entrypoint; mounts the tree, renders clierr
+internal/
+  cli/                  # cobra root builder (NewCmd, Version) — importable by generators
+  commands/             # cobra surface, one dir per resource, one file per leaf
+    aura/               # `neo4j-cli aura` root + instance, project, organization, agent,
+                        # graphql, graphanalytics, customermanagedkey, workspace, utils, ...
+    admin/ agentcontext/ config/ credential/ dataset/ desktop/ docker/ history/ mcp/ update/
+    query/              # Bolt subsystem + `query` leaf (Cypher, :schema, embed, desktop/dotenv connect)
+  aura/                 # Aura service layer: api/ flags/ output/ testutils/
+  dataset/ dbconn/ desktopclient/   # domain/service packages (no cobra)
+  skill/                # binary-agnostic skill logic (catalog/, render/)
+    neo4jcli/           # per-binary skill template (bundle, description.txt, additions.md, gen/)
+  clicfg/               # config, credentials, project state (OS paths)
+  clicmd/ clierr/ clievents/ agent/ analytics/ configmigrate/ confirm/ debug/
+  flags/ output/ tee/ skillrefresh/ versioncheck/ quip/
+  testutil/             # testfs, testjson shared test helpers
+test/e2e/               # build-tagged end-to-end suites
 ```
 
-- **Internal-package rule**: `common/*` CANNOT import `neo4j-cli/internal/*`. Helpers reachable from `clicfg.NewConfig` must live under `common/`. Once clicfg depends on a helper, that helper's tests can't import clicfg/testfs (import cycle) — seed memFs with a hard-coded relative path.
-- **Skill subsystem**: `common/skill/` = binary-agnostic logic; `neo4j-cli/internal/skill/` = per-binary template (`embed.go`, `description.txt`, `additions.md`, `gen/main.go`, committed `bundle/`). New CLI = copy template, edit 3 files, mount `skill.NewCmd(...)`, `go generate`. No `common/skill/` edits. See `CONTRIBUTING.md`.
+- **Import-cycle rule**: `internal/clicfg` is the base of the graph. Helpers reachable from `clicfg.NewConfig` must not import `clicfg` back, and once clicfg depends on a helper, that helper's tests can't import clicfg/testfs (import cycle) — seed memFs with a hard-coded relative path. Command packages (`internal/commands/...`) depend on service/domain packages, never the reverse.
+- **Skill subsystem**: `internal/skill/` = binary-agnostic logic; `internal/skill/neo4jcli/` = per-binary template (`embed.go`, `description.txt`, `additions.md`, `gen/main.go`, committed `bundle/`). New CLI = copy template, edit 3 files, mount `skill.NewCmd(...)`, `go generate`. No edits to the generic `internal/skill/` logic. See `CONTRIBUTING.md`.
 - **CLI conventions**: singular nouns; `<resource> <action>`; ≤1 positional (extras → flags); `--format json|table|toon` on reads; `--wait` for async. Follow https://clig.dev/.
 
 ## Deployment
@@ -93,22 +90,22 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 
 ## `go generate` / Skill Bundle Gate
 
-`TestGenerator_RoundTrip` (in `make test`) fails if the committed skill bundle drifts. Run `go generate ./neo4j-cli/internal/skill/...` after ANY of:
+`TestGenerator_RoundTrip` (in `make test`) fails if the committed skill bundle drifts. Run `go generate ./internal/skill/neo4jcli/...` after ANY of:
 
 - Adding/changing a command in the tree (incl. sub-sub-pkgs like `credential/dbms/`) → `references/<cmd>.md` drifts.
 - `Long`/`Example` changes on `credential/...` or `query/...` commands.
 - Changing `ValidFormatValues` in `clicfg.go` (affects `--format` help → bundle).
-- Mutating `common/skill/AGENTS` catalog (install/remove Long embeds `agentNames()`). The catalog is capability-by-presence (`SkillsDir`/`MCPConfig`), so skill-side code must project via `SkillAgents()`, never walk `AGENTS` — an MCP-only entry in `agentNames()` drifts the bundle.
+- Mutating `internal/skill/AGENTS` catalog (install/remove Long embeds `agentNames()`). The catalog is capability-by-presence (`SkillsDir`/`MCPConfig`), so skill-side code must project via `SkillAgents()`, never walk `AGENTS` — an MCP-only entry in `agentNames()` drifts the bundle.
 
 `make generate-check` = `go generate ./...` + `git diff --exit-code`; only meaningful on a clean tree (CI). `gen/main.go` builds the tree over an empty MemMapFs so flag-gated subtrees stay out of the bundle — but env binding still applies, so unset any `NEO4J_CLI_FLAG_*` before generating or you commit a drifted bundle. Locally commit source + regenerated bundle together. Editing a bundle file directly is futile (generate overwrites). To simulate drift, mutate a cobra input (e.g. a `Short` in `app.go`).
 
 - Skill `Example:` fields render flush-left (`render.go` TrimSpaces first line only) — write multi-line Examples with NO leading indent.
 - Every runnable leaf needs a flush-left `Example:` (≥2 invocations, `# comment` per invocation, `neo4j-cli` prefix, `--rw` on writes, ≥1 `--format json` on reads). Gate: `TestAllLeafCommands_HaveExamples` (agentcontext).
-- Adding/renaming ANY command also diffs `neo4j-cli/internal/subcommands/mcp/server/testdata/policy.golden` (its MCP policy). Decide whether the new policy is right, then `go test ./neo4j-cli/internal/subcommands/mcp/server -update`.
+- Adding/renaming ANY command also diffs `internal/commands/mcp/server/testdata/policy.golden` (its MCP policy). Decide whether the new policy is right, then `go test ./internal/commands/mcp/server -update`.
 - Adding an MCP tool MUST pass two gates in `tooldefs_gate_test.go`: a 4000-byte budget on serialized tool definitions and a naming check enforcing `^neo4j_cli_[a-z][a-z0-9]*(_[a-z0-9]+)*$`/`^[a-z][a-z0-9_]*$` for names and schema properties. Both read from `ToolDefinitions()`.
 - **MCP package split**: `subcommands/mcp/` holds only the cobra surface (leaves + `manifest.go` bundle packaging); the server runtime (`server.go`, `executor.go`, `stdio.go`, `allow.go`, `tooldefs.go`, the tool handlers, `result.go`) lives in `subcommands/mcp/server/`. The root factory and version reach the runtime via `server.Configure(newRoot, version)` called from `mcp.NewCmd`; `mcp.RootFactory` is an alias of `server.RootFactory` so `app.go` imports only `mcp`.
 - **MCP stdio fd swap**: `ClaimStdio` swaps `os.Stdout`/`os.Stdin` so the SDK gets the JSON-RPC pipe via `IOTransport`, never `StdioTransport` (which reads the post-swap variables). Any future command that reads `os.Stdin` directly is a protocol hazard.
-- **stdin-reader annotation**: a command that reads `os.Stdin` directly (not `cmd.InOrStdin()`) MUST carry `Annotations["stdin-reader"]="true"` so the MCP executor's `isStdinLeaf` detects it pre-exec and refuses a no-arg call before it hangs the server. See `query` in `neo4j-cli/query/query.go`.
+- **stdin-reader annotation**: a command that reads `os.Stdin` directly (not `cmd.InOrStdin()`) MUST carry `Annotations["stdin-reader"]="true"` so the MCP executor's `isStdinLeaf` detects it pre-exec and refuses a no-arg call before it hangs the server. See `query` in `internal/commands/query/query.go`.
 - **MCP gate env vars need the manifest marker**: `NEO4J_CLI_MCP_ALLOW_WRITES`/`_AURA`/`_CREDENTIAL_WRITE` are honoured ONLY when `NEO4J_CLI_MCP_MANIFEST=1` (set unconditionally in the `.mcpb` manifest `Env` block, so Desktop's settings-UI toggles work); without it only the `--rw`/`--allow-*` flags grant capability. Resolve gates through `resolveGates` in `serve.go` — a new gate flag with an env fallback MUST go through the same marker check, never a bare `envBool`.
 - **$APP_SUPPORT path in tests**: never hardcode darwin paths (`/Users/test/Library/Application Support/Claude`) — `$APP_SUPPORT` differs per GOOS. Derive from `a.MCPConfigPath()` / `a.DetectPath()`, which resolve through the same `expandPath` the production code uses. Use `setGOOSForTest` in `agents_helpers_test.go` to verify all three branches on any host.
 - `description.txt` frontmatter: single paragraph, ≤1024 chars, third-person; name each credential subtree explicitly.
@@ -133,25 +130,25 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 
 ## Secrets / Redaction
 
-- `common/clievents/RedactArgs` is the SINGLE source of truth for secret scrubbing (telemetry + panic/error msgs + on-disk history). Scrubs `secretFlags` allow-list (incl. `-p`) + `--uri` userinfo. Add secret-bearing flags THERE.
+- `internal/clievents/RedactArgs` is the SINGLE source of truth for secret scrubbing (telemetry + panic/error msgs + on-disk history). Scrubs `secretFlags` allow-list (incl. `-p`) + `--uri` userinfo. Add secret-bearing flags THERE.
 - `clievents.RedactText` (tee redactor) is shape-based (key=value, JSON, URIs, auth headers) — NOT table cells, and NOT TOON array rows either (both put the value on a different line from its header; TOON is the agent-harness default format). Runtime secret printed only in a table/TOON row → `clievents.RegisterSecretValue(value)` BEFORE printing (see `instance/create_core.go`). Secret-word vocab single-sourced as `secretWords` in `redact.go`. `docker.redactString` delegates to `RedactText`.
 - Docker container passwords: `subcommands/docker/password.go` `generatePassword()` is the SINGLE mint point (`docker create`; `docker load` + `aura instance load` staging, both new-container path only) and registers the value itself — callers must not, and must not re-inline `randSource` + base64; the supplied-password exclusion and the desktop asymmetry are documented on its doc comment.
 - **MCP tool results**: every result and error string passes through `clievents.RedactText` + `output.StripControl` (REQ-F-031) — these strings are copied into the model context. Wider than telemetry/panic paths.
 - **New secret-minting leaf**: skipping `clievents.RegisterSecretValue` leaks the secret into MCP transcripts under `--format table`/`toon` (the JSON field regex closes it only for `--format json`). Register at the mint point, as `docker/password.go` does.
 - See [`.agents/credentials.md`](.agents/credentials.md) for Aura/Dbms/Embed credential types.
-- **Credential env-var gate (`accept-env-vars`)**: reading credentials from well-known env vars (`NEO4J_URI`/`USERNAME`/`PASSWORD`/`DATABASE`, embed `NEO4J_EMBED_*`/provider keys, `NEO4J_AURA_CLIENT_*`) is opt-in behind `cfg.Global.AcceptEnvVars()` (config key `accept-env-vars`, env bootstrap `NEO4J_CLI_ACCEPT_ENV_VARS=1`). The single shared gate is the method `(*clicfg.Config).GatedGetenv(name)` (returns `""` when off; nil-safe on receiver+`Global`) — use it, don't reintroduce a local `gatedGetenv`. The env-var NAME constants are single-sourced in `common/clicfg/credentials/env_spec.go` (`credentials.EnvURI`, `EnvEmbedProvider`, …) — reference those, not new literals; `dbconn.Env*` are re-export aliases. DBMS reads are gated at the single chokepoint `dbconn.ResolveConn` so query+admin+desktop inherit it. The dotenv (`--env` walk-up) mechanism is SEPARATE and NEVER gated; explicit flags are never gated. Tests that need an env var honoured must `t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")` (viper `GetBool` treats `"1"` true) — otherwise the read returns `""` and resolution falls to dotenv/stored cred.
+- **Credential env-var gate (`accept-env-vars`)**: reading credentials from well-known env vars (`NEO4J_URI`/`USERNAME`/`PASSWORD`/`DATABASE`, embed `NEO4J_EMBED_*`/provider keys, `NEO4J_AURA_CLIENT_*`) is opt-in behind `cfg.Global.AcceptEnvVars()` (config key `accept-env-vars`, env bootstrap `NEO4J_CLI_ACCEPT_ENV_VARS=1`). The single shared gate is the method `(*clicfg.Config).GatedGetenv(name)` (returns `""` when off; nil-safe on receiver+`Global`) — use it, don't reintroduce a local `gatedGetenv`. The env-var NAME constants are single-sourced in `internal/clicfg/credentials/env_spec.go` (`credentials.EnvURI`, `EnvEmbedProvider`, …) — reference those, not new literals; `dbconn.Env*` are re-export aliases. DBMS reads are gated at the single chokepoint `dbconn.ResolveConn` so query+admin+desktop inherit it. The dotenv (`--env` walk-up) mechanism is SEPARATE and NEVER gated; explicit flags are never gated. Tests that need an env var honoured must `t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")` (viper `GetBool` treats `"1"` true) — otherwise the read returns `""` and resolution falls to dotenv/stored cred.
 - When emitting free-text debug/log lines through `RedactText`, do NOT start a line with a `<secretword>:` prefix (`token:`, `auth:`, `secret:`, `password:`, `key:`) — its assignment regex treats `<secretword>[:=] <word>` as a secret assignment and scrubs the next word to `***`. Word prose so no secret word immediately precedes a `:`/`=` (see aura api `debugInfo`).
-- Aura `--debug` diagnostics in `neo4j-cli/aura/internal/api/` route through the package-level `debugW` seam (default `os.Stderr`, overridable via `SetDebugWriterForTest`); guard all emit/redact work behind `cfg.Aura.Debug()` so the off-path is untouched. Every emitted line passes through `RedactText` then `output.StripControl` (the `scrub` helper) so secrets are redacted AND control/ANSI bytes neutralised. Use the `[aura-debug] > `/`[aura-debug] < ` prefixes (helpers in `debug.go`).
-- Both aura AND docker (`neo4j-cli/internal/subcommands/docker/`, `[docker-debug] > `/`< ` prefixes) `--debug` traces write to a package-global `debugW` seam, NOT `cmd.ErrOrStderr()` — `runEnv` has no `*cobra.Command`. Tests must capture via `SetDebugWriterForTest(t, &buf)` and assert against `buf`; cobra-captured stderr stays empty (caused a smoke-test CI fail).
+- Aura `--debug` diagnostics in `internal/aura/api/` route through the package-level `debugW` seam (default `os.Stderr`, overridable via `SetDebugWriterForTest`); guard all emit/redact work behind `cfg.Aura.Debug()` so the off-path is untouched. Every emitted line passes through `RedactText` then `output.StripControl` (the `scrub` helper) so secrets are redacted AND control/ANSI bytes neutralised. Use the `[aura-debug] > `/`[aura-debug] < ` prefixes (helpers in `debug.go`).
+- Both aura AND docker (`internal/commands/docker/`, `[docker-debug] > `/`< ` prefixes) `--debug` traces write to a package-global `debugW` seam, NOT `cmd.ErrOrStderr()` — `runEnv` has no `*cobra.Command`. Tests must capture via `SetDebugWriterForTest(t, &buf)` and assert against `buf`; cobra-captured stderr stays empty (caused a smoke-test CI fail).
 - `desktopclient` (`[desktop-debug] > `/`< `/` ` prefixes) also uses the package-global `debugW` + `debugEnabled` (toggled by `SetDebug`, resolved in the desktop-root `PersistentPreRunE`). Its `SetDebugWriterForTest`/`SetDebugForTest`/`DebugEnabled` live in PRODUCTION `debug.go` (not `export_test.go`) because the external `desktop_test` package drives them through the imported `desktopclient` and can't see `export_test.go` symbols. `debugEnabled` is a process-global: reset (`SetDebug(false)`) between resolution cases and don't `t.Parallel()` them.
 
 ## Tee-on-failure
 
-- Failing commands tee redacted output to `common/tee` (`ConfigPrefix/neo4j/cli/tee/`); `tee_path` in error envelope. Root sets `SilenceErrors: true`, so `clierr.Render` runs AFTER capture is read in `main.go` — `teeContent` appends `err.Error()` to captured bytes before `tee.Save`. Preserve that or no-intermediate-output failures tee empty.
+- Failing commands tee redacted output to `internal/tee` (`ConfigPrefix/neo4j/cli/tee/`); `tee_path` in error envelope. Root sets `SilenceErrors: true`, so `clierr.Render` runs AFTER capture is read in `main.go` — `teeContent` appends `err.Error()` to captured bytes before `tee.Save`. Preserve that or no-intermediate-output failures tee empty.
 
 ## clierr Rendering
 
-- `clierr.Render` (`common/clierr/render.go`) renders `*clierr.CLIError` from `ce.Message`/`ce.Code` via `errors.As` — NOT from `Error()`. Wrapping with `fmt.Errorf("...: %w", ce)` DROPS appended text. To append: mutate `ce.Message` (via `errors.As`), return original error. Plain errors → `NewFatalError("%s", err.Error())` (so `%w` survives only for them).
+- `clierr.Render` (`internal/clierr/render.go`) renders `*clierr.CLIError` from `ce.Message`/`ce.Code` via `errors.As` — NOT from `Error()`. Wrapping with `fmt.Errorf("...: %w", ce)` DROPS appended text. To append: mutate `ce.Message` (via `errors.As`), return original error. Plain errors → `NewFatalError("%s", err.Error())` (so `%w` survives only for them).
 - Aura test harness (`ExecuteCommand`/`E`) does NOT call `clierr.Render` (that's in `main.go`) — tests get cobra's default stderr. To assert envelope/exit-code, recover `*clierr.CLIError` via `errors.As`, inspect `ce.Code`/`ce.BuildEnvelope()`.
 
 ## Output / TTY / Casing
@@ -160,18 +157,18 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - `output.ResolveOutput` precedence: explicit flag > agent harness (`IsAgent`→`toon`) > TTY (`table`) > `json`. `agent.Detect()` reads env (`CLAUDECODE`) — tests seed `output.IsAgent = func() bool { return false }` via TestMain.
 - `toon.Marshal` rejects C0 control bytes (accepts `\t\n\r`). `printToonValue` `stripControlDeep`s before marshal and falls back to JSON on residual error — never panic on data-driven marshal failure.
 - `printTable` (go-pretty `StyleLight`) UPPER-CASES header cells — table-output tests must assert `ID`, not `id`. `getNestedField` `StripControl`s string CELLS only, so any runtime-derived column name must be stripped by the caller.
-- **Casing (CLI-127)**: OUTPUT field names = snake_case (JSON/TOON keys, table headers, `Print*` `fields` slices). INPUT identifiers = kebab-case (`Use`, aliases, flag long names; single-char shorthands exempt). Exemptions: wire/parse structs (`api/.../response.go`, `desktopclient/types.go`, OAuth, `update/release.go`), config keys, Docker label consts, enum VALUES. Gates: input → `agentcontext/casing_input_gate_test.go`; output → `common/output/casing_gate_test.go` (`Print*` literals + json-tag allowlist — add new output structs there). Neither gate covers `test/e2e/` build-tagged suites — update their decoders + run `go test -tags=e2e_desktop ./test/e2e/desktop/...` on output-name changes; leave `test/e2e/desktop_fixture/**` camelCase (mirrors Desktop wire).
+- **Casing (CLI-127)**: OUTPUT field names = snake_case (JSON/TOON keys, table headers, `Print*` `fields` slices). INPUT identifiers = kebab-case (`Use`, aliases, flag long names; single-char shorthands exempt). Exemptions: wire/parse structs (`api/.../response.go`, `desktopclient/types.go`, OAuth, `update/release.go`), config keys, Docker label consts, enum VALUES. Gates: input → `agentcontext/casing_input_gate_test.go`; output → `internal/output/casing_gate_test.go` (`Print*` literals + json-tag allowlist — add new output structs there). Neither gate covers `test/e2e/` build-tagged suites — update their decoders + run `go test -tags=e2e_desktop ./test/e2e/desktop/...` on output-name changes; leave `test/e2e/desktop_fixture/**` camelCase (mirrors Desktop wire).
 
 ## Invoker Classification
 
-- `common/agent.Invoker()` is the single caller classifier (history + telemetry `invoker` prop): `"agent"` (harness env via `Detect()`), `"script"` (no harness, non-TTY stdin), `"human"` (no harness, TTY). Don't add a second. Tested via same-pkg `_test.go` setting unexported `getenv`/`stdinIsTerminal`. Consumers own a local `var invokerFn = agent.Invoker` seam (see `clievents.go`, `history/store.go`).
+- `internal/agent.Invoker()` is the single caller classifier (history + telemetry `invoker` prop): `"agent"` (harness env via `Detect()`), `"script"` (no harness, non-TTY stdin), `"human"` (no harness, TTY). Don't add a second. Tested via same-pkg `_test.go` setting unexported `getenv`/`stdinIsTerminal`. Consumers own a local `var invokerFn = agent.Invoker` seam (see `clievents.go`, `history/store.go`).
 
 ## Subsystem Notes
 
 - **query** — Bolt driver, execution, creds, embedding providers: [`.agents/query.md`](.agents/query.md).
-- **dataset** (`neo4j-cli/internal/dataset/`) — no semver-range lib; `version.go` hand-rolls npm-style comparator-set matcher (`rangeMatches`/`canonicalVersion`); `rawBaseURL`/`httpDoFn` are httptest seams. Dumps come as REGULAR Git blob (raw serves bytes) OR Git-LFS (raw serves pointer, bytes on media host) — `download.go` fetches raw, sniffs `version https://git-lfs`, falls back to media; don't revert to media-only. **Resolver**: calver (2025.x/2026.x) continues the 5.x line — `Resolve` treats calver target OR `"latest"` as matching dumps with lower bound `>=5.0.0`; concrete targets keep exact matching; `canonicalVersion` strips leading zeros (calver months zero-padded).
+- **dataset** (`internal/dataset/`) — no semver-range lib; `version.go` hand-rolls npm-style comparator-set matcher (`rangeMatches`/`canonicalVersion`); `rawBaseURL`/`httpDoFn` are httptest seams. Dumps come as REGULAR Git blob (raw serves bytes) OR Git-LFS (raw serves pointer, bytes on media host) — `download.go` fetches raw, sniffs `version https://git-lfs`, falls back to media; don't revert to media-only. **Resolver**: calver (2025.x/2026.x) continues the 5.x line — `Resolve` treats calver target OR `"latest"` as matching dumps with lower bound `>=5.0.0`; concrete targets keep exact matching; `canonicalVersion` strips leading zeros (calver months zero-padded).
 - **desktopclient mDNS** (`discovery_mdns.go`) — `mdns.QueryContext` honors caller's `params.Entries`; silence socket warnings via `params.Logger = log.New(io.Discard,...)`; keep all mDNS imports + macOS `dns-sd` exec isolated to this file.
-- **Docker** (`neo4j-cli/internal/subcommands/docker/`) — shells to host `docker`; Docker is source-of-truth (managed containers carry `org.neo4j.cli.managed=true` + metadata labels; no state file). Details:
+- **Docker** (`internal/commands/docker/`) — shells to host `docker`; Docker is source-of-truth (managed containers carry `org.neo4j.cli.managed=true` + metadata labels; no state file). Details:
   - `client.go` `dockerClient` interface; `execClient` shells out; `clientFactory` var is the test seam (fake in `helpers_test.go`). Only exported constructor: `NewDeployClient()`.
   - `bolt_ready.go` `WaitForBolt(...)` (create/start `--wait`, vendored driver); `stop --wait` polls `Inspect` for `State.Running == false`.
   - `create` auto-suffixes name vs `PsAll` + `DbmsCredentials.List()`. `--ephemeral` adds `--rm`, skips cred persistence, emits `.env` blob to stdout or `--env-out-file` (0600); consumed by `query --env`.
@@ -184,7 +181,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - **agent-context** — `neo4j-cli agent-context` reflects live cobra tree; hand-coded `schemaVersion`/`exitCodes`/`errorCodes`/`asyncFlag` in `agentcontext/build.go`. See [`.agents/agent-context.md`](.agents/agent-context.md).
 - **v2beta1 404 suggestions** — once a resource is migrated to the nested v2beta1 scoped path, its 404 suggestion should come natively from `api/response.go` `suggestionForResource(<singular>)` (parseResourceFromRequest tags the trailing plural/id), NOT a call-site `utils.WithNotFoundContext` rewrite — add a `case` there when migrating a resource.
 - **feature flags** — naming `flag.<area>-<feature>`, default-false, config+env override. `SetForTest` panics on unregistered keys (Registry check precedes mutex). See [`.agents/feature-flags.md`](.agents/feature-flags.md).
-- **config migrations** — `common/configmigrate/`, `_schema_version` marker, warn-and-continue, `runWith` seam, under `common/` due to internal-pkg rule. See [`.agents/config-migrations.md`](.agents/config-migrations.md).
+- **config migrations** — `internal/configmigrate/`, `_schema_version` marker, warn-and-continue, `runWith` seam, must not import `clicfg` (import cycle). See [`.agents/config-migrations.md`](.agents/config-migrations.md).
 - **`internal/quip/`** — intentional cosmetic terminal-message helper. Keep as-is; don't document triggers, simplify, or "tidy" the obfuscation.
 
 ## Misc
@@ -192,7 +189,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - `cfg.Aura.BaseUrl()`/`AuthUrl()` run `removePathParametersFromUrl` — any configured path is dropped, leaving `scheme://host`. A test base-url of `<server>/v1` therefore contributes NO path segment; don't "fix" a doubled prefix by overriding it.
 - Verifying an Aura endpoint or query param in docs/examples: `https://api.neo4j.io/v2beta1/spec.json` is public and curl-able (43 paths, ALL scoped under `/organizations/...` — there is no flat `/instances`). `v1/spec.json` returns 403, so check v1 claims against repo history instead (v1 `GET /instances` takes `tenantId`, not `include_deleted`).
 - `cmd.Flags()` does NOT include a command's own persistent flags until cobra parses argv (`mergePersistentFlags` runs in `ParseFlags`). A test inspecting an unexecuted command's flag surface must use `cmd.LocalFlags()`.
-- `aura-client` cred cmd lives only in `neo4j-cli/internal/subcommands/credential/credential.go` (feeds the skill bundle; run `go generate ./neo4j-cli/internal/skill/...` after flag/Long changes). The aura tree has no standalone `config`/`credential` commands; aura tests drive `aura.NewCmd` via `AuraTestHelper`, which adds `--rw` and the usage-error flag func itself.
+- `aura-client` cred cmd lives only in `internal/commands/credential/credential.go` (feeds the skill bundle; run `go generate ./internal/skill/neo4jcli/...` after flag/Long changes). The aura tree has no standalone `config`/`credential` commands; aura tests drive `aura.NewCmd` via `AuraTestHelper`, which adds `--rw` and the usage-error flag func itself.
 - An ephemeral Aura credential (e.g. env-var-synthesized via `cfg.Aura.SetActiveCredential`) is NOT in `cfg.Credentials.Aura`'s store, so `getToken` (`aura/internal/api/token.go`) MUST skip `UpdateAccessToken` for it — `UpdateAccessToken` does `c.Get(name)` which `panic`s on a not-found name. Guard with a non-panicking `cfg.Credentials.Aura.Get(name)` probe before persisting; such tokens are kept in-process only (never written to credentials.json/keyring).
 - `fileutils.WriteFile` PANICS on error; `WriteFileErr` is the error-returning twin (atomic 0600). Use `WriteFileErr` in best-effort paths (e.g. history logging).
 - Every `clicfg.NewConfig` starts an analytics worker goroutine that exits only on `cfg.Events.Flush()` (idempotent). Code building more than one Config per process must Flush each, or it leaks a goroutine per config.

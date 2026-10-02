@@ -3,13 +3,13 @@
 # Windows checkouts converts LF to CRLF, breaking golden-file equality
 # checks (the renderer always emits LF) and producing spurious CRLF/LF
 # diffs in `git diff --exit-code` after `go generate`.
-common/skill/render/testdata/** text eol=lf
-neo4j-cli/internal/subcommands/mcp/**/testdata/** text eol=lf
-neo4j-cli/internal/subcommands/mcp/testdata/** text eol=lf
-**/internal/skill/bundle/** text eol=lf
-**/internal/skill/additions.md text eol=lf
-**/internal/skill/query-additions.md text eol=lf
-**/internal/skill/description.txt text eol=lf
+internal/skill/render/testdata/** text eol=lf
+internal/commands/mcp/**/testdata/** text eol=lf
+internal/commands/mcp/testdata/** text eol=lf
+internal/skill/neo4jcli/bundle/** text eol=lf
+internal/skill/neo4jcli/additions.md text eol=lf
+internal/skill/neo4jcli/query-additions.md text eol=lf
+internal/skill/neo4jcli/description.txt text eol=lf
 
 # Pin LF for CI script and bats test files. A CRLF shebang (#!/usr/bin/env bash\r)
 # makes the kernel look for an interpreter named "bash\r", so the script fails
