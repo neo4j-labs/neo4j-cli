@@ -6,7 +6,6 @@ package organization
 import (
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/spf13/cobra"
@@ -36,7 +35,7 @@ neo4j-cli aura organization list --format json | jq -r '.data[].id'`,
 			for i, o := range orgs {
 				rows[i] = o.Record
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name"})
+			output.PrintRecords(cmd, cfg, rows, []string{"id", "name"})
 
 			return nil
 		},

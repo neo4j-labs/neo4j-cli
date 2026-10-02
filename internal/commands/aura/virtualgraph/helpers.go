@@ -5,7 +5,6 @@ package virtualgraph
 
 import (
 	"github.com/neo4j/cli/internal/aura"
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/spf13/cobra"
@@ -61,5 +60,5 @@ func detailFieldsFor(virtualGraph map[string]any, extra ...string) []string {
 // printVirtualGraph renders a virtual graph with the shared detail projection,
 // widened by extra.
 func printVirtualGraph(cmd *cobra.Command, cfg *clicfg.Config, vg *aura.VirtualGraph, extra ...string) {
-	output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(vg.Record), detailFieldsFor(vg.Record, extra...))
+	output.PrintRecord(cmd, cfg, vg.Record, detailFieldsFor(vg.Record, extra...))
 }

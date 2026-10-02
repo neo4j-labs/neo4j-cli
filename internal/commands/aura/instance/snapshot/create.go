@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -44,7 +43,7 @@ neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(snap.Record), []string{"snapshot_id"})
+			output.PrintRecord(cmd, cfg, snap.Record, []string{"snapshot_id"})
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for snapshot to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

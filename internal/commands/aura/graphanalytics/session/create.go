@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -77,7 +76,7 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 				return err
 			}
 
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(sess.Record), []string{"id", "name", "project_id", "memory", "status", "created_at"})
+			output.PrintRecord(cmd, cfg, sess.Record, []string{"id", "name", "project_id", "memory", "status", "created_at"})
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

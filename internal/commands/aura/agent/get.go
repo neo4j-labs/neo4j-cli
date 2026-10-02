@@ -6,7 +6,6 @@ package agent
 import (
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -38,7 +37,7 @@ neo4j-cli aura agent get 00000000-0000-0000-0000-000000000000 --format json`,
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(agent.Record), []string{"id", "name", "description", "dbid", "is_private", "is_mcp_enabled", "enabled"})
+			output.PrintRecord(cmd, cfg, agent.Record, []string{"id", "name", "description", "dbid", "is_private", "is_mcp_enabled", "enabled"})
 
 			return nil
 		},

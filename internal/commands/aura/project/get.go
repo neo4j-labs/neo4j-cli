@@ -8,7 +8,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -50,7 +49,7 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 			}
 
 			// Only id and name are modelled for a project; output carries exactly those.
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(map[string]any{"id": found.ID, "name": found.Name}), []string{"id", "name"})
+			output.PrintRecord(cmd, cfg, map[string]any{"id": found.ID, "name": found.Name}, []string{"id", "name"})
 
 			return nil
 		},

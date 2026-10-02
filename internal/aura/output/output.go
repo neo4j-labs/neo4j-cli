@@ -1,39 +1,46 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
+// Package output renders the records the Aura client returns. Commands hand it a
+// record (or a list of records) and the columns to show; it wraps them in the
+// {"data": ...} envelope Aura output uses and prints them in the format the user
+// asked for.
 package output
 
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/output"
 )
 
-// PrintBodyMap is a shim that delegates to internal/output.PrintBodyMap so that
-// all existing call sites in subcommands/ continue to compile without import changes.
+// single is the {"data": {...}} envelope of one record.
+type single struct {
+	Data map[string]any `json:"data"`
+}
+
+func (d single) AsArray() []map[string]any { return []map[string]any{d.Data} }
+
+// list is the {"data": [...]} envelope of several records.
+type list struct {
+	Data []map[string]any `json:"data"`
+}
+
+func (d list) AsArray() []map[string]any { return d.Data }
+
+// PrintRecord prints one record. JSON output is the whole record; fields are the
+// columns of the table form.
+func PrintRecord(cmd *cobra.Command, cfg *clicfg.Config, record map[string]any, fields []string) {
+	output.PrintBodyMap(cmd, cfg, single{Data: record}, fields)
+}
+
+// PrintRecords prints a list of records.
+func PrintRecords(cmd *cobra.Command, cfg *clicfg.Config, records []map[string]any, fields []string) {
+	output.PrintBodyMap(cmd, cfg, list{Data: records}, fields)
+}
+
+// PrintBodyMap prints any value that satisfies output.ResponseData, for the few
+// commands whose result is not an Aura record (for example the workspace list).
 func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values output.ResponseData, fields []string) {
 	output.PrintBodyMap(cmd, cfg, values, fields)
-}
-
-// PrintBody parses the raw response body and then calls PrintBodyMap.
-func PrintBody(cmd *cobra.Command, cfg *clicfg.Config, body []byte, fields []string) {
-	if len(body) == 0 {
-		return
-	}
-	values := api.ParseBody(body)
-
-	PrintBodyMap(cmd, cfg, values, fields)
-}
-
-// PrintRawBody prints a bare-JSON response body (no `{"data": ...}` envelope).
-// Used for endpoints (e.g. the Aura Agents API) whose response shape is a bare
-// array or a bare object at the top level. The response is wrapped in a
-// `{"data": ...}` envelope via PrintBodyMap for consistency with other Aura commands.
-func PrintRawBody(cmd *cobra.Command, cfg *clicfg.Config, body []byte, fields []string) {
-	if len(body) == 0 {
-		return
-	}
-	PrintBodyMap(cmd, cfg, api.ParseRawBody(body), fields)
 }

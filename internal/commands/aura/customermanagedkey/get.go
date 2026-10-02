@@ -7,7 +7,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -40,7 +39,7 @@ neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --o
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(key.Record), []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
+			output.PrintRecord(cmd, cfg, key.Record, []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
 			return nil
 		},

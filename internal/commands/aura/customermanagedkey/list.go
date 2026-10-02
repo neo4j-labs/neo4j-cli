@@ -6,7 +6,6 @@ package customermanagedkey
 import (
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -45,7 +44,7 @@ neo4j-cli aura customer-managed-key list --organization-id 00000000-0000-0000-00
 			for i, k := range keys {
 				rows[i] = k.Record
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "project_id"})
+			output.PrintRecords(cmd, cfg, rows, []string{"id", "name", "project_id"})
 
 			return nil
 		},

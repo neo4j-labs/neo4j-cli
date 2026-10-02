@@ -6,7 +6,6 @@ package agent
 import (
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -43,7 +42,7 @@ neo4j-cli aura agent list --format json`,
 			for i, a := range agents {
 				rows[i] = a.Record
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "description", "dbid", "enabled"})
+			output.PrintRecords(cmd, cfg, rows, []string{"id", "name", "description", "dbid", "enabled"})
 
 			return nil
 		},

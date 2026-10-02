@@ -14,7 +14,6 @@ import (
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clicfg/credentials"
 	"github.com/neo4j/cli/internal/clierr"
-	"github.com/neo4j/cli/internal/output"
 )
 
 // authSuggestion is the next-action hint attached to every 401/403 *CLIError
@@ -416,86 +415,6 @@ const (
 var GraphAnalyticsSessionWaitingStatus = []string{
 	GraphAnalyticsSessionCreating,
 	GraphAnalyticsSessionInitial,
-}
-
-type ResponseData interface {
-	output.ResponseData
-	GetSingleOrError() (map[string]any, error)
-}
-
-type ListResponseData struct {
-	Data []map[string]any `json:"data"`
-}
-
-func (d ListResponseData) GetSingleOrError() (map[string]any, error) {
-	if len(d.Data) != 1 {
-		return nil, clierr.NewFatalError("expected 1 array value: %v", len(d.Data))
-	}
-	return d.Data[0], nil
-}
-
-func (d ListResponseData) AsArray() []map[string]any {
-	return d.Data
-}
-
-type SingleValueResponseData struct {
-	Data   map[string]any   `json:"data"`
-	Errors []map[string]any `json:"errors,omitempty"`
-}
-
-func (d SingleValueResponseData) GetSingleOrError() (map[string]any, error) {
-	return d.Data, nil
-}
-
-func (d SingleValueResponseData) AsArray() []map[string]any {
-	return []map[string]any{d.Data}
-}
-
-func NewSingleValueResponseData(data map[string]any) ResponseData {
-	return SingleValueResponseData{
-		Data: data,
-	}
-}
-
-func NewListResponseData(data []map[string]any) ResponseData {
-	return ListResponseData{
-		Data: data,
-	}
-}
-
-func ParseBody(body []byte) ResponseData {
-	var listResponseData ListResponseData
-	err := json.Unmarshal(body, &listResponseData)
-
-	// Try unmarshalling array first, if not it creates an array from the single item
-	if err == nil {
-		return listResponseData
-	} else {
-		var singleValueResponseData SingleValueResponseData
-		err := json.Unmarshal(body, &singleValueResponseData)
-		if err != nil {
-			panic(err)
-		}
-		return singleValueResponseData
-	}
-}
-
-// ParseRawBody parses a bare-JSON response body (no `{"data": ...}` envelope)
-// into a ResponseData. It tries `[]map[string]any` first then `map[string]any`,
-// panicking if neither matches. Used by endpoints (e.g. the Aura Agents API)
-// whose response shape is a bare array or a bare object at the top level.
-func ParseRawBody(body []byte) ResponseData {
-	var listData []map[string]any
-	if err := json.Unmarshal(body, &listData); err == nil {
-		return NewListResponseData(listData)
-	}
-
-	var singleData map[string]any
-	if err := json.Unmarshal(body, &singleData); err == nil {
-		return NewSingleValueResponseData(singleData)
-	}
-
-	panic("could not parse raw response body")
 }
 
 func formatAuthorizationError(resBody []byte, statusCode int, credential *credentials.AuraCredential, cfg *clicfg.Config) error {

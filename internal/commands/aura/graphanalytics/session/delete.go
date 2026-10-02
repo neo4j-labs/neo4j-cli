@@ -7,7 +7,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -51,7 +50,7 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 				return err
 			}
 			if rec != nil {
-				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(rec), []string{"id"})
+				output.PrintRecord(cmd, cfg, rec, []string{"id"})
 			}
 			return nil
 		},

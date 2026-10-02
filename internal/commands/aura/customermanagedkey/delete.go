@@ -8,7 +8,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -58,8 +57,7 @@ neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 
 			}
 
 			fmt.Fprintf(cmd.ErrOrStderr(), "customer-managed-key %s deleted\n", cmkID) //nolint:errcheck // narration to stderr; write errors are not actionable
-			output.PrintBodyMap(cmd, cfg,
-				api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": cmkID}),
+			output.PrintRecord(cmd, cfg, map[string]any{"deleted": true, "id": cmkID},
 				[]string{"deleted", "id"})
 
 			return nil

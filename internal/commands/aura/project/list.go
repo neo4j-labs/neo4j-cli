@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -48,7 +47,7 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 			for i, p := range projects {
 				rows[i] = p.Record
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name"})
+			output.PrintRecords(cmd, cfg, rows, []string{"id", "name"})
 
 			return nil
 		},

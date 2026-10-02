@@ -7,7 +7,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -41,7 +40,7 @@ neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --inst
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(snap.Record), []string{"snapshot_id", "instance_id", "profile", "status", "timestamp", "exportable"})
+			output.PrintRecord(cmd, cfg, snap.Record, []string{"snapshot_id", "instance_id", "profile", "status", "timestamp", "exportable"})
 			return nil
 		},
 	}

@@ -82,7 +82,11 @@ func ListAllPages(ctx context.Context, cfg *clicfg.Config, path string, version 
 			return result, nil
 		}
 
-		result.Items = append(result.Items, ParseBody(resBody).AsArray()...)
+		items, err := pageItems(resBody)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = append(result.Items, items...)
 		next := NextPageToken(resBody)
 
 		if limit > 0 && len(result.Items) >= limit {
@@ -105,6 +109,27 @@ func ListAllPages(ctx context.Context, cfg *clicfg.Config, path string, version 
 
 	result.PageCapReached = true
 	return result, nil
+}
+
+// pageItems reads the records of one list page: the {"data": ...} envelope's data
+// is an array of records, or a single record (returned as one item). A body that
+// is not that envelope is an error, not a panic.
+func pageItems(body []byte) ([]map[string]any, error) {
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, clierr.NewUpstreamError("unreadable list response from the Aura API: %w", err)
+	}
+	var rows []map[string]any
+	if err := json.Unmarshal(envelope.Data, &rows); err == nil {
+		return rows, nil
+	}
+	var row map[string]any
+	if err := json.Unmarshal(envelope.Data, &row); err != nil {
+		return nil, clierr.NewUpstreamError("unreadable list response from the Aura API: %w", err)
+	}
+	return []map[string]any{row}, nil
 }
 
 // NextPageToken extracts the page_token query parameter from a list response's

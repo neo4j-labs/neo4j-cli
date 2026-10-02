@@ -5,7 +5,6 @@ package instance
 
 import (
 	"github.com/neo4j/cli/internal/aura"
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -43,7 +42,7 @@ neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000
 			for i, inst := range instances {
 				rows[i] = inst.Record
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "status", "organization_id", "project_id", "cloud_provider"})
+			output.PrintRecords(cmd, cfg, rows, []string{"id", "name", "status", "organization_id", "project_id", "cloud_provider"})
 			return nil
 		},
 	}

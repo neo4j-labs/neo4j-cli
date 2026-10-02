@@ -7,7 +7,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -58,7 +57,7 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(inst.Record), []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
+			output.PrintRecord(cmd, cfg, inst.Record, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 
 			return nil
 		},

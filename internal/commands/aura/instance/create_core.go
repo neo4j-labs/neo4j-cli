@@ -9,11 +9,9 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"io"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -84,8 +82,7 @@ func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[s
 		delete(instance, "password")
 	}
 
-	renamed := utils.RenameResponseField(api.NewSingleValueResponseData(instance), "tenant_id", "project_id")
-	renamedInstance, _ := renamed.GetSingleOrError()
+	renamedInstance := aura.RenameKey(instance, "tenant_id", "project_id", false)
 
 	fields := []string{"id", "name", "project_id", "connection_url", "username"}
 	if !noCredentialPrint {
@@ -97,7 +94,7 @@ func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[s
 	fields = append(fields, "cloud_provider", "region", "type")
 	fields = append(fields, extraFields...)
 
-	output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(renamedInstance), fields)
+	output.PrintRecord(cmd, cfg, renamedInstance, fields)
 }
 
 // newInstanceCreate maps the already-validated create flag values to the

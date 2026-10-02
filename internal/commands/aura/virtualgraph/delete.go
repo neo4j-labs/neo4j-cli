@@ -7,7 +7,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -61,7 +60,7 @@ while neo4j-cli aura virtual-graph get ge82059a > /dev/null 2>&1; do sleep 5; do
 			if err := aura.New(cfg).VirtualGraphs().Delete(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID); err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(map[string]any{"id": virtualGraphID}), []string{"id"})
+			output.PrintRecord(cmd, cfg, map[string]any{"id": virtualGraphID}, []string{"id"})
 
 			return nil
 		},

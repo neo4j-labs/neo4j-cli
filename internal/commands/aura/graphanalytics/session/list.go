@@ -6,7 +6,6 @@ package session
 import (
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -45,7 +44,7 @@ Use --organization-id and --project-id to specify which project's sessions to li
 			for i, sess := range sessions {
 				rows[i] = sess.Record
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "status", "project_id", "cloud_provider", "ttl"})
+			output.PrintRecords(cmd, cfg, rows, []string{"id", "name", "status", "project_id", "cloud_provider", "ttl"})
 			return nil
 		},
 	}

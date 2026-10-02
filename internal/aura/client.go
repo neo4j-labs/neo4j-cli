@@ -48,6 +48,10 @@ func New(cfg *clicfg.Config) Client {
 	return &httpClient{cfg: cfg}
 }
 
+// MaxListPages bounds how many pages a paginated list walks before it reports
+// that the result may be incomplete.
+const MaxListPages = api.MaxListPages
+
 // Instance statuses callers may wait on. They mirror the API's values.
 const (
 	InstanceStatusCreating    = api.InstanceStatusCreating

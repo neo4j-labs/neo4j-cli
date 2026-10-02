@@ -7,7 +7,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/spf13/cobra"
@@ -35,7 +34,7 @@ neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format js
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(org.Record), []string{"id", "name"})
+			output.PrintRecord(cmd, cfg, org.Record, []string{"id", "name"})
 
 			return nil
 		},

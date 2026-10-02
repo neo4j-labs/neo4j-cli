@@ -9,7 +9,6 @@ import (
 	"log"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -71,7 +70,7 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, result *aura.AgentInvocation) {
 	invocationID := result.InvocationID
 	if commonoutput.ResolveOutput(cmd, cfg) == "json" {
-		output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(result.Record), nil)
+		output.PrintRecord(cmd, cfg, result.Record, nil)
 		if invocationID != "" {
 			cmd.PrintErrln("Invocation ID: " + invocationID)
 		}

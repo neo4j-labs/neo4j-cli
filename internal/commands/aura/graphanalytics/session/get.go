@@ -7,7 +7,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -41,7 +40,7 @@ neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 
 				return err
 			}
 
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(sess.Record), []string{
+			output.PrintRecord(cmd, cfg, sess.Record, []string{
 				"id",
 				"name",
 				"memory",

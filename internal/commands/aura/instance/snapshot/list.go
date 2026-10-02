@@ -6,7 +6,6 @@ package snapshot
 import (
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -43,7 +42,7 @@ neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 0
 			for i, sn := range snaps {
 				rows[i] = sn.Record
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"snapshot_id", "instance_id", "profile", "status", "timestamp"})
+			output.PrintRecords(cmd, cfg, rows, []string{"snapshot_id", "instance_id", "profile", "status", "timestamp"})
 			return nil
 		},
 	}

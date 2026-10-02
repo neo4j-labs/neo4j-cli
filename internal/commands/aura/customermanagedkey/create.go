@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
@@ -72,7 +71,7 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(key.Record), []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
+			output.PrintRecord(cmd, cfg, key.Record, []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for customer managed key to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -42,28 +41,19 @@ neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-0
 				return err
 			}
 
-			data := api.NewSingleValueResponseData(inst.Record)
-			fields, err := getFields(data)
-			if err != nil {
-				return err
-			}
-			output.PrintBodyMap(cmd, cfg, data, fields)
+			output.PrintRecord(cmd, cfg, inst.Record, getFields(inst.Record))
 
 			return nil
 		},
 	}
 }
 
-func getFields(responseBody api.ResponseData) ([]string, error) {
+func getFields(instance map[string]any) []string {
 	fields := []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"}
-	instance, err := responseBody.GetSingleOrError()
-	if err != nil {
-		return nil, err
-	}
 	if HasMetricsIntegrationEndpointUrl(instance) {
 		fields = append(fields, "metrics_integration_url")
 	}
-	return fields, nil
+	return fields
 }
 
 func HasMetricsIntegrationEndpointUrl(instance map[string]any) bool {

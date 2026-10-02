@@ -8,7 +8,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -48,7 +47,7 @@ neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --wait --organizat
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(g.Record), []string{"id", "name", "status", "url"})
+			output.PrintRecord(cmd, cfg, g.Record, []string{"id", "name", "status", "url"})
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be resumed...") //nolint:errcheck // narration to stderr; write errors are not actionable

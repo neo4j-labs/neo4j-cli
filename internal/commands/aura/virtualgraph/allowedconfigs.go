@@ -6,7 +6,6 @@ package virtualgraph
 import (
 	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -40,7 +39,7 @@ neo4j-cli aura virtual-graph allowed-configs --format json | jq -r '.data.config
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(configs), []string{"default_memory", "configs"})
+			output.PrintRecord(cmd, cfg, configs, []string{"default_memory", "configs"})
 			return nil
 		},
 	}

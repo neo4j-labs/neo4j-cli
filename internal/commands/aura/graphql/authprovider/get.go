@@ -7,7 +7,6 @@ import (
 	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -43,7 +42,7 @@ neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-
 			if err != nil {
 				return err
 			}
-			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(p.Record), []string{"id", "name", "type", "enabled", "url"})
+			output.PrintRecord(cmd, cfg, p.Record, []string{"id", "name", "type", "enabled", "url"})
 			return nil
 		},
 	}
