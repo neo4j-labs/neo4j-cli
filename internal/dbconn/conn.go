@@ -90,7 +90,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 				ctx = context.Background()
 			}
 			desktopclient.SetDebug(ResolveDebug(cmd))
-			match, err := resolveDesktopActiveDbmsCredentialFn(ctx, cfg.Aura.Fs())
+			match, err := resolveDesktopActiveDbmsCredentialFn(ctx, cfg.Fs())
 			if err != nil {
 				return nil, err
 			}
@@ -109,7 +109,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 				ctx = context.Background()
 			}
 			desktopclient.SetDebug(ResolveDebug(cmd))
-			match, err := resolveDesktopConnectionCredentialFn(ctx, cfg.Aura.Fs(), raw)
+			match, err := resolveDesktopConnectionCredentialFn(ctx, cfg.Fs(), raw)
 			if err != nil {
 				return nil, err
 			}
@@ -141,7 +141,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine current directory: %w", err)
 	}
-	dotenvVals, err := LoadEnvFile(cfg.Aura.Fs(), envFlag, cwd, cmd.ErrOrStderr())
+	dotenvVals, err := LoadEnvFile(cfg.Fs(), envFlag, cwd, cmd.ErrOrStderr())
 	if err != nil {
 		return nil, err
 	}

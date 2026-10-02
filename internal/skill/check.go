@@ -60,7 +60,7 @@ func runCheck(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh 
 	}
 	load.PrintWarn(cmd.ErrOrStderr())
 
-	rows := filterInstalled(BuildInventory(cfg.Aura.Fs(), skillName, cfg.Version, load.Cat))
+	rows := filterInstalled(BuildInventory(cfg.Fs(), skillName, cfg.Version, load.Cat))
 	renderCheckResult(cmd, cfg, rows)
 
 	drift := countCheckDrift(rows)

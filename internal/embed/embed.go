@@ -383,7 +383,7 @@ func loadDotenv(cfg *clicfg.Config, stderr io.Writer) map[string]string {
 	if cfg == nil || cfg.Aura == nil {
 		return map[string]string{}
 	}
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	if fs == nil {
 		return map[string]string{}
 	}

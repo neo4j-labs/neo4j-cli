@@ -60,7 +60,7 @@ func Record(cfg *clicfg.Config) {
 		return
 	}
 
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	if fs == nil {
 		return
 	}
@@ -97,7 +97,7 @@ func Load(cfg *clicfg.Config) ([]Entry, error) {
 	if cfg == nil {
 		return nil, nil
 	}
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	if fs == nil {
 		return nil, nil
 	}
@@ -130,7 +130,7 @@ func Clear(cfg *clicfg.Config) error {
 	if cfg == nil {
 		return nil
 	}
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	if fs == nil {
 		return nil
 	}

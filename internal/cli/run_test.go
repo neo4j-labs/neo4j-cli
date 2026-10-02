@@ -72,7 +72,7 @@ func TestTeeContent(t *testing.T) {
 
 // TestHandleFailure_TeesRedactedAndAttachesPath exercises the integration of
 // the tee feature wired into main(): handleFailure must run tee.Save on the
-// captured+error content, land a redacted file on cfg.Aura.Fs() under the tee
+// captured+error content, land a redacted file on cfg.Fs() under the tee
 // dir, and return a *CLIError carrying that path. Uses a memfs-backed config so
 // nothing touches the real ~/Library/Preferences (Dir() resolves via
 // clicfg.ConfigPrefix, but the file is written to and read back from the same
@@ -94,7 +94,7 @@ func TestHandleFailure_TeesRedactedAndAttachesPath(t *testing.T) {
 	assert.True(t, strings.HasSuffix(ce.TeePath, "_aura-instance-list.log"), "slug-derived filename; got %q", ce.TeePath)
 
 	data, err := afero.ReadFile(fs, ce.TeePath)
-	require.NoError(t, err, "tee file must exist on cfg.Aura.Fs()")
+	require.NoError(t, err, "tee file must exist on cfg.Fs()")
 	got := string(data)
 	assert.NotContains(t, got, secret, "secret must be redacted in the tee file")
 	assert.Contains(t, got, "***", "redacted placeholder must be present")

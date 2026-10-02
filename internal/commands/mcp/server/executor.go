@@ -69,7 +69,7 @@ func NewExecutor(cfg *clicfg.Config, newRoot RootFactory) (*Executor, error) {
 		// AuraConfig.Fs is the only accessor for the filesystem a Config was
 		// built over; the per-call configs must share it so the server sees the
 		// same config file and credential store as the rest of the CLI.
-		fs:      cfg.Aura.Fs(),
+		fs:      cfg.Fs(),
 		version: cfg.Version,
 		newRoot: newRoot,
 	}, nil

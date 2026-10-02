@@ -23,7 +23,7 @@ func GetTypeDefsFromFlag(cfg *clicfg.Config, typeDefs string, typeDefsFile strin
 		// type defs in request body need to be base 64 encoded
 		typeDefsForBody = typeDefs
 	} else {
-		base64EncodedTypeDefs, err := ResolveTypeDefsFileFlagValue(cfg.Aura.Fs(), typeDefsFile)
+		base64EncodedTypeDefs, err := ResolveTypeDefsFileFlagValue(cfg.Fs(), typeDefsFile)
 		if err != nil {
 			return "", err
 		}

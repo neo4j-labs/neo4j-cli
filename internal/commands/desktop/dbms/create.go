@@ -181,7 +181,7 @@ neo4j-cli desktop dbms create --name my-dbms --version 5.21.0 --password superse
 			cmd.SilenceUsage = true
 
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt(portFlag)
 
 			client, err := newDesktopClientFn(ctx, fs, port)

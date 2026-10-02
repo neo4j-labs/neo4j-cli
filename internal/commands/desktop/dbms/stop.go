@@ -71,7 +71,7 @@ neo4j-cli desktop dbms stop my-dbms-id --wait --format json --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt(portFlag)
 			id := args[0]
 

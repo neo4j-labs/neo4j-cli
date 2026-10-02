@@ -77,7 +77,7 @@ func TestSave_WritesRedactedFile(t *testing.T) {
 	assert.Equal(t, Dir(), filepath.Dir(path))
 	assert.True(t, strings.HasSuffix(path, "_query.log"))
 
-	data, err := afero.ReadFile(cfg.Aura.Fs(), path)
+	data, err := afero.ReadFile(cfg.Fs(), path)
 	require.NoError(t, err)
 	got := string(data)
 	assert.Contains(t, got, "neo4j://neo4j:***@host")
@@ -102,7 +102,7 @@ func TestSave_FileMode0600(t *testing.T) {
 	cfg := newTestConfig(t, `{"format":"json"}`)
 	path, err := Save(cfg, "query", []byte("x"))
 	require.NoError(t, err)
-	info, err := cfg.Aura.Fs().Stat(path)
+	info, err := cfg.Fs().Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, "-rw-------", info.Mode().String())
 }
@@ -146,7 +146,7 @@ func TestSave_ShortCircuits(t *testing.T) {
 
 func TestSave_RotationPerSlug(t *testing.T) {
 	cfg := newTestConfig(t, `{"format":"json","tee-limit":3}`)
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 
 	// Seed 4 older query files plus 2 other-slug files that must be untouched.
 	seed := []string{

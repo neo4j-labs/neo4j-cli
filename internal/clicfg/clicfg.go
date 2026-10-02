@@ -54,6 +54,14 @@ type Config struct {
 	Credentials *credentials.Credentials
 	Events      analytics.Service // Look to refactor this in the future , pull this into an application struct
 	scope       ConfigScope
+	fs          afero.Fs
+}
+
+// Fs returns the filesystem the config, credentials and every other piece of
+// persisted CLI state is read from and written to. Production passes the OS
+// filesystem; tests pass an in-memory one.
+func (c *Config) Fs() afero.Fs {
+	return c.fs
 }
 
 func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
@@ -141,6 +149,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		Credentials: creds,
 		Events:      events,
 		scope:       scope,
+		fs:          fs,
 	}
 }
 
@@ -375,10 +384,6 @@ func (config *AuraConfig) DefaultTenant() string {
 		}
 	}
 	return config.viper.GetString("aura.default-tenant")
-}
-
-func (config *AuraConfig) Fs() afero.Fs {
-	return config.fs
 }
 
 func (config *AuraConfig) PollingConfig() PollingConfig {

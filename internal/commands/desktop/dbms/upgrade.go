@@ -74,7 +74,7 @@ neo4j-cli desktop dbms upgrade my-dbms-id --version 5.26.1 --format json --rw`,
 			cmd.SilenceUsage = true
 
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt(portFlag)
 			id := args[0]
 

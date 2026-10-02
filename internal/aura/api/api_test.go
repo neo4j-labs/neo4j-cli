@@ -155,7 +155,7 @@ func TestMakeRequest_EnvCredentialNotPersisted(t *testing.T) {
 		ClientSecret: "env-secret",
 	})
 
-	before, err := testfs.GetTestCredentials(cfg.Aura.Fs())
+	before, err := testfs.GetTestCredentials(cfg.Fs())
 	require.NoError(t, err)
 
 	_, _, err = api.MakeRequest(cfg, "instances", &api.RequestConfig{
@@ -165,7 +165,7 @@ func TestMakeRequest_EnvCredentialNotPersisted(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "env-client", *capturedClientID)
 
-	after, err := testfs.GetTestCredentials(cfg.Aura.Fs())
+	after, err := testfs.GetTestCredentials(cfg.Fs())
 	require.NoError(t, err)
 	assert.Equal(t, before, after, "env-synthesized token must not be persisted to credentials.json")
 }

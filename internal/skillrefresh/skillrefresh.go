@@ -80,7 +80,7 @@ func MaybeRefresh(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, b
 		return
 	}
 
-	auraFs := cfg.Aura.Fs()
+	auraFs := cfg.Fs()
 	cached := readCache(auraFs)
 	if cached != nil && cached.LastRefreshedVersion == current {
 		return

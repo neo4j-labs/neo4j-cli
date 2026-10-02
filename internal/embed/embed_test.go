@@ -123,7 +123,7 @@ func TestResolve_FlagsBeatEnvBeatsDotenvBeatsStored(t *testing.T) {
 		`"base-url":"https://stored.example/v1","dimensions":100,"api-key":"stored-key"}` +
 		`]}}`
 	cfg := newTestCfg(t, creds)
-	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_MODEL=dotenv-model\nNEO4J_EMBED_BASE_URL=https://dotenv.example/v1\nNEO4J_EMBED_DIMENSIONS=200\nNEO4J_EMBED_API_KEY=dotenv-key\n")
+	withDotenvCwd(t, cfg.Fs(), "NEO4J_EMBED_MODEL=dotenv-model\nNEO4J_EMBED_BASE_URL=https://dotenv.example/v1\nNEO4J_EMBED_DIMENSIONS=200\nNEO4J_EMBED_API_KEY=dotenv-key\n")
 
 	t.Setenv(envEmbedModel, "env-model")
 	t.Setenv(envEmbedBaseURL, "https://env.example/v1")
@@ -585,7 +585,7 @@ func TestResolve_EnvGate_OffProviderViaFlagKeyFromDotenv(t *testing.T) {
 	clearEmbedEnv(t)
 
 	cfg := newTestCfg(t, "{}")
-	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_API_KEY=dotenv-key\n")
+	withDotenvCwd(t, cfg.Fs(), "NEO4J_EMBED_API_KEY=dotenv-key\n")
 
 	cmd := newTestCmd(t, "--embed-provider=openai")
 	got, err := Resolve(cmd, cfg)
@@ -603,7 +603,7 @@ func TestResolve_EnvGate_OnProviderFromEnvKeyFromDotenv(t *testing.T) {
 	t.Setenv(envEmbedProvider, "openai")
 
 	cfg := newTestCfg(t, "{}")
-	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_API_KEY=dotenv-key\n")
+	withDotenvCwd(t, cfg.Fs(), "NEO4J_EMBED_API_KEY=dotenv-key\n")
 
 	cmd := newTestCmd(t)
 	got, err := Resolve(cmd, cfg)
@@ -664,7 +664,7 @@ func TestResolve_EnvGate_OffDotenvUnaffected(t *testing.T) {
 		`"base-url":"https://stored.example/v1","dimensions":100,"api-key":"stored-key"}` +
 		`]}}`
 	cfg := newTestCfg(t, creds)
-	withDotenvCwd(t, cfg.Aura.Fs(), "NEO4J_EMBED_MODEL=dotenv-model\nNEO4J_EMBED_API_KEY=dotenv-key\n")
+	withDotenvCwd(t, cfg.Fs(), "NEO4J_EMBED_MODEL=dotenv-model\nNEO4J_EMBED_API_KEY=dotenv-key\n")
 
 	cmd := newTestCmd(t)
 	got, err := Resolve(cmd, cfg)

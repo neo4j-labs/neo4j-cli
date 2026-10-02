@@ -59,7 +59,7 @@ neo4j-cli desktop list --port 44225`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt(portFlag)
 
 			client, err := newDesktopClientFn(ctx, fs, port)

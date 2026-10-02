@@ -142,7 +142,7 @@ func resolveInstallGates(cmd *cobra.Command) skill.MCPGates {
 }
 
 func runInstallCmd(cfg *clicfg.Config, cmd *cobra.Command, agentFilter string, installAll, useBundle bool) error {
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	gates := resolveInstallGates(cmd)
 
 	if agentFilter != "" {

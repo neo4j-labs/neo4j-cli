@@ -163,7 +163,7 @@ neo4j-cli desktop connection create --name aura-dev --uri neo4j+s://xyz789.datab
 			cmd.SilenceUsage = true
 
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt("port")
 
 			// Password is optional on the flag surface so we can prompt on a

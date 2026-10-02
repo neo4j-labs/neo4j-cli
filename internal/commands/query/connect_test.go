@@ -68,7 +68,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 
 	// Use a mem FS so the test is hermetic regardless of real credentials or
 	// dotenv files on the machine. Write the dotenv at the temp cwd path so
-	// the walk-up logic finds it via cfg.Aura.Fs().
+	// the walk-up logic finds it via cfg.Fs().
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
@@ -107,7 +107,7 @@ func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 
 	// Use a mem FS so the test is hermetic regardless of real credentials on the
 	// machine. Write the dotenv at the temp cwd path so the walk-up logic finds
-	// it via cfg.Aura.Fs().
+	// it via cfg.Fs().
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),

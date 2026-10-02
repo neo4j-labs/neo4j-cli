@@ -134,7 +134,7 @@ func RunChecksForTest(ctx context.Context, cfg *clicfg.Config, pinnedPort int) D
 // checks (data-dir resolution falls back on its own); a miss/failure renders
 // as INFO rather than FAIL. standard_probe runs regardless of the mDNS result.
 func runChecks(ctx context.Context, cfg *clicfg.Config, pinnedPort int) DoctorReport {
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 
 	checks := make([]CheckResult, 0, 7)
 

@@ -66,7 +66,7 @@ func runList(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh b
 	}
 	load.PrintWarn(cmd.ErrOrStderr())
 
-	rows := BuildInventory(cfg.Aura.Fs(), skillName, cfg.Version, load.Cat)
+	rows := BuildInventory(cfg.Fs(), skillName, cfg.Version, load.Cat)
 
 	load.PrintColdCacheHint(cmd.ErrOrStderr(), skillName)
 

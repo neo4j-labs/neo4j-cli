@@ -35,7 +35,7 @@ neo4j-cli desktop dbms delete my-dbms-id --yes --force --format json --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt(portFlag)
 			id := args[0]
 

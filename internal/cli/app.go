@@ -70,7 +70,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	// Compose the root PersistentPreRunE: bind --format, enforce --rw,
 	// then schedule the silent background version-check (5% sample, cached
-	// in version-check.json under cfg.Aura.Fs()) and print the
+	// in version-check.json under cfg.Fs()) and print the
 	// stderr nag if the cache shows a newer stable. Both versioncheck
 	// surfaces are no-ops when NEO4J_CLI_NO_UPDATE_NAG is set; the dice
 	// roll can also short-circuit before any network call. None of this

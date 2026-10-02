@@ -115,7 +115,7 @@ neo4j-cli desktop dbms load neo4j-graph-examples/recommendations --name recs --p
 			}
 
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt(portFlag)
 
 			if dbmsID != "" {

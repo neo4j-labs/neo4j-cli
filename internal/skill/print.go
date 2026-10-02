@@ -65,11 +65,11 @@ func runPrint(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, s
 		return fmt.Errorf("skill: resolve cache root: %w", cerr)
 	}
 	cat := catalog.New(catalog.Options{CacheRoot: cacheRoot, BinaryVersion: cfg.Version})
-	if lerr := cat.Load(cfg.Aura.Fs()); lerr != nil {
+	if lerr := cat.Load(cfg.Fs()); lerr != nil {
 		cat = nil
 	}
 
-	src, _, err := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, skillArg)
+	src, _, err := resolveSkillSource(bundle, cfg.Version, cat, cfg.Fs(), skillName, skillArg)
 	if err != nil {
 		if cat == nil && skillArg != "" && !catalog.IsReserved(skillArg, skillName) && !isAgentName(skillArg) {
 			return clierr.NewUsageError("unknown skill: %s; %s", skillArg, coldCacheHint(skillName))

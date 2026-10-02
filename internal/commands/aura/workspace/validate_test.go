@@ -50,7 +50,7 @@ func buildValidateTestConfig(t *testing.T, serverURL string) *clicfg.Config {
 // AuraConfig.Set writes to the filesystem but does not update viper's in-memory state.
 func readPersistedDefaultWorkspace(t *testing.T, cfg *clicfg.Config) string {
 	t.Helper()
-	raw, err := testfs.GetTestConfig(cfg.Aura.Fs())
+	raw, err := testfs.GetTestConfig(cfg.Fs())
 	require.NoError(t, err)
 	return gjson.Get(raw, "aura.default-workspace").String()
 }

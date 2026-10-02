@@ -66,7 +66,7 @@ func newParamsTestConfig(t *testing.T, payload string) *clicfg.Config {
 	t.Helper()
 
 	cfg := newEndpointTestConfig(t, "")
-	require.NoError(t, afero.WriteFile(cfg.Aura.Fs(), testPayloadFile, []byte(payload), 0600))
+	require.NoError(t, afero.WriteFile(cfg.Fs(), testPayloadFile, []byte(payload), 0600))
 
 	return cfg
 }

@@ -64,7 +64,7 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 				filePresent = map[string]bool{}
 			)
 			if envPath != "" {
-				vals, present, err := envfile.Parse(cfg.Aura.Fs(), envPath)
+				vals, present, err := envfile.Parse(cfg.Fs(), envPath)
 				if err != nil {
 					return err
 				}

@@ -76,7 +76,7 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --descr
 			}
 
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt("port")
 
 			// `--password ""` is the "prompt me" form — relate does not accept

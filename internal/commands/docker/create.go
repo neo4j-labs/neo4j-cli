@@ -327,7 +327,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				if vol.value == "" {
 					continue
 				}
-				resolved, err := resolveHostDir(cmd, cfg.Aura.Fs(), vol.flag, vol.value)
+				resolved, err := resolveHostDir(cmd, cfg.Fs(), vol.flag, vol.value)
 				if err != nil {
 					return err
 				}
@@ -386,13 +386,13 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 			// --ephemeral replaces the standard table/JSON output with a
 			// `.env` file blob suitable for `query --env <path>` (REQ-F-017).
-			// With --env-out-file we write to disk via cfg.Aura.Fs() with 0600
+			// With --env-out-file we write to disk via cfg.Fs() with 0600
 			// perms and stay silent on stdout (so callers can pipe). Without
 			// --env-out-file we emit the blob to stdout.
 			if ephemeral {
 				blob := renderEnvFile(chosenName, image, uri, resolvedPassword)
 				if envOutFile != "" {
-					if err := writeEnvFile(cfg.Aura.Fs(), envOutFile, blob); err != nil {
+					if err := writeEnvFile(cfg.Fs(), envOutFile, blob); err != nil {
 						cmd.SilenceUsage = true
 						return err
 					}
@@ -712,7 +712,7 @@ func validateVersion(version string) (string, error) {
 // the resolved directory exists (creating at mode 0o755 if missing), and
 // narrates a single `info: created host directory <path>` line to stderr
 // when the directory was created. Routing through the supplied afero.Fs keeps
-// unit tests hermetic; production passes cfg.Aura.Fs() which is backed by the
+// unit tests hermetic; production passes cfg.Fs() which is backed by the
 // real OS fs.
 //
 // flagName is only used for error rendering — it identifies which of the

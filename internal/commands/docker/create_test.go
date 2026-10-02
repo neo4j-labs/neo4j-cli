@@ -831,7 +831,7 @@ func TestCreate_NoWait_DoesNotInvokeBoltProbe(t *testing.T) {
 
 // runCreateForEphemeral is the test rig for --ephemeral / --env-out-file cases.
 // It mirrors runCreate but exposes stderr (where the env-file write narration
-// lands) and returns the cfg.Aura.Fs() handle so tests can stat / read any
+// lands) and returns the cfg.Fs() handle so tests can stat / read any
 // file written via the afero seam.
 func runCreateForEphemeral(t *testing.T, args string) (*fakeDockerClient, *clicfg.Config, afero.Fs, string, string, error) {
 	t.Helper()
@@ -863,7 +863,7 @@ func runCreateForEphemeral(t *testing.T, args string) (*fakeDockerClient, *clicf
 	cmd.SetArgs(append([]string{"create"}, argv...))
 
 	execErr := cmd.Execute()
-	return fake, cfg, cfg.Aura.Fs(), out.String(), errBuf.String(), execErr
+	return fake, cfg, cfg.Fs(), out.String(), errBuf.String(), execErr
 }
 
 func TestCreate_Ephemeral_HappyPath_EmitsEnvBlobAndSkipsCredential(t *testing.T) {
@@ -976,8 +976,8 @@ func TestCreate_Ephemeral_EnvOutFile_ChmodsPreexistingFileTo0600(t *testing.T) {
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
 	// Pre-seed the file with a permissive mode so we can verify Chmod ran.
-	require.NoError(t, afero.WriteFile(cfg.Aura.Fs(), envPath, []byte("stale\n"), 0o644))
-	pre, err := cfg.Aura.Fs().Stat(envPath)
+	require.NoError(t, afero.WriteFile(cfg.Fs(), envPath, []byte("stale\n"), 0o644))
+	pre, err := cfg.Fs().Stat(envPath)
 	require.NoError(t, err)
 	require.Equal(t, "-rw-r--r--", pre.Mode().Perm().String(), "preflight: file must be seeded at 0o644")
 
@@ -999,7 +999,7 @@ func TestCreate_Ephemeral_EnvOutFile_ChmodsPreexistingFileTo0600(t *testing.T) {
 
 	require.NoError(t, cmd.Execute())
 
-	info, statErr := cfg.Aura.Fs().Stat(envPath)
+	info, statErr := cfg.Fs().Stat(envPath)
 	require.NoError(t, statErr)
 	assert.Equal(t, "-rw-------", info.Mode().Perm().String(),
 		"pre-existing env-file must be chmod'd to 0o600 (REQ-NF-004); got %s", info.Mode().Perm())

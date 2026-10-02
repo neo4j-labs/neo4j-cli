@@ -63,7 +63,7 @@ func resetOnce(t *testing.T) {
 }
 
 // newTestCfg returns a fresh in-memory clicfg.Config seeded with the given
-// format value. The afero.MemMapFs is reachable via cfg.Aura.Fs().
+// format value. The afero.MemMapFs is reachable via cfg.Fs().
 func newTestCfg(t *testing.T, format string) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs(`{"format":"`+format+`"}`, "{}")
@@ -148,7 +148,7 @@ func TestSchedule_DiceRollHitsAndWritesCache(t *testing.T) {
 	// Goroutine writes asynchronously; allow the writeCache to land.
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if e := readCache(cfg.Aura.Fs()); e != nil {
+		if e := readCache(cfg.Fs()); e != nil {
 			assert.Equal(t, "v0.2.0", e.LatestStable)
 			assert.Equal(t, time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC), e.CheckedAt)
 			return
@@ -167,7 +167,7 @@ func TestSchedule_FreshCacheSkipsNetwork(t *testing.T) {
 
 	cfg := newTestCfg(t, "default")
 	// Pre-seed a fresh cache (1h old, well under the 24h TTL).
-	writeCache(cfg.Aura.Fs(), cacheEntry{
+	writeCache(cfg.Fs(), cacheEntry{
 		CheckedAt:    now.Add(-1 * time.Hour),
 		LatestStable: "v0.2.0",
 	})
@@ -193,7 +193,7 @@ func TestSchedule_StaleCacheTriggersNetwork(t *testing.T) {
 
 	cfg := newTestCfg(t, "default")
 	// Pre-seed a stale cache (25h old, just past the 24h TTL).
-	writeCache(cfg.Aura.Fs(), cacheEntry{
+	writeCache(cfg.Fs(), cacheEntry{
 		CheckedAt:    now.Add(-25 * time.Hour),
 		LatestStable: "v0.0.5",
 	})
@@ -270,7 +270,7 @@ func TestSchedule_LatestErrorIsSilent(t *testing.T) {
 	require.True(t, fired.Load(), "latestFn was never called")
 	// Allow the goroutine to fully unwind (writeCache MUST NOT be called).
 	time.Sleep(100 * time.Millisecond)
-	assert.Nil(t, readCache(cfg.Aura.Fs()), "error path must NOT write the cache")
+	assert.Nil(t, readCache(cfg.Fs()), "error path must NOT write the cache")
 }
 
 // makeRoot constructs a minimal cobra root for MaybeHint tests. It mounts
@@ -314,7 +314,7 @@ func runMaybeHint(t *testing.T, cfg *clicfg.Config, current, subName string) str
 
 func seedCache(t *testing.T, cfg *clicfg.Config, latest string) {
 	t.Helper()
-	writeCache(cfg.Aura.Fs(), cacheEntry{
+	writeCache(cfg.Fs(), cacheEntry{
 		CheckedAt:    time.Now(),
 		LatestStable: latest,
 	})
@@ -430,8 +430,8 @@ func TestMaybeHint_CorruptCacheNoOp(t *testing.T) {
 	cfg := newTestCfg(t, "default")
 	// Write garbage to the cache path.
 	cachePathStr := filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", cacheFileName)
-	require.NoError(t, cfg.Aura.Fs().MkdirAll(filepath.Dir(cachePathStr), 0o700))
-	f, err := cfg.Aura.Fs().Create(cachePathStr)
+	require.NoError(t, cfg.Fs().MkdirAll(filepath.Dir(cachePathStr), 0o700))
+	f, err := cfg.Fs().Create(cachePathStr)
 	require.NoError(t, err)
 	_, err = f.WriteString("{not-json")
 	require.NoError(t, err)
@@ -518,14 +518,14 @@ func TestCacheRoundTrip(t *testing.T) {
 	cfg := newTestCfg(t, "default")
 	now := time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC)
 
-	writeCache(cfg.Aura.Fs(), cacheEntry{CheckedAt: now, LatestStable: "v0.2.0"})
-	got := readCache(cfg.Aura.Fs())
+	writeCache(cfg.Fs(), cacheEntry{CheckedAt: now, LatestStable: "v0.2.0"})
+	got := readCache(cfg.Fs())
 	require.NotNil(t, got)
 	assert.Equal(t, "v0.2.0", got.LatestStable)
 	assert.True(t, got.CheckedAt.Equal(now))
 
 	// File on disk should be valid JSON with the documented field names.
-	raw, err := afero.ReadFile(cfg.Aura.Fs(), cachePath())
+	raw, err := afero.ReadFile(cfg.Fs(), cachePath())
 	require.NoError(t, err)
 	var doc map[string]any
 	require.NoError(t, json.Unmarshal(raw, &doc))

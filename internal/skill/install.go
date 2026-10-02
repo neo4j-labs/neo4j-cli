@@ -106,7 +106,7 @@ func runInstall(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName,
 		return runInstallAll(cmd, cfg, bundle, skillName, agentFilter, cat)
 	}
 
-	src, entry, err := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, skillArg)
+	src, entry, err := resolveSkillSource(bundle, cfg.Version, cat, cfg.Fs(), skillName, skillArg)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func runInstall(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName,
 		installDir = entry.Name
 	}
 
-	targets, ierr := Install(cfg.Aura.Fs(), src, installDir, agentFilter)
+	targets, ierr := Install(cfg.Fs(), src, installDir, agentFilter)
 	if ierr != nil {
 		return formatAgentErr(ierr)
 	}
@@ -136,11 +136,11 @@ func runInstallAll(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillNa
 	var allRows []installResultRow
 	var failures []string
 
-	selfSrc, _, rerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, "")
+	selfSrc, _, rerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Fs(), skillName, "")
 	if rerr != nil {
 		return rerr
 	}
-	selfTargets, err := Install(cfg.Aura.Fs(), selfSrc, skillName, agentFilter)
+	selfTargets, err := Install(cfg.Fs(), selfSrc, skillName, agentFilter)
 	if err != nil {
 		return formatAgentErr(err)
 	}
@@ -150,12 +150,12 @@ func runInstallAll(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillNa
 		if catalog.IsReserved(entry.Name, skillName) {
 			continue
 		}
-		src, _, lerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, entry.Name)
+		src, _, lerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Fs(), skillName, entry.Name)
 		if lerr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", entry.Name, lerr))
 			continue
 		}
-		targets, ierr := Install(cfg.Aura.Fs(), src, entry.Name, agentFilter)
+		targets, ierr := Install(cfg.Fs(), src, entry.Name, agentFilter)
 		if ierr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", entry.Name, formatAgentErr(ierr)))
 			continue

@@ -621,7 +621,7 @@ func refreshSkillBundles(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, s
 	if bundle == nil || skillName == "" {
 		return nil, false
 	}
-	rows, err := listSkillsFn(cfg.Aura.Fs(), skillName)
+	rows, err := listSkillsFn(cfg.Fs(), skillName)
 	if err != nil {
 		// Listing failed (e.g. afero.Fs error) — non-fatal. Don't suggest
 		// install either since we couldn't tell.
@@ -640,7 +640,7 @@ func refreshSkillBundles(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, s
 
 	refreshed := make([]string, 0, len(installed))
 	for _, a := range installed {
-		if _, rerr := installSkillFn(cfg.Aura.Fs(), bundle, skillName, version, a.Name); rerr != nil {
+		if _, rerr := installSkillFn(cfg.Fs(), bundle, skillName, version, a.Name); rerr != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to refresh skill bundle for %s (%s); continuing.\n", a.Name, rerr) //nolint:errcheck // warning to stderr; write errors are not actionable
 			continue
 		}

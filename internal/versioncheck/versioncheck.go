@@ -123,7 +123,7 @@ func scheduleOnce(_ context.Context, cfg *clicfg.Config) {
 	if cfg == nil || cfg.Aura == nil {
 		return
 	}
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	if cached := readCache(fs); cached.fresh(nowFn()) {
 		return
 	}
@@ -182,7 +182,7 @@ func MaybeHint(cmd *cobra.Command, cfg *clicfg.Config, current string) {
 	if current == "" || current == devVersion || !semver.IsValid(current) {
 		return
 	}
-	cached := readCache(cfg.Aura.Fs())
+	cached := readCache(cfg.Fs())
 	if cached == nil {
 		return
 	}

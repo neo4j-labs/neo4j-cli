@@ -46,7 +46,7 @@ neo4j-cli mcp remove --agent claude-desktop --format json --rw`,
 }
 
 func runRemoveCmd(cfg *clicfg.Config, cmd *cobra.Command, agentFilter string) error {
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 
 	var targets []*skill.Agent
 	if agentFilter != "" {

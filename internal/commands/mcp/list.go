@@ -62,7 +62,7 @@ neo4j-cli mcp list --format toon`,
 }
 
 func runListCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	installs := skill.MCPList(fs)
 
 	rows := make(resultRows[mcpListResultRow], 0, len(installs))

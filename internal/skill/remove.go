@@ -86,11 +86,11 @@ func runRemove(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, 
 		return fmt.Errorf("skill: resolve cache root: %w", err)
 	}
 	cat := catalog.New(catalog.Options{CacheRoot: cacheRoot, BinaryVersion: cfg.Version})
-	if lerr := cat.Load(cfg.Aura.Fs()); lerr != nil {
+	if lerr := cat.Load(cfg.Fs()); lerr != nil {
 		cat = nil
 	}
 
-	_, entry, rerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, skillArg)
+	_, entry, rerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Fs(), skillName, skillArg)
 	if rerr != nil {
 		return rerr
 	}
@@ -100,7 +100,7 @@ func runRemove(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, 
 		target = entry.Name
 	}
 
-	targets, ierr := Remove(cfg.Aura.Fs(), target, agentFilter)
+	targets, ierr := Remove(cfg.Fs(), target, agentFilter)
 	if ierr != nil {
 		return formatAgentErr(ierr)
 	}
@@ -127,7 +127,7 @@ func runRemoveAll(cmd *cobra.Command, cfg *clicfg.Config, skillName, agentFilter
 		return fmt.Errorf("skill: resolve cache root: %w", err)
 	}
 	cat := catalog.New(catalog.Options{CacheRoot: cacheRoot, BinaryVersion: cfg.Version})
-	if lerr := cat.Load(cfg.Aura.Fs()); lerr != nil {
+	if lerr := cat.Load(cfg.Fs()); lerr != nil {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "skill catalog cache is empty; nothing to remove\n")
 		return nil
 	}
@@ -140,7 +140,7 @@ func runRemoveAll(cmd *cobra.Command, cfg *clicfg.Config, skillName, agentFilter
 		if catalog.IsReserved(entry.Name, skillName) {
 			continue
 		}
-		targets, rerr := Remove(cfg.Aura.Fs(), entry.Name, agentFilter)
+		targets, rerr := Remove(cfg.Fs(), entry.Name, agentFilter)
 		if rerr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", entry.Name, formatAgentErr(rerr)))
 			continue

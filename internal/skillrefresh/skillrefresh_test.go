@@ -209,7 +209,7 @@ func TestMaybeRefresh_TableDriven(t *testing.T) {
 
 			// Pre-seed the cache if requested.
 			if tc.preSeedVersion != "" {
-				writeCache(cfg.Aura.Fs(), cacheEntry{LastRefreshedVersion: tc.preSeedVersion})
+				writeCache(cfg.Fs(), cacheEntry{LastRefreshedVersion: tc.preSeedVersion})
 			}
 
 			// Track whether install was called.
@@ -257,7 +257,7 @@ func TestMaybeRefresh_TableDriven(t *testing.T) {
 
 			// For refresh cases, wait for the cache version to land.
 			if tc.wantCacheVersion != "" {
-				ok := waitForCacheVersion(t, cfg.Aura.Fs(), tc.wantCacheVersion)
+				ok := waitForCacheVersion(t, cfg.Fs(), tc.wantCacheVersion)
 				require.True(t, ok, "cache was never written with version %s", tc.wantCacheVersion)
 			}
 
@@ -346,7 +346,7 @@ func TestMaybeRefresh_MultipleAgents(t *testing.T) {
 	cmd := makeCmd(stderr)
 	MaybeRefresh(context.Background(), cmd, cfg, nil, "neo4j-cli")
 
-	ok := waitForCacheVersion(t, cfg.Aura.Fs(), "v1.1.0")
+	ok := waitForCacheVersion(t, cfg.Fs(), "v1.1.0")
 	require.True(t, ok, "cache was never written")
 	time.Sleep(50 * time.Millisecond)
 

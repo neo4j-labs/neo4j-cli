@@ -93,7 +93,7 @@ neo4j-cli credential aura-client use personal --rw`,
 				filePresent = map[string]bool{}
 			)
 			if envPath != "" {
-				vals, present, err := envfile.Parse(cfg.Aura.Fs(), envPath)
+				vals, present, err := envfile.Parse(cfg.Fs(), envPath)
 				if err != nil {
 					return err
 				}

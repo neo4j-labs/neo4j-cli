@@ -146,7 +146,7 @@ func TestRecord_WritesFileMode0600(t *testing.T) {
 
 	Record(cfg)
 
-	info, err := cfg.Aura.Fs().Stat(path())
+	info, err := cfg.Fs().Stat(path())
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 }
@@ -172,7 +172,7 @@ func TestLoad_SkipsCorruptLines(t *testing.T) {
 not json at all
 {"time":"2026-06-01T00:01:00Z","command":"neo4j-cli b","invoker":"agent","version":"v1"}
 `
-	require.NoError(t, afero.WriteFile(cfg.Aura.Fs(), path(), []byte(content), 0600))
+	require.NoError(t, afero.WriteFile(cfg.Fs(), path(), []byte(content), 0600))
 
 	entries, err := Load(cfg)
 	require.NoError(t, err)

@@ -61,7 +61,7 @@ neo4j-cli mcp check --format toon`,
 }
 
 func runCheckCmd(cfg *clicfg.Config, cmd *cobra.Command) error {
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	currentBin, err := os.Executable()
 	if err != nil {
 		return clierr.NewFatalError("cannot resolve binary path: %s", err.Error())

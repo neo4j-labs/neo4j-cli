@@ -302,7 +302,7 @@ func TestMakeRawRequest_401ClearsAccessToken(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	assert.Equal(t, `{"errors":[{"message":"unauthorized"}]}`, string(res.Body))
 
-	stored, err := testfs.GetTestCredentials(cfg.Aura.Fs())
+	stored, err := testfs.GetTestCredentials(cfg.Fs())
 	require.NoError(t, err)
 	assert.NotContains(t, stored, "super-secret-token")
 }
@@ -342,7 +342,7 @@ func TestMakeRawRequest_401EphemeralCredential(t *testing.T) {
 	require.NotNil(t, res)
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
-	stored, err := testfs.GetTestCredentials(cfg.Aura.Fs())
+	stored, err := testfs.GetTestCredentials(cfg.Fs())
 	require.NoError(t, err)
 	assert.Equal(t, emptyCreds, stored, "an ephemeral credential must never be persisted")
 }

@@ -296,7 +296,7 @@ func (r *payloadReader) read(flag, source string) ([]byte, error) {
 		return contents, nil
 	}
 
-	contents, err := afero.ReadFile(r.cfg.Aura.Fs(), source)
+	contents, err := afero.ReadFile(r.cfg.Fs(), source)
 	if err != nil {
 		return nil, clierr.NewUsageError("could not read --%s file %q: %s", flag, source, err.Error())
 	}

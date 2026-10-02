@@ -104,7 +104,7 @@ func coldCacheHint(binaryName string) string {
 // The fatal error wraps a UsageError pointing the user at
 // `neo4j-cli skill refresh` per the PRD.
 func loadOrRefreshCatalog(ctx context.Context, cfg *clicfg.Config, opts catalogOpts) (catalogLoad, error) {
-	filesystem := cfg.Aura.Fs()
+	filesystem := cfg.Fs()
 
 	cacheRoot, err := catalogCacheRootFn()
 	if err != nil {

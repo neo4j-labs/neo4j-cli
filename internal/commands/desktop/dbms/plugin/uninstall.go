@@ -50,7 +50,7 @@ neo4j-cli desktop dbms plugin uninstall my-dbms-id --plugin apoc --format json -
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt(portFlag)
 			dbmsID := args[0]
 			if pluginValue == "" {

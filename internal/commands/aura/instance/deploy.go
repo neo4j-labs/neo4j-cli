@@ -291,7 +291,7 @@ func stringField(m map[string]any, key string) string {
 // target, wait for the task to settle, and restore the prior running state. The
 // restore is deferred so it runs even when the upload fails.
 func deployViaDesktop(ctx context.Context, cfg *clicfg.Config, dbmsID, database string, port int, target deployTarget, warnOut io.Writer) error {
-	client, err := newDeployDesktopClient(ctx, cfg.Aura.Fs(), port)
+	client, err := newDeployDesktopClient(ctx, cfg.Fs(), port)
 	if err != nil {
 		return err
 	}

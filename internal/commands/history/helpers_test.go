@@ -38,7 +38,7 @@ func seedEntries(t *testing.T, cfg *clicfg.Config, entries []Entry) {
 		buf.Write(line)
 		buf.WriteByte('\n')
 	}
-	require.NoError(t, afero.WriteFile(cfg.Aura.Fs(), path(), buf.Bytes(), 0600))
+	require.NoError(t, afero.WriteFile(cfg.Fs(), path(), buf.Bytes(), 0600))
 }
 
 // runCmd executes a leaf command with the given args, capturing stdout+stderr.

@@ -77,6 +77,7 @@ test/e2e/               # build-tagged end-to-end suites
 ```
 
 - **Import-cycle rule**: `internal/clicfg` is the base of the graph. Helpers reachable from `clicfg.NewConfig` must not import `clicfg` back, and once clicfg depends on a helper, that helper's tests can't import clicfg/testfs (import cycle) — seed memFs with a hard-coded relative path. Command packages (`internal/commands/...`) depend on service/domain packages, never the reverse.
+- **Config access**: `*clicfg.Config` is the app-wide handle (335 funcs take it) — don't add another sprawl of fields. The filesystem is `cfg.Fs()` (never `cfg.Aura.Fs()`, which no longer exists); `cfg.Aura` is for Aura-only settings, `cfg.Global` for user-level keys, `cfg.Credentials` for stored creds. New service-layer code should take the narrowest thing it needs (an `afero.Fs`, a small interface, or a plain value) rather than the whole `*Config`, and narrow existing signatures opportunistically when touching them.
 - **Skill subsystem**: `internal/skill/` = binary-agnostic logic; `internal/skill/neo4jcli/` = per-binary template (`embed.go`, `description.txt`, `additions.md`, `gen/main.go`, committed `bundle/`). New CLI = copy template, edit 3 files, mount `skill.NewCmd(...)`, `go generate`. No edits to the generic `internal/skill/` logic. See `CONTRIBUTING.md`.
 - **CLI conventions**: singular nouns; `<resource> <action>`; ≤1 positional (extras → flags); `--format json|table|toon` on reads; `--wait` for async. Follow https://clig.dev/.
 

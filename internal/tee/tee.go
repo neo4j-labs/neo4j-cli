@@ -90,7 +90,7 @@ func Save(cfg *clicfg.Config, commandSlug string, content []byte) (string, error
 	if limit <= 0 {
 		return "", nil
 	}
-	fs := cfg.Aura.Fs()
+	fs := cfg.Fs()
 	if fs == nil {
 		return "", nil
 	}

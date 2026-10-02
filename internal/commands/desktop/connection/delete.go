@@ -50,7 +50,7 @@ neo4j-cli desktop connection delete f4e2f3c0-1111-2222-3333-444455556666 --yes -
 			}
 
 			ctx := cmd.Context()
-			fs := cfg.Aura.Fs()
+			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt("port")
 
 			client, err := newDesktopClientFn(ctx, fs, port)
