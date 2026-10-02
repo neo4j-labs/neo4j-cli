@@ -47,7 +47,7 @@ func TestBundleWalkAtRoot(t *testing.T) {
 
 // TestInstallE2E exercises the real exported Bundle through the installer
 // against an afero.MemMapFs. This is the regression test for the
-// real-world bug where `./neo4j-cli skill install claude-code` wrote to
+// real-world bug where `neo4j-cli skill install claude-code` wrote to
 // `~/.claude/skills/neo4j-cli/bundle/SKILL.md` and never substituted
 // {{VERSION}}.
 func TestInstallE2E(t *testing.T) {

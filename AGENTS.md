@@ -54,7 +54,7 @@ TESTING FRAMEWORKS: [Go testing, testify, afero in-memory FS]. See [`.agents/tes
 
 ARCHITECTURE PATTERN: Cobra command tree — one file per leaf, dirs mirror command hierarchy. See [`.agents/architecture.md`](.agents/architecture.md), [`.agents/repo-layout.md`](.agents/repo-layout.md).
 
-One binary: `neo4j-cli` (`neo4j-cli/main.go`); Aura tree lives under the `aura` subcommand.
+One binary: `neo4j-cli` (`cmd/neo4j-cli/main.go`); Aura tree lives under the `aura` subcommand.
 
 ```
 neo4j-cli/

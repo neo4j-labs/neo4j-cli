@@ -15,7 +15,7 @@ before:
     - go mod tidy
 
 builds:
-  - main: ./neo4j-cli
+  - main: ./cmd/neo4j-cli
     id: neo4j-cli
     binary: neo4j-cli
     env:

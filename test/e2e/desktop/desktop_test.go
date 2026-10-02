@@ -92,7 +92,7 @@ func runMain(m *testing.M) (int, error) {
 	binPath = filepath.Join(dir, cliName)
 	fixtureBin = filepath.Join(dir, fixName)
 
-	build := exec.Command("go", "build", "-tags", "e2e_desktop_seams", "-o", binPath, "./neo4j-cli")
+	build := exec.Command("go", "build", "-tags", "e2e_desktop_seams", "-o", binPath, "./cmd/neo4j-cli")
 	build.Dir = root
 	build.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if combined, buildErr := build.CombinedOutput(); buildErr != nil {
