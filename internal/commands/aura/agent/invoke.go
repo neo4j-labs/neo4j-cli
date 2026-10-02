@@ -6,7 +6,6 @@ package agent
 import (
 	"fmt"
 	"github.com/neo4j/cli/internal/auraclient"
-	"log"
 	"strings"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -58,9 +57,7 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 
 	cmd.Flags().StringVar(&input, inputFlag, "", "(required) Input message to send to the agent")
 
-	if err := cmd.MarkFlagRequired(inputFlag); err != nil {
-		log.Fatal(err)
-	}
+	cmd.MarkFlagRequired(inputFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	return cmd
 }

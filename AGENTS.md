@@ -153,6 +153,8 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - Thread `ctx` into anything that blocks: the Aura transport (`api.MakeRequest`/`MakeRawRequest`/`ListAllPages`/`Poll*`, token mint) takes it first and uses `NewRequestWithContext`; polling waits via `sleepCtx`. A cancelled request returns the context error (not an "upstream error"). Use `cmd.Context()` in leaves, never `context.Background()`.
 - A recovered panic is a FAILURE: `cli.guarded` renders a panicked `*clierr.CLIError` like a returned one (its own exit code); anything else prints the redacted diagnostic to stderr and exits 1. Never rely on a panic to signal an error — return a `clierr` (network and token-mint failures are `NewUpstreamError`, exit 8).
 
+- Never `log.Fatal` in command code: it exits without `clierr.Render`, panic recovery, `clievents` flushing or secret redaction (`forbidigo` in `.golangci.yml` enforces this). Return an error. `cmd.MarkFlagRequired(...)` can only fail for a flag name that does not exist (a startup programming error), so call it as `cmd.MarkFlagRequired(name) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup`.
+
 ## Tee-on-failure
 
 - Failing commands tee redacted output to `internal/tee` (`ConfigPrefix/neo4j/cli/tee/`); `tee_path` in error envelope. Root sets `SilenceErrors: true`, so `clierr.Render` runs AFTER capture is read in `cli.Run` (`internal/cli/run.go`) — `teeContent` appends `err.Error()` to captured bytes before `tee.Save`. Preserve that or no-intermediate-output failures tee empty.

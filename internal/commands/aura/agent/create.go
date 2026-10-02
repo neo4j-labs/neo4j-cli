@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/neo4j/cli/internal/auraclient"
-	"log"
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/output"
@@ -93,9 +92,7 @@ neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000
 	cmd.Flags().BoolVar(&enabled, enabledFlag, true, "Whether the agent is enabled")
 
 	for _, f := range []string{nameFlag, descriptionFlag, dbidFlag, toolsFlag} {
-		if err := cmd.MarkFlagRequired(f); err != nil {
-			log.Fatal(err)
-		}
+		cmd.MarkFlagRequired(f) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 	}
 
 	return cmd

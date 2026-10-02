@@ -11,8 +11,17 @@ linters:
     - staticcheck
     - unused
     - depguard
+    - forbidigo
 
   settings:
+    forbidigo:
+      forbid:
+        # log.Fatal exits the process directly, skipping clierr.Render, panic
+        # recovery, event flushing and secret redaction. Return an error instead
+        # (or //nolint:errcheck for MarkFlagRequired, which cannot fail for a
+        # flag that exists).
+        - pattern: '^log\.(Fatal|Fatalf|Fatalln)$'
+          msg: return an error instead of log.Fatal so the error pipeline (render, flush, redaction) runs
     depguard:
       rules:
         # Layering: service/domain packages (aura api, dbconn, clicfg, ...) must
