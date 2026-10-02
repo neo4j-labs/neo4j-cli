@@ -4,7 +4,7 @@
 package virtualgraph
 
 import (
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -36,18 +36,11 @@ neo4j-cli aura virtual-graph allowed-configs --format json | jq -r '.data.config
 				return err
 			}
 
-			path := api.ScopedVirtualGraphAllowedConfigsPath(orgID, projectID)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodGet,
-				Version: api.AuraApiVersion2,
-			})
+			configs, err := aura.New(cfg).VirtualGraphs().AllowedConfigs(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID})
 			if err != nil {
 				return err
 			}
-
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"default_memory", "configs"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(configs), []string{"default_memory", "configs"})
 			return nil
 		},
 	}

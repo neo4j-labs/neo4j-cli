@@ -4,7 +4,7 @@
 package session
 
 import (
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -37,26 +37,15 @@ Use --organization-id and --project-id to specify which project's sessions to li
 				return err
 			}
 
-			path := api.ScopedSessionsPath(orgID, projectID)
-
-			var queryParams map[string]string
-			if instanceId != "" {
-				queryParams = map[string]string{"instanceId": instanceId}
-			}
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:      http.MethodGet,
-				Version:     api.AuraApiVersion2,
-				QueryParams: queryParams,
-			})
+			sessions, err := aura.New(cfg).Sessions().List(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, instanceId)
 			if err != nil {
 				return err
 			}
-
-			if statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				normalized := utils.NormalizeV2Beta1Response(responseData)
-				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "status", "project_id", "cloud_provider", "ttl"})
+			rows := make([]map[string]any, len(sessions))
+			for i, sess := range sessions {
+				rows[i] = sess.Record
 			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "status", "project_id", "cloud_provider", "ttl"})
 			return nil
 		},
 	}

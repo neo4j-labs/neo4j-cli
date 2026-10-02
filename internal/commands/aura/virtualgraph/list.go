@@ -5,11 +5,11 @@ package virtualgraph
 
 import (
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -42,24 +42,21 @@ neo4j-cli aura virtual-graph list --limit 10 --format json`,
 				return err
 			}
 
-			if limit < 0 {
-				return clierr.NewUsageError("--limit must be zero or greater; zero returns every virtual graph")
-			}
-
-			path := api.ScopedVirtualGraphsPath(orgID, projectID)
-			result, err := api.ListAllPages(cfg, path, api.AuraApiVersion2, limit)
+			page, err := aura.New(cfg).VirtualGraphs().List(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, limit)
 			if err != nil {
 				return err
 			}
 
-			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(result.Items), summaryFields)
+			rows := make([]map[string]any, len(page.Items))
+			for i, vg := range page.Items {
+				rows[i] = vg.Record
+			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), summaryFields)
 
-			// Both notices go to stderr so stdout stays a clean, pipeable envelope.
-			// Staying silent here would make a partial list read as a complete one.
-			if result.LimitReached {
+			if page.LimitReached {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Showing the first %d virtual graphs; more are available. Raise or omit --limit to see them all.\n", limit) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
-			if result.PageCapReached {
+			if page.PageCapReached {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Stopped after %d pages, so this list may be incomplete.\n", api.MaxListPages) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 

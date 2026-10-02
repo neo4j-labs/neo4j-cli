@@ -5,7 +5,7 @@ package session
 
 import (
 	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -63,59 +63,35 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 				return err
 			}
 
-			body := map[string]any{
-				"name":      name,
-				"memory":    memory,
-				"tenant_id": projectID,
-			}
-
-			if ttl != "" {
-				body["ttl"] = ttl
-			}
-
-			if instance_id != "" {
-				body["instance_id"] = instance_id
-			}
-
-			if cloudProvider != "" {
-				body["cloud_provider"] = cloudProvider
-			}
-
-			if region != "" {
-				body["region"] = region
-			}
-			path := api.ScopedSessionsPath(orgID, projectID)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				PostBody: body,
-				Method:   http.MethodPost,
-				Version:  api.AuraApiVersion2,
+			scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
+			sessions := aura.New(cfg).Sessions()
+			sess, err := sessions.Create(cmd.Context(), scope, aura.SessionCreate{
+				Name:          name,
+				Memory:        memory,
+				TTL:           ttl,
+				InstanceID:    instance_id,
+				CloudProvider: cloudProvider,
+				Region:        region,
 			})
 			if err != nil {
 				return err
 			}
 
-			// NOTE: Return 202 if new session gets created and 200 if existing session was found
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				normalized := utils.NormalizeV2Beta1Response(responseData)
-				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "project_id", "memory", "status", "created_at"})
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(sess.Record), []string{"id", "name", "project_id", "memory", "status", "created_at"})
 
-				if wait {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
+			if wait {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
-					status := normalized.AsArray()[0]["status"]
-					sessionID := normalized.AsArray()[0]["id"].(string)
-					if status == "Ready" {
-						return nil
-					}
-
-					pollResponse, err := api.PollGraphAnalyticsSessionReady(cfg, orgID, projectID, sessionID, api.GraphAnalyticsSessionWaitingStatus)
-					if err != nil {
-						return err
-					}
-
-					fmt.Fprintln(cmd.ErrOrStderr(), "Session Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+				if sess.Status == aura.SessionStatusReady {
+					return nil
 				}
+
+				status, err := sessions.WaitUntilReady(cmd.Context(), scope, sess.ID)
+				if err != nil {
+					return err
+				}
+
+				fmt.Fprintln(cmd.ErrOrStderr(), "Session Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 
 			return nil

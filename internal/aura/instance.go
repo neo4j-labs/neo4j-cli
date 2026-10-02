@@ -36,9 +36,16 @@ type Instance struct {
 	Record map[string]any
 }
 
-func newInstance(raw map[string]any) Instance {
+// normalizeV2Beta1 applies the renames shared by every v2beta1 resource:
+// legacy_status->status and tenant_id->project_id, a native value winning over
+// its legacy twin. The input is not modified.
+func normalizeV2Beta1(raw map[string]any) map[string]any {
 	rec := RenameKey(raw, "legacy_status", "status", true)
-	rec = RenameKey(rec, "tenant_id", "project_id", true)
+	return RenameKey(rec, "tenant_id", "project_id", true)
+}
+
+func newInstance(raw map[string]any) Instance {
+	rec := normalizeV2Beta1(raw)
 	return Instance{
 		ID:             str(rec, "id"),
 		Name:           str(rec, "name"),

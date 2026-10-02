@@ -5,7 +5,6 @@ package virtualgraph
 
 import (
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -59,21 +58,10 @@ while neo4j-cli aura virtual-graph get ge82059a > /dev/null 2>&1; do sleep 5; do
 				return err
 			}
 
-			path := api.ScopedVirtualGraphPath(orgID, projectID, virtualGraphID)
-			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodDelete,
-				Version: api.AuraApiVersion2,
-			})
-			if err != nil {
+			if err := aura.New(cfg).VirtualGraphs().Delete(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID); err != nil {
 				return err
 			}
-
-			// DELETE acknowledges with 202 and an empty body, and a follow-up GET
-			// 404s, so echo the accepted id rather than printing nothing or
-			// re-reading a resource that is already gone.
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(map[string]any{"id": virtualGraphID}), []string{"id"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(map[string]any{"id": virtualGraphID}), []string{"id"})
 
 			return nil
 		},

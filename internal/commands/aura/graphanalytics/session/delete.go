@@ -5,7 +5,6 @@ package session
 
 import (
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -43,25 +42,16 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 				return err
 			}
 
-			if err := aura.ValidateResourceID("session", sessionID); err != nil {
-				return err
-			}
-
 			if err := confirm.Require(cmd, sessionID); err != nil {
 				return err
 			}
 
-			path := api.ScopedSessionPath(orgID, projectID, sessionID)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodDelete,
-				Version: api.AuraApiVersion2,
-			})
+			rec, err := aura.New(cfg).Sessions().Delete(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, sessionID)
 			if err != nil {
 				return err
 			}
-
-			if statusCode == http.StatusAccepted {
-				output.PrintBody(cmd, cfg, resBody, []string{"id"})
+			if rec != nil {
+				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(rec), []string{"id"})
 			}
 			return nil
 		},

@@ -4,6 +4,7 @@
 package virtualgraph
 
 import (
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -36,16 +37,13 @@ neo4j-cli aura virtual-graph get ge82059a --organization-id 00000000-0000-0000-0
 				return err
 			}
 
-			resBody, err := utils.FetchScopedVirtualGraph(cfg, orgID, projectID, virtualGraphID)
+			vg, err := aura.New(cfg).VirtualGraphs().Get(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID)
 			if err != nil {
 				return err
 			}
 
-			if resBody == nil {
-				return nil
-			}
-
-			return printVirtualGraph(cmd, cfg, resBody)
+			printVirtualGraph(cmd, cfg, vg)
+			return nil
 		},
 	}
 }

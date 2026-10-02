@@ -5,14 +5,11 @@ package virtualgraph
 
 import (
 	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	auraflags "github.com/neo4j/cli/internal/aura/flags"
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
-	"github.com/neo4j/cli/internal/clievents"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -68,71 +65,43 @@ neo4j-cli aura virtual-graph create --rw --name bq-analytics --data-source-id ds
 
 			// project_id is NOT sent: the API derives the owning project from the
 			// org/project-scoped path and the caller's token.
-			body := map[string]any{
-				"name":            name,
-				"data_source_id":  dataSourceID,
-				"import_model_id": importModelID,
-				"cloud_provider":  cloudProvider.String(),
-				"region":          region,
+			spec := aura.VirtualGraphCreate{
+				Name:          name,
+				DataSourceID:  dataSourceID,
+				ImportModelID: importModelID,
+				CloudProvider: cloudProvider.String(),
+				Region:        region,
+				Memory:        memory,
 			}
-
-			if memory != "" {
-				body["memory"] = memory
-			}
-
-			// Sent only when explicitly given so a zero value is never mistaken for
-			// "cap every query at 0 bytes"; omitting it lets the API apply its default.
 			if cmd.Flags().Changed(maximumBytesBilledFlag) {
-				body["maximum_bytes_billed"] = maximumBytesBilled
+				spec.MaximumBytesBilled = &maximumBytesBilled
 			}
 
-			path := api.ScopedVirtualGraphsPath(orgID, projectID)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:   http.MethodPost,
-				PostBody: body,
-				Version:  api.AuraApiVersion2,
-			})
+			scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
+			virtualGraphs := aura.New(cfg).VirtualGraphs()
+			vg, err := virtualGraphs.Create(cmd.Context(), scope, spec)
 			if err != nil {
 				return err
 			}
 
-			if statusCode != http.StatusAccepted && statusCode != http.StatusOK {
-				return nil
-			}
-
-			responseData := api.ParseBody(resBody)
-			virtualGraph, err := responseData.GetSingleOrError()
-			if err != nil {
-				return err
-			}
-
-			// The password is printed (once) for the user, but on a later --wait
-			// failure the captured output is teed to disk. Register the literal value
-			// so tee redaction scrubs it from formats the shape-based regexes can't
-			// reach (notably the table-cell layout).
-			if password, ok := virtualGraph["plain_password"].(string); ok {
-				clievents.RegisterSecretValue(password)
-			}
-
-			output.PrintBodyMap(cmd, cfg, responseData, detailFieldsFor(virtualGraph, "plain_password"))
+			printVirtualGraph(cmd, cfg, vg, "plain_password")
 
 			if !wait {
 				return nil
 			}
 
-			virtualGraphID, ok := virtualGraph["id"].(string)
-			if !ok {
+			if vg.ID == "" {
 				return clierr.NewUpstreamError("create response did not carry a virtual graph id, cannot wait")
 			}
 
 			fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for virtual graph to be running...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
-			pollResponse, err := api.PollVirtualGraph(cfg, orgID, projectID, virtualGraphID, api.VirtualGraphStatusCreating)
+			status, err := virtualGraphs.WaitWhile(cmd.Context(), scope, vg.ID, aura.VirtualGraphStatusCreating)
 			if err != nil {
 				return err
 			}
 
-			fmt.Fprintln(cmd.ErrOrStderr(), "Virtual Graph Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+			fmt.Fprintln(cmd.ErrOrStderr(), "Virtual Graph Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 
 			return nil
 		},

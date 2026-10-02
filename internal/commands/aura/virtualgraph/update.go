@@ -5,10 +5,8 @@ package virtualgraph
 
 import (
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
@@ -52,46 +50,17 @@ neo4j-cli aura virtual-graph update ge82059a --import-model-id im-xyz789 --rw --
 				return err
 			}
 
-			if err := aura.ValidateResourceID(resourceName, virtualGraphID); err != nil {
-				return err
-			}
-
-			body := map[string]any{}
-
-			if name != "" {
-				body["name"] = name
-			}
-
-			if memory != "" {
-				body["memory"] = memory
-			}
-
-			if importModelID != "" {
-				body["import_model_id"] = importModelID
-			}
-
-			path := api.ScopedVirtualGraphPath(orgID, projectID, virtualGraphID)
-			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:   http.MethodPatch,
-				PostBody: body,
-				Version:  api.AuraApiVersion2,
+			vg, err := aura.New(cfg).VirtualGraphs().Update(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID, aura.VirtualGraphPatch{
+				Name:          name,
+				Memory:        memory,
+				ImportModelID: importModelID,
 			})
 			if err != nil {
 				return err
 			}
 
-			if statusCode != http.StatusAccepted && statusCode != http.StatusOK {
-				return nil
-			}
-
-			// PATCH acknowledges with 202 and an empty body, so re-read the resource
-			// rather than printing nothing.
-			resBody, err := utils.FetchScopedVirtualGraph(cfg, orgID, projectID, virtualGraphID)
-			if err != nil {
-				return err
-			}
-
-			return printVirtualGraph(cmd, cfg, resBody)
+			printVirtualGraph(cmd, cfg, vg)
+			return nil
 		},
 	}
 

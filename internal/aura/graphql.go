@@ -279,7 +279,11 @@ func (s graphqlService) one(method, path string, body map[string]any, doing stri
 	if err != nil {
 		return nil, err
 	}
-	g := newGraphQL(rows[0])
+	rec, err := single(rows, doing)
+	if err != nil {
+		return nil, err
+	}
+	g := newGraphQL(rec)
 	return &g, nil
 }
 
@@ -368,7 +372,11 @@ func (s authProviderService) one(method, path string, body map[string]any, doing
 	if err != nil {
 		return nil, err
 	}
-	ap := newAuthProvider(rows[0])
+	rec, err := single(rows, doing)
+	if err != nil {
+		return nil, err
+	}
+	ap := newAuthProvider(rec)
 	return &ap, nil
 }
 

@@ -34,6 +34,8 @@ type Client interface {
 	Instances() InstanceService
 	Agents() AgentService
 	GraphQL() GraphQLService
+	VirtualGraphs() VirtualGraphService
+	Sessions() SessionService
 }
 
 // New returns a Client backed by the Aura HTTP API using cfg's credentials and
@@ -89,6 +91,14 @@ func (c *httpClient) Agents() AgentService {
 
 func (c *httpClient) GraphQL() GraphQLService {
 	return graphqlService{cfg: c.cfg}
+}
+
+func (c *httpClient) VirtualGraphs() VirtualGraphService {
+	return virtualGraphService{cfg: c.cfg}
+}
+
+func (c *httpClient) Sessions() SessionService {
+	return sessionService{cfg: c.cfg}
 }
 
 var (

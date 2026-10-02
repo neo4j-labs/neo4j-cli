@@ -4,6 +4,7 @@
 package session
 
 import (
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -35,29 +36,25 @@ neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 
 			if err != nil {
 				return err
 			}
-			resBody, err := utils.FetchScopedSession(cfg, orgID, projectID, sessionID)
+			sess, err := aura.New(cfg).Sessions().Get(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, sessionID)
 			if err != nil {
 				return err
 			}
 
-			if resBody != nil {
-				responseData := api.ParseBody(resBody)
-				normalized := utils.NormalizeV2Beta1Response(responseData)
-				output.PrintBodyMap(cmd, cfg, normalized, []string{
-					"id",
-					"name",
-					"memory",
-					"status",
-					"created_at",
-					"user_id",
-					"project_id",
-					"cloud_provider",
-					"region",
-					"host",
-					"expiry_date",
-					"instance_id",
-				})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(sess.Record), []string{
+				"id",
+				"name",
+				"memory",
+				"status",
+				"created_at",
+				"user_id",
+				"project_id",
+				"cloud_provider",
+				"region",
+				"host",
+				"expiry_date",
+				"instance_id",
+			})
 			return nil
 		},
 	}
