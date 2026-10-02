@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package graphql
+package aura
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDefaultGraphQLName(t *testing.T) {
+func TestDefaultName(t *testing.T) {
 	testCases := []struct {
 		name          string
 		existingNames []string
@@ -76,8 +76,13 @@ func TestDefaultGraphQLName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := defaultGraphQLName(tc.existingNames)
+			got := DefaultName("GraphQL", tc.existingNames)
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestDefaultName_UsesPrefix(t *testing.T) {
+	assert.Equal(t, "Instance01", DefaultName("Instance", nil))
+	assert.Equal(t, "Instance02", DefaultName("Instance", []string{"instance01", "GraphQL02"}))
 }

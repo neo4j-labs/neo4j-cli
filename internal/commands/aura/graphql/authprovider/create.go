@@ -4,16 +4,13 @@
 package authprovider
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/clievents"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -73,59 +70,36 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-			if err != nil {
-				return err
-			}
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
 				return err
 			}
 
-			body := map[string]any{
-				"type":    _type,
-				"name":    name,
-				"enabled": !disabled,
-			}
-
-			if url != "" {
-				body["url"] = url
-			}
-
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers", instanceId, dataApiId)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				PostBody: body,
-				Method:   http.MethodPost,
-				Version:  api.AuraApiVersionBeta1,
+			p, err := aura.New(cfg).GraphQL().AuthProviders().Create(cmd.Context(), instanceId, dataApiId, aura.AuthProviderSpec{
+				Type:    string(_type),
+				Name:    name,
+				Enabled: !disabled,
+				URL:     url,
 			})
 			if err != nil {
 				return err
 			}
 
-			// NOTE: Auth provider create should not return OK (200), it always returns 202, checking both just in case
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
+			if _type == api.GraphQLDataApiAuthProviderTypeApiKey {
+				fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
+				fmt.Fprintln(cmd.ErrOrStderr(), "# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.") //nolint:errcheck // narration to stderr; write errors are not actionable
+				fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
+			}
 
-				if _type == api.GraphQLDataApiAuthProviderTypeApiKey {
-					fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
-					fmt.Fprintln(cmd.ErrOrStderr(), "# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(p.Record), []string{"id", "name", "type", "enabled", "key", "url"})
 
-					var resp struct{ Data struct{ Key string } }
-					if json.Unmarshal(resBody, &resp) == nil && resp.Data.Key != "" {
-						clievents.RegisterSecretValue(resp.Data.Key)
-					}
+			if wait {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
+				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, dataApiId, aura.GraphQLStatusCreating)
+				if err != nil {
+					return err
 				}
 
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "type", "enabled", "key", "url"})
-
-				if wait {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, dataApiId, api.GraphQLDataApiStatusCreating)
-					if err != nil {
-						return err
-					}
-
-					fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
-				}
+				fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 			return nil
 		},

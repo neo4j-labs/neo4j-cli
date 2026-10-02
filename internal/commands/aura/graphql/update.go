@@ -6,7 +6,6 @@ package graphql
 import (
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -59,56 +58,33 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account 
 				return fmt.Errorf("invalid --service-account value %q: must be read_only or read_write", serviceAccount)
 			}
 
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-			if err != nil {
-				return err
-			}
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
 				return err
 			}
 
-			body := map[string]any{}
-
-			if name != "" {
-				body["name"] = name
-			}
-
+			patch := aura.GraphQLPatch{Name: name, ServiceAccount: serviceAccount}
 			if typeDefs != "" || typeDefsFile != "" {
 				base64EncodedTypeDefs, err := GetTypeDefsFromFlag(cfg, typeDefs, typeDefsFile)
 				if err != nil {
 					return err
 				}
-				body["type_definitions"] = base64EncodedTypeDefs
+				patch.TypeDefinitions = base64EncodedTypeDefs
 			}
 
-			if serviceAccount != "" {
-				body["aura_instance"] = map[string]string{"service_account": serviceAccount}
-			}
-
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphqlId)
-
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:   http.MethodPatch,
-				PostBody: body,
-				Version:  api.AuraApiVersionBeta1,
-			})
+			g, err := aura.New(cfg).GraphQL().Update(cmd.Context(), instanceId, graphqlId, patch)
 			if err != nil {
 				return err
 			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(g.Record), []string{"id", "name", "status", "url"})
 
-			// NOTE: GraphQL Data API update should not return OK (200), it always returns 202, checking both just in case
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
-
-				if wait {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be updated...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, graphqlId, api.GraphQLDataApiStatusUpdating)
-					if err != nil {
-						return err
-					}
-
-					fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+			if wait {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be updated...") //nolint:errcheck // narration to stderr; write errors are not actionable
+				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, graphqlId, aura.GraphQLStatusUpdating)
+				if err != nil {
+					return err
 				}
+
+				fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 			return nil
 		},

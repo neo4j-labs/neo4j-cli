@@ -4,9 +4,7 @@
 package authprovider
 
 import (
-	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -34,23 +32,18 @@ neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 1
 neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
+				return err
+			}
+			providers, err := aura.New(cfg).GraphQL().AuthProviders().List(cmd.Context(), instanceId, dataApiId)
 			if err != nil {
 				return err
 			}
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
-				return err
+			rows := make([]map[string]any, len(providers))
+			for i, p := range providers {
+				rows[i] = p.Record
 			}
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers", instanceId, dataApiId)
-
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{Method: http.MethodGet, Version: api.AuraApiVersionBeta1})
-			if err != nil {
-				return err
-			}
-
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "type", "enabled", "url"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "type", "enabled", "url"})
 			return nil
 		},
 	}

@@ -125,6 +125,9 @@ func (s instanceService) transition(ctx context.Context, scope Scope, id, action
 }
 
 func (s instanceService) Verify(_ context.Context, scope Scope, id string) error {
+	if err := ValidateResourceID("instance", id); err != nil {
+		return err
+	}
 	body, status, err := api.MakeRequest(s.cfg, fmt.Sprintf("/instances/%s", id), &api.RequestConfig{
 		Method: http.MethodGet,
 	})

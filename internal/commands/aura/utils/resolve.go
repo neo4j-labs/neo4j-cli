@@ -268,3 +268,20 @@ func FetchAndVerifyCMKInProject(cfg *clicfg.Config, cmkID, projectID string) ([]
 
 	return resBody, nil
 }
+
+// ResolveAndVerifyInstance resolves the organization and project (flags, then
+// the default workspace), validates them, and checks that the instance belongs
+// to the project. It is the single preflight for leaves that operate on
+// instance-scoped endpoints which are not themselves project-scoped (the
+// GraphQL Data API family, snapshots, ...).
+func ResolveAndVerifyInstance(cmd *cobra.Command, cfg *clicfg.Config, instanceID string) (aura.Scope, error) {
+	orgID, projectID, err := ResolveAndValidateOrgProject(cmd, cfg)
+	if err != nil {
+		return aura.Scope{}, err
+	}
+	scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
+	if err := aura.New(cfg).Instances().Verify(cmd.Context(), scope, instanceID); err != nil {
+		return aura.Scope{}, err
+	}
+	return scope, nil
+}

@@ -4,9 +4,7 @@
 package graphql
 
 import (
-	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -31,22 +29,18 @@ neo4j-cli aura graphql list --instance-id 00000000
 neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
+				return err
+			}
+			apis, err := aura.New(cfg).GraphQL().List(cmd.Context(), instanceId)
 			if err != nil {
 				return err
 			}
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
-				return err
+			rows := make([]map[string]any, len(apis))
+			for i, a := range apis {
+				rows[i] = a.Record
 			}
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql", instanceId)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{Method: http.MethodGet, Version: api.AuraApiVersionBeta1})
-			if err != nil {
-				return err
-			}
-
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "status", "url"})
 			return nil
 		},
 	}

@@ -6,7 +6,6 @@ package graphql
 import (
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -42,36 +41,23 @@ neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --wait --organizati
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			graphqlId := strings.TrimSpace(args[0])
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
+				return err
+			}
+			g, err := aura.New(cfg).GraphQL().Pause(cmd.Context(), instanceId, graphqlId)
 			if err != nil {
 				return err
 			}
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
-				return err
-			}
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/pause", instanceId, graphqlId)
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(g.Record), []string{"id", "name", "status", "url"})
 
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodPost,
-				Version: api.AuraApiVersionBeta1,
-			})
-			if err != nil {
-				return err
-			}
-
-			// NOTE: pause should not return OK (200), it always returns 202, checking both just in case
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
-
-				if wait {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be paused...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, graphqlId, api.GraphQLDataApiStatusPausing)
-					if err != nil {
-						return err
-					}
-
-					fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+			if wait {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be paused...") //nolint:errcheck // narration to stderr; write errors are not actionable
+				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, graphqlId, aura.GraphQLStatusPausing)
+				if err != nil {
+					return err
 				}
+
+				fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 			return nil
 		},

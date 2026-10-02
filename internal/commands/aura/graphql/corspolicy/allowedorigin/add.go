@@ -6,7 +6,6 @@ package allowedorigin
 import (
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -52,15 +51,11 @@ neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --
 			cmd.SilenceUsage = true
 			newOrigin := strings.TrimSpace(args[0])
 
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-			if err != nil {
-				return err
-			}
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
 				return err
 			}
 
-			existingOrigins, err := getExistingOrigins(cfg, dataApiId, instanceId)
+			existingOrigins, err := aura.New(cfg).GraphQL().AllowedOrigins(cmd.Context(), instanceId, dataApiId)
 			if err != nil {
 				return err
 			}
@@ -73,36 +68,21 @@ neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --
 
 			newOrigins := append(existingOrigins, newOrigin)
 
-			body := map[string]any{
-				"security": map[string]any{
-					"cors_policy": map[string]any{
-						"allowed_origins": newOrigins,
-					},
-				},
-			}
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, dataApiId)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				PostBody: body,
-				Method:   http.MethodPatch,
-				Version:  api.AuraApiVersionBeta1,
-			})
+			g, err := aura.New(cfg).GraphQL().SetAllowedOrigins(cmd.Context(), instanceId, dataApiId, newOrigins)
 			if err != nil {
 				return err
 			}
 
-			// NOTE: Update should not return OK (200), it always returns 202, checking both just in case
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				fmt.Fprintf(cmd.ErrOrStderr(), "New allowed origins: [\"%s\"]\n", strings.Join(newOrigins, "\", \"")) //nolint:errcheck // narration to stderr; write errors are not actionable
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
-				if wait {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, dataApiId, api.GraphQLDataApiStatusUpdating)
-					if err != nil {
-						return err
-					}
-
-					fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+			fmt.Fprintf(cmd.ErrOrStderr(), "New allowed origins: [\"%s\"]\n", strings.Join(newOrigins, "\", \"")) //nolint:errcheck // narration to stderr; write errors are not actionable
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(g.Record), []string{"id", "name", "status", "url"})
+			if wait {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
+				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, dataApiId, aura.GraphQLStatusUpdating)
+				if err != nil {
+					return err
 				}
+
+				fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 			return nil
 		},

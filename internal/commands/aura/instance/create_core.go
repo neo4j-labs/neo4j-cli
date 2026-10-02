@@ -5,6 +5,7 @@ package instance
 
 import (
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"io"
 	"net/http"
 
@@ -95,7 +96,7 @@ func resolveInstanceName(cfg *clicfg.Config, name, orgID, projectID string) (str
 			existingNames = append(existingNames, n)
 		}
 	}
-	return defaultInstanceName(existingNames), nil
+	return aura.DefaultName("Instance", existingNames), nil
 }
 
 // renderInstanceResult prints the standard instance result fields, renaming

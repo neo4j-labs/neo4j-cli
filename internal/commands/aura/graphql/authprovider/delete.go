@@ -4,9 +4,7 @@
 package authprovider
 
 import (
-	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -43,11 +41,7 @@ neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --da
 			cmd.SilenceUsage = true
 			authProviderId := strings.TrimSpace(args[0])
 
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-			if err != nil {
-				return err
-			}
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
 				return err
 			}
 
@@ -55,20 +49,11 @@ neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --da
 				return err
 			}
 
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, authProviderId)
-
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodDelete,
-				Version: api.AuraApiVersionBeta1,
-			})
+			p, err := aura.New(cfg).GraphQL().AuthProviders().Delete(cmd.Context(), instanceId, dataApiId, authProviderId)
 			if err != nil {
 				return err
 			}
-
-			// NOTE: delete should not return OK (200), it always returns 202, checking both just in case
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "type", "enabled", "url"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(p.Record), []string{"id", "name", "type", "enabled", "url"})
 			return nil
 		},
 	}

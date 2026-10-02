@@ -33,6 +33,7 @@ type Scope struct {
 type Client interface {
 	Instances() InstanceService
 	Agents() AgentService
+	GraphQL() GraphQLService
 }
 
 // New returns a Client backed by the Aura HTTP API using cfg's credentials and
@@ -86,8 +87,14 @@ func (c *httpClient) Agents() AgentService {
 	return agentService{cfg: c.cfg}
 }
 
+func (c *httpClient) GraphQL() GraphQLService {
+	return graphqlService{cfg: c.cfg}
+}
+
 var (
-	_ Client          = (*httpClient)(nil)
-	_ InstanceService = instanceService{}
-	_ AgentService    = agentService{}
+	_ Client              = (*httpClient)(nil)
+	_ InstanceService     = instanceService{}
+	_ AgentService        = agentService{}
+	_ GraphQLService      = graphqlService{}
+	_ AuthProviderService = authProviderService{}
 )
