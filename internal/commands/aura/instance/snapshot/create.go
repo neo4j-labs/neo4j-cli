@@ -5,10 +5,10 @@ package snapshot
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -39,7 +39,7 @@ neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id
 				return err
 			}
 
-			snap, err := aura.New(cfg).Snapshots().Create(cmd.Context(), instanceId)
+			snap, err := auraclient.New(cfg).Snapshots().Create(cmd.Context(), instanceId)
 			if err != nil {
 				return err
 			}
@@ -47,7 +47,7 @@ neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for snapshot to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := aura.New(cfg).Snapshots().WaitWhilePending(cmd.Context(), instanceId, snap.ID)
+				status, err := auraclient.New(cfg).Snapshots().WaitWhilePending(cmd.Context(), instanceId, snap.ID)
 				if err != nil {
 					return err
 				}

@@ -5,10 +5,10 @@ package graphql
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -77,7 +77,7 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256M
 				return err
 			}
 
-			g, err := aura.New(cfg).GraphQL().Create(cmd.Context(), instanceId, aura.GraphQLCreate{
+			g, err := auraclient.New(cfg).GraphQL().Create(cmd.Context(), instanceId, auraclient.GraphQLCreate{
 				Name:            name,
 				Memory:          memory,
 				ServiceAccount:  serviceAccount,
@@ -95,7 +95,7 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256M
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, g.ID, aura.GraphQLStatusCreating)
+				status, err := auraclient.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, g.ID, auraclient.GraphQLStatusCreating)
 				if err != nil {
 					return err
 				}

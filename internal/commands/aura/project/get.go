@@ -5,11 +5,11 @@ package project
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +43,7 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 
 			cmd.SilenceUsage = true
 
-			found, err := aura.New(cfg).Projects().Get(cmd.Context(), orgID, projectID)
+			found, err := auraclient.New(cfg).Projects().Get(cmd.Context(), orgID, projectID)
 			if err != nil {
 				return err
 			}

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	auraflags "github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
+	auraflags "github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/testutil/testfs"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"

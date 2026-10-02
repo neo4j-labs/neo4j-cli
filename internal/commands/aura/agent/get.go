@@ -4,10 +4,10 @@
 package agent
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +33,7 @@ neo4j-cli aura agent get 00000000-0000-0000-0000-000000000000 --format json`,
 			}
 
 			cmd.SilenceUsage = true
-			agent, err := aura.New(cfg).Agents().Get(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, args[0])
+			agent, err := auraclient.New(cfg).Agents().Get(cmd.Context(), auraclient.Scope{OrgID: organizationId, ProjectID: projectId}, args[0])
 			if err != nil {
 				return err
 			}

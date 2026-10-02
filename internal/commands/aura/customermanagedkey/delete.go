@@ -5,11 +5,11 @@ package customermanagedkey
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/spf13/cobra"
@@ -44,7 +44,7 @@ neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 
 				return err
 			}
 
-			if _, err := aura.New(cfg).CustomerManagedKeys().Get(cmd.Context(), aura.Scope{ProjectID: projectID}, cmkID); err != nil {
+			if _, err := auraclient.New(cfg).CustomerManagedKeys().Get(cmd.Context(), auraclient.Scope{ProjectID: projectID}, cmkID); err != nil {
 				return err
 			}
 
@@ -52,7 +52,7 @@ neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 
 				return err
 			}
 
-			if err := aura.New(cfg).CustomerManagedKeys().Delete(cmd.Context(), cmkID); err != nil {
+			if err := auraclient.New(cfg).CustomerManagedKeys().Delete(cmd.Context(), cmkID); err != nil {
 				return err
 			}
 

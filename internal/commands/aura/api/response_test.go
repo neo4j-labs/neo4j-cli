@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"testing"
 
-	auraapi "github.com/neo4j/cli/internal/aura/api"
+	"github.com/neo4j/cli/internal/auraclient/transport"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,7 +22,7 @@ func TestPrintResponseMeta_StripsControlBytes(t *testing.T) {
 	cmd := &cobra.Command{Use: "api"}
 	cmd.SetOut(&out)
 
-	printResponseMeta(cmd, &auraapi.RawResponse{
+	printResponseMeta(cmd, &transport.RawResponse{
 		Proto:  "HTTP/1.1",
 		Status: "200 \x1b[31mOK",
 		Header: http.Header{
@@ -43,7 +43,7 @@ func TestPrintResponseMeta_PrintsEveryValueOfARepeatedHeader(t *testing.T) {
 	cmd := &cobra.Command{Use: "api"}
 	cmd.SetOut(&out)
 
-	printResponseMeta(cmd, &auraapi.RawResponse{
+	printResponseMeta(cmd, &transport.RawResponse{
 		Proto:  "HTTP/1.1",
 		Status: "200 OK",
 		Header: http.Header{"Link": []string{"<a>; rel=next", "<b>; rel=prev"}},

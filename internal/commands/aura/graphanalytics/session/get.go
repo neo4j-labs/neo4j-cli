@@ -4,11 +4,11 @@
 package session
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +35,7 @@ neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 
 			if err != nil {
 				return err
 			}
-			sess, err := aura.New(cfg).Sessions().Get(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, sessionID)
+			sess, err := auraclient.New(cfg).Sessions().Get(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID}, sessionID)
 			if err != nil {
 				return err
 			}

@@ -5,11 +5,11 @@ package virtualgraph
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	auraflags "github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	auraflags "github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -65,7 +65,7 @@ neo4j-cli aura virtual-graph create --rw --name bq-analytics --data-source-id ds
 
 			// project_id is NOT sent: the API derives the owning project from the
 			// org/project-scoped path and the caller's token.
-			spec := aura.VirtualGraphCreate{
+			spec := auraclient.VirtualGraphCreate{
 				Name:          name,
 				DataSourceID:  dataSourceID,
 				ImportModelID: importModelID,
@@ -77,8 +77,8 @@ neo4j-cli aura virtual-graph create --rw --name bq-analytics --data-source-id ds
 				spec.MaximumBytesBilled = &maximumBytesBilled
 			}
 
-			scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
-			virtualGraphs := aura.New(cfg).VirtualGraphs()
+			scope := auraclient.Scope{OrgID: orgID, ProjectID: projectID}
+			virtualGraphs := auraclient.New(cfg).VirtualGraphs()
 			vg, err := virtualGraphs.Create(cmd.Context(), scope, spec)
 			if err != nil {
 				return err
@@ -96,7 +96,7 @@ neo4j-cli aura virtual-graph create --rw --name bq-analytics --data-source-id ds
 
 			fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for virtual graph to be running...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
-			status, err := virtualGraphs.WaitWhile(cmd.Context(), scope, vg.ID, aura.VirtualGraphStatusCreating)
+			status, err := virtualGraphs.WaitWhile(cmd.Context(), scope, vg.ID, auraclient.VirtualGraphStatusCreating)
 			if err != nil {
 				return err
 			}

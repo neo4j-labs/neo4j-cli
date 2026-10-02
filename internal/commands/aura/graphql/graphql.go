@@ -4,8 +4,8 @@
 package graphql
 
 import (
-	auraflags "github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
+	auraflags "github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/commands/aura/graphql/authprovider"
 	"github.com/neo4j/cli/internal/commands/aura/graphql/corspolicy"
 	"github.com/neo4j/cli/internal/flags"

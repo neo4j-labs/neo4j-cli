@@ -5,10 +5,10 @@ package project
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +38,7 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 			}
 
 			cmd.SilenceUsage = true
-			projects, err := aura.New(cfg).Projects().List(cmd.Context(), orgID)
+			projects, err := auraclient.New(cfg).Projects().List(cmd.Context(), orgID)
 			if err != nil {
 				return err
 			}

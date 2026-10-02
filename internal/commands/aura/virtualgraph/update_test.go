@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/neo4j/cli/internal/aura/testutils"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 )
 
 // TestUpdateVirtualGraphName covers the PATCH-then-GET shape: the API

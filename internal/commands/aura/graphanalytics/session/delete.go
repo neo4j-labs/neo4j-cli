@@ -4,11 +4,11 @@
 package session
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/spf13/cobra"
@@ -45,7 +45,7 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 				return err
 			}
 
-			rec, err := aura.New(cfg).Sessions().Delete(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, sessionID)
+			rec, err := auraclient.New(cfg).Sessions().Delete(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID}, sessionID)
 			if err != nil {
 				return err
 			}

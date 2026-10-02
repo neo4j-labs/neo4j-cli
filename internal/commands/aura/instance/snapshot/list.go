@@ -4,10 +4,10 @@
 package snapshot
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +34,7 @@ neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 0
 				return err
 			}
 
-			snaps, err := aura.New(cfg).Snapshots().List(cmd.Context(), instanceId, date)
+			snaps, err := auraclient.New(cfg).Snapshots().List(cmd.Context(), instanceId, date)
 			if err != nil {
 				return err
 			}

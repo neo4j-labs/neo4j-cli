@@ -15,8 +15,8 @@ import (
 	"testing"
 
 	"github.com/google/shlex"
-	auraflags "github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
+	auraflags "github.com/neo4j/cli/internal/commands/aura/flags"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/neo4j/cli/internal/testutil/testfs"
 	"github.com/spf13/cobra"

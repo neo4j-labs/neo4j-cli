@@ -5,11 +5,11 @@ package instance
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -47,8 +47,8 @@ neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
-			scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
-			instances := aura.New(cfg).Instances()
+			scope := auraclient.Scope{OrgID: orgID, ProjectID: projectID}
+			instances := auraclient.New(cfg).Instances()
 			inst, err := instances.Resume(cmd.Context(), scope, instanceID)
 			if err != nil {
 				return err
@@ -57,7 +57,7 @@ neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-000
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := instances.WaitWhile(cmd.Context(), scope, inst.ID, aura.InstanceStatusResuming)
+				status, err := instances.WaitWhile(cmd.Context(), scope, inst.ID, auraclient.InstanceStatusResuming)
 				if err != nil {
 					return err
 				}

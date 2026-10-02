@@ -4,10 +4,10 @@
 package graphql
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -31,7 +31,7 @@ neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-00
 			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
 				return err
 			}
-			apis, err := aura.New(cfg).GraphQL().List(cmd.Context(), instanceId)
+			apis, err := auraclient.New(cfg).GraphQL().List(cmd.Context(), instanceId)
 			if err != nil {
 				return err
 			}

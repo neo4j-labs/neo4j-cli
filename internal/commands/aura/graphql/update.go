@@ -5,11 +5,11 @@ package graphql
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -61,7 +61,7 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account 
 				return err
 			}
 
-			patch := aura.GraphQLPatch{Name: name, ServiceAccount: serviceAccount}
+			patch := auraclient.GraphQLPatch{Name: name, ServiceAccount: serviceAccount}
 			if typeDefs != "" || typeDefsFile != "" {
 				base64EncodedTypeDefs, err := GetTypeDefsFromFlag(cfg, typeDefs, typeDefsFile)
 				if err != nil {
@@ -70,7 +70,7 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account 
 				patch.TypeDefinitions = base64EncodedTypeDefs
 			}
 
-			g, err := aura.New(cfg).GraphQL().Update(cmd.Context(), instanceId, graphqlId, patch)
+			g, err := auraclient.New(cfg).GraphQL().Update(cmd.Context(), instanceId, graphqlId, patch)
 			if err != nil {
 				return err
 			}
@@ -78,7 +78,7 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account 
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be updated...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, graphqlId, aura.GraphQLStatusUpdating)
+				status, err := auraclient.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, graphqlId, auraclient.GraphQLStatusUpdating)
 				if err != nil {
 					return err
 				}

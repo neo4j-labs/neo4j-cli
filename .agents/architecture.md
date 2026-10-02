@@ -17,12 +17,12 @@ internal/
         ...
         snapshot/
       project/ organization/ agent/ graphql/ graphanalytics/ customermanagedkey/ ...
+      flags/                 # Reusable custom flag types (memory, cloud provider, etc.)
+      output/                # Aura record printing (PrintRecord / PrintRecords)
+      testutils/             # Shared aura test helpers
     docker/ desktop/ admin/ query/ ...
-  aura/
-    api/                     # HTTP client wrapping the Neo4j Aura REST API
-    flags/                   # Reusable custom flag types (memory, cloud provider, etc.)
-    output/                  # Aura response printing
-    testutils/               # Shared aura test helpers
+  auraclient/                # Aura service layer: auraclient.New(cfg).Instances()/Agents()/...
+    transport/               # HTTP client wrapping the Neo4j Aura REST API (SDK swap point)
   clicfg/                    # Config struct, credential and project management
   clierr/                    # Shared error types
 ```

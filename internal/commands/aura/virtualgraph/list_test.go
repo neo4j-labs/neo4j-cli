@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/neo4j/cli/internal/aura/api"
-	"github.com/neo4j/cli/internal/aura/testutils"
+	"github.com/neo4j/cli/internal/auraclient/transport"
 	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -102,7 +102,7 @@ func TestListVirtualGraphsRequestsMaxPageSize(t *testing.T) {
 
 	helper.ExecuteCommand(fmt.Sprintf("virtual-graph list --organization-id %s --project-id %s", testOrgID, testProjectID))
 
-	mockHandler.AssertCalledWithQueryParam("page_limit", fmt.Sprintf("%d", api.ListPageSize))
+	mockHandler.AssertCalledWithQueryParam("page_limit", fmt.Sprintf("%d", transport.ListPageSize))
 	require.False(t, mockHandler.Calls[0].QueryParams.Has("page_token"), "first request must not carry a cursor")
 }
 

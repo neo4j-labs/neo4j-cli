@@ -6,7 +6,7 @@ package customermanagedkey_test
 import (
 	"net/http"
 
-	"github.com/neo4j/cli/internal/aura/testutils"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 )
 
 const (

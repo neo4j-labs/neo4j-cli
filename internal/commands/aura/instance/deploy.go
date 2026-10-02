@@ -7,14 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"io"
 	"strings"
 	"time"
 
-	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/neo4j/cli/internal/desktopclient"
 	"github.com/neo4j/cli/internal/docker"
@@ -193,7 +193,7 @@ The command waits for the instance to be ready and for the data load to finish b
 				}
 			}
 
-			scope := aura.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
+			scope := auraclient.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
 			spec := newInstanceCreate(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
 
 			fmt.Fprintln(errOut, "Creating instance...") //nolint:errcheck // narration to stderr; write errors are not actionable
@@ -222,7 +222,7 @@ The command waits for the instance to be ready and for the data load to finish b
 			}
 
 			fmt.Fprintln(errOut, "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-			if _, err := aura.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceID, aura.InstanceStatusCreating); err != nil {
+			if _, err := auraclient.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceID, auraclient.InstanceStatusCreating); err != nil {
 				return err
 			}
 

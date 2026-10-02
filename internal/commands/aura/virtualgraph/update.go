@@ -4,7 +4,7 @@
 package virtualgraph
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -50,7 +50,7 @@ neo4j-cli aura virtual-graph update ge82059a --import-model-id im-xyz789 --rw --
 				return err
 			}
 
-			vg, err := aura.New(cfg).VirtualGraphs().Update(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID, aura.VirtualGraphPatch{
+			vg, err := auraclient.New(cfg).VirtualGraphs().Update(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID, auraclient.VirtualGraphPatch{
 				Name:          name,
 				Memory:        memory,
 				ImportModelID: importModelID,

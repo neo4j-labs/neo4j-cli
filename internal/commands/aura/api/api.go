@@ -11,9 +11,9 @@ import (
 	"net/http"
 	"slices"
 
-	auraapi "github.com/neo4j/cli/internal/aura/api"
-	auraflags "github.com/neo4j/cli/internal/aura/flags"
+	"github.com/neo4j/cli/internal/auraclient/transport"
 	"github.com/neo4j/cli/internal/clicfg"
+	auraflags "github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/neo4j/cli/internal/flags"
 	commonoutput "github.com/neo4j/cli/internal/output"
@@ -113,7 +113,7 @@ func runRequest(cmd *cobra.Command, cfg *clicfg.Config, endpoint string, reqFlag
 		return err
 	}
 
-	res, err := auraapi.MakeRawRequest(cmd.Context(), cfg, &auraapi.RawRequestConfig{
+	res, err := transport.MakeRawRequest(cmd.Context(), cfg, &transport.RawRequestConfig{
 		Method:      method,
 		VersionPath: parsed.versionPath,
 		Path:        parsed.path,
@@ -133,7 +133,7 @@ func runRequest(cmd *cobra.Command, cfg *clicfg.Config, endpoint string, reqFlag
 	// Likewise before rendering — RawStatusError folds the upstream body into
 	// the error, which clierr.Render writes to stdout as a JSON envelope, so an
 	// echoed body would put two documents there.
-	if err := auraapi.RawStatusError(res); err != nil {
+	if err := transport.RawStatusError(res); err != nil {
 		return err
 	}
 

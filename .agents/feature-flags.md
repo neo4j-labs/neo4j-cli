@@ -28,7 +28,7 @@ Explicit: no `--flag` CLI option. CI / one-shot use is covered by the env var at
 
 - Every flag ships with tests for BOTH states while it lives.
 - CI runs the flag-on path explicitly (test build step or env var) until the flag is removed.
-- Aura-side tests toggle flags by writing the dotted key (e.g. `flag.aura-beta`) into the helper config JSON via `helper.SetConfigValue` in `internal/aura/testutils/auratesthelper.go`; the registry's viper binding picks it up — no Go-side bridge.
+- Aura-side tests toggle flags by writing the dotted key (e.g. `flag.aura-beta`) into the helper config JSON via `helper.SetConfigValue` in `internal/commands/aura/testutils/auratesthelper.go`; the registry's viper binding picks it up — no Go-side bridge.
 
 ## Unknown / removed keys
 

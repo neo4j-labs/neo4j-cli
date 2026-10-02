@@ -5,12 +5,12 @@ package utils
 
 import (
 	"context"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +78,7 @@ func ResolveOrgID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 
 	// Reject malformed IDs before they reach a request path, so a "." / ".." /
 	// slash segment can't retarget it (see ValidateResourceID).
-	if err := aura.ValidateResourceID("organization", orgID); err != nil {
+	if err := auraclient.ValidateResourceID("organization", orgID); err != nil {
 		return "", err
 	}
 
@@ -101,7 +101,7 @@ func ResolveProjectID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 			WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.")
 	}
 
-	if err := aura.ValidateResourceID("project", projectID); err != nil {
+	if err := auraclient.ValidateResourceID("project", projectID); err != nil {
 		return "", err
 	}
 
@@ -111,7 +111,7 @@ func ResolveProjectID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 // validateProjectInOrg confirms that projectID appears in the org's project
 // list, reusing the canonical FetchProjectInOrg lookup.
 func validateProjectInOrg(ctx context.Context, cfg *clicfg.Config, orgID, projectID string) error {
-	_, err := aura.New(cfg).Projects().Get(ctx, orgID, projectID)
+	_, err := auraclient.New(cfg).Projects().Get(ctx, orgID, projectID)
 	return err
 }
 
@@ -143,14 +143,14 @@ func OrgFromWorkspace(cfg *clicfg.Config) string {
 // to the project. It is the single preflight for leaves that operate on
 // instance-scoped endpoints which are not themselves project-scoped (the
 // GraphQL Data API family, snapshots, ...).
-func ResolveAndVerifyInstance(cmd *cobra.Command, cfg *clicfg.Config, instanceID string) (aura.Scope, error) {
+func ResolveAndVerifyInstance(cmd *cobra.Command, cfg *clicfg.Config, instanceID string) (auraclient.Scope, error) {
 	orgID, projectID, err := ResolveAndValidateOrgProject(cmd, cfg)
 	if err != nil {
-		return aura.Scope{}, err
+		return auraclient.Scope{}, err
 	}
-	scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
-	if err := aura.New(cfg).Instances().Verify(cmd.Context(), scope, instanceID); err != nil {
-		return aura.Scope{}, err
+	scope := auraclient.Scope{OrgID: orgID, ProjectID: projectID}
+	if err := auraclient.New(cfg).Instances().Verify(cmd.Context(), scope, instanceID); err != nil {
+		return auraclient.Scope{}, err
 	}
 	return scope, nil
 }

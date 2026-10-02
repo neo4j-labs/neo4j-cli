@@ -5,11 +5,11 @@ package instance
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -56,8 +56,8 @@ neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organ
 			}
 
 			// Pre-flight ownership check.
-			scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
-			inst, err := aura.New(cfg).Instances().Overwrite(cmd.Context(), scope, instanceId, aura.OverwriteSource{InstanceID: sourceInstanceId, SnapshotID: sourceSnapshotId})
+			scope := auraclient.Scope{OrgID: orgID, ProjectID: projectID}
+			inst, err := auraclient.New(cfg).Instances().Overwrite(cmd.Context(), scope, instanceId, auraclient.OverwriteSource{InstanceID: sourceInstanceId, SnapshotID: sourceSnapshotId})
 			if err != nil {
 				return err
 			}
@@ -65,7 +65,7 @@ neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organ
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := aura.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceId, aura.InstanceStatusOverwriting)
+				status, err := auraclient.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceId, auraclient.InstanceStatusOverwriting)
 				if err != nil {
 					return err
 				}

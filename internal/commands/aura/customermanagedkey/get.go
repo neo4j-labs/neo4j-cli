@@ -4,11 +4,11 @@
 package customermanagedkey
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +35,7 @@ neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --o
 			if err != nil {
 				return err
 			}
-			key, err := aura.New(cfg).CustomerManagedKeys().Get(cmd.Context(), aura.Scope{ProjectID: projectID}, cmkID)
+			key, err := auraclient.New(cfg).CustomerManagedKeys().Get(cmd.Context(), auraclient.Scope{ProjectID: projectID}, cmkID)
 			if err != nil {
 				return err
 			}

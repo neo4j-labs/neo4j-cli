@@ -5,11 +5,11 @@ package customermanagedkey
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/flags"
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/flags"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -61,7 +61,7 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 				return err
 			}
 
-			key, err := aura.New(cfg).CustomerManagedKeys().Create(cmd.Context(), aura.Scope{ProjectID: projectID}, aura.CustomerManagedKeyCreate{
+			key, err := auraclient.New(cfg).CustomerManagedKeys().Create(cmd.Context(), auraclient.Scope{ProjectID: projectID}, auraclient.CustomerManagedKeyCreate{
 				Name:          name,
 				Region:        region,
 				InstanceType:  string(instanceType),
@@ -75,7 +75,7 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for customer managed key to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := aura.New(cfg).CustomerManagedKeys().WaitWhilePending(cmd.Context(), key.ID)
+				status, err := auraclient.New(cfg).CustomerManagedKeys().WaitWhilePending(cmd.Context(), key.ID)
 				if err != nil {
 					return err
 				}

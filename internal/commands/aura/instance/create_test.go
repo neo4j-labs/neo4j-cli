@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/neo4j/cli/internal/aura/testutils"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/instance"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 	"github.com/neo4j/cli/internal/testutil/testfs"
 	"github.com/stretchr/testify/require"
 )

@@ -4,7 +4,7 @@
 package virtualgraph
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -37,7 +37,7 @@ neo4j-cli aura virtual-graph get ge82059a --organization-id 00000000-0000-0000-0
 				return err
 			}
 
-			vg, err := aura.New(cfg).VirtualGraphs().Get(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID)
+			vg, err := auraclient.New(cfg).VirtualGraphs().Get(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID)
 			if err != nil {
 				return err
 			}

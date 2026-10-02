@@ -6,11 +6,11 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"log"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -64,7 +64,7 @@ neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agen
 			}
 
 			cmd.SilenceUsage = true
-			agent, err := aura.New(cfg).Agents().Replace(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, args[0], aura.AgentSpec{
+			agent, err := auraclient.New(cfg).Agents().Replace(cmd.Context(), auraclient.Scope{OrgID: organizationId, ProjectID: projectId}, args[0], auraclient.AgentSpec{
 				Name:         name,
 				Description:  description,
 				DBID:         dbid,

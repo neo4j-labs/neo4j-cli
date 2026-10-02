@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/neo4j/cli/internal/aura/testutils"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 )
 
 const listInstancesPath = "/v2beta1/organizations/" + testListOrgID + "/projects/" + testListProjectID + "/instances"

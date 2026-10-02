@@ -4,10 +4,10 @@
 package organization
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +26,7 @@ neo4j-cli aura organization list --format json
 neo4j-cli aura organization list --format json | jq -r '.data[].id'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			orgs, err := aura.New(cfg).Organizations().List(cmd.Context())
+			orgs, err := auraclient.New(cfg).Organizations().List(cmd.Context())
 			if err != nil {
 				return err
 			}

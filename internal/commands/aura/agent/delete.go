@@ -4,7 +4,7 @@
 package agent
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -43,7 +43,7 @@ neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --fo
 				return err
 			}
 
-			if err := aura.New(cfg).Agents().Delete(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, agentId); err != nil {
+			if err := auraclient.New(cfg).Agents().Delete(cmd.Context(), auraclient.Scope{OrgID: organizationId, ProjectID: projectId}, agentId); err != nil {
 				return err
 			}
 			cmd.Println("Agent deleted successfully", agentId)

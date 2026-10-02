@@ -11,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/neo4j/cli/internal/aura/testutils"
 	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 	"github.com/neo4j/cli/internal/confirm/confirmtest"
 )
 

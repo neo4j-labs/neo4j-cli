@@ -5,12 +5,12 @@ package allowedorigin
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/neo4j/cli/internal/confirm"
 	commonflags "github.com/neo4j/cli/internal/flags"
@@ -58,7 +58,7 @@ neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com
 				return err
 			}
 
-			existingOrigins, err := aura.New(cfg).GraphQL().AllowedOrigins(cmd.Context(), instanceId, dataApiId)
+			existingOrigins, err := auraclient.New(cfg).GraphQL().AllowedOrigins(cmd.Context(), instanceId, dataApiId)
 			if err != nil {
 				return err
 			}
@@ -82,7 +82,7 @@ neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com
 				return err
 			}
 
-			g, err := aura.New(cfg).GraphQL().SetAllowedOrigins(cmd.Context(), instanceId, dataApiId, newOrigins)
+			g, err := auraclient.New(cfg).GraphQL().SetAllowedOrigins(cmd.Context(), instanceId, dataApiId, newOrigins)
 			if err != nil {
 				return err
 			}
@@ -95,7 +95,7 @@ neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com
 			output.PrintRecord(cmd, cfg, g.Record, []string{"id", "name", "status", "url"})
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, dataApiId, aura.GraphQLStatusUpdating)
+				status, err := auraclient.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, dataApiId, auraclient.GraphQLStatusUpdating)
 				if err != nil {
 					return err
 				}

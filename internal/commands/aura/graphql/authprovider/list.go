@@ -4,10 +4,10 @@
 package authprovider
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +34,7 @@ neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 1
 			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
 				return err
 			}
-			providers, err := aura.New(cfg).GraphQL().AuthProviders().List(cmd.Context(), instanceId, dataApiId)
+			providers, err := auraclient.New(cfg).GraphQL().AuthProviders().List(cmd.Context(), instanceId, dataApiId)
 			if err != nil {
 				return err
 			}

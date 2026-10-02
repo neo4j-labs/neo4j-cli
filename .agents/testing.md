@@ -19,14 +19,14 @@ go test -v ./...
 Tests live alongside source files as `*_test.go`. Integration-style tests use:
 
 - `github.com/spf13/afero` — in-memory filesystem via `afero.NewMemMapFs()` to avoid touching disk
-- `testutils.AuraTestHelper` — helper in `internal/aura/testutils/` for constructing test commands with mock HTTP handlers
+- `testutils.AuraTestHelper` — helper in `internal/commands/aura/testutils/` for constructing test commands with mock HTTP handlers
 - `testutils.RequestHandlerMock` — mock HTTP server for API calls
 - `github.com/google/go-cmp` — deep equality checks on structured output
 
 ## Test Helpers Location
 
 ```
-internal/aura/testutils/
+internal/commands/aura/testutils/
   auratesthelper.go      - AuraTestHelper wrapping cobra cmd + mock server
   requesthandlermock.go  - HTTP handler mock
   formatjson.go          - JSON formatting helpers

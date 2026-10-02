@@ -4,10 +4,10 @@
 package session
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +36,7 @@ Use --organization-id and --project-id to specify which project's sessions to li
 				return err
 			}
 
-			sessions, err := aura.New(cfg).Sessions().List(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, instanceId)
+			sessions, err := auraclient.New(cfg).Sessions().List(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID}, instanceId)
 			if err != nil {
 				return err
 			}

@@ -6,10 +6,10 @@ package instance
 import (
 	"errors"
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -98,7 +98,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			}
 
 			// Auto-generate a default name when --name is omitted.
-			scope := aura.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
+			scope := auraclient.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
 			spec := newInstanceCreate(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
 
 			instance, err := createAndStoreInstance(cmd.Context(), cfg, scope, spec, credentialOptions{
@@ -119,7 +119,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					instanceId, _ := instance["id"].(string)
 
-					status, err := aura.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceId, aura.InstanceStatusCreating)
+					status, err := auraclient.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceId, auraclient.InstanceStatusCreating)
 					if err != nil {
 						return err
 					}

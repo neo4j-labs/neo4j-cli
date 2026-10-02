@@ -26,7 +26,6 @@ linters:
             - "**/internal/**"
             - "!**/internal/commands/**"
             - "!**/internal/cli/**"
-            - "!**/internal/aura/testutils/**"
             - "!**/internal/skill/neo4jcli/gen/**"
             - "!$test"
           deny:

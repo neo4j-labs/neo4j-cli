@@ -18,7 +18,7 @@ import (
 // (`<agentSkillsDir>/<skillName>/`) and the SKILL.md frontmatter `name:`.
 //
 // Each leaf renders results as a table by default and emits a JSON envelope
-// when `--format json` (or `-f json`) is passed (matching internal/aura/output
+// when `--format json` (or `-f json`) is passed (matching internal/commands/aura/output
 // conventions).
 func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	cmd := &cobra.Command{

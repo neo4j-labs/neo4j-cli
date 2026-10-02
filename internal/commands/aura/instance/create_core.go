@@ -6,12 +6,12 @@ package instance
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"io"
 
-	"github.com/neo4j/cli/internal/aura/flags"
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/flags"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/spf13/cobra"
 )
 
@@ -82,7 +82,7 @@ func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[s
 		delete(instance, "password")
 	}
 
-	renamedInstance := aura.RenameKey(instance, "tenant_id", "project_id", false)
+	renamedInstance := auraclient.RenameKey(instance, "tenant_id", "project_id", false)
 
 	fields := []string{"id", "name", "project_id", "connection_url", "username"}
 	if !noCredentialPrint {
@@ -110,8 +110,8 @@ func newInstanceCreate(
 	memory flags.Memory,
 	vectorOptimized bool,
 	graphAnalyticsPlugin bool,
-) aura.InstanceCreate {
-	return aura.InstanceCreate{
+) auraclient.InstanceCreate {
+	return auraclient.InstanceCreate{
 		Name:                 name,
 		Version:              version,
 		Region:               region,
@@ -145,8 +145,8 @@ type credentialOptions struct {
 // locally, recording the resolved credential name under the "credential_name"
 // key of the returned instance record. Storing credentials is CLI state, not
 // part of the Aura API, so it lives here rather than in the service.
-func createAndStoreInstance(ctx context.Context, cfg *clicfg.Config, scope aura.Scope, spec aura.InstanceCreate, credOpts credentialOptions) (map[string]any, error) {
-	created, err := aura.New(cfg).Instances().Create(ctx, scope, spec)
+func createAndStoreInstance(ctx context.Context, cfg *clicfg.Config, scope auraclient.Scope, spec auraclient.InstanceCreate, credOpts credentialOptions) (map[string]any, error) {
+	created, err := auraclient.New(cfg).Instances().Create(ctx, scope, spec)
 	if err != nil {
 		return nil, err
 	}

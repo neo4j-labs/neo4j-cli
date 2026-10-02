@@ -4,9 +4,9 @@
 package instance
 
 import (
-	"github.com/neo4j/cli/internal/aura"
-	"github.com/neo4j/cli/internal/aura/output"
+	"github.com/neo4j/cli/internal/auraclient"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +33,7 @@ neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000
 				return err
 			}
 
-			instances, err := aura.New(cfg).Instances().List(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID})
+			instances, err := auraclient.New(cfg).Instances().List(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID})
 			if err != nil {
 				return err
 			}

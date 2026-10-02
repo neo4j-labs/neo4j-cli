@@ -5,12 +5,12 @@ package agent
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"log"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonoutput "github.com/neo4j/cli/internal/output"
 	"github.com/spf13/cobra"
@@ -46,7 +46,7 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 			}
 
 			cmd.SilenceUsage = true
-			result, err := aura.New(cfg).Agents().Invoke(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, args[0], input)
+			result, err := auraclient.New(cfg).Agents().Invoke(cmd.Context(), auraclient.Scope{OrgID: organizationId, ProjectID: projectId}, args[0], input)
 			if err != nil {
 				return err
 			}
@@ -67,7 +67,7 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 
 // withInvocationID appends the agent invocation id to err for support/tracing.
 // It is a no-op when err is nil or id is empty.
-func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, result *aura.AgentInvocation) {
+func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, result *auraclient.AgentInvocation) {
 	invocationID := result.InvocationID
 	if commonoutput.ResolveOutput(cmd, cfg) == "json" {
 		output.PrintRecord(cmd, cfg, result.Record, nil)

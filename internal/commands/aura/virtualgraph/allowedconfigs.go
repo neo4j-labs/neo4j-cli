@@ -4,10 +4,10 @@
 package virtualgraph
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +35,7 @@ neo4j-cli aura virtual-graph allowed-configs --format json | jq -r '.data.config
 				return err
 			}
 
-			configs, err := aura.New(cfg).VirtualGraphs().AllowedConfigs(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID})
+			configs, err := auraclient.New(cfg).VirtualGraphs().AllowedConfigs(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID})
 			if err != nil {
 				return err
 			}

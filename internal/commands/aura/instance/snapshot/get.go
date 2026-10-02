@@ -4,11 +4,11 @@
 package snapshot
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +36,7 @@ neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --inst
 			}
 
 			snapshotId := strings.TrimSpace(args[0])
-			snap, err := aura.New(cfg).Snapshots().Get(cmd.Context(), instanceId, snapshotId)
+			snap, err := auraclient.New(cfg).Snapshots().Get(cmd.Context(), instanceId, snapshotId)
 			if err != nil {
 				return err
 			}

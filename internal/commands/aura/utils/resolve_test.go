@@ -7,15 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 
-	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/neo4j/cli/internal/testutil/testfs"
 	"github.com/spf13/cobra"
@@ -515,7 +515,7 @@ func TestVerifyInstance_OwnershipMismatch(t *testing.T) {
 	srv := buildResourceServer(t, "/v1/instances/"+instanceID, "other-project")
 	cfg := buildTestConfig(t, srv.URL, "")
 
-	err := aura.New(cfg).Instances().Verify(context.Background(), aura.Scope{ProjectID: testProjectID}, instanceID)
+	err := auraclient.New(cfg).Instances().Verify(context.Background(), auraclient.Scope{ProjectID: testProjectID}, instanceID)
 	require.Error(t, err)
 	assert.Equal(t, fmt.Sprintf("could not find instance %s in project %s", instanceID, testProjectID), err.Error())
 

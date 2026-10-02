@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/neo4j/cli/internal/aura/testutils"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 )
 
 // TestDeleteVirtualGraph covers the empty-202 contract: the API returns no

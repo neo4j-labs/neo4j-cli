@@ -4,11 +4,11 @@
 package instance
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/spf13/cobra"
@@ -45,7 +45,7 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
-			if err := aura.ValidateResourceID("instance", instanceID); err != nil {
+			if err := auraclient.ValidateResourceID("instance", instanceID); err != nil {
 				return err
 			}
 
@@ -53,7 +53,7 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
-			inst, err := aura.New(cfg).Instances().Delete(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, instanceID)
+			inst, err := auraclient.New(cfg).Instances().Delete(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID}, instanceID)
 			if err != nil {
 				return err
 			}

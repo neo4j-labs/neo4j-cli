@@ -5,10 +5,10 @@ package session
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -62,9 +62,9 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 				return err
 			}
 
-			scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
-			sessions := aura.New(cfg).Sessions()
-			sess, err := sessions.Create(cmd.Context(), scope, aura.SessionCreate{
+			scope := auraclient.Scope{OrgID: orgID, ProjectID: projectID}
+			sessions := auraclient.New(cfg).Sessions()
+			sess, err := sessions.Create(cmd.Context(), scope, auraclient.SessionCreate{
 				Name:          name,
 				Memory:        memory,
 				TTL:           ttl,
@@ -81,7 +81,7 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
-				if sess.Status == aura.SessionStatusReady {
+				if sess.Status == auraclient.SessionStatusReady {
 					return nil
 				}
 

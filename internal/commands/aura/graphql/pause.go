@@ -5,11 +5,11 @@ package graphql
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -43,7 +43,7 @@ neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --wait --organizati
 			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
 				return err
 			}
-			g, err := aura.New(cfg).GraphQL().Pause(cmd.Context(), instanceId, graphqlId)
+			g, err := auraclient.New(cfg).GraphQL().Pause(cmd.Context(), instanceId, graphqlId)
 			if err != nil {
 				return err
 			}
@@ -51,7 +51,7 @@ neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --wait --organizati
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be paused...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, graphqlId, aura.GraphQLStatusPausing)
+				status, err := auraclient.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, graphqlId, auraclient.GraphQLStatusPausing)
 				if err != nil {
 					return err
 				}

@@ -4,8 +4,8 @@
 package instance
 
 import (
-	auraflags "github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
+	auraflags "github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/commands/aura/instance/snapshot"
 	"github.com/neo4j/cli/internal/flags"
 

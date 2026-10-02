@@ -6,10 +6,10 @@ package workspace
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +64,7 @@ neo4j-cli aura workspace list --format json | jq -r '.data[] | select(.default =
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			orgs, err := aura.New(cfg).Organizations().List(cmd.Context())
+			orgs, err := auraclient.New(cfg).Organizations().List(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("failed to list organizations: %w", err)
 			}
@@ -73,7 +73,7 @@ neo4j-cli aura workspace list --format json | jq -r '.data[] | select(.default =
 
 			var entries []workspaceEntry
 			for _, org := range orgs {
-				projects, err := aura.New(cfg).Projects().List(cmd.Context(), org.ID)
+				projects, err := auraclient.New(cfg).Projects().List(cmd.Context(), org.ID)
 				if err != nil {
 					return fmt.Errorf("failed to list projects for organization %s: %w", org.ID, err)
 				}

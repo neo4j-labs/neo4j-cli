@@ -15,11 +15,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/cli/internal/aura/testutils"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/clievents"
 	"github.com/neo4j/cli/internal/commands/aura"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/neo4j/cli/internal/confirm/confirmtest"
 	"github.com/neo4j/cli/internal/testutil/testfs"

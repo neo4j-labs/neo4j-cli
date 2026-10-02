@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	auraapi "github.com/neo4j/cli/internal/aura/api"
+	"github.com/neo4j/cli/internal/auraclient/transport"
 	commonoutput "github.com/neo4j/cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +42,7 @@ func mergeQuery(inline, fields url.Values) url.Values {
 // printResponseMeta writes the status line and the response headers, sorted by
 // name and control-stripped: both are upstream-controlled text reaching a
 // terminal, and net/http filters neither the reason phrase nor a header value.
-func printResponseMeta(cmd *cobra.Command, res *auraapi.RawResponse) {
+func printResponseMeta(cmd *cobra.Command, res *transport.RawResponse) {
 	w := cmd.OutOrStdout()
 
 	statusLine := strings.TrimSpace(fmt.Sprintf("%s %s", res.Proto, res.Status))

@@ -6,10 +6,10 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -60,7 +60,7 @@ neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --description "
 				return err
 			}
 
-			var patch aura.AgentPatch
+			var patch auraclient.AgentPatch
 			if name != "" {
 				patch.Name = &name
 			}
@@ -91,7 +91,7 @@ neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --description "
 			}
 
 			cmd.SilenceUsage = true
-			agent, err := aura.New(cfg).Agents().Update(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, args[0], patch)
+			agent, err := auraclient.New(cfg).Agents().Update(cmd.Context(), auraclient.Scope{OrgID: organizationId, ProjectID: projectId}, args[0], patch)
 			if err != nil {
 				return err
 			}

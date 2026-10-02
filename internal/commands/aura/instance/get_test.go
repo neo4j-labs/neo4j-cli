@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neo4j/cli/internal/aura/testutils"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/commands/aura/instance"
+	"github.com/neo4j/cli/internal/commands/aura/testutils"
 )
 
 // scopedInstancePath builds the v2beta1 org/project-scoped instance path used

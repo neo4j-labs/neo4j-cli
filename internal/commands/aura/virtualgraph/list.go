@@ -5,10 +5,10 @@ package virtualgraph
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +41,7 @@ neo4j-cli aura virtual-graph list --limit 10 --format json`,
 				return err
 			}
 
-			page, err := aura.New(cfg).VirtualGraphs().List(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, limit)
+			page, err := auraclient.New(cfg).VirtualGraphs().List(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID}, limit)
 			if err != nil {
 				return err
 			}
@@ -56,7 +56,7 @@ neo4j-cli aura virtual-graph list --limit 10 --format json`,
 				fmt.Fprintf(cmd.ErrOrStderr(), "Showing the first %d virtual graphs; more are available. Raise or omit --limit to see them all.\n", limit) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 			if page.PageCapReached {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Stopped after %d pages, so this list may be incomplete.\n", aura.MaxListPages) //nolint:errcheck // narration to stderr; write errors are not actionable
+				fmt.Fprintf(cmd.ErrOrStderr(), "Stopped after %d pages, so this list may be incomplete.\n", auraclient.MaxListPages) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 
 			return nil

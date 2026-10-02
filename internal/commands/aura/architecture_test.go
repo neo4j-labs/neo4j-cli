@@ -17,9 +17,9 @@ import (
 )
 
 // transportImport is the Aura HTTP transport. Commands reach Aura only through
-// the service layer (internal/aura), so the transport can be replaced — by the
+// the service layer (internal/auraclient), so the transport can be replaced — by the
 // Aura SDK — in one place.
-const transportImport = "github.com/neo4j/cli/internal/aura/api"
+const transportImport = "github.com/neo4j/cli/internal/auraclient/transport"
 
 // passthroughDir is the one command allowed to use the transport directly: `aura
 // api` makes arbitrary requests to endpoints the CLI has no model of, so it
@@ -50,7 +50,7 @@ func TestCommandsImportTheServiceLayerNotTheTransport(t *testing.T) {
 		for _, imp := range file.Imports {
 			if p, _ := strconv.Unquote(imp.Path.Value); p == transportImport && !allowed {
 				assert.Failf(t, "transport imported by a command",
-					"%s imports %s — use the internal/aura service layer instead (see AGENTS.md, \"Aura service layer\")",
+					"%s imports %s — use the internal/auraclient service layer instead (see AGENTS.md, \"Aura service layer\")",
 					fset.Position(imp.Pos()), transportImport)
 			}
 		}

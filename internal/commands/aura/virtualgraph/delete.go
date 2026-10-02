@@ -4,11 +4,11 @@
 package virtualgraph
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/spf13/cobra"
@@ -49,7 +49,7 @@ while neo4j-cli aura virtual-graph get ge82059a > /dev/null 2>&1; do sleep 5; do
 				return err
 			}
 
-			if err := aura.ValidateResourceID(resourceName, virtualGraphID); err != nil {
+			if err := auraclient.ValidateResourceID(resourceName, virtualGraphID); err != nil {
 				return err
 			}
 
@@ -57,7 +57,7 @@ while neo4j-cli aura virtual-graph get ge82059a > /dev/null 2>&1; do sleep 5; do
 				return err
 			}
 
-			if err := aura.New(cfg).VirtualGraphs().Delete(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID); err != nil {
+			if err := auraclient.New(cfg).VirtualGraphs().Delete(cmd.Context(), auraclient.Scope{OrgID: orgID, ProjectID: projectID}, virtualGraphID); err != nil {
 				return err
 			}
 			output.PrintRecord(cmd, cfg, map[string]any{"id": virtualGraphID}, []string{"id"})

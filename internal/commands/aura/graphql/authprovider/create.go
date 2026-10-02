@@ -5,11 +5,11 @@ package authprovider
 
 import (
 	"fmt"
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 
-	"github.com/neo4j/cli/internal/aura/flags"
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/flags"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonflags "github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -57,12 +57,12 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 # Create a JWKS authentication provider with a validation URL
 neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type jwks --name my-jwks --url https://example.com/.well-known/jwks.json --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if _type == aura.AuthProviderJWKS {
+			if _type == auraclient.AuthProviderJWKS {
 				cmd.MarkFlagRequired(urlFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 			}
 
-			if _type == aura.AuthProviderAPIKey && url != "" {
-				return fmt.Errorf("url flag can not be set for authentication provider type '%s'", aura.AuthProviderAPIKey)
+			if _type == auraclient.AuthProviderAPIKey && url != "" {
+				return fmt.Errorf("url flag can not be set for authentication provider type '%s'", auraclient.AuthProviderAPIKey)
 			}
 
 			return nil
@@ -73,7 +73,7 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 				return err
 			}
 
-			p, err := aura.New(cfg).GraphQL().AuthProviders().Create(cmd.Context(), instanceId, dataApiId, aura.AuthProviderSpec{
+			p, err := auraclient.New(cfg).GraphQL().AuthProviders().Create(cmd.Context(), instanceId, dataApiId, auraclient.AuthProviderSpec{
 				Type:    string(_type),
 				Name:    name,
 				Enabled: !disabled,
@@ -83,7 +83,7 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 				return err
 			}
 
-			if _type == aura.AuthProviderAPIKey {
+			if _type == auraclient.AuthProviderAPIKey {
 				fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
 				fmt.Fprintln(cmd.ErrOrStderr(), "# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.") //nolint:errcheck // narration to stderr; write errors are not actionable
 				fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
@@ -93,7 +93,7 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				status, err := aura.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, dataApiId, aura.GraphQLStatusCreating)
+				status, err := auraclient.New(cfg).GraphQL().WaitWhile(cmd.Context(), instanceId, dataApiId, auraclient.GraphQLStatusCreating)
 				if err != nil {
 					return err
 				}
@@ -110,7 +110,7 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 	cmd.Flags().StringVar(&dataApiId, dataApiIdFlag, "", "(required) The ID of the GraphQL Data API to create the authentication provider for")
 	cmd.MarkFlagRequired(dataApiIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	msgTypeFlag := fmt.Sprintf("(required) The type of the Authentication provider, one of '%s' or '%s'", aura.AuthProviderAPIKey, aura.AuthProviderJWKS)
+	msgTypeFlag := fmt.Sprintf("(required) The type of the Authentication provider, one of '%s' or '%s'", auraclient.AuthProviderAPIKey, auraclient.AuthProviderJWKS)
 	cmd.Flags().Var(&_type, typeFlag, msgTypeFlag)
 	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
@@ -119,7 +119,7 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 
 	cmd.Flags().BoolVar(&disabled, disabledFlag, disabledDefault, "Whether or not the Authentication provider is disabled")
 
-	msgUrlFlag := fmt.Sprintf("The JWKS URL that you want the bearer tokens in incoming GraphQL requests to be validated against. NOTE: only applicable for Authentication provider type '%s'", aura.AuthProviderJWKS)
+	msgUrlFlag := fmt.Sprintf("The JWKS URL that you want the bearer tokens in incoming GraphQL requests to be validated against. NOTE: only applicable for Authentication provider type '%s'", auraclient.AuthProviderJWKS)
 	cmd.Flags().StringVar(&url, urlFlag, "", msgUrlFlag)
 
 	commonflags.RegisterWait(cmd, &wait, "Waits until created Authentication provider is ready.")

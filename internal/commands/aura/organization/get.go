@@ -4,11 +4,11 @@
 package organization
 
 import (
-	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/auraclient"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +30,7 @@ neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format js
 			orgID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			org, err := aura.New(cfg).Organizations().Get(cmd.Context(), orgID)
+			org, err := auraclient.New(cfg).Organizations().Get(cmd.Context(), orgID)
 			if err != nil {
 				return err
 			}
