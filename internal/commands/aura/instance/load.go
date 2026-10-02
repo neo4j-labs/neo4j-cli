@@ -6,10 +6,10 @@ package instance
 import (
 	"context"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"io"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
@@ -167,16 +167,12 @@ If the data load fails after the instance was created, the instance is left in p
 				)
 			}
 
-			name, err = resolveInstanceName(cfg, name, resolvedOrgID, resolvedProjectID)
-			if err != nil {
-				return err
-			}
-
-			body := buildCreateInstanceBody(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin, resolvedProjectID)
+			scope := aura.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
+			createSpec := newInstanceCreate(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
 
 			fmt.Fprintln(errOut, "Creating instance...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
-			instance, err := createAndStoreInstance(cfg, body, resolvedOrgID, resolvedProjectID, credentialOptions{
+			instance, err := createAndStoreInstance(cmd.Context(), cfg, scope, createSpec, credentialOptions{
 				instanceType:        string(_type),
 				credentialName:      credentialName,
 				noCredentialStorage: noCredentialStorage,
@@ -198,7 +194,7 @@ If the data load fails after the instance was created, the instance is left in p
 			}
 
 			fmt.Fprintln(errOut, "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-			if _, err := api.PollInstance(cfg, resolvedOrgID, resolvedProjectID, instanceID, api.InstanceStatusCreating); err != nil {
+			if _, err := aura.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceID, aura.InstanceStatusCreating); err != nil {
 				return err
 			}
 

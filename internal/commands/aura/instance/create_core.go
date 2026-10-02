@@ -4,16 +4,15 @@
 package instance
 
 import (
+	"context"
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
 	"io"
-	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/clievents"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/spf13/cobra"
 )
@@ -73,46 +72,16 @@ func validateInstanceFlags(cmd *cobra.Command, cfg *clicfg.Config, f instanceFla
 	return nil
 }
 
-// resolveInstanceName returns the explicit name when non-empty, otherwise it
-// lists the project's instances (via the v2beta1 org/project-scoped path) and
-// derives an unused default name (e.g. Instance01). Shared by the create and
-// deploy leaves' auto-naming.
-func resolveInstanceName(cfg *clicfg.Config, name, orgID, projectID string) (string, error) {
-	if name != "" {
-		return name, nil
-	}
-
-	listBody, _, listErr := api.MakeRequest(cfg, api.ScopedInstancesPath(orgID, projectID), &api.RequestConfig{
-		Method:  http.MethodGet,
-		Version: api.AuraApiVersion2,
-	})
-	if listErr != nil {
-		return "", listErr
-	}
-	listData := api.ParseBody(listBody)
-	existingNames := make([]string, 0, len(listData.AsArray()))
-	for _, inst := range listData.AsArray() {
-		if n, ok := inst["name"].(string); ok {
-			existingNames = append(existingNames, n)
-		}
-	}
-	return aura.DefaultName("Instance", existingNames), nil
-}
-
 // renderInstanceResult prints the standard instance result fields, renaming
 // tenant_id -> project_id like the Aura API output convention. password is
 // omitted when noCredentialPrint is set, credential_name when noCredentialStorage
 // is set, and any extraFields are appended after the trailing cloud/region/type
 // columns (deploy uses this for deploy_status).
 func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[string]any, noCredentialPrint, noCredentialStorage bool, extraFields ...string) {
+	// The password literal is already registered for redaction by the service
+	// that received it, so a later --wait failure cannot tee it to disk.
 	if noCredentialPrint {
 		delete(instance, "password")
-	} else if pw, ok := instance["password"].(string); ok {
-		// The password is printed (once) for the user, but on a later --wait
-		// failure the captured output is teed to disk. Register the literal value
-		// so tee redaction scrubs it from formats the shape-based regexes can't
-		// reach (notably the table-cell layout).
-		clievents.RegisterSecretValue(pw)
 	}
 
 	renamed := utils.RenameResponseField(api.NewSingleValueResponseData(instance), "tenant_id", "project_id")
@@ -131,23 +100,10 @@ func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[s
 	output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(renamedInstance), fields)
 }
 
-// buildCreateInstanceBody assembles the POST /instances request body from the
-// already-validated create flag values and the resolved project id. free
-// targets ignore the caller's memory/region/cloud-provider/version and use
-// fixed defaults, matching the Aura free-tier contract.
-//
-// The "type" value is the canonical v2beta1 tier name — flags.InstanceType.Set
-// has already normalized any legacy v1 alias — because this body is POSTed to
-// the v2beta1 scoped instances endpoint, which rejects the v1 names.
-//
-// graphAnalyticsPlugin (from --graph-analytics-plugin, professional only)
-// maps to the v2beta1 "graph_analytics" enum, not the v1
-// "graph_analytics_plugin" bool — the scoped endpoint ignores the latter
-// silently. Only the true case ("plugin") is sent explicitly: "unavailable"
-// is not a settable create-time value — by design, every new instance gets
-// at least "serverless" — so the false case omits the field and lets the
-// API apply that default itself, same as the non-professional tiers do.
-func buildCreateInstanceBody(
+// newInstanceCreate maps the already-validated create flag values to the
+// service's create spec. The "type" value is the canonical v2beta1 tier name:
+// flags.InstanceType.Set has already normalised any legacy v1 alias.
+func newInstanceCreate(
 	version string,
 	region string,
 	name string,
@@ -157,37 +113,18 @@ func buildCreateInstanceBody(
 	memory flags.Memory,
 	vectorOptimized bool,
 	graphAnalyticsPlugin bool,
-	resolvedProjectID string,
-) map[string]any {
-	body := map[string]any{
-		"version":        version,
-		"region":         region,
-		"name":           name,
-		"type":           _type,
-		"cloud_provider": cloudProvider,
-		"tenant_id":      resolvedProjectID,
+) aura.InstanceCreate {
+	return aura.InstanceCreate{
+		Name:                 name,
+		Version:              version,
+		Region:               region,
+		Type:                 string(_type),
+		CloudProvider:        string(cloudProvider),
+		Memory:               string(memory),
+		CustomerManagedKeyID: customerManagedKeyId,
+		VectorOptimized:      vectorOptimized,
+		GraphAnalyticsPlugin: graphAnalyticsPlugin,
 	}
-
-	if _type == "free" {
-		body["memory"] = "1GB"
-		body["region"] = "europe-west1"
-		body["cloud_provider"] = "gcp"
-		body["version"] = "5"
-	} else {
-		body["memory"] = memory
-		body["region"] = region
-		body["vector_optimized"] = vectorOptimized
-	}
-
-	if _type == "professional" && graphAnalyticsPlugin {
-		body["graph_analytics"] = "plugin"
-	}
-
-	if customerManagedKeyId != "" {
-		body["customer_managed_key_id"] = customerManagedKeyId
-	}
-
-	return body
 }
 
 // credentialOptions carries the credential-storage flag values used when
@@ -206,34 +143,17 @@ type credentialOptions struct {
 	warnOut io.Writer
 }
 
-// createAndStoreInstance POSTs the create body to /instances, parses the single
-// instance from the response, and (unless credOpts.noCredentialStorage) stores
-// the generated dbms credential, recording the resolved credential name under
-// the "credential_name" key of the returned instance map.
-//
-// A status other than 202 Accepted or 200 OK yields a nil map and nil error
-// (mirroring the historic create behaviour, where only those paths produce
-// output).
-func createAndStoreInstance(cfg *clicfg.Config, body map[string]any, orgID, projectID string, credOpts credentialOptions) (map[string]any, error) {
-	resBody, statusCode, err := api.MakeRequest(cfg, api.ScopedInstancesPath(orgID, projectID), &api.RequestConfig{
-		PostBody: body,
-		Method:   http.MethodPost,
-		Version:  api.AuraApiVersion2,
-	})
+// createAndStoreInstance creates the instance through the Aura client and
+// (unless credOpts.noCredentialStorage) stores the generated dbms credential
+// locally, recording the resolved credential name under the "credential_name"
+// key of the returned instance record. Storing credentials is CLI state, not
+// part of the Aura API, so it lives here rather than in the service.
+func createAndStoreInstance(ctx context.Context, cfg *clicfg.Config, scope aura.Scope, spec aura.InstanceCreate, credOpts credentialOptions) (map[string]any, error) {
+	created, err := aura.New(cfg).Instances().Create(ctx, scope, spec)
 	if err != nil {
 		return nil, err
 	}
-
-	// NOTE: Instance create should not return OK (200), it always returns 202, checking both just in case
-	if statusCode != http.StatusAccepted && statusCode != http.StatusOK {
-		return nil, nil
-	}
-
-	responseData := api.ParseBody(resBody)
-	instance, err := responseData.GetSingleOrError()
-	if err != nil {
-		return nil, err
-	}
+	instance := created.Record
 
 	if !credOpts.noCredentialStorage {
 		instanceID, _ := instance["id"].(string)

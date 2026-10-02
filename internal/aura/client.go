@@ -50,7 +50,9 @@ func New(cfg *clicfg.Config) Client {
 
 // Instance statuses callers may wait on. They mirror the API's values.
 const (
-	InstanceStatusResuming = api.InstanceStatusResuming
+	InstanceStatusCreating    = api.InstanceStatusCreating
+	InstanceStatusResuming    = api.InstanceStatusResuming
+	InstanceStatusOverwriting = api.InstanceStatusOverwriting
 )
 
 // InstanceService operates on Aura instances. Callers never see which API
@@ -70,6 +72,17 @@ type InstanceService interface {
 	Delete(ctx context.Context, scope Scope, id string) (*Instance, error)
 	Pause(ctx context.Context, scope Scope, id string) (*Instance, error)
 	Resume(ctx context.Context, scope Scope, id string) (*Instance, error)
+
+	// Create provisions an instance. The returned Record carries the generated
+	// username and one-time password (registered for redaction as soon as they
+	// are received); the instance is still creating, so use WaitWhile with
+	// InstanceStatusCreating to block until it is ready.
+	Create(ctx context.Context, scope Scope, spec InstanceCreate) (*Instance, error)
+	// Update changes an instance's name and/or memory.
+	Update(ctx context.Context, scope Scope, id string, patch InstancePatch) (*Instance, error)
+	// Overwrite replaces an instance's data with that of a source instance or
+	// snapshot.
+	Overwrite(ctx context.Context, scope Scope, id string, src OverwriteSource) (*Instance, error)
 
 	// Verify returns a not-found error unless the instance belongs to the
 	// scope's project. Use it before operating on an instance through an

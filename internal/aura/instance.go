@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/clievents"
 )
 
 // Instance is an Aura instance as the CLI sees it.
@@ -60,6 +61,38 @@ func newInstance(raw map[string]any) Instance {
 		Storage:        str(rec, "storage"),
 		Record:         rec,
 	}
+}
+
+// InstanceCreate describes an instance to provision. Type is the canonical
+// v2beta1 tier name (free, professional, business-critical,
+// virtual-dedicated-cloud); the v2beta1 endpoint rejects the v1 names. An empty
+// Name is replaced by the lowest unused InstanceNN name in the project.
+type InstanceCreate struct {
+	Name                 string
+	Version              string
+	Region               string
+	Type                 string
+	CloudProvider        string
+	Memory               string
+	CustomerManagedKeyID string
+	VectorOptimized      bool
+	// GraphAnalyticsPlugin requests the graph analytics plugin (professional
+	// tier only).
+	GraphAnalyticsPlugin bool
+}
+
+// InstancePatch is a partial update: only non-empty fields are sent.
+type InstancePatch struct {
+	Name   string
+	Memory string
+}
+
+// OverwriteSource names the data to overwrite an instance with. An empty
+// InstanceID means the instance itself (restore from one of its own
+// snapshots); SnapshotID is optional (latest when empty).
+type OverwriteSource struct {
+	InstanceID string
+	SnapshotID string
 }
 
 type instanceService struct {
@@ -181,10 +214,15 @@ func (s instanceService) get(path, doing string) ([]byte, error) {
 	return body, nil
 }
 
-// mutate sends a state-changing request that the API answers with 202 Accepted
-// (200 is tolerated) and the instance record.
+// mutate sends a body-less state-changing request; see send.
 func (s instanceService) mutate(method, path string, version api.AuraApiVersion, doing string) (*Instance, error) {
-	body, status, err := api.MakeRequest(s.cfg, path, &api.RequestConfig{Method: method, Version: version})
+	return s.send(method, path, nil, version, doing)
+}
+
+// send issues a state-changing request that the API answers with 202 Accepted
+// (200 is tolerated) and the instance record.
+func (s instanceService) send(method, path string, reqBody map[string]any, version api.AuraApiVersion, doing string) (*Instance, error) {
+	body, status, err := api.MakeRequest(s.cfg, path, &api.RequestConfig{Method: method, PostBody: reqBody, Version: version})
 	if err != nil {
 		return nil, err
 	}
@@ -221,4 +259,111 @@ func decodeRows(body []byte) ([]map[string]any, error) {
 		return nil, clierr.NewFatalError("unexpected response from Aura API: %s", err.Error())
 	}
 	return []map[string]any{row}, nil
+}
+
+func (s instanceService) Create(ctx context.Context, scope Scope, spec InstanceCreate) (*Instance, error) {
+	if err := ValidateResourceID("organization", scope.OrgID); err != nil {
+		return nil, err
+	}
+	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
+		return nil, err
+	}
+	if spec.Name == "" {
+		existing, err := s.List(ctx, scope)
+		if err != nil {
+			return nil, err
+		}
+		names := make([]string, 0, len(existing))
+		for _, e := range existing {
+			if e.Name != "" {
+				names = append(names, e.Name)
+			}
+		}
+		spec.Name = DefaultName("Instance", names)
+	}
+
+	body, err := s.send(http.MethodPost, api.ScopedInstancesPath(scope.OrgID, scope.ProjectID), spec.body(scope.ProjectID), api.AuraApiVersion2, "creating instance")
+	if err != nil {
+		return nil, err
+	}
+	// The password is returned once. Register it before anything can print or
+	// capture it so tee files, telemetry and MCP transcripts scrub the literal.
+	if pw, _ := body.Record["password"].(string); pw != "" {
+		clievents.RegisterSecretValue(pw)
+	}
+	return body, nil
+}
+
+func (s instanceService) Update(ctx context.Context, scope Scope, id string, patch InstancePatch) (*Instance, error) {
+	if err := s.Verify(ctx, scope, id); err != nil {
+		return nil, err
+	}
+	body := map[string]any{}
+	if patch.Memory != "" {
+		body["memory"] = patch.Memory
+	}
+	if patch.Name != "" {
+		body["name"] = patch.Name
+	}
+	return s.send(http.MethodPatch, "/instances/"+id, body, "", "updating instance")
+}
+
+func (s instanceService) Overwrite(ctx context.Context, scope Scope, id string, src OverwriteSource) (*Instance, error) {
+	if err := s.Verify(ctx, scope, id); err != nil {
+		return nil, err
+	}
+	if src.InstanceID == "" {
+		src.InstanceID = id
+	} else if err := ValidateResourceID("source instance", src.InstanceID); err != nil {
+		return nil, err
+	}
+	body := map[string]any{"source_instance_id": src.InstanceID}
+	if src.SnapshotID != "" {
+		if err := ValidateResourceID("source snapshot", src.SnapshotID); err != nil {
+			return nil, err
+		}
+		body["source_snapshot_id"] = src.SnapshotID
+	}
+	return s.send(http.MethodPost, "/instances/"+id+"/overwrite", body, "", "overwriting instance")
+}
+
+// body assembles the POST body from a validated spec. Free instances ignore the
+// caller's memory, region, cloud provider and version and use fixed defaults,
+// matching the Aura free-tier contract.
+//
+// graph_analytics is the v2beta1 enum, not the v1 "graph_analytics_plugin" bool
+// (the scoped endpoint silently ignores the latter). Only the true case
+// ("plugin") is sent: "unavailable" is not a settable create-time value, as
+// every new instance gets at least "serverless", so the false case omits the
+// field and lets the API apply that default.
+func (c InstanceCreate) body(projectID string) map[string]any {
+	body := map[string]any{
+		"version":        c.Version,
+		"region":         c.Region,
+		"name":           c.Name,
+		"type":           c.Type,
+		"cloud_provider": c.CloudProvider,
+		"tenant_id":      projectID,
+	}
+
+	if c.Type == "free" {
+		body["memory"] = "1GB"
+		body["region"] = "europe-west1"
+		body["cloud_provider"] = "gcp"
+		body["version"] = "5"
+	} else {
+		body["memory"] = c.Memory
+		body["region"] = c.Region
+		body["vector_optimized"] = c.VectorOptimized
+	}
+
+	if c.Type == "professional" && c.GraphAnalyticsPlugin {
+		body["graph_analytics"] = "plugin"
+	}
+
+	if c.CustomerManagedKeyID != "" {
+		body["customer_managed_key_id"] = c.CustomerManagedKeyID
+	}
+
+	return body
 }

@@ -6,8 +6,8 @@ package instance
 import (
 	"errors"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
@@ -98,14 +98,10 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			}
 
 			// Auto-generate a default name when --name is omitted.
-			name, err = resolveInstanceName(cfg, name, resolvedOrgID, resolvedProjectID)
-			if err != nil {
-				return err
-			}
+			scope := aura.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
+			spec := newInstanceCreate(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
 
-			body := buildCreateInstanceBody(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin, resolvedProjectID)
-
-			instance, err := createAndStoreInstance(cfg, body, resolvedOrgID, resolvedProjectID, credentialOptions{
+			instance, err := createAndStoreInstance(cmd.Context(), cfg, scope, spec, credentialOptions{
 				instanceType:        string(_type),
 				credentialName:      credentialName,
 				noCredentialStorage: noCredentialStorage,
@@ -123,12 +119,12 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					instanceId, _ := instance["id"].(string)
 
-					pollResponse, err := api.PollInstance(cfg, resolvedOrgID, resolvedProjectID, instanceId, api.InstanceStatusCreating)
+					status, err := aura.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceId, aura.InstanceStatusCreating)
 					if err != nil {
 						return err
 					}
 
-					fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+					fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 

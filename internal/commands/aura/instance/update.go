@@ -4,9 +4,7 @@
 package instance
 
 import (
-	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -47,40 +45,16 @@ neo4j-cli aura instance update 00000000 --organization-id 00000000-0000-0000-000
 			instanceID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
-			// Pre-flight ownership check.
-			if err := aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceID); err != nil {
-				return err
-			}
-
-			body := map[string]any{}
-
-			if memory != "" {
-				body["memory"] = memory
-			}
-
-			if name != "" {
-				body["name"] = name
-			}
-
-			path := fmt.Sprintf("/instances/%s", instanceID)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:   http.MethodPatch,
-				PostBody: body,
-			})
+			inst, err := aura.New(cfg).Instances().Update(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, instanceID, aura.InstancePatch{Name: name, Memory: memory})
 			if err != nil {
 				return err
 			}
-
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(inst.Record), []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 			return nil
 		},
 	}

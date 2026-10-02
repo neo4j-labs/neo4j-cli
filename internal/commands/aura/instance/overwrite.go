@@ -6,7 +6,6 @@ package instance
 import (
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -58,44 +57,21 @@ neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organ
 			}
 
 			// Pre-flight ownership check.
-			if err := aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
-				return err
-			}
-
-			path := fmt.Sprintf("/instances/%s/overwrite", instanceId)
-
-			postBody := make(map[string]any)
-			if sourceInstanceId == "" {
-				sourceInstanceId = instanceId
-			}
-			postBody["source_instance_id"] = sourceInstanceId
-
-			if sourceSnapshotId != "" {
-				postBody["source_snapshot_id"] = sourceSnapshotId
-			}
-
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:   http.MethodPost,
-				PostBody: postBody,
-			})
+			scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
+			inst, err := aura.New(cfg).Instances().Overwrite(cmd.Context(), scope, instanceId, aura.OverwriteSource{InstanceID: sourceInstanceId, SnapshotID: sourceSnapshotId})
 			if err != nil {
 				return err
 			}
-
-			if statusCode == http.StatusAccepted {
-				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(inst.Record), []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"})
 
 			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				pollResponse, err := api.PollInstance(cfg, orgID, projectID, instanceId, api.InstanceStatusOverwriting)
+				status, err := aura.New(cfg).Instances().WaitWhile(cmd.Context(), scope, instanceId, aura.InstanceStatusOverwriting)
 				if err != nil {
 					return err
 				}
 
-				fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+				fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 
 			return nil
