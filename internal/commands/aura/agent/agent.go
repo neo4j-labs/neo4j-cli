@@ -4,6 +4,7 @@
 package agent
 
 import (
+	auraflags "github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.PersistentFlags().String("base-url", "", "")
 
 	flags.RegisterAuraCredentialFlag(cmd, cfg)
+	auraflags.RegisterOrgProjectFlags(cmd)
 
 	return cmd
 }

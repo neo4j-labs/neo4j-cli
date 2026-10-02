@@ -17,29 +17,25 @@ import (
 
 func newUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
-		organizationId string
-		projectId      string
-		name           string
-		description    string
-		dbid           string
-		isPrivate      bool
-		toolsJSON      string
-		systemPrompt   string
-		isMcpEnabled   bool
-		enabled        bool
+		name         string
+		description  string
+		dbid         string
+		isPrivate    bool
+		toolsJSON    string
+		systemPrompt string
+		isMcpEnabled bool
+		enabled      bool
 	)
 
 	const (
-		organizationIdFlag = "organization-id"
-		projectIdFlag      = "project-id"
-		nameFlag           = "name"
-		descriptionFlag    = "description"
-		dbidFlag           = "dbid"
-		isPrivateFlag      = "is-private"
-		toolsFlag          = "tools"
-		systemPromptFlag   = "system-prompt"
-		isMcpEnabledFlag   = "is-mcp-enabled"
-		enabledFlag        = "enabled"
+		nameFlag         = "name"
+		descriptionFlag  = "description"
+		dbidFlag         = "dbid"
+		isPrivateFlag    = "is-private"
+		toolsFlag        = "tools"
+		systemPromptFlag = "system-prompt"
+		isMcpEnabledFlag = "is-mcp-enabled"
+		enabledFlag      = "enabled"
 	)
 
 	cmd := &cobra.Command{
@@ -59,11 +55,8 @@ neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --tools '[{"nam
 # Update an agent and emit the response as JSON
 neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --description "updated" --rw --format json`,
 		Args: cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return utils.SetProjectFlagsAsRequired(cfg, cmd)
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
+			organizationId, projectId, err := utils.ResolveOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
@@ -109,8 +102,6 @@ neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --description "
 		},
 	}
 
-	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project ID")
 	cmd.Flags().StringVar(&name, nameFlag, "", "Agent name")
 	cmd.Flags().StringVar(&description, descriptionFlag, "", "Agent description")
 	cmd.Flags().StringVar(&dbid, dbidFlag, "", "Aura database instance ID the agent connects to")

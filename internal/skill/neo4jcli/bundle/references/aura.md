@@ -96,6 +96,8 @@ Flags:
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
 | `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+| `--organization-id` | string | - | ID of the Aura organization |
+| `--project-id` | string | - | ID of the Aura project |
 
 ### neo4j-cli aura agent create
 
@@ -115,8 +117,6 @@ Flags:
 | `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | (required) Agent name |
-| `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project ID |
 | `--system-prompt` | string | - | Optional system prompt for the agent |
 | `--tools` | string | - | (required) Tools configuration as a JSON array |
 
@@ -148,8 +148,6 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
-| `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project ID |
 | `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
@@ -171,14 +169,7 @@ Returns agent details
 
 Returns the details of a specific agent.
 
-Usage: `neo4j-cli aura agent get <id> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project ID |
+Usage: `neo4j-cli aura agent get <id>`
 
 Examples:
 
@@ -206,8 +197,6 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--input` | string | - | (required) Input message to send to the agent |
-| `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project ID |
 
 Examples:
 
@@ -228,14 +217,7 @@ Returns a list of agents
 
 Returns a list of agents for the specified project.
 
-Usage: `neo4j-cli aura agent list [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project ID |
+Usage: `neo4j-cli aura agent list`
 
 Examples:
 
@@ -268,8 +250,6 @@ Flags:
 | `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | (required) Agent name |
-| `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project ID |
 | `--system-prompt` | string | - | System prompt for the agent |
 | `--tools` | string | - | (required) Tools configuration as a JSON array |
 
@@ -304,8 +284,6 @@ Flags:
 | `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | Agent name |
-| `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project ID |
 | `--system-prompt` | string | - | System prompt for the agent |
 | `--tools` | string | - | Tools configuration as a JSON array |
 

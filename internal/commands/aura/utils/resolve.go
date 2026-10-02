@@ -6,6 +6,7 @@ package utils
 import (
 	"context"
 	"github.com/neo4j/cli/internal/aura"
+	"strings"
 
 	"github.com/neo4j/cli/internal/aura/flags"
 	"github.com/neo4j/cli/internal/clicfg"
@@ -112,6 +113,21 @@ func ResolveProjectID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
 	_, err := aura.New(cfg).Projects().Get(context.Background(), orgID, projectID)
 	return err
+}
+
+// defaultOrgAndProject parses the aura.default-workspace slug ("{orgId}/{projectId}")
+// and returns the org and project portions. Returns empty strings when the workspace
+// is not set or does not contain a '/'.
+func defaultOrgAndProject(cfg *clicfg.Config) (orgID, projectID string) {
+	ctx := cfg.Aura.DefaultWorkspace()
+	if ctx == "" {
+		return "", ""
+	}
+	idx := strings.LastIndex(ctx, "/")
+	if idx < 0 {
+		return "", ""
+	}
+	return ctx[:idx], ctx[idx+1:]
 }
 
 // OrgFromWorkspace returns the organization portion of aura.default-workspace,

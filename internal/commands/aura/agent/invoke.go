@@ -19,15 +19,11 @@ import (
 
 func newInvokeCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
-		organizationId string
-		projectId      string
-		input          string
+		input string
 	)
 
 	const (
-		organizationIdFlag = "organization-id"
-		projectIdFlag      = "project-id"
-		inputFlag          = "input"
+		inputFlag = "input"
 	)
 
 	cmd := &cobra.Command{
@@ -44,11 +40,8 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 # Invoke an agent and emit the response as JSON
 neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello" --rw --format json`,
 		Args: cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return utils.SetProjectFlagsAsRequired(cfg, cmd)
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
+			organizationId, projectId, err := utils.ResolveOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
@@ -64,8 +57,6 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 		},
 	}
 
-	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project ID")
 	cmd.Flags().StringVar(&input, inputFlag, "", "(required) Input message to send to the agent")
 
 	if err := cmd.MarkFlagRequired(inputFlag); err != nil {

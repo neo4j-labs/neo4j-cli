@@ -146,7 +146,7 @@ func TestListAgentsWithMissingProjectId(t *testing.T) {
 
 	helper.ExecuteCommand(fmt.Sprintf("agent list --organization-id=%s", organizationId))
 
-	helper.AssertErr("Error: required flag(s) \"project-id\" not set")
+	helper.AssertErr("Error: no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
 }
 
 func TestListAgentsWithMissingOrganizationId(t *testing.T) {
@@ -157,5 +157,26 @@ func TestListAgentsWithMissingOrganizationId(t *testing.T) {
 
 	helper.ExecuteCommand(fmt.Sprintf("agent list --project-id=%s", projectId))
 
-	helper.AssertErr("Error: required flag(s) \"organization-id\" not set")
+	helper.AssertErr("Error: no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'")
+}
+
+func TestAgentCommandsRejectMalformedScopeIDsBeforeAnyRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cmd  string
+		want string
+	}{
+		{name: "traversal in organization id", cmd: "agent list --organization-id=../x --project-id=proj-1", want: `invalid organization id "../x"`},
+		{name: "slash in project id", cmd: "agent get a1 --organization-id=org-1 --project-id=a/b", want: `invalid project id "a/b"`},
+		{name: "traversal in agent id", cmd: "agent get ../../x --organization-id=org-1 --project-id=proj-1", want: `invalid agent id "../../x"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			helper.ExecuteCommand(tc.cmd)
+
+			helper.AssertErr("Error: " + tc.want)
+		})
+	}
 }

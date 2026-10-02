@@ -13,16 +13,6 @@ import (
 )
 
 func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
-	var (
-		organizationId string
-		projectId      string
-	)
-
-	const (
-		organizationIdFlag = "organization-id"
-		projectIdFlag      = "project-id"
-	)
-
 	cmd := &cobra.Command{
 		Annotations: map[string]string{"write": "true"},
 		Use:         "delete <id>",
@@ -39,13 +29,10 @@ neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --organization-
 # Delete an agent and emit the response as JSON
 neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --force --format json`,
 		Args: cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return utils.SetProjectFlagsAsRequired(cfg, cmd)
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
+			organizationId, projectId, err := utils.ResolveOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
@@ -66,9 +53,6 @@ neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --fo
 	}
 
 	confirm.Register(cmd)
-
-	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project ID")
 
 	return cmd
 }
