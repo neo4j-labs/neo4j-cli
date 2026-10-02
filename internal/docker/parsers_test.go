@@ -181,3 +181,42 @@ func TestParseInspectOutput(t *testing.T) {
 		assert.Contains(t, err.Error(), `"dev"`)
 	})
 }
+
+// podman is documented as a drop-in (`alias docker=podman`), but its
+// `ps --format '{{json .}}'` differs from docker's: Names is an array and Labels
+// an object (or null). Both must parse to the same normalised entry.
+func TestParsePsOutput_AcceptsDockerAndPodmanShapes(t *testing.T) {
+	dockerLine := `{"ID":"abc","Names":"dev,dev-alias","Labels":"org.neo4j.cli.managed=true,org.neo4j.cli.edition=enterprise","State":"running","Status":"Up 2 hours","Image":"neo4j:enterprise"}`
+	podmanLine := `{"Id":"abc","Names":["dev","dev-alias"],"Labels":{"org.neo4j.cli.managed":"true","org.neo4j.cli.edition":"enterprise"},"State":"running","Status":"Up 2 hours","Image":"neo4j:enterprise"}`
+
+	d, err := parsePsOutput(dockerLine)
+	require.NoError(t, err)
+	p, err := parsePsOutput(podmanLine)
+	require.NoError(t, err)
+
+	require.Len(t, d, 1)
+	require.Len(t, p, 1)
+	assert.Equal(t, "abc", p[0].ID, "podman's Id key is matched case-insensitively")
+	assert.Equal(t, d[0].Names, p[0].Names)
+	assert.Equal(t, "dev,dev-alias", p[0].Names)
+	assert.ElementsMatch(t, strings.Split(d[0].Labels, ","), strings.Split(p[0].Labels, ","))
+	assert.Equal(t, "org.neo4j.cli.edition=enterprise,org.neo4j.cli.managed=true", p[0].Labels, "object keys are sorted for a deterministic result")
+}
+
+func TestParsePsOutput_PodmanNullAndEmptyFields(t *testing.T) {
+	got, err := parsePsOutput(`{"Id":"x","Names":["only"],"Labels":null,"State":"exited","Image":"i"}` + "\n" +
+		`{"Id":"y","Names":null,"Labels":{},"State":"running","Image":"i"}`)
+
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, "only", got[0].Names)
+	assert.Equal(t, "", got[0].Labels, "null labels")
+	assert.Equal(t, "", got[1].Names, "null names")
+	assert.Equal(t, "", got[1].Labels, "empty labels object")
+}
+
+func TestParsePsOutput_RejectsAnUnexpectedFieldShape(t *testing.T) {
+	_, err := parsePsOutput(`{"Id":"x","Names":42}`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Names")
+}

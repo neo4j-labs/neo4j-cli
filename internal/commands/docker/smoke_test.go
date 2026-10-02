@@ -119,7 +119,11 @@ func TestSmoke_Lifecycle(t *testing.T) {
 	// resolve to the bare `neo4j:enterprise` tag (Docker Hub does NOT publish
 	// neo4j:latest-enterprise). Pin it live so a future image-resolution
 	// refactor that silently re-breaks the tag is caught by the smoke.
-	assert.Equal(t, "neo4j:enterprise", asString(getRow["image"]), "get image must be bare neo4j:enterprise")
+	// The tag is what matters; podman reports the registry-qualified reference
+	// (docker.io/library/neo4j:enterprise) where docker reports neo4j:enterprise.
+	image := asString(getRow["image"])
+	assert.True(t, strings.HasSuffix(image, "neo4j:enterprise"), "get image must resolve to the bare neo4j:enterprise tag, got %q", image)
+	assert.NotContains(t, image, "latest-enterprise", "Docker Hub does not publish neo4j:latest-enterprise")
 
 	// All 9 documented fields are present; status is Docker's
 	// "Up X seconds" or similar (non-empty); ephemeral is bool false.

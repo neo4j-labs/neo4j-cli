@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -445,6 +446,77 @@ func parseNeo4jPluginsEnv(env []string) []string {
 // The scanner buffer is bumped to 4 MiB because rich label payloads
 // (multi-line org.opencontainers.image.* etc.) can push a single emitted line
 // well past bufio's default 64 KB ceiling.
+// UnmarshalJSON accepts the `ps --format '{{json .}}'` shape of both runtimes.
+// Docker emits Names as a comma-separated string and Labels as "k=v,k2=v2";
+// podman emits Names as an array and Labels as an object (or null). Both are
+// normalised to Docker's string forms, so everything downstream — name
+// collision detection, `docker list` — is runtime-agnostic.
+func (e *PsEntry) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ID     string          `json:"ID"`
+		Names  json.RawMessage `json:"Names"`
+		Status string          `json:"Status"`
+		State  string          `json:"State"`
+		Image  string          `json:"Image"`
+		Labels json.RawMessage `json:"Labels"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	names, err := flexNames(raw.Names)
+	if err != nil {
+		return fmt.Errorf("decode the Names field: %w", err)
+	}
+	labels, err := flexLabels(raw.Labels)
+	if err != nil {
+		return fmt.Errorf("decode the Labels field: %w", err)
+	}
+	*e = PsEntry{ID: raw.ID, Names: names, Status: raw.Status, State: raw.State, Image: raw.Image, Labels: labels}
+	return nil
+}
+
+// flexNames reads a string, an array of strings, or null.
+func flexNames(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s, nil
+	}
+	var list []string
+	if err := json.Unmarshal(raw, &list); err != nil {
+		return "", fmt.Errorf("expected a string or an array of strings: %w", err)
+	}
+	return strings.Join(list, ","), nil
+}
+
+// flexLabels reads a "k=v,k2=v2" string, an object, or null. Object keys are
+// sorted so the result is deterministic.
+func flexLabels(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s, nil
+	}
+	var m map[string]string
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return "", fmt.Errorf("expected a string or an object of strings: %w", err)
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	pairs := make([]string, 0, len(keys))
+	for _, k := range keys {
+		pairs = append(pairs, k+"="+m[k])
+	}
+	return strings.Join(pairs, ","), nil
+}
+
 func parsePsOutput(stdout string) ([]PsEntry, error) {
 	entries := []PsEntry{}
 	if stdout == "" {
