@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package main
+package cli
 
 import (
 	"bytes"
@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/cli/internal/cli"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/confirm"
@@ -42,7 +41,7 @@ func TestCommandSlug(t *testing.T) {
 		{name: "no args falls back to root", args: []string{}, want: "root"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := cli.NewCmd(cfg)
+			cmd := NewCmd(cfg)
 			assert.Equal(t, tc.want, commandSlug(cmd, tc.args))
 		})
 	}
@@ -84,7 +83,7 @@ func TestHandleFailure_TeesRedactedAndAttachesPath(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	cmd := cli.NewCmd(cfg)
+	cmd := NewCmd(cfg)
 
 	captured := []byte("connecting to neo4j://neo4j:" + secret + "@host\npassword=" + secret + "\n")
 	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, captured, errors.New("boom"))
@@ -109,7 +108,7 @@ func TestHandleFailure_TeeDisabled(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json","tee-enabled":false}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	cmd := cli.NewCmd(cfg)
+	cmd := NewCmd(cfg)
 
 	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, []byte("password=hunter2\n"), errors.New("boom"))
 
@@ -129,7 +128,7 @@ func TestHandleFailure_PreservesExitCode(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	cmd := cli.NewCmd(cfg)
+	cmd := NewCmd(cfg)
 
 	for _, tc := range []struct {
 		name string
@@ -380,7 +379,7 @@ func TestConfirmCancellation_EndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	cmd := cli.NewCmd(cfg)
+	cmd := NewCmd(cfg)
 
 	var stdout, stderr bytes.Buffer
 	cmd.SetOut(&stdout)
@@ -394,7 +393,7 @@ func TestConfirmCancellation_EndToEnd(t *testing.T) {
 	require.True(t, errors.Is(execErr, confirm.ErrCancelled),
 		"cmd.Execute must return confirm.ErrCancelled so main.go's chokepoint can exit 0; got %v", execErr)
 
-	// main.go's chokepoint runs `os.Exit(0)` for this error class — verify the
+	// main.go's chokepoint runs `return 0` for this error class — verify the
 	// exitCodeFor mapping would otherwise produce non-zero (proves the
 	// chokepoint adds real behaviour rather than being a no-op).
 	assert.NotEqual(t, 0, exitCodeFor(execErr), "without the chokepoint exitCodeFor would map ErrCancelled to non-zero")
@@ -408,4 +407,35 @@ func TestConfirmCancellation_EndToEnd(t *testing.T) {
 	cred, err := cfg.Credentials.Aura.Get("work")
 	require.NoError(t, err)
 	assert.Equal(t, "id", cred.ClientId)
+}
+
+func newRunConfig(t *testing.T) *clicfg.Config {
+	t.Helper()
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+	return clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+}
+
+func TestRun_ExitCodesAndStreams(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantStdout string
+		wantStderr string
+	}{
+		{name: "version succeeds", args: []string{"--version"}, wantCode: 0, wantStdout: "neo4j-cli version"},
+		{name: "unknown flag is a usage error", args: []string{"--bad-flag"}, wantCode: 2, wantStderr: "bad-flag"},
+		{name: "unknown command is a usage error", args: []string{"nonesuch"}, wantCode: 2, wantStderr: "nonesuch"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := run(newRunConfig(t), tc.args, IO{In: strings.NewReader(""), Out: &stdout, Err: &stderr})
+
+			assert.Equal(t, tc.wantCode, code)
+			assert.Contains(t, stdout.String(), tc.wantStdout)
+			assert.Contains(t, stdout.String()+stderr.String(), tc.wantStderr)
+		})
+	}
 }

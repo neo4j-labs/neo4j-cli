@@ -114,7 +114,7 @@ func RequireTyped(cmd *cobra.Command, resourceType, resourceID string) error {
 
 // cancel narrates the cancellation to stderr, silences cobra's default
 // error/usage rendering for this command, and returns ErrCancelled. The
-// chokepoint in `cmd/neo4j-cli/main.go` matches ErrCancelled and exits 0.
+// chokepoint in `internal/cli/run.go` matches ErrCancelled and exits 0.
 func cancel(cmd *cobra.Command) error {
 	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
 	cmd.SilenceErrors = true

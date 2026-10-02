@@ -57,7 +57,7 @@ ARCHITECTURE PATTERN: Cobra command tree — one file per leaf, dirs mirror comm
 One binary: `neo4j-cli` (`cmd/neo4j-cli/main.go`; tree builder in `internal/cli`); Aura tree lives under the `aura` subcommand.
 
 ```
-cmd/neo4j-cli/main.go   # entrypoint; mounts the tree, renders clierr
+cmd/neo4j-cli/main.go   # 5-line entrypoint: os.Exit(cli.Run(args, stdio))
 internal/
   cli/                  # cobra root builder (NewCmd, Version) — importable by generators
   commands/             # cobra surface, one dir per resource, one file per leaf
@@ -144,12 +144,12 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 
 ## Tee-on-failure
 
-- Failing commands tee redacted output to `internal/tee` (`ConfigPrefix/neo4j/cli/tee/`); `tee_path` in error envelope. Root sets `SilenceErrors: true`, so `clierr.Render` runs AFTER capture is read in `main.go` — `teeContent` appends `err.Error()` to captured bytes before `tee.Save`. Preserve that or no-intermediate-output failures tee empty.
+- Failing commands tee redacted output to `internal/tee` (`ConfigPrefix/neo4j/cli/tee/`); `tee_path` in error envelope. Root sets `SilenceErrors: true`, so `clierr.Render` runs AFTER capture is read in `cli.Run` (`internal/cli/run.go`) — `teeContent` appends `err.Error()` to captured bytes before `tee.Save`. Preserve that or no-intermediate-output failures tee empty.
 
 ## clierr Rendering
 
 - `clierr.Render` (`internal/clierr/render.go`) renders `*clierr.CLIError` from `ce.Message`/`ce.Code` via `errors.As` — NOT from `Error()`. Wrapping with `fmt.Errorf("...: %w", ce)` DROPS appended text. To append: mutate `ce.Message` (via `errors.As`), return original error. Plain errors → `NewFatalError("%s", err.Error())` (so `%w` survives only for them).
-- Aura test harness (`ExecuteCommand`/`E`) does NOT call `clierr.Render` (that's in `main.go`) — tests get cobra's default stderr. To assert envelope/exit-code, recover `*clierr.CLIError` via `errors.As`, inspect `ce.Code`/`ce.BuildEnvelope()`.
+- Aura test harness (`ExecuteCommand`/`E`) does NOT call `clierr.Render` (that's in `cli.Run`) — tests get cobra's default stderr. To assert envelope/exit-code, recover `*clierr.CLIError` via `errors.As`, inspect `ce.Code`/`ce.BuildEnvelope()`.
 
 ## Output / TTY / Casing
 

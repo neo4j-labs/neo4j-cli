@@ -60,7 +60,7 @@ func StripControl(s string) string {
 
 // StdoutIsTerminal is the package-level test seam for terminal detection. It
 // reads the real os.Stdout file descriptor directly so that wrapping the
-// command's writer (e.g. the tee io.MultiWriter installed in main.go) cannot
+// command's writer (e.g. the tee io.MultiWriter installed in cli.Run) cannot
 // affect format resolution (CLI-210). Mirrors internal/flags.stdoutIsTerminal.
 // Tests may replace this var and restore it via t.Cleanup.
 var StdoutIsTerminal = func() bool {

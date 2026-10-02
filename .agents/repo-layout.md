@@ -2,7 +2,7 @@
 
 Gotchas and conventions about how the repo is laid out — mostly the agent-skill subsystem.
 
-- `internal/cli/app.go` builds the neo4j-cli cobra tree and exports `Version`. `cmd/neo4j-cli/main.go` is a thin entrypoint. Generators (e.g. skill bundle) import `internal/cli` to walk the tree without main-side effects.
+- `internal/cli/app.go` builds the neo4j-cli cobra tree and exports `Version`; `internal/cli/run.go` owns `Run(args, IO) int` (config, events, tee-on-failure, error rendering, panic recovery). `cmd/neo4j-cli/main.go` only calls it. Generators (e.g. skill bundle) import `internal/cli` to walk the tree without main-side effects.
 - `internal/commands/aura/aura.go` exposes `NewCmd` (the `neo4j-cli aura` mount); there is no standalone aura binary.
 - `internal/skill/` holds shared agent-skill logic (catalog, path expansion, installer). Hermetic-friendly: `DetectAgents(afero.Fs)` takes an FS; tests use `afero.NewMemMapFs` + `t.Setenv("HOME", ...)`.
 - `internal/skill/filesystem.go::CopyBundle(dst, dstDir, bundle fs.FS)` walks `bundle` (already scoped — generators do `fs.Sub(Bundle, "bundle")` upstream). Uses `filepath.FromSlash` on each entry so embed.FS forward slashes translate to OS separators on Windows.

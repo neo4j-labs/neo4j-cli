@@ -5,7 +5,7 @@
 The CLI is built as a tree of Cobra commands, one file per leaf command. Directory structure mirrors the command hierarchy.
 
 ```
-cmd/neo4j-cli/main.go        # Binary entrypoint
+cmd/neo4j-cli/main.go        # Binary entrypoint (calls cli.Run)
 internal/
   cli/                       # Root cobra command + hooks (NewCmd, Version)
   commands/                  # Cobra surface: one directory per resource, one file per action

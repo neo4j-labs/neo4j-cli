@@ -4,7 +4,7 @@
 // Package app builds the neo4j-cli cobra command tree.
 //
 // It is split out of package main so generators (e.g. the per-binary skill
-// bundle generator) can import the tree without pulling in main's entrypoint
+// bundle generator) can import the tree without pulling in Run's entrypoint
 // side-effects.
 package cli
 
@@ -50,7 +50,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:   "Allows you to manage Neo4j resources",
 		Long:    "Allows you to manage Neo4j resources. Write operations require --rw.",
 		Version: Version,
-		// Cobra's built-in "Error: <msg>" print is suppressed; main.go's
+		// Cobra's built-in "Error: <msg>" print is suppressed; run.go's
 		// clierr.Render is the single point of error output so JSON/plaintext
 		// envelope rendering stays consistent. SilenceUsage stays unset — the
 		// existing silenceUsageOnError hook in internal/flags handles RunE-side
