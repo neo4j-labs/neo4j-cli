@@ -28,7 +28,7 @@ func TestDoctor_Help_BuildsAndListsLeaf(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTestFs: %v", err)
 	}
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	t.Run("doctor --help renders Long and Example", func(t *testing.T) {
 		cmd := desktop.NewCmd(cfg)

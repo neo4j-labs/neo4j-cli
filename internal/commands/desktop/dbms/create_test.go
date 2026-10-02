@@ -94,7 +94,7 @@ func (h *createHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := dbms.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -399,7 +399,7 @@ func TestCreate_NoCredentialsJSONWrite(t *testing.T) {
 func TestCreate_Annotated_Write(t *testing.T) {
 	// Sanity check: the create command must be annotated write=true so the
 	// root enforcement fires on non-TTY callers.
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := dbms.NewCmd(cfg)
 	var createCmd *cobra.Command
 	for _, c := range parent.Commands() {
@@ -419,7 +419,7 @@ func TestCreate_Annotated_Write(t *testing.T) {
 func TestCreate_NoEditionFlag(t *testing.T) {
 	// REQ-F-002: there is no --edition flag — Desktop 2 is enterprise-only
 	// and exposing one would imply choice we don't have.
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := dbms.NewCmd(cfg)
 	var createCmd *cobra.Command
 	for _, c := range parent.Commands() {

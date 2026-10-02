@@ -78,7 +78,7 @@ func (h *startHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := dbms.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -318,7 +318,7 @@ func TestStart_NoCredentialsJSONWrite(t *testing.T) {
 }
 
 func TestStart_Annotated_Write(t *testing.T) {
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := dbms.NewCmd(cfg)
 	var startCmd *cobra.Command
 	for _, c := range parent.Commands() {

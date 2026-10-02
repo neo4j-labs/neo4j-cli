@@ -32,7 +32,7 @@ func newAppCmd(t *testing.T, mcpEnabled bool) *cobra.Command {
 	t.Helper()
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cfg.Flags.SetForTest("flag.mcp-server", mcpEnabled)
 	return cli.NewCmd(cfg)
 }
@@ -47,7 +47,7 @@ func newAppCmdEveryFlagEnabled(t *testing.T) *cobra.Command {
 	t.Helper()
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	for name := range clicfg.Registry {
 		cfg.Flags.SetForTest(name, true)
 	}
@@ -135,7 +135,7 @@ func newMCPInstallFixture(t *testing.T, detected bool) (*bytes.Buffer, *bytes.Bu
 		require.NoError(t, fs.MkdirAll(claudeDir, 0755))
 	}
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	for name := range clicfg.Registry {
 		cfg.Flags.SetForTest(name, true)
 	}
@@ -165,7 +165,7 @@ func newMCPInstallFixtureFS(t *testing.T, detected bool) (afero.Fs, *cobra.Comma
 		require.NoError(t, fs.MkdirAll(claudeDir, 0755))
 	}
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	for name := range clicfg.Registry {
 		cfg.Flags.SetForTest(name, true)
 	}

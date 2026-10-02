@@ -327,7 +327,7 @@ func newDoctorCfgDefaultFormat(t *testing.T) *clicfg.Config {
 	if err != nil {
 		t.Fatalf("GetTestFs: %v", err)
 	}
-	return clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 // TestDoctor_DefaultFormat_TTYIsTable verifies the auto-detection path:

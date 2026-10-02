@@ -46,7 +46,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 				return err
 			}
 		}
-		cfg.Aura.SetDebug(debug.Resolve(cmd))
+		cfg.AuraRuntime.SetDebug(debug.Resolve(cmd))
 		if err := applyEnvCredential(cfg); err != nil {
 			return err
 		}
@@ -85,7 +85,7 @@ func applyEnvCredential(cfg *clicfg.Config) error {
 	if clientID == "" || clientSecret == "" {
 		return nil
 	}
-	cfg.Aura.SetActiveCredential(&credentials.AuraCredential{
+	cfg.AuraRuntime.SetActiveCredential(&credentials.AuraCredential{
 		Name:         "env",
 		ClientId:     clientID,
 		ClientSecret: clientSecret,

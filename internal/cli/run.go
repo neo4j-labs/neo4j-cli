@@ -153,7 +153,18 @@ func Run(args []string, stdio IO) int {
 	defer stop()
 
 	return guarded(stdio, args, func() int {
-		return run(ctx, clicfg.NewConfig(afero.NewOsFs(), Version, clicfg.GlobalScope), args, stdio)
+		cfg, err := clicfg.Load(afero.NewOsFs(), Version)
+		if err != nil {
+			// A config file that cannot be read or created is reported like any
+			// other failure (naming the file), not as a crash.
+			var ce *clierr.CLIError
+			if !errors.As(err, &ce) {
+				ce = clierr.NewFatalError("%s", err.Error())
+			}
+			clierr.Render(ce, stdio.Out, stdio.Err, resolveFormatForRender(args, ""))
+			return exitCodeFor(ce)
+		}
+		return run(ctx, cfg, args, stdio)
 	})
 }
 

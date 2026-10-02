@@ -30,7 +30,7 @@ func runGet(t *testing.T, args string, rows []map[string]any, execErr error) (st
 		return rows, execErr
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newGetCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)

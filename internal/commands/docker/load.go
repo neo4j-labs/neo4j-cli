@@ -136,7 +136,7 @@ func loadIntoNewContainerLeaf(cmd *cobra.Command, cfg *clicfg.Config, client eng
 	}
 	defer cleanup()
 
-	result, err := engine.LoadDumpIntoNewContainer(ctx, cfg, client, engine.NewContainerLoad{
+	result, err := engine.LoadDumpIntoNewContainer(ctx, cfg.DbmsCredentials(), client, engine.NewContainerLoad{
 		Name:       name,
 		Database:   database,
 		Version:    version,

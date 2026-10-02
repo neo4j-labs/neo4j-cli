@@ -56,7 +56,7 @@ func newRunHarness(t *testing.T, output string) *runHarness {
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 	return &runHarness{
-		cfg:    clicfg.NewConfig(fs, "test", clicfg.QueryScope),
+		cfg:    clicfg.NewConfig(fs, "test"),
 		stdout: &bytes.Buffer{},
 		stderr: &bytes.Buffer{},
 	}
@@ -633,7 +633,7 @@ func TestRejectWriteCypher_QueryTypeClassifier(t *testing.T) {
 			withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
 				return makeExplainResponse(tc.qt), nil
 			})
-			cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.QueryScope))
+			cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test"))
 			cmd.SetContext(context.Background())
 			err := rejectWriteCypher(cmd, &conn{}, "MATCH (n) RETURN n", nil)
 			if tc.wantErr {
@@ -695,7 +695,7 @@ func TestRejectWriteCypher_ProfileClassifiedViaExplainBody(t *testing.T) {
 	r.resp["EXPLAIN MATCH (n)   RETURN  n"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
 	r.install(t)
 
-	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.QueryScope))
+	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test"))
 	cmd.SetContext(context.Background())
 	err := rejectWriteCypher(cmd, &conn{}, "PROFILE MATCH (n)   RETURN  n", nil)
 	require.NoError(t, err)
@@ -714,7 +714,7 @@ func TestRejectWriteCypher_ExplainSkipsClassification(t *testing.T) {
 	r := newSeamRouter()
 	r.install(t)
 
-	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.QueryScope))
+	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test"))
 	cmd.SetContext(context.Background())
 	err := rejectWriteCypher(cmd, &conn{}, "EXPLAIN MATCH (n)   RETURN  n", nil)
 	require.NoError(t, err)
@@ -1461,7 +1461,7 @@ func TestPromptPassword_NonTTYReturnsUsageError(t *testing.T) {
 	dbconn.StdinIsTTY = func() bool { return false }
 
 	fs := afero.NewMemMapFs()
-	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetOut(&bytes.Buffer{})
@@ -1484,7 +1484,7 @@ func TestPromptPassword_NonTTY_AcceptEnvVarsOn_NamesEnvVar(t *testing.T) {
 	t.Setenv("NEO4J_CLI_ACCEPT_ENV_VARS", "1")
 
 	fs := afero.NewMemMapFs()
-	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetOut(&bytes.Buffer{})

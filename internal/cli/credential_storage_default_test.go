@@ -79,7 +79,7 @@ func TestInitCredentialStorageDefault(t *testing.T) {
 			fs, err := testfs.GetTestFs(tc.configJSON, tc.credentialsJSON)
 			require.NoError(t, err)
 
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 
 			var stderr bytes.Buffer
 			initCredentialStorageDefault(cfg, &stderr)
@@ -119,7 +119,7 @@ func TestInitCredentialStorageDefault_NoCreds_KeyringUnavailable(t *testing.T) {
 	fs, err := testfs.GetTestFs("{}", "{}")
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	var stderr bytes.Buffer
 	initCredentialStorageDefault(cfg, &stderr)
@@ -144,7 +144,7 @@ func TestInitCredentialStorageDefault_SubsequentRuns_NoNotice(t *testing.T) {
 	fs, err := testfs.GetTestFs("{}", "{}")
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	var stderr bytes.Buffer
 	// First call: writes keyring silently

@@ -60,7 +60,7 @@ func TestHistoryHookRecordsThroughExecute(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"history-enabled":true,"history-limit":1000}`, "{}")
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test-version", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test-version")
 	root := NewCmd(cfg)
 	root.SetOut(&bytes.Buffer{})
 	root.SetErr(&bytes.Buffer{})
@@ -85,7 +85,7 @@ func TestHistoryHookFiresForNestedAuraSubcommand(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"history-enabled":true,"history-limit":1000}`, "{}")
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test-version", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test-version")
 	root := NewCmd(cfg)
 	root.SetOut(&bytes.Buffer{})
 	root.SetErr(&bytes.Buffer{})
@@ -109,7 +109,7 @@ func TestHistoryHookSkipsHelpCommandThroughExecute(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"history-enabled":true,"history-limit":1000}`, "{}")
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test-version", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test-version")
 	root := NewCmd(cfg)
 	root.SetOut(&bytes.Buffer{})
 	root.SetErr(&bytes.Buffer{})

@@ -36,8 +36,8 @@ func envCfg(t *testing.T, serverURL, clientID, clientSecret string) *clicfg.Conf
 	}`, serverURL, serverURL)
 	fs, err := testfs.GetTestFs(cfgJSON, `{"aura":{"credentials":[],"default-credential":""}}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-	cfg.Aura.SetActiveCredential(&credentials.AuraCredential{
+	cfg := clicfg.NewConfig(fs, "test")
+	cfg.AuraRuntime.SetActiveCredential(&credentials.AuraCredential{
 		Name:         "env",
 		ClientId:     clientID,
 		ClientSecret: clientSecret,
@@ -203,8 +203,8 @@ func TestTokenCache_NotConsultedWhenAcceptEnvVarsOff(t *testing.T) {
 	cfgJSON := fmt.Sprintf(`{"format":"json","aura":{"auth-url":"%s/oauth/token","base-url":"%s"}}`, srv, srv)
 	fs, err := testfs.GetTestFs(cfgJSON, `{"aura":{"credentials":[],"default-credential":""}}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-	cfg.Aura.SetActiveCredential(&credentials.AuraCredential{Name: "env", ClientId: "id", ClientSecret: "secret"})
+	cfg := clicfg.NewConfig(fs, "test")
+	cfg.AuraRuntime.SetActiveCredential(&credentials.AuraCredential{Name: "env", ClientId: "id", ClientSecret: "secret"})
 
 	doRequest(t, cfg)
 	doRequest(t, cfg)

@@ -114,7 +114,7 @@ func newDoctorCfg(t *testing.T) *clicfg.Config {
 	if err != nil {
 		t.Fatalf("GetTestFs: %v", err)
 	}
-	return clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 func passResult(name, label, detail string) *desktop.CheckResult {

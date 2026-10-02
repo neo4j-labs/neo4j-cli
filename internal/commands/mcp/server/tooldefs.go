@@ -43,7 +43,7 @@ func EnsureToolDefinitions(srcCfg *clicfg.Config) {
 			enabled := srcCfg.Flags.Enabled(name)
 			storedFlagStates[name] = enabled
 		}
-		cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion, clicfg.GlobalScope)
+		cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion)
 		defer cfg.Events.Flush()
 		for name, enabled := range storedFlagStates {
 			if enabled {

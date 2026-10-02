@@ -32,7 +32,7 @@ func runSetPassword(t *testing.T, args string, execRows []map[string]any, execEr
 		return execRows, execErr
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newSetPasswordCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -66,7 +66,7 @@ func TestSetPassword_ExplicitPassword_HappyPath(t *testing.T) {
 		return setPasswordUserRow, nil
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newSetPasswordCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -119,7 +119,7 @@ func TestSetPassword_PasswordChangeRequired(t *testing.T) {
 				return setPasswordUserRow, nil
 			}))
 
-			cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 			conn := testConn()
 			cmd := newSetPasswordCmd(cfg, &conn)
 			flags.RegisterOutputFlag(cmd, cfg)
@@ -152,7 +152,7 @@ func TestSetPassword_TTYPrompt_HappyPath(t *testing.T) {
 		return setPasswordUserRow, nil
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newSetPasswordCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -205,7 +205,7 @@ func TestSetPassword_NotFound_ReturnsNotFoundError(t *testing.T) {
 }
 
 func TestSetPassword_HasWriteAnnotation(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newSetPasswordCmd(cfg, &conn)
 	assert.Equal(t, "true", cmd.Annotations["write"])

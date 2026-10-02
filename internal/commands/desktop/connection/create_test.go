@@ -86,7 +86,7 @@ func (h *createHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := desktop.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -287,7 +287,7 @@ func TestCreate_DuplicateName_400Surfaces(t *testing.T) {
 // TestCreate_Annotated_Write covers the cobra annotation: the create leaf
 // must be tagged write=true so the root --rw enforcement fires.
 func TestCreate_Annotated_Write(t *testing.T) {
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := desktop.NewCmd(cfg)
 	var leaf *cobra.Command
 	for _, c := range parent.Commands() {
@@ -311,7 +311,7 @@ func TestCreate_Annotated_Write(t *testing.T) {
 // TestAllLeafCommands_HaveExamples whole-tree gate: each new leaf carries
 // a flush-left Example with ≥3 invocations.
 func TestCreate_Example_FlushLeft(t *testing.T) {
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := desktop.NewCmd(cfg)
 	var leaf *cobra.Command
 	for _, c := range parent.Commands() {

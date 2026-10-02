@@ -247,7 +247,7 @@ func TestInstall_BundleFallbackToConfig(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, fs.MkdirAll(claudeDir, 0755))
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	for name := range clicfg.Registry {
 		cfg.Flags.SetForTest(name, true)
 	}

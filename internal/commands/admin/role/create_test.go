@@ -29,7 +29,7 @@ func runCreate(t *testing.T, args string, responses []struct {
 
 	withSequencedExecFn(t, responses)
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := NewCmd(cfg, &conn, roleExecFn)
 	flags.RegisterOutputFlag(cmd, cfg)

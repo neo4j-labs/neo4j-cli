@@ -53,7 +53,7 @@ func TestMakeRequest_AbandonsABlockedRequestWhenContextIsCancelled(t *testing.T)
 func TestPoll_IsInterruptedDuringTheIntervalSleep(t *testing.T) {
 	srv := hangingServer(t)
 	cfg := buildTestConfig(t, srv.URL, cachedTokenCredJSON)
-	cfg.Aura.SetPollingConfig(5, 3600) // an hour between attempts
+	cfg.AuraRuntime.SetPollingConfig(5, 3600) // an hour between attempts
 
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(50*time.Millisecond, cancel)
@@ -73,7 +73,7 @@ func TestPoll_AlreadyCancelledContextMakesNoRequest(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	cfg := buildTestConfig(t, srv.URL, cachedTokenCredJSON)
-	cfg.Aura.SetPollingConfig(3, 0)
+	cfg.AuraRuntime.SetPollingConfig(3, 0)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

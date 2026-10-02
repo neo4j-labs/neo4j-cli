@@ -24,7 +24,7 @@ func newTestConfigFmt(t *testing.T, format string) *clicfg.Config {
 	}
 	fs, err := testfs.GetTestFs(config, "{}")
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test-version", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "test-version")
 }
 
 // seedEntries writes the given entries to the history file (oldest-first, one

@@ -69,7 +69,7 @@ func (h *listHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := desktop.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)

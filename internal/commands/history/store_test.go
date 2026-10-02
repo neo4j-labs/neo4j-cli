@@ -27,7 +27,7 @@ func newTestConfig(t *testing.T, config, credentials string) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs(config, credentials)
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test-version", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "test-version")
 }
 
 func withArgs(t *testing.T, args []string) {

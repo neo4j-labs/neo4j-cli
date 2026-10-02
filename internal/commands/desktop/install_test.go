@@ -86,7 +86,7 @@ func (h *installHelper) run(command string) error {
 // an escape).
 func (h *installHelper) runArgs(args []string) error {
 	h.t.Helper()
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := desktop.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -481,7 +481,7 @@ func TestInstall_ManifestFetchError_Surfaces(t *testing.T) {
 }
 
 func TestInstall_HasWriteAnnotation(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	root := desktop.NewCmd(cfg)
 	var install *cobra.Command
 	for _, c := range root.Commands() {

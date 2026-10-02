@@ -80,7 +80,7 @@ func (h *dbmsTestHelper) executeCommandWithConfig(command string, configJSON str
 		assert.Nil(h.t, afero.WriteFile(fs, path, []byte(contents), 0600))
 	}
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := dbms.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)

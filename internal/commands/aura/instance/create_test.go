@@ -744,7 +744,7 @@ func TestCreatePreRunERejectsNilDbms(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json","aura":{"default-workspace":"test-org-id/YOUR_TENANT_ID"}}`, credentialsJSON)
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	require.Nil(t, cfg.Credentials.Dbms, "expected Dbms to be nil with 'dbms: null' in credentials file")
 
 	cmd := instance.NewCreateCmd(cfg)

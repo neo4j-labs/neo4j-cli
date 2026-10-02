@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/clicfg/credentials"
 	"github.com/neo4j/cli/internal/clierr"
 )
 
@@ -25,8 +25,8 @@ const MaxNameSuffix = 99
 // the first non-colliding `<name>-<i>` suffix in 1..maxNameSuffix.
 // Returns a clierr.UsageError when every suffix in that range is taken
 // so the operator gets a clear "pick a different --name" hint.
-func ResolveContainerName(ctx context.Context, client Client, cfg *clicfg.Config, requested string) (string, error) {
-	used, err := collectUsedNames(ctx, client, cfg)
+func ResolveContainerName(ctx context.Context, client Client, dbms *credentials.DbmsCredentials, requested string) (string, error) {
+	used, err := collectUsedNames(ctx, client, dbms)
 	if err != nil {
 		return "", err
 	}
@@ -50,7 +50,7 @@ func ResolveContainerName(ctx context.Context, client Client, cfg *clicfg.Config
 // single set used for collision detection. The set is conservative: any
 // PsEntry.Names value gets split on `,` and trimmed because Docker emits
 // multi-name entries as a comma-separated string.
-func collectUsedNames(ctx context.Context, client Client, cfg *clicfg.Config) (map[string]struct{}, error) {
+func collectUsedNames(ctx context.Context, client Client, dbms *credentials.DbmsCredentials) (map[string]struct{}, error) {
 	used := map[string]struct{}{}
 
 	entries, err := client.PsAll(ctx, nil)
@@ -66,8 +66,8 @@ func collectUsedNames(ctx context.Context, client Client, cfg *clicfg.Config) (m
 		}
 	}
 
-	if cfg != nil && cfg.Credentials != nil && cfg.Credentials.Dbms != nil {
-		for _, cred := range cfg.Credentials.Dbms.List() {
+	if dbms != nil {
+		for _, cred := range dbms.List() {
 			if cred != nil && cred.Name != "" {
 				used[cred.Name] = struct{}{}
 			}

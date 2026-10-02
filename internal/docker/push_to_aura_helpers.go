@@ -10,7 +10,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 
-	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/clicfg/credentials"
 	"github.com/neo4j/cli/internal/clierr"
 )
 
@@ -85,19 +85,19 @@ var stopStartFn = stopStartDatabase
 // `-e NEO4J_PASSWORD` passthrough flags (NAME only, no =value), so the password
 // never appears in the host docker CLI argv, the in-container neo4j-admin argv,
 // or any redacted stderr echo.
-func PushToAura(ctx context.Context, cfg *clicfg.Config, client Client, containerName, database string, target AuraTarget) error {
+func PushToAura(ctx context.Context, dbms *credentials.DbmsCredentials, client Client, containerName, database string, target AuraTarget) error {
 	if err := ValidateDatabaseName(database); err != nil {
 		return err
 	}
 
-	if cfg == nil || cfg.Credentials == nil || cfg.Credentials.Dbms == nil {
+	if dbms == nil {
 		return clierr.NewUsageError(
 			"credential storage is not available; cannot resolve the source password for container %q",
 			containerName,
 		)
 	}
 
-	cred, err := cfg.Credentials.Dbms.Get(containerName)
+	cred, err := dbms.Get(containerName)
 	if err != nil {
 		return clierr.NewUsageError(
 			"no stored dbms credential named %q for the source container; create the container with `neo4j-cli docker create --name %s` (which stores a credential) or add one via `neo4j-cli credential dbms add`",

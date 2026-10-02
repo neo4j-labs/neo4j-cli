@@ -38,7 +38,7 @@ func setupRunTest(t *testing.T) *Executor {
 	// list_commands tests that depend on it.
 	storedRootFactory = nil
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	defer cfg.Events.Flush()
 	exec, err := NewExecutor(cfg, runTestRootFactory)
 	require.NoError(t, err)

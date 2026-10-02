@@ -88,7 +88,7 @@ func listTargetsRootFactory(stubs map[string]string) RootFactory {
 // rootFactory that has its stubs populated.
 func listTargetsExecutor(t *testing.T, stubs map[string]string) *Executor {
 	t.Helper()
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	exec, err := NewExecutor(cfg, listTargetsRootFactory(stubs))
 	require.NoError(t, err)
 	return exec

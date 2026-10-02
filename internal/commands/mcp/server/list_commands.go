@@ -23,7 +23,7 @@ import (
 func HandleListCommands(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
 	tree := resolveTreeArg(req)
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion)
 	defer cfg.Events.Flush()
 	for name, enabled := range storedFlagStates {
 		if enabled {

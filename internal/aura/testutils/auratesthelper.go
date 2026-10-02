@@ -66,9 +66,9 @@ func (helper *AuraTestHelper) ExecuteCommandE(command string) error {
 		assert.Nil(helper.t, afero.WriteFile(helper.fs, path, []byte(content), 0o644))
 	}
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
-	cfg.Aura.SetPollingConfig(5, 0)
+	cfg.AuraRuntime.SetPollingConfig(5, 0)
 
 	cmd := aura.NewCmd(cfg)
 	flags.RegisterRwFlag(cmd)

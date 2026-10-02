@@ -80,7 +80,7 @@ func newFixture(t *testing.T, homeDir, output string, agentNames ...string) *fix
 		require.NoError(t, memFs.MkdirAll(dp, 0755))
 	}
 
-	cfg := clicfg.NewConfig(memFs, "1.7.0", clicfg.SkillsScope)
+	cfg := clicfg.NewConfig(memFs, "1.7.0")
 	cmd := newStandaloneSkillCmd(cfg)
 
 	stdout := &bytes.Buffer{}
@@ -111,7 +111,7 @@ func newRootFixture(t *testing.T, homeDir, output string, agentNames ...string) 
 		require.NoError(t, memFs.MkdirAll(dp, 0755))
 	}
 
-	cfg := clicfg.NewConfig(memFs, "1.7.0", clicfg.SkillsScope)
+	cfg := clicfg.NewConfig(memFs, "1.7.0")
 	cmd := newRootSkillCmd(cfg)
 
 	stdout := &bytes.Buffer{}

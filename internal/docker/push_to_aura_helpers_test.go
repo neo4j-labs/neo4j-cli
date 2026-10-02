@@ -33,7 +33,7 @@ func newDeployTestCfg(t *testing.T) *clicfg.Config {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 // stubStopStartFn swaps the package-level stopStartFn for a recorder that
@@ -63,7 +63,7 @@ func TestPushToAura_HappyPath_Ordering(t *testing.T) {
 	starts := stubStopStartFn(t, nil)
 	fake := NewFakeClient()
 
-	err := PushToAura(context.Background(), cfg, fake, "dev", "neo4j", AuraTarget{
+	err := PushToAura(context.Background(), cfg.DbmsCredentials(), fake, "dev", "neo4j", AuraTarget{
 		URI:      "neo4j+s://abc.databases.neo4j.io",
 		Username: "neo4j",
 		Password: "aurasecret",
@@ -129,7 +129,7 @@ func TestPushToAura_StartRunsWhenUploadFails(t *testing.T) {
 		return "", nil
 	}
 
-	err := PushToAura(context.Background(), cfg, fake, "dev", "neo4j", AuraTarget{
+	err := PushToAura(context.Background(), cfg.DbmsCredentials(), fake, "dev", "neo4j", AuraTarget{
 		URI:      "neo4j+s://abc.databases.neo4j.io",
 		Username: "neo4j",
 		Password: "aurasecret",
@@ -155,7 +155,7 @@ func TestPushToAura_MissingCredential_UsageError(t *testing.T) {
 	starts := stubStopStartFn(t, nil)
 	fake := NewFakeClient()
 
-	err := PushToAura(context.Background(), cfg, fake, "dev", "neo4j", AuraTarget{
+	err := PushToAura(context.Background(), cfg.DbmsCredentials(), fake, "dev", "neo4j", AuraTarget{
 		URI:      "neo4j+s://abc.databases.neo4j.io",
 		Username: "neo4j",
 		Password: "aurasecret",
@@ -184,7 +184,7 @@ func TestPushToAura_InjectionDatabaseName_Rejected(t *testing.T) {
 			starts := stubStopStartFn(t, nil)
 			fake := NewFakeClient()
 
-			err := PushToAura(context.Background(), cfg, fake, "dev", name, AuraTarget{
+			err := PushToAura(context.Background(), cfg.DbmsCredentials(), fake, "dev", name, AuraTarget{
 				URI:      "neo4j+s://abc.databases.neo4j.io",
 				Username: "neo4j",
 				Password: "aurasecret",
@@ -217,7 +217,7 @@ func TestPushToAura_TargetPasswordAbsentFromArgvOnError(t *testing.T) {
 		return "", nil
 	}
 
-	err := PushToAura(context.Background(), cfg, fake, "dev", "neo4j", AuraTarget{
+	err := PushToAura(context.Background(), cfg.DbmsCredentials(), fake, "dev", "neo4j", AuraTarget{
 		URI:      "neo4j+s://abc.databases.neo4j.io",
 		Username: "neo4j",
 		Password: secret,

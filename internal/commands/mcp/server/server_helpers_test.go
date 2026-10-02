@@ -24,7 +24,7 @@ func newAppCmd(t *testing.T, mcpEnabled bool) *cobra.Command {
 	t.Helper()
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cfg.Flags.SetForTest("flag.mcp-server", mcpEnabled)
 	return cli.NewCmd(cfg)
 }
@@ -35,7 +35,7 @@ func newAppCmdEveryFlagEnabled(t *testing.T) *cobra.Command {
 	t.Helper()
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	for name := range clicfg.Registry {
 		cfg.Flags.SetForTest(name, true)
 	}
@@ -108,7 +108,7 @@ func newExecutor(t *testing.T, newRoot server.RootFactory) *server.Executor {
 	t.Helper()
 	fs, err := testfs.GetTestFs(`{"telemetry": false}`, "{}")
 	require.NoError(t, err)
-	exec, err := server.NewExecutor(clicfg.NewConfig(fs, "test", clicfg.GlobalScope), newRoot)
+	exec, err := server.NewExecutor(clicfg.NewConfig(fs, "test"), newRoot)
 	require.NoError(t, err)
 	return exec
 }

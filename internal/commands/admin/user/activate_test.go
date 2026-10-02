@@ -38,7 +38,7 @@ func runActivate(t *testing.T, args string, execResponses []fakeResponse) (strin
 		return r.rows, r.err
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newActivateCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -111,7 +111,7 @@ func TestUserActivate_NoArgs_CobraUsageError(t *testing.T) {
 }
 
 func TestUserActivate_HasWriteAnnotation(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newActivateCmd(cfg, &conn)
 	assert.Equal(t, "true", cmd.Annotations["write"])

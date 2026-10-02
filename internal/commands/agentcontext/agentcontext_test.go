@@ -27,7 +27,7 @@ func newAppCmd(t *testing.T) *cobra.Command {
 	t.Helper()
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	return cli.NewCmd(cfg)
 }
 
@@ -40,7 +40,7 @@ func newAppCmdEveryFlagEnabled(t *testing.T) *cobra.Command {
 	t.Helper()
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	for name := range clicfg.Registry {
 		cfg.Flags.SetForTest(name, true)
 	}

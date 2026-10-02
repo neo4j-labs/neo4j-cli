@@ -29,7 +29,7 @@ func runList(t *testing.T, args string, entries []engine.PsEntry) (*engine.FakeC
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	fake.PsEntries = entries

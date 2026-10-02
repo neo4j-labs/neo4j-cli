@@ -60,7 +60,7 @@ func newCfgWithCreds(t *testing.T, credsJSON string) (*clicfg.Config, afero.Fs) 
 	t.Helper()
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, credsJSON)
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test", clicfg.GlobalScope), fs
+	return clicfg.NewConfig(fs, "test"), fs
 }
 
 // storedDefaultCredJSON returns a credentials.json with one dbms credential
@@ -333,7 +333,7 @@ func TestResolveConn_Admin_UserAgent(t *testing.T) {
 			t.Chdir(t.TempDir())
 
 			fs := afero.NewMemMapFs()
-			cfg := clicfg.NewConfig(fs, tc.version, clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, tc.version)
 			cmd := newAdminCmd(cfg)
 
 			conn, err := ResolveConn(cmd, cfg, true)
@@ -364,7 +364,7 @@ func TestResolveDebug_FlagAndEnvPrecedence(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("NEO4J_DEBUG", tc.envValue)
 			fs := afero.NewMemMapFs()
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 			cmd := newAdminCmd(cfg)
 			require.NoError(t, cmd.ParseFlags(tc.flagArgs))
 			assert.Equal(t, tc.wantDebug, ResolveDebug(cmd))

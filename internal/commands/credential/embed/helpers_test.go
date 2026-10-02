@@ -68,7 +68,7 @@ func (h *embedTestHelper) executeCommandWithConfig(command string, configJSON st
 	assert.Nil(h.t, err)
 	h.fs = fs
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := embed.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)

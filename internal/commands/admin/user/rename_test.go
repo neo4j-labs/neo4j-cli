@@ -42,7 +42,7 @@ func runRename(t *testing.T, args string, showRows []map[string]any, execErr err
 		return showRows, nil
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newRenameCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)

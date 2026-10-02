@@ -47,7 +47,7 @@ func TestMCPGroup_EnabledByEnvVar(t *testing.T) {
 	t.Setenv("NEO4J_CLI_FLAG_MCP_SERVER", "1")
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	root := cli.NewCmd(clicfg.NewConfig(fs, "test", clicfg.GlobalScope))
+	root := cli.NewCmd(clicfg.NewConfig(fs, "test"))
 	assert.NotNil(t, findSubcommand(root, "mcp"),
 		"NEO4J_CLI_FLAG_MCP_SERVER=1 must register the group")
 }

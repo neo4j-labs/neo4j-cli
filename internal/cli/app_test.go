@@ -23,7 +23,7 @@ func TestNewCmdEnablesTraverseRunHooks(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	NewCmd(cfg)
 
 	assert.True(t, cobra.EnableTraverseRunHooks,
@@ -35,7 +35,7 @@ func TestNewCmdRegistersRwFlag(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 
 	flag := cmd.PersistentFlags().Lookup("rw")
@@ -61,7 +61,7 @@ func TestNewCmdFlagErrorFuncWrapsAsUsageError(t *testing.T) {
 			fs, err := testfs.GetDefaultTestFs()
 			require.NoError(t, err)
 
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 			cmd := NewCmd(cfg)
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})

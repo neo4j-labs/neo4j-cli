@@ -35,7 +35,7 @@ func setupServerTest(t *testing.T, gates Gates, defaultFormat string) (*mcpsdk.S
 	storedFlagStates = map[string]bool{}
 	storedRootFactory = serverTestRootFactory
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	defer cfg.Events.Flush()
 	exec, err := NewExecutor(cfg, serverTestRootFactory)
 	require.NoError(t, err)

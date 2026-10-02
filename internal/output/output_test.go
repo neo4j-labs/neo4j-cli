@@ -37,7 +37,7 @@ func newOutputCmd(t *testing.T, format string) (*cobra.Command, *clicfg.Config, 
 	cfgJSON := `{"format":"` + format + `"}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := &cobra.Command{}
 	stdout := &bytes.Buffer{}

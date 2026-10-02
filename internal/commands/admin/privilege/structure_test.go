@@ -19,7 +19,7 @@ import (
 // verbParent builds a grant/deny/revoke parent for structural assertions.
 func verbParent(t *testing.T, word string) *cobra.Command {
 	t.Helper()
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	switch word {
 	case "grant":

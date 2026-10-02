@@ -39,7 +39,7 @@ func newDeleteSetup(t *testing.T, containers map[string]engine.Container, creds 
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	for name, c := range containers {
@@ -338,7 +338,7 @@ func TestDelete_HasWriteAnnotation(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	root := NewCmd(cfg)
 
 	var found bool

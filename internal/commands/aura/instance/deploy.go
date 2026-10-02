@@ -35,7 +35,7 @@ type deployTarget struct {
 // deploy_test.go swaps a recorder so the leaf's orchestration can be exercised
 // without a docker daemon or Bolt server.
 var deployViaDockerFn = func(ctx context.Context, cfg *clicfg.Config, containerName, database string, target deployTarget) error {
-	return docker.PushToAura(ctx, cfg, docker.NewDeployClient(), containerName, database, docker.AuraTarget{
+	return docker.PushToAura(ctx, cfg.DbmsCredentials(), docker.NewDeployClient(), containerName, database, docker.AuraTarget{
 		URI:      target.URI,
 		Username: target.Username,
 		Password: target.Password,

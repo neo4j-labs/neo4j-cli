@@ -38,7 +38,7 @@ func buildTestConfig(t *testing.T, serverURL string, credJSON string) *clicfg.Co
 	fs, err := testfs.GetTestFs(cfgJSON, credJSON)
 	require.NoError(t, err)
 
-	return clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 // setupServer returns a test HTTP server that:
@@ -122,7 +122,7 @@ func TestMakeRequest_CredentialResolution(t *testing.T) {
 
 			cfg := buildTestConfig(t, srv.URL, tc.credJSON)
 			if tc.setActive != nil {
-				cfg.Aura.SetActiveCredential(tc.setActive)
+				cfg.AuraRuntime.SetActiveCredential(tc.setActive)
 			}
 
 			_, _, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
@@ -150,7 +150,7 @@ func TestMakeRequest_EnvCredentialNotPersisted(t *testing.T) {
 
 	const emptyCreds = `{"aura":{"credentials":[],"default-credential":""}}`
 	cfg := buildTestConfig(t, srv.URL, emptyCreds)
-	cfg.Aura.SetActiveCredential(&credentials.AuraCredential{
+	cfg.AuraRuntime.SetActiveCredential(&credentials.AuraCredential{
 		Name:         "env",
 		ClientId:     "env-client",
 		ClientSecret: "env-secret",
@@ -255,7 +255,7 @@ func TestMakeRequest_RejectsBlockedBaseURL(t *testing.T) {
 				}
 			}`)
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+			cfg := clicfg.NewConfig(fs, "test")
 
 			_, _, err = api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 				Method:  http.MethodGet,
@@ -285,7 +285,7 @@ func TestMakeRequest_RejectsBlockedAuthURL(t *testing.T) {
 		}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	_, _, err = api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,

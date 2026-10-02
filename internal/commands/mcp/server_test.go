@@ -40,7 +40,7 @@ func TestCheckCredentialStore_KeyringUnavailable(t *testing.T) {
 
 	fs, err := testfs.GetTestFs(`{"credential-storage":"keyring"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	defer cfg.Events.Flush()
 
 	err = checkCredentialStore(cfg)
@@ -63,7 +63,7 @@ func TestCheckCredentialStore_KeyringOK(t *testing.T) {
 
 	fs, err := testfs.GetTestFs(`{"credential-storage":"keyring"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	defer cfg.Events.Flush()
 
 	err = checkCredentialStore(cfg)
@@ -80,7 +80,7 @@ func TestCheckCredentialStore_InsecureModeSkipsProbe(t *testing.T) {
 
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	defer cfg.Events.Flush()
 
 	err = checkCredentialStore(cfg)

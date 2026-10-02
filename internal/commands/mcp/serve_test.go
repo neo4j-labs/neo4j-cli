@@ -17,7 +17,7 @@ import (
 // TestServeCmd_FlagDefaults locks the read-only-by-default posture: every gate
 // flag must default to the safe value so starting the server grants nothing.
 func TestServeCmd_FlagDefaults(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	defer cfg.Events.Flush()
 
 	cmd := newServeCmd(cfg)
@@ -38,7 +38,7 @@ func TestServeCmd_FlagDefaults(t *testing.T) {
 // command would make EnforceWriteGate demand --rw merely to START the server,
 // because stdout is never a TTY under MCP — destroying the read-only default.
 func TestServeCmd_NotWriteAnnotated(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	defer cfg.Events.Flush()
 
 	cmd := newServeCmd(cfg)

@@ -35,7 +35,7 @@ func scrub(s string) string {
 var debugW io.Writer = os.Stderr
 
 // debugEnabled gates every emit helper. Unlike the aura api package (which
-// gates at the call site via cfg.Aura.Debug()), the gate lives inside the
+// gates at the call site via cfg.AuraRuntime.Debug()), the gate lives inside the
 // helpers here so call sites in client.go/discovery.go can call them
 // unconditionally. Toggle via SetDebug.
 var debugEnabled bool

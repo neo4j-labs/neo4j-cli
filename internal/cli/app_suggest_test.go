@@ -83,7 +83,7 @@ func TestSuggestionsForTypos(t *testing.T) {
 			fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 			require.NoError(t, err)
 
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 			cmd := NewCmd(cfg)
 
 			var outBuf, errBuf bytes.Buffer
@@ -137,7 +137,7 @@ func TestSuggestionsDoNotShadowRunnableCommands(t *testing.T) {
 			fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 			require.NoError(t, err)
 
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 			cmd := NewCmd(cfg)
 
 			var outBuf, errBuf bytes.Buffer

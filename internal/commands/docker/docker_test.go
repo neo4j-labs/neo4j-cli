@@ -21,7 +21,7 @@ import (
 func TestNewCmd_Scaffold(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := NewCmd(cfg)
 	require.NotNil(t, cmd)

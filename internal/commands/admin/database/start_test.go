@@ -39,7 +39,7 @@ func runStart(t *testing.T, args string, execResponses []execResponse) (string, 
 	}
 	t.Cleanup(func() { dbExecFn = orig })
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := NewCmd(cfg, &conn, dbExecFn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -131,7 +131,7 @@ func TestStart_NoArgs_CobraUsageError(t *testing.T) {
 }
 
 func TestStart_HasWriteAnnotation(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := NewCmd(cfg, &conn, dbExecFn)
 

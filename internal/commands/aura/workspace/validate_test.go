@@ -42,7 +42,7 @@ func buildValidateTestConfig(t *testing.T, serverURL string) *clicfg.Config {
 	fs, err := testfs.GetTestFs(cfgJSON, testCredJSON)
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	return cfg
 }
 

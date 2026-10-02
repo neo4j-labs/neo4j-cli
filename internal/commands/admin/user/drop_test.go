@@ -28,7 +28,7 @@ import (
 func buildDropCmd(t *testing.T, stdin string) (*bytes.Buffer, *bytes.Buffer, func(args string) error) {
 	t.Helper()
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 
 	out := bytes.NewBuffer(nil)
 	errBuf := bytes.NewBuffer(nil)
@@ -135,7 +135,7 @@ func TestDrop_NoArgs_CobraUsageError(t *testing.T) {
 }
 
 func TestDrop_HasWriteAnnotation(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newDropCmd(cfg, &conn)
 	assert.Equal(t, "true", cmd.Annotations["write"])

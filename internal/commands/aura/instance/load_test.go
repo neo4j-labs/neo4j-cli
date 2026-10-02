@@ -84,8 +84,8 @@ func (h *loadHarness) run(command string) error {
 	fs, err := testfs.GetTestFs(cfgJSON, credsJSON)
 	require.NoError(h.t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-	cfg.Aura.SetPollingConfig(5, 0)
+	cfg := clicfg.NewConfig(fs, "test")
+	cfg.AuraRuntime.SetPollingConfig(5, 0)
 
 	cmd := NewLoadCmd(cfg)
 	auraflags.RegisterOrgProjectFlags(cmd)

@@ -65,9 +65,20 @@ type Analytics struct {
 	// Closed by Flush() to signal the worker to drain and exit.
 	eventCh chan TrackEvent
 
-	// closed is set to 1 by Flush() before closing eventCh.
+	// closed is set by Flush() before closing eventCh.
 	// EmitEvent checks this to avoid a send-on-closed-channel panic.
 	closed atomic.Bool
+
+	// mu serialises starting the worker, sending an event and closing the
+	// channel, so Flush can never close eventCh under a concurrent send. The
+	// send is non-blocking, so holding mu across it is cheap.
+	mu sync.Mutex
+
+	// started reports whether the worker goroutine exists. The worker (and the
+	// machine-ID lookup it needs) start lazily on the first event, so a Config
+	// that never emits — and every Config when telemetry is disabled — costs
+	// nothing and has nothing to Flush.
+	started bool
 
 	// wg tracks the single worker goroutine so Flush() can wait for it.
 	wg sync.WaitGroup
@@ -108,9 +119,10 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 		log:     log,
 		eventCh: make(chan TrackEvent, eventBufferSize),
 		cfg: analyticsConfig{
-			// Use the stable, OS-derived machine ID as the distinct ID so that
-			// Mixpanel can correlate events across sessions for the same user.
-			distinctID:  GetMachineID(appName),
+			// distinctID is the stable, OS-derived machine ID so Mixpanel can
+			// correlate events across sessions for the same user. It is resolved
+			// when the worker starts (see EmitEvent), not here: the lookup can
+			// shell out, and most Configs never emit an event.
 			cliVersion:  version,
 			token:       mixPanelToken,
 			startupTime: time.Now().Unix(),
@@ -118,10 +130,6 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 			appName:     appName,
 		},
 	}
-
-	// Start the single background worker that serialises all Mixpanel calls.
-	a.wg.Add(1)
-	go a.worker()
 
 	return a
 }
@@ -131,8 +139,20 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 // It never blocks: if the internal buffer is full the event is dropped
 // and a warning is logged. Safe to call after Flush() — it is a no-op.
 func (a *Analytics) EmitEvent(eventSuffix string, event TrackEvent) {
-	if a.disabled || a.closed.Load() {
+	if a.disabled {
 		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed.Load() {
+		return
+	}
+	if !a.started {
+		// Start the single background worker that serialises all Mixpanel calls.
+		a.started = true
+		a.cfg.distinctID = GetMachineID(a.cfg.appName)
+		a.wg.Add(1)
+		go a.worker()
 	}
 	event.Event = strings.Join([]string{a.cfg.appName, eventSuffix}, "_")
 	select {
@@ -144,15 +164,18 @@ func (a *Analytics) EmitEvent(eventSuffix string, event TrackEvent) {
 	}
 }
 
-// Flush closes the event channel and blocks until the worker has sent every
-// queued event. Call it once during application shutdown.
-// After Flush returns, EmitEvent is a safe no-op.
+// Flush closes the event channel and blocks until the worker (if one was ever
+// started) has sent every queued event. Call it once during application
+// shutdown. After Flush returns, EmitEvent is a safe no-op. Flushing a service
+// that never emitted returns immediately.
 func (a *Analytics) Flush() {
+	a.mu.Lock()
 	// Mark as closed before closing the channel so EmitEvent's guard fires
 	// first and we never race a send against a close.
 	if a.closed.CompareAndSwap(false, true) {
 		close(a.eventCh)
 	}
+	a.mu.Unlock()
 	a.wg.Wait()
 }
 

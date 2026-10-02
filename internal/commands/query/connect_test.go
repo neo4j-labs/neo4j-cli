@@ -29,7 +29,7 @@ import (
 func newTestCmd(t *testing.T) (*cobra.Command, *clicfg.Config) {
 	t.Helper()
 	fs := afero.NewMemMapFs()
-	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 	return cmd, cfg
 }
@@ -78,7 +78,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 			"NEO4J_PASSWORD=dotenv-pw",
 			"NEO4J_DATABASE=dotenvdb",
 		}, "\n")+"\n"), 0644))
-	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 	require.NoError(t, cmd.ParseFlags([]string{
 		"--uri=neo4j://from-flag:7687",
@@ -112,7 +112,7 @@ func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
 		[]byte("NEO4J_URI=neo4j://onlydotenv:7687\nNEO4J_USERNAME=onlydotenv\nNEO4J_PASSWORD=onlydotenvpw\n"), 0644))
-	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 
 	c, err := resolveConn(cmd, cfg)
@@ -233,7 +233,7 @@ func TestResolveConn_UserAgent(t *testing.T) {
 			t.Chdir(t.TempDir())
 
 			fs := afero.NewMemMapFs()
-			cfg := clicfg.NewConfig(fs, tc.version, clicfg.QueryScope)
+			cfg := clicfg.NewConfig(fs, tc.version)
 			cmd := NewCmd(cfg)
 
 			c, err := resolveConn(cmd, cfg)
@@ -290,7 +290,7 @@ func newTestCmdWithCreds(t *testing.T, credsJSON string) (*cobra.Command, *clicf
 	t.Helper()
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, credsJSON)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 	return cmd, cfg
 }

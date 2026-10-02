@@ -104,7 +104,7 @@ func (a *instanceAPI) client(t *testing.T) Client {
 	cfgJSON := fmt.Sprintf(`{"format":"json","aura":{"auth-url":"%s/oauth/token","base-url":"%s"}}`, srv.URL, srv.URL)
 	fs, err := testfs.GetTestFs(cfgJSON, testCredJSON)
 	require.NoError(t, err)
-	return New(clicfg.NewConfig(fs, "test", clicfg.AuraScope))
+	return New(clicfg.NewConfig(fs, "test"))
 }
 
 var createScope = Scope{OrgID: "org-1", ProjectID: "proj-1"}
@@ -176,7 +176,7 @@ func TestInstancesOverwrite(t *testing.T) {
 	cfgJSON := fmt.Sprintf(`{"format":"json","aura":{"auth-url":"%s/oauth/token","base-url":"%s"}}`, srv.URL, srv.URL)
 	fs, err := testfs.GetTestFs(cfgJSON, testCredJSON)
 	require.NoError(t, err)
-	instances := New(clicfg.NewConfig(fs, "test", clicfg.AuraScope)).Instances()
+	instances := New(clicfg.NewConfig(fs, "test")).Instances()
 	scope := Scope{OrgID: "org-1", ProjectID: "proj-1"}
 
 	t.Run("defaults the source to the instance itself and verifies ownership first", func(t *testing.T) {

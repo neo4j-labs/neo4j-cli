@@ -60,7 +60,7 @@ func TestDebug_NoSecretLeaksAcrossPaths(t *testing.T) {
 	api.SetDebugWriterForTest(t, &buf)
 
 	cfg := buildTestConfig(t, srv.URL, credJSON)
-	cfg.Aura.SetDebug(true)
+	cfg.AuraRuntime.SetDebug(true)
 
 	_, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:   http.MethodPost,

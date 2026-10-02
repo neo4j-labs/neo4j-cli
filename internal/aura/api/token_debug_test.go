@@ -36,7 +36,7 @@ func TestGetToken_DebugReportsCachedReuse(t *testing.T) {
 	api.SetDebugWriterForTest(t, &buf)
 
 	cfg := buildTestConfig(t, srv.URL, cachedTokenCredJSON)
-	cfg.Aura.SetDebug(true)
+	cfg.AuraRuntime.SetDebug(true)
 
 	_, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
@@ -58,7 +58,7 @@ func TestGetToken_DebugReportsFetchAndStatus(t *testing.T) {
 	api.SetDebugWriterForTest(t, &buf)
 
 	cfg := buildTestConfig(t, srv.URL, noTokenCredJSON)
-	cfg.Aura.SetDebug(true)
+	cfg.AuraRuntime.SetDebug(true)
 
 	_, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,

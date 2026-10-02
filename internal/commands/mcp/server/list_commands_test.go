@@ -172,7 +172,7 @@ func setupListCommandsTest(t *testing.T) {
 
 	storedVersion = "test"
 	storedFlagStates = map[string]bool{}
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	defer cfg.Events.Flush()
 	storedRootFactory = testRootFactory
 	root := testRootFactory(cfg)

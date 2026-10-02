@@ -81,7 +81,7 @@ func generate(pkgDir string) error {
 		return fmt.Errorf("read query-additions.md: %w", err)
 	}
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), cli.Version, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), cli.Version)
 	root := cli.NewCmd(cfg)
 
 	files, err := render.Bundle(root, render.Options{

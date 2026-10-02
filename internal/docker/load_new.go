@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/clicfg/credentials"
 )
 
 // LoaderImportDir is the in-container mount point the dump is bind-mounted into
@@ -67,7 +67,7 @@ type NewContainerResult struct {
 // load a dump from any supported source version. neo4j-admin database load requires the dump to
 // be named `<database>.dump` under --from-path, so the dump is staged under that
 // name in the bind-mounted dir before loading.
-func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client Client, load NewContainerLoad) (NewContainerResult, error) {
+func LoadDumpIntoNewContainer(ctx context.Context, dbms *credentials.DbmsCredentials, client Client, load NewContainerLoad) (NewContainerResult, error) {
 	if err := ValidateDatabaseName(load.Database); err != nil {
 		return NewContainerResult{}, err
 	}
@@ -79,7 +79,7 @@ func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client Cl
 		return NewContainerResult{}, err
 	}
 
-	chosenName, err := ResolveContainerName(ctx, client, cfg, load.Name)
+	chosenName, err := ResolveContainerName(ctx, client, dbms, load.Name)
 	if err != nil {
 		return NewContainerResult{}, err
 	}
@@ -171,8 +171,8 @@ func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client Cl
 
 	uri := fmt.Sprintf("neo4j://localhost:%d", boltPort)
 
-	if cfg != nil && cfg.Credentials != nil && cfg.Credentials.Dbms != nil {
-		if err := cfg.Credentials.Dbms.Add(chosenName, "neo4j", password, load.Database, uri); err != nil {
+	if dbms != nil {
+		if err := dbms.Add(chosenName, "neo4j", password, load.Database, uri); err != nil {
 			return NewContainerResult{}, err
 		}
 	}

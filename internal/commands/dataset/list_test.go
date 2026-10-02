@@ -27,7 +27,7 @@ func runList(t *testing.T, args string) (string, error) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -92,7 +92,7 @@ func TestList_NoLoadLeafUnderDataset(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 	for _, c := range cmd.Commands() {
 		assert.NotEqual(t, "load", c.Name(), "dataset must be discovery-only — no load leaf")

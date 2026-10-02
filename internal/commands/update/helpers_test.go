@@ -137,7 +137,7 @@ func runWithOptsFormat(t *testing.T, current string, opts runOpts, format string
 	cfgJSON := `{"format":"` + format + `"}`
 	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, current)
 
 	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}
@@ -160,7 +160,7 @@ func runWithOptsSplit(t *testing.T, current string, opts runOpts, format string)
 	cfgJSON := `{"format":"` + format + `"}`
 	tfs, terr := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, terr)
-	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, current)
 
 	cmd := NewCmd(cfg, nil, "")
 	stdoutBuf := &bytes.Buffer{}
@@ -183,7 +183,7 @@ func runWithOptsParented(t *testing.T, current string, opts runOpts) (string, er
 	t.Helper()
 	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, current)
 
 	root := &cobra.Command{Use: "neo4j-cli"}
 	updateCmd := NewCmd(cfg, nil, "")
@@ -227,7 +227,7 @@ func runWithBundleFormat(t *testing.T, current string, opts runOpts, format stri
 	cfgJSON := `{"format":"` + format + `"}`
 	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, current)
 
 	cmd := NewCmd(cfg, stubBundle, "neo4j-cli")
 	out := &bytes.Buffer{}
@@ -251,7 +251,7 @@ func runWithSplitBuffers(t *testing.T, current string, opts runOpts) (string, st
 	t.Helper()
 	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, current)
 
 	cmd := NewCmd(cfg, nil, "")
 	outBuf := &bytes.Buffer{}

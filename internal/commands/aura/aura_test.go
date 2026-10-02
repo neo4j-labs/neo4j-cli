@@ -18,7 +18,7 @@ func TestNewCmdDoesNotRegisterRwFlag(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 
 	assert.Nil(t, cmd.PersistentFlags().Lookup("rw"))
@@ -28,7 +28,7 @@ func TestNewCmd_RejectsRemovedTenantCommand(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})

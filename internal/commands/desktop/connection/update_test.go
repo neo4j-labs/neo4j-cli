@@ -73,7 +73,7 @@ func (h *updateHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := desktop.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -305,7 +305,7 @@ func TestUpdate_SuccessRendersConnection(t *testing.T) {
 // TestUpdate_Annotated_Write covers the cobra annotation: the update leaf
 // must be tagged write=true so the root --rw enforcement fires.
 func TestUpdate_Annotated_Write(t *testing.T) {
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := desktop.NewCmd(cfg)
 	var leaf *cobra.Command
 	for _, c := range parent.Commands() {
@@ -328,7 +328,7 @@ func TestUpdate_Annotated_Write(t *testing.T) {
 // TestUpdate_Example_FlushLeft mirrors the create equivalent: every new
 // leaf carries a flush-left Example with ≥3 invocations.
 func TestUpdate_Example_FlushLeft(t *testing.T) {
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := desktop.NewCmd(cfg)
 	var leaf *cobra.Command
 	for _, c := range parent.Commands() {

@@ -79,7 +79,7 @@ func (h *deleteHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := desktop.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -386,7 +386,7 @@ func TestDelete_UnknownUUID_Surfaces404(t *testing.T) {
 // TestDelete_Annotated_Write: the delete leaf must be tagged write=true so
 // the root --rw enforcement fires.
 func TestDelete_Annotated_Write(t *testing.T) {
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := desktop.NewCmd(cfg)
 	var leaf *cobra.Command
 	for _, c := range parent.Commands() {
@@ -408,7 +408,7 @@ func TestDelete_Annotated_Write(t *testing.T) {
 
 // TestDelete_Example_FlushLeft mirrors the create / update equivalents.
 func TestDelete_Example_FlushLeft(t *testing.T) {
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := desktop.NewCmd(cfg)
 	var leaf *cobra.Command
 	for _, c := range parent.Commands() {

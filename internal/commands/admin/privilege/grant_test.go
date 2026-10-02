@@ -28,7 +28,7 @@ func runGrant(t *testing.T, args string, calls *[]sequencedCall, responses []str
 
 	withRecordingSequencedExecFn(t, calls, responses)
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := NewCmd(cfg, &conn, privilegeExecFn)
 	flags.RegisterOutputFlag(cmd, cfg)

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -106,5 +107,33 @@ func TestExitCode_SIGINTDuringARequestExits130(t *testing.T) {
 	case <-time.After(20 * time.Second):
 		_ = cmd.Process.Kill()
 		t.Fatalf("the CLI did not exit after SIGINT\nstderr:\n%s", stderr.String())
+	}
+}
+
+// TestExitCode_CorruptConfigFileIsACleanError pins that an unparseable
+// config.json is reported naming the file (exit 1), not as a panic with a
+// crash report.
+func TestExitCode_CorruptConfigFileIsACleanError(t *testing.T) {
+	bin := buildBinary(t)
+	home := t.TempDir()
+	dir := configDirFor(t, home)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"format": "json"`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code, stdout, stderr := runCLI(t, bin, []string{"config", "list"}, home, "http://127.0.0.1:1")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d (want 1)\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	combined := stdout + stderr
+	if !strings.Contains(combined, "cannot read the config file") || !strings.Contains(combined, "config.json") {
+		t.Fatalf("the message should name the config file\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
+	}
+	if strings.Contains(combined, "Unexpected error running CLI") || strings.Contains(combined, "goroutine ") {
+		t.Fatalf("a corrupt config is an ordinary error, not a crash\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
 	}
 }

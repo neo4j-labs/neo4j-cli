@@ -50,7 +50,7 @@ func newUpdateCmdForTest(t *testing.T, current, format string) (*cobra.Command, 
 	cfgJSON := `{"format":"` + format + `"}`
 	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, current)
 
 	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}

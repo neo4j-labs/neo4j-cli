@@ -47,8 +47,8 @@ func TestPoll_DebugEmitsLoopContext(t *testing.T) {
 	api.SetDebugWriterForTest(t, &buf)
 
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
-	cfg.Aura.SetDebug(true)
-	cfg.Aura.SetPollingConfig(5, 0)
+	cfg.AuraRuntime.SetDebug(true)
+	cfg.AuraRuntime.SetPollingConfig(5, 0)
 
 	res, err := api.PollInstance(context.Background(), cfg, pollTestOrgID, pollTestProjectID, "abc", "creating")
 	require.NoError(t, err)
@@ -72,7 +72,7 @@ func TestPoll_DebugOffEmitsNoLoopLines(t *testing.T) {
 
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 	// debug not set -> off
-	cfg.Aura.SetPollingConfig(5, 0)
+	cfg.AuraRuntime.SetPollingConfig(5, 0)
 
 	_, err := api.PollInstance(context.Background(), cfg, pollTestOrgID, pollTestProjectID, "abc", "creating")
 	require.NoError(t, err)

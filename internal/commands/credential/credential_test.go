@@ -75,7 +75,7 @@ func (h *credentialTestHelper) executeCommandWithConfig(command string, configJS
 	assert.Nil(h.t, err)
 	h.fs = fs
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := credential.NewCredentialCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)

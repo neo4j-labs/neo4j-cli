@@ -79,7 +79,7 @@ func MakeRequest(ctx context.Context, cfg *clicfg.Config, path string, config *R
 		return responseBody, 0, err
 	}
 
-	debug := cfg.Aura.Debug()
+	debug := cfg.AuraRuntime.Debug()
 
 	start := time.Now()
 	res, err := client.Do(req)
@@ -167,7 +167,7 @@ func prepareRequest(ctx context.Context, cfg *clicfg.Config, config *RawRequestC
 	}
 
 	var credential *credentials.AuraCredential
-	if active := cfg.Aura.ActiveCredential(); active != nil {
+	if active := cfg.AuraRuntime.ActiveCredential(); active != nil {
 		credential = active
 	} else {
 		credential, err = cfg.Credentials.Aura.GetDefault()
@@ -187,7 +187,7 @@ func prepareRequest(ctx context.Context, cfg *clicfg.Config, config *RawRequestC
 	}
 	overlayHeaders(req.Header, config.Headers)
 
-	if cfg.Aura.Debug() {
+	if cfg.AuraRuntime.Debug() {
 		debugRequest(config.Method, urlString, req.Header, config.Body)
 	}
 

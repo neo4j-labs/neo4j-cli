@@ -38,7 +38,7 @@ func newRenderCmd(t *testing.T, output string) (*cobra.Command, *clicfg.Config, 
 	cfgJSON := `{"format":"` + output + `"}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := &cobra.Command{}
 	stdout := &bytes.Buffer{}

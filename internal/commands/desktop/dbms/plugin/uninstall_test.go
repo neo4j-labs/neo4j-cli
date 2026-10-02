@@ -77,7 +77,7 @@ func (h *uninstallHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := dbms.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -122,7 +122,7 @@ func TestPluginUninstall_RequiresBothPositionals(t *testing.T) {
 }
 
 func TestPluginUninstall_Annotated_WriteTrue(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	root := dbms.NewCmd(cfg)
 	plug, _, err := root.Find([]string{"plugin", "uninstall"})
 	if err != nil {

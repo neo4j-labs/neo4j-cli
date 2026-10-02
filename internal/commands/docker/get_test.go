@@ -32,7 +32,7 @@ func runGet(t *testing.T, args string, containers map[string]engine.Container) (
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	for name, c := range containers {
@@ -217,7 +217,7 @@ func TestGet_DaemonError_Propagated(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, fsErr)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)

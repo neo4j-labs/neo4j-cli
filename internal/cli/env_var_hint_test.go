@@ -82,7 +82,7 @@ func TestMaybeEmitEnvVarHint(t *testing.T) {
 
 			fs, err := testfs.GetTestFs(tc.configJSON, "{}")
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 
 			var stderr bytes.Buffer
 			maybeEmitEnvVarHint(cfg, &stderr)
@@ -105,7 +105,7 @@ func TestMaybeEmitEnvVarHint_FiresAtMostOnce(t *testing.T) {
 
 	fs, err := testfs.GetTestFs(`{}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	var stderr bytes.Buffer
 	maybeEmitEnvVarHint(cfg, &stderr)
@@ -131,7 +131,7 @@ func TestEnvVarHint_SurfacesRegardlessOfCommand(t *testing.T) {
 
 			fs, err := testfs.GetTestFs(`{"credential-storage":"keyring"}`, "{}")
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 
 			cmd := NewCmd(cfg)
 			var stderr bytes.Buffer

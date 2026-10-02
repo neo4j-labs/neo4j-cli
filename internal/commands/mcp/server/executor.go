@@ -104,7 +104,7 @@ func (e *Executor) dispatch(ctx context.Context, args []string, stdout, stderr i
 		}
 	}()
 
-	cfg := clicfg.NewConfig(e.fs, e.version, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(e.fs, e.version)
 	// Every clicfg.NewConfig starts an analytics worker goroutine that only
 	// exits once the channel is closed, so a per-call config that is never
 	// flushed leaks one goroutine per tool call for the life of the server.

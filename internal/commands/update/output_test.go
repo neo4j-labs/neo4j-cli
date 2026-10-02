@@ -85,7 +85,7 @@ func TestPlainTextOutput_WithChangelog(t *testing.T) {
 	cfgJSON := `{"format":"default"}`
 	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v1.0.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v1.0.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}
@@ -126,7 +126,7 @@ func TestPlainTextOutput_NoChangelogFlag(t *testing.T) {
 	cfgJSON := `{"format":"default"}`
 	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v1.0.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v1.0.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}
@@ -200,7 +200,7 @@ func TestJSONOutput_WithChangelog(t *testing.T) {
 	cfgJSON := `{"format":"json"}`
 	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v1.0.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v1.0.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}
@@ -256,7 +256,7 @@ func TestJSONOutput_WithChangelog_NotElided(t *testing.T) {
 	cfgJSON := `{"format":"json"}`
 	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v1.0.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v1.0.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}

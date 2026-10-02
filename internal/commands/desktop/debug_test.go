@@ -88,7 +88,7 @@ func runDesktopDbmsList(t *testing.T, srvURL, format, debugArg string) (stdout, 
 
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	pinDesktopClient(t, srvURL)
 	root := mountDesktopUnderRoot(t, cfg)
@@ -139,7 +139,7 @@ func runDebugResolution(t *testing.T, args []string) bool {
 
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	root := mountDesktopUnderRoot(t, cfg)
 
@@ -202,7 +202,7 @@ func TestDbmsCreate_DebugRedactsPassword(t *testing.T) {
 
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	pinDesktopClient(t, srv.URL)
 	t.Cleanup(dbms.SetCreatePollSleepFnForTest(func(_ time.Duration) {}))

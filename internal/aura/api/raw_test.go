@@ -326,7 +326,7 @@ func TestMakeRawRequest_401EphemeralCredential(t *testing.T) {
 
 	const emptyCreds = `{"aura":{"credentials":[],"default-credential":""}}`
 	cfg := buildTestConfig(t, srv.URL, emptyCreds)
-	cfg.Aura.SetActiveCredential(&credentials.AuraCredential{
+	cfg.AuraRuntime.SetActiveCredential(&credentials.AuraCredential{
 		Name:         "env",
 		ClientId:     "env-client",
 		ClientSecret: "env-secret",
@@ -372,7 +372,7 @@ func TestMakeRawRequest_RejectsBlockedBaseURL(t *testing.T) {
 			cfgJSON := fmt.Sprintf(`{"format":"json","aura":{"auth-url":"https://api.neo4j.io/oauth/token","base-url":"%s"}}`, baseURL)
 			fs, err := testfs.GetTestFs(cfgJSON, debugTestCredJSON)
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+			cfg := clicfg.NewConfig(fs, "test")
 
 			res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 				Method:      http.MethodGet,
@@ -396,7 +396,7 @@ func TestMakeRawRequest_Debug(t *testing.T) {
 	api.SetDebugWriterForTest(t, &buf)
 
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
-	cfg.Aura.SetDebug(true)
+	cfg.AuraRuntime.SetDebug(true)
 
 	_, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodPost,

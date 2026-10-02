@@ -18,7 +18,7 @@ func TestParentExample_ReferencesAllThreeLoadVerbs(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	example := NewCmd(cfg).Example
 	for _, verb := range []string{"docker load", "desktop dbms load", "aura instance load"} {

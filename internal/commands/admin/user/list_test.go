@@ -30,7 +30,7 @@ func runList(t *testing.T, args string, rows []map[string]any, execErr error) (s
 		return rows, execErr
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newListCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)

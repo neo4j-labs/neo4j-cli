@@ -49,7 +49,7 @@ func runList(t *testing.T, args string, cap *capture, rows []map[string]any, exe
 
 	withCapturingExecFn(t, cap, rows, execErr)
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := NewCmd(cfg, &conn, privilegeExecFn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -155,7 +155,7 @@ func runListSequenced(t *testing.T, args string, responses []struct {
 	calls := &[]sequencedCall{}
 	withRecordingSequencedExecFn(t, calls, responses)
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := NewCmd(cfg, &conn, privilegeExecFn)
 	flags.RegisterOutputFlag(cmd, cfg)

@@ -113,7 +113,7 @@ func runCreateWithOccupiedPortsAndStderr(t *testing.T, args string, occupiedPort
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	origFactory := clientFactory
@@ -440,7 +440,7 @@ func TestCreate_PortPreflight_ProbesBoltThenHTTP_OnSuccess(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	origFactory := clientFactory
@@ -551,7 +551,7 @@ func runCreateWithSeed(t *testing.T, args string, dockerNames []string, credenti
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	// Seed dbms credentials. Each call to Add gives the credential a fresh
 	// URI so the entries are distinguishable but otherwise meaningless to
@@ -721,7 +721,7 @@ func TestCreate_Wait_HappyPath_SucceedsAndNarrates(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	origFactory := clientFactory
@@ -777,7 +777,7 @@ func TestCreate_Wait_Timeout_ReturnsErrorAndLeavesContainerRunning(t *testing.T)
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	origFactory := clientFactory
@@ -840,7 +840,7 @@ func runCreateForEphemeral(t *testing.T, args string) (*engine.FakeClient, *clic
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	origFactory := clientFactory
@@ -972,7 +972,7 @@ func TestCreate_Ephemeral_EnvOutFile_ChmodsPreexistingFileTo0600(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	// Pre-seed the file with a permissive mode so we can verify Chmod ran.
 	require.NoError(t, afero.WriteFile(cfg.Fs(), envPath, []byte("stale\n"), 0o644))
@@ -1028,7 +1028,7 @@ func TestCreate_PortPreflight_EqualPorts_SkipsListenCalls(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	origFactory := clientFactory
@@ -1362,7 +1362,7 @@ func TestCreate_DataDir_PreexistingDir_NoCreatedInfoLine(t *testing.T) {
 	// Pre-create the directory so the mkdir branch must be a no-op.
 	require.NoError(t, fs.MkdirAll(hostPath, 0o755))
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	fake := engine.NewFakeClient()
 	origFactory := clientFactory
 	clientFactory = func(bool) engine.Client { return fake }
@@ -1461,7 +1461,7 @@ func TestCreate_DataDir_OsFs_MkdirModeIs0755(t *testing.T) {
 	// resolveHostDir only consumes cmd.ErrOrStderr() and the supplied fs —
 	// no clicfg.Config is involved on this code path. Build a minimal cobra
 	// command (no leaf body) so cmd.ErrOrStderr() resolves to our buffer.
-	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope))
+	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test"))
 	cmd.SetErr(bytes.NewBuffer(nil))
 
 	resolved, err := resolveHostDir(cmd, fs, "data-dir", hostPath)
@@ -1494,7 +1494,7 @@ func TestCreate_Ephemeral_EnvOutFile_RenameFailure_NoTempLeftover(t *testing.T) 
 
 	sentinel := errors.New("simulated rename failure")
 	wrapped := &renameFailFs{Fs: mem, err: sentinel}
-	cfg := clicfg.NewConfig(wrapped, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(wrapped, "test")
 
 	fake := engine.NewFakeClient()
 	origFactory := clientFactory

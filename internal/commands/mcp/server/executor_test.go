@@ -28,7 +28,7 @@ import (
 func TestNewExecutor_RequiresBothInjectedPieces(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	for _, tc := range []struct {
 		name    string
@@ -60,7 +60,7 @@ func TestNewExecutor_RequiresBothInjectedPieces(t *testing.T) {
 func TestMCPGroup_NilRootFactoryIsRefused(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := mcp.NewCmd(cfg, nil)
 	cmd.SetArgs([]string{"tool"})

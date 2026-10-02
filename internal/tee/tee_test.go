@@ -21,7 +21,7 @@ func newTestConfig(t *testing.T, config string) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs(config, "{}")
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test-version", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "test-version")
 }
 
 func TestLimitedBuffer_BelowCap(t *testing.T) {

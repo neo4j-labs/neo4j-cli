@@ -80,7 +80,7 @@ func (h *installHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := dbms.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -129,7 +129,7 @@ func TestPluginInstall_Annotated_WriteTrue(t *testing.T) {
 	// it in non-interactive contexts (REQ-F-014). We can't drive the gate
 	// itself from the dbms.NewCmd entrypoint (the gate lives on the root
 	// PersistentPreRunE), but the annotation is the load-bearing contract.
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	root := dbms.NewCmd(cfg)
 	plug, _, err := root.Find([]string{"plugin", "install"})
 	if err != nil {

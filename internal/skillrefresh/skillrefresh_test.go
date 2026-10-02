@@ -42,7 +42,7 @@ func newTestCfg(t *testing.T, version string) *clicfg.Config {
 	t.Helper()
 	memFs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
 	require.NoError(t, err)
-	return clicfg.NewConfig(memFs, version, clicfg.GlobalScope)
+	return clicfg.NewConfig(memFs, version)
 }
 
 // newTestCfgWithAutoRefresh returns a Config with skill-auto-refresh set to
@@ -52,7 +52,7 @@ func newTestCfgWithAutoRefresh(t *testing.T, version, autoRefresh string) *clicf
 	config := `{"format":"default","skill-auto-refresh":"` + autoRefresh + `"}`
 	memFs, err := testfs.GetTestFs(config, "{}")
 	require.NoError(t, err)
-	return clicfg.NewConfig(memFs, version, clicfg.GlobalScope)
+	return clicfg.NewConfig(memFs, version)
 }
 
 // makeCmd returns a minimal cobra command wired with stderr/stdout buffers.

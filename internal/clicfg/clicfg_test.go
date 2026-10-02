@@ -19,11 +19,11 @@ import (
 // newTestConfig builds a Config over an in-memory FS seeded with configJSON.
 // afero.NewOsFs is deliberately never used here: the dev machine has real
 // credentials on disk.
-func newTestConfig(t *testing.T, scope clicfg.ConfigScope, configJSON string) *clicfg.Config {
+func newTestConfig(t *testing.T, configJSON string) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs(configJSON, `{}`)
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test", scope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 func TestResolveConfigKey(t *testing.T) {
@@ -44,7 +44,6 @@ func TestResolveConfigKey(t *testing.T) {
 	tests := []struct {
 		name          string
 		key           string
-		scope         clicfg.ConfigScope
 		wantNamespace clicfg.ConfigScope
 		wantKey       string
 		wantErr       string
@@ -52,67 +51,58 @@ func TestResolveConfigKey(t *testing.T) {
 		{
 			name:          "global key format resolves to global namespace",
 			key:           "format",
-			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.GlobalScope,
 			wantKey:       "format",
 		},
 		{
 			name:          "aura-prefixed key resolves to aura namespace with prefix stripped",
 			key:           "aura.default-workspace",
-			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.AuraScope,
 			wantKey:       "default-workspace",
 		},
 		{
 			name:          "aura.base-url resolves to aura namespace",
 			key:           "aura.base-url",
-			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.AuraScope,
 			wantKey:       "base-url",
 		},
 		{
 			name:          "aura.auth-url resolves to aura namespace",
 			key:           "aura.auth-url",
-			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.AuraScope,
 			wantKey:       "auth-url",
 		},
 		{
 			name:    "aura.format is rejected because format is a global-only key",
 			key:     "aura.format",
-			scope:   clicfg.GlobalScope,
 			wantErr: `invalid config key: "aura.format" is a global key and cannot be addressed with the "aura." prefix`,
 		},
 		{
 			name:    "aura.unknown is rejected as an unrecognised aura key",
 			key:     "aura.unknown",
-			scope:   clicfg.GlobalScope,
 			wantErr: `invalid config key: "aura.unknown"`,
 		},
 		{
 			name:    "unknown bare key is rejected as unrecognised",
 			key:     "unknown",
-			scope:   clicfg.GlobalScope,
 			wantErr: `invalid config key: "unknown"`,
 		},
 		{
 			name:          "registered flag resolves to flag namespace with full key preserved",
 			key:           testFlagKey,
-			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.FlagScope,
 			wantKey:       testFlagKey,
 		},
 		{
 			name:    "unknown flag.* key is rejected as unrecognised",
 			key:     "flag.unknown-thing",
-			scope:   clicfg.GlobalScope,
 			wantErr: `invalid config key: "flag.unknown-thing"`,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := newTestConfig(t, tc.scope, `{}`)
+			cfg := newTestConfig(t, `{}`)
 			gotNamespace, gotKey, err := clicfg.ResolveConfigKey(tc.key, cfg)
 
 			if tc.wantErr != "" {
@@ -153,7 +143,7 @@ func TestGetAuraBaseUrlConfigRemovesTrailingPath(t *testing.T) {
 
 	fs, err := testfs.GetTestFs(cfgStr, credentialsStr)
 	assert.Nil(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	//The path parameter will be removed from GET base url
 	assert.Equal(t, server.URL, cfg.Aura.BaseUrl())
@@ -196,7 +186,7 @@ func TestDefaultTenant(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fs, err := testfs.GetTestFs(tc.configJSON, "{}")
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 			assert.Equal(t, tc.want, cfg.Aura.DefaultTenant())
 		})
 	}
@@ -229,7 +219,7 @@ func TestGlobalConfigCredentialStorage(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fs, err := testfs.GetTestFs(tc.configJSON, "{}")
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 			assert.Equal(t, tc.want, cfg.Global.CredentialStorage())
 		})
 	}
@@ -251,7 +241,7 @@ func TestAuraConfigActiveCredential(t *testing.T) {
 			name: "returns the credential after SetActiveCredential",
 			setup: func(cfg *clicfg.Config) {
 				cred := &credentials.AuraCredential{Name: "my-cred", ClientId: "id1", ClientSecret: "secret1"}
-				cfg.Aura.SetActiveCredential(cred)
+				cfg.AuraRuntime.SetActiveCredential(cred)
 			},
 			wantNil:  false,
 			wantName: "my-cred",
@@ -260,9 +250,9 @@ func TestAuraConfigActiveCredential(t *testing.T) {
 			name: "overwrites previous active credential",
 			setup: func(cfg *clicfg.Config) {
 				first := &credentials.AuraCredential{Name: "first", ClientId: "id1", ClientSecret: "secret1"}
-				cfg.Aura.SetActiveCredential(first)
+				cfg.AuraRuntime.SetActiveCredential(first)
 				second := &credentials.AuraCredential{Name: "second", ClientId: "id2", ClientSecret: "secret2"}
-				cfg.Aura.SetActiveCredential(second)
+				cfg.AuraRuntime.SetActiveCredential(second)
 			},
 			wantNil:  false,
 			wantName: "second",
@@ -271,9 +261,9 @@ func TestAuraConfigActiveCredential(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := newTestConfig(t, clicfg.AuraScope, `{}`)
+			cfg := newTestConfig(t, `{}`)
 			tc.setup(cfg)
-			got := cfg.Aura.ActiveCredential()
+			got := cfg.AuraRuntime.ActiveCredential()
 			if tc.wantNil {
 				assert.Nil(t, got)
 			} else {

@@ -39,7 +39,7 @@ func TestGlobalConfigTeeEnabled(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fs, err := testfs.GetTestFs(tc.configJSON, "{}")
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 			assert.Equal(t, tc.want, cfg.Global.TeeEnabled())
 		})
 	}
@@ -72,7 +72,7 @@ func TestGlobalConfigTeeLimit(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fs, err := testfs.GetTestFs(tc.configJSON, "{}")
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 			assert.Equal(t, tc.want, cfg.Global.TeeLimit())
 		})
 	}
@@ -96,7 +96,7 @@ func TestGlobalConfigTeeKeysResolveAndSet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fs, err := testfs.GetTestFs(`{}`, "{}")
 			require.NoError(t, err)
-			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(fs, "test")
 
 			scope, resolvedKey, err := clicfg.ResolveConfigKey(tc.key, cfg)
 			require.NoError(t, err)
@@ -117,7 +117,7 @@ func TestGlobalConfigTeeKeysResolveAndSet(t *testing.T) {
 func TestTeeKeysAppearInPrintable(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	keys := make(map[string]bool)
 	for _, e := range cfg.Printable() {

@@ -243,7 +243,7 @@ func TestHandleRunWrite_AuthoritativeGate(t *testing.T) {
 
 	// Build a separate executor and use writeGateRootFactory which has
 	// EnforceWriteGate installed on the root.
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	defer cfg.Events.Flush()
 	exec, err := NewExecutor(cfg, writeGateRootFactory)
 	require.NoError(t, err)
@@ -271,7 +271,7 @@ func TestHandleRunWrite_AuthoritativeGate(t *testing.T) {
 func TestHandleRunWrite_WriteWithRwPassesAllGates(t *testing.T) {
 	ctx := context.Background()
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	defer cfg.Events.Flush()
 	exec, err := NewExecutor(cfg, writeGateRootFactory)
 	require.NoError(t, err)

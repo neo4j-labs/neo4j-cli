@@ -110,7 +110,7 @@ func newAuthFixture(t *testing.T) (*clicfg.Config, *credentials.AuraCredential) 
 	t.Helper()
 	fs, err := testfs.GetTestFs("{}", `{"aura":{"default-credential":"x","credentials":[{"name":"x","client-id":"id","client-secret":"secret"}]}}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cred, err := cfg.Credentials.Aura.GetDefault()
 	require.NoError(t, err)
 	return cfg, cred
@@ -741,7 +741,7 @@ func TestSuggestionForPaymentRequired(t *testing.T) {
 func TestHandleResponseError_NoPanic(t *testing.T) {
 	authFs, err := testfs.GetTestFs("{}", `{"aura":{"default-credential":"x","credentials":[{"name":"x","client-id":"id","client-secret":"secret"}]}}`)
 	require.NoError(t, err)
-	authCfg := clicfg.NewConfig(authFs, "test", clicfg.AuraScope)
+	authCfg := clicfg.NewConfig(authFs, "test")
 	authCred, err := authCfg.Credentials.Aura.GetDefault()
 	require.NoError(t, err)
 

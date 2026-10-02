@@ -235,7 +235,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// requested name when free; otherwise try <name>-1 … <name>-99.
 			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
-			chosenName, err := engine.ResolveContainerName(ctx, client, cfg, name)
+			chosenName, err := engine.ResolveContainerName(ctx, client, cfg.DbmsCredentials(), name)
 			if err != nil {
 				return err
 			}

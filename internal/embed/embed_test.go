@@ -64,7 +64,7 @@ func newTestCfg(t *testing.T, credsJSON string) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, credsJSON)
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 // clearEmbedEnv clears every env var Resolve consults, so tests start from a
@@ -765,7 +765,7 @@ func TestLoadDotenv_StopsAtGitBoundary(t *testing.T) {
 	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "", nil })
 	defer restore()
 
-	got := loadDotenv(clicfg.NewConfig(fs, "test", clicfg.QueryScope), nil)
+	got := loadDotenv(clicfg.NewConfig(fs, "test"), nil)
 	assert.Empty(t, got, "poison .env above .git boundary must not be loaded")
 }
 
@@ -790,7 +790,7 @@ func TestLoadDotenv_AnnouncesOverlay(t *testing.T) {
 		defer restore()
 
 		var buf bytes.Buffer
-		got := loadDotenv(clicfg.NewConfig(fs, "test", clicfg.QueryScope), &buf)
+		got := loadDotenv(clicfg.NewConfig(fs, "test"), &buf)
 		assert.Equal(t, "found", got["NEO4J_EMBED_API_KEY"])
 		assert.Contains(t, buf.String(), "info: loading .env from")
 		assert.Contains(t, buf.String(), filepath.Join(tmp, ".env"))
@@ -806,7 +806,7 @@ func TestLoadDotenv_AnnouncesOverlay(t *testing.T) {
 			[]byte("NEO4J_EMBED_API_KEY=found\n"), 0644))
 
 		var buf bytes.Buffer
-		got := loadDotenv(clicfg.NewConfig(fs, "test", clicfg.QueryScope), &buf)
+		got := loadDotenv(clicfg.NewConfig(fs, "test"), &buf)
 		assert.Equal(t, "found", got["NEO4J_EMBED_API_KEY"])
 		assert.Empty(t, buf.String(), "no info line when .env is in cwd")
 	})

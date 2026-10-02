@@ -88,8 +88,8 @@ func Poll(ctx context.Context, cfg *clicfg.Config, url string, cond func(status 
 }
 
 func PollWithVersion(ctx context.Context, cfg *clicfg.Config, url string, version AuraApiVersion, cond func(status string) bool) (*PollResponse, error) {
-	debug := cfg.Aura.Debug()
-	pollingConfig := cfg.Aura.PollingConfig()
+	debug := cfg.AuraRuntime.Debug()
+	pollingConfig := cfg.AuraRuntime.PollingConfig()
 	for i := 0; i < pollingConfig.MaxRetries; i++ {
 		if err := sleepCtx(ctx, time.Second*time.Duration(pollingConfig.Interval)); err != nil {
 			return nil, err

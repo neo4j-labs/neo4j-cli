@@ -38,7 +38,7 @@ func runSuspend(t *testing.T, args string, execResponses []fakeResponse) (string
 		return r.rows, r.err
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newSuspendCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -121,7 +121,7 @@ func TestUserSuspend_NoArgs_CobraUsageError(t *testing.T) {
 }
 
 func TestUserSuspend_HasWriteAnnotation(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newSuspendCmd(cfg, &conn)
 	assert.Equal(t, "true", cmd.Annotations["write"])

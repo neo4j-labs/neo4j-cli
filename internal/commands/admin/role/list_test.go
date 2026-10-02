@@ -26,7 +26,7 @@ func runList(t *testing.T, args string, rows []map[string]any, execErr error) (s
 
 	withFakeExecFn(t, rows, execErr)
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := NewCmd(cfg, &conn, roleExecFn)
 	flags.RegisterOutputFlag(cmd, cfg)

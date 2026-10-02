@@ -78,7 +78,7 @@ func (h *deleteHelper) run(command string) error {
 	if err != nil {
 		h.t.Fatalf("shlex: %v", err)
 	}
-	cfg := clicfg.NewConfig(h.fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(h.fs, "test")
 	cmd := dbms.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
@@ -484,7 +484,7 @@ func TestDelete_NoCredentialsJSONWrite_OnFailure(t *testing.T) {
 }
 
 func TestDelete_Annotated_Write(t *testing.T) {
-	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(mustTestFs(t), "test")
 	parent := dbms.NewCmd(cfg)
 	var deleteCmd *cobra.Command
 	for _, c := range parent.Commands() {

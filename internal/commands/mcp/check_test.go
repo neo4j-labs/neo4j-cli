@@ -103,7 +103,7 @@ func writeCheckConfigAndRun(t *testing.T, fs afero.Fs, entry map[string]any) ([]
 	}
 
 	// Build tree with all flags on so mcp subtree is visible.
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	for name := range clicfg.Registry {
 		cfg.Flags.SetForTest(name, true)
 	}
@@ -201,7 +201,7 @@ func TestCheck_EnvDrift_ExitCode(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, afero.WriteFile(fs, configPath, data, 0644))
 
-	cfgObj := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfgObj := clicfg.NewConfig(fs, "test")
 	for name := range clicfg.Registry {
 		cfgObj.Flags.SetForTest(name, true)
 	}

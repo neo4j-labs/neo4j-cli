@@ -99,7 +99,7 @@ func TestRegistry_MCPServerFlag_Overrides(t *testing.T) {
 			if tc.env != "" {
 				t.Setenv("NEO4J_CLI_FLAG_MCP_SERVER", tc.env)
 			}
-			cfg := newTestConfig(t, clicfg.GlobalScope, tc.configJSON)
+			cfg := newTestConfig(t, tc.configJSON)
 			assert.Equal(t, tc.want, cfg.Flags.Enabled("flag.mcp-server"))
 		})
 	}

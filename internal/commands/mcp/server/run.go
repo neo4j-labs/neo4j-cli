@@ -46,7 +46,7 @@ func resolveCommand(ctx context.Context, req *mcpsdk.CallToolRequest, exec *Exec
 		return &resolvedCommand{err: runError(fmt.Sprintf("args exceeds maximum of %d items", MaxRunArgs))}
 	}
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion)
 	defer cfg.Events.Flush()
 	for name, enabled := range storedFlagStates {
 		if enabled {

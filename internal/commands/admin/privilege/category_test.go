@@ -31,7 +31,7 @@ func runCategory(t *testing.T, verb string, cat actionCategory, args string, cal
 
 	withRecordingSequencedExecFn(t, calls, responses)
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 
 	leaf := newCategoryCmd(cfg, &conn, verb, cat)
@@ -50,7 +50,7 @@ func runCategory(t *testing.T, verb string, cat actionCategory, args string, cal
 }
 
 func TestNewCategoryCmd_Structure(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 
 	cmd := newCategoryCmd(cfg, &conn, "GRANT", propertyBearer)
@@ -71,7 +71,7 @@ func TestNewCategoryCmd_Structure(t *testing.T) {
 }
 
 func TestNewCategoryCmd_RevokeRegistersRevokeType(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 
 	cmd := newCategoryCmd(cfg, &conn, "REVOKE", propertyBearer)
@@ -300,7 +300,7 @@ func TestNewCategoryCmd_MissingRole_ReturnsUsageError(t *testing.T) {
 }
 
 func TestNewCategoryCmd_OnlyCategoryFlagsRegistered(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 
 	cmd := newCategoryCmd(cfg, &conn, "GRANT", load)

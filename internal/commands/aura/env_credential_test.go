@@ -32,7 +32,7 @@ func runEnvCredentialResolution(t *testing.T, fs afero.Fs, args ...string) (*cre
 		fs, err = testfs.GetDefaultTestFs()
 		require.NoError(t, err)
 	}
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	var captured *credentials.AuraCredential
 	auraCmd := NewCmd(cfg)
@@ -41,7 +41,7 @@ func runEnvCredentialResolution(t *testing.T, fs afero.Fs, args ...string) (*cre
 	leaf, _, err := auraCmd.Find([]string{"instance", "list"})
 	require.NoError(t, err)
 	leaf.RunE = func(_ *cobra.Command, _ []string) error {
-		captured = cfg.Aura.ActiveCredential()
+		captured = cfg.AuraRuntime.ActiveCredential()
 		return nil
 	}
 

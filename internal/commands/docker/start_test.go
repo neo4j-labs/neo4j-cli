@@ -44,7 +44,7 @@ func newStartSetup(t *testing.T, containers map[string]engine.Container, creds m
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	fake := engine.NewFakeClient()
 	for name, c := range containers {

@@ -38,7 +38,7 @@ func runCreate(t *testing.T, args string, responses []fakeResponse) (string, str
 		return r.rows, r.err
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newCreateCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -120,7 +120,7 @@ func TestUserCreate_PasswordChangeRequired(t *testing.T) {
 				return r.rows, r.err
 			}))
 
-			cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+			cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 			conn := testConn()
 			cmd := newCreateCmd(cfg, &conn)
 			flags.RegisterOutputFlag(cmd, cfg)
@@ -160,7 +160,7 @@ func TestUserCreate_TTYPrompt_UsesPasswordReader(t *testing.T) {
 		return r.rows, r.err
 	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newCreateCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -237,7 +237,7 @@ func TestUserCreate_AlreadyExists_ReturnsUsageError(t *testing.T) {
 }
 
 func TestUserCreate_HasWriteAnnotation(t *testing.T) {
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := newCreateCmd(cfg, &conn)
 	assert.Equal(t, "true", cmd.Annotations["write"])

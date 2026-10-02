@@ -54,7 +54,7 @@ func runLoad(t *testing.T, fake *engine.FakeClient, deps *loadDeps, args string)
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	origFactory := clientFactory
 	clientFactory = func(bool) engine.Client { return fake }
@@ -280,7 +280,7 @@ func TestLoad_ExistingContainer_ForceLoadsWithCredential(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	require.NoError(t, cfg.Credentials.Dbms.Add("movies", "neo4j", "pw", "neo4j", "neo4j://localhost:7687"))
 
 	origFactory := clientFactory

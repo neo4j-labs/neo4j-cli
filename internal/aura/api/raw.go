@@ -86,13 +86,13 @@ func MakeRawRequest(ctx context.Context, cfg *clicfg.Config, config *RawRequestC
 	if err != nil {
 		// A truncated response is exactly the case a trace is wanted for, so
 		// report the status reached before bailing.
-		if cfg.Aura.Debug() {
+		if cfg.AuraRuntime.Debug() {
 			debugInfo("response body read failed after status %d: %s", res.StatusCode, err.Error())
 		}
 		return nil, clierr.NewUpstreamError("could not read aura api response body: %s", scrub(err.Error()))
 	}
 
-	if cfg.Aura.Debug() {
+	if cfg.AuraRuntime.Debug() {
 		debugResponse(res.StatusCode, res.Header, body, time.Since(start))
 	}
 

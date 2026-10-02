@@ -519,7 +519,7 @@ func TestRunUpdate_SwapErrPermissionWindows_AdminShellHint(t *testing.T) {
 func TestBuildReRunCommand(t *testing.T) {
 	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0")
 
 	root := &cobra.Command{Use: "neo4j-cli"}
 	updateCmd := NewCmd(cfg, nil, "")
@@ -553,7 +553,7 @@ func TestNewCmd_FlagsExposed(t *testing.T) {
 	// RunE refactor.
 	tfs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	for _, name := range []string{"pre-releases", "version", "force"} {
@@ -571,7 +571,7 @@ func TestNewCmd_FlagsExposed(t *testing.T) {
 func TestNewCmd_ForceFlagShorthand(t *testing.T) {
 	tfs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	flag := cmd.Flags().Lookup("force")
@@ -599,7 +599,7 @@ func TestNewCmd_ForceShorthand_ParsesToTrue(t *testing.T) {
 
 	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}
@@ -676,7 +676,7 @@ func TestNewCmd_StubReplacedByRunUpdate(t *testing.T) {
 	// the output formatting itself — that lives in TestPlainTextOutput_*).
 	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}
@@ -697,7 +697,7 @@ func TestNewCmd_StubReplacedByRunUpdate(t *testing.T) {
 func TestNewCmd_LongDescriptionPreserved(t *testing.T) {
 	tfs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0")
 
 	cmd := NewCmd(cfg, nil, "")
 	assert.Contains(t, cmd.Long, "Self-update")
@@ -980,7 +980,7 @@ func TestRunUpdate_PostSwap_JSONHappyPath(t *testing.T) {
 func TestUpdateCmd_UpgradeAlias(t *testing.T) {
 	tfs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0")
 
 	updateCmd := NewCmd(cfg, nil, "")
 	assert.Contains(t, updateCmd.Aliases, "upgrade",

@@ -68,7 +68,7 @@ func newTestCfg(t *testing.T, format string) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs(`{"format":"`+format+`"}`, "{}")
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "v0.1.0", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "v0.1.0")
 }
 
 // TestSchedule_DiceRollSampling table-drives the 5% sampler boundary. The

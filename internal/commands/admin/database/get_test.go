@@ -26,7 +26,7 @@ func runGet(t *testing.T, args string, rows []map[string]any, execErr error) (st
 
 	withFakeExecFn(t, rows, execErr)
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	conn := testConn()
 	cmd := NewCmd(cfg, &conn, dbExecFn)
 	flags.RegisterOutputFlag(cmd, cfg)

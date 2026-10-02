@@ -197,7 +197,7 @@ func RegisterAuraCredentialFlag(cmd *cobra.Command, cfg *clicfg.Config) {
 			return silenceUsageOnError(cmd, clierr.NewUsageError("credential %q not found, run `%s` to see available credentials", name, hint))
 		}
 
-		cfg.Aura.SetActiveCredential(cred)
+		cfg.AuraRuntime.SetActiveCredential(cred)
 		return nil
 	}
 }

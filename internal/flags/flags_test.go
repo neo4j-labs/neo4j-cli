@@ -31,7 +31,7 @@ func buildConfig(t *testing.T, credJSON string) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, credJSON)
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 // executeWithArgs wires a root command (containing cmd as a child), parses args,
@@ -81,10 +81,10 @@ func TestRegisterAuraCredentialFlag_ActiveCredential(t *testing.T) {
 			require.NoError(t, err)
 
 			if tc.wantActiveName == "" {
-				assert.Nil(t, cfg.Aura.ActiveCredential())
+				assert.Nil(t, cfg.AuraRuntime.ActiveCredential())
 			} else {
-				require.NotNil(t, cfg.Aura.ActiveCredential())
-				assert.Equal(t, tc.wantActiveName, cfg.Aura.ActiveCredential().Name)
+				require.NotNil(t, cfg.AuraRuntime.ActiveCredential())
+				assert.Equal(t, tc.wantActiveName, cfg.AuraRuntime.ActiveCredential().Name)
 			}
 		})
 	}
@@ -291,10 +291,10 @@ func TestRegisterAuraCredentialFlag_PriorHook(t *testing.T) {
 			}
 
 			if tc.wantActiveName == "" {
-				assert.Nil(t, cfg.Aura.ActiveCredential())
+				assert.Nil(t, cfg.AuraRuntime.ActiveCredential())
 			} else {
-				require.NotNil(t, cfg.Aura.ActiveCredential())
-				assert.Equal(t, tc.wantActiveName, cfg.Aura.ActiveCredential().Name)
+				require.NotNil(t, cfg.AuraRuntime.ActiveCredential())
+				assert.Equal(t, tc.wantActiveName, cfg.AuraRuntime.ActiveCredential().Name)
 			}
 		})
 	}

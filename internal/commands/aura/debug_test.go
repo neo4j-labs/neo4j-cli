@@ -18,7 +18,7 @@ func TestDebugFlagRegisteredAndInherited(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 
 	root := cmd.PersistentFlags().Lookup("debug")
@@ -44,7 +44,7 @@ func runDebugResolution(t *testing.T, args []string) bool {
 
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	captured := false
 	auraCmd := NewCmd(cfg)
@@ -55,7 +55,7 @@ func runDebugResolution(t *testing.T, args []string) bool {
 	leaf, _, err := auraCmd.Find([]string{"instance", "list"})
 	require.NoError(t, err)
 	leaf.RunE = func(_ *cobra.Command, _ []string) error {
-		captured = cfg.Aura.Debug()
+		captured = cfg.AuraRuntime.Debug()
 		return nil
 	}
 

@@ -29,7 +29,7 @@ import (
 func TestCommandSlug(t *testing.T) {
 	fs, err := testfs.GetTestFs("{}", "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 
 	for _, tc := range []struct {
 		name string
@@ -83,7 +83,7 @@ func TestHandleFailure_TeesRedactedAndAttachesPath(t *testing.T) {
 
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 
 	captured := []byte("connecting to neo4j://neo4j:" + secret + "@host\npassword=" + secret + "\n")
@@ -108,7 +108,7 @@ func TestHandleFailure_TeesRedactedAndAttachesPath(t *testing.T) {
 func TestHandleFailure_TeeDisabled(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json","tee-enabled":false}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 
 	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, []byte("password=hunter2\n"), errors.New("boom"))
@@ -128,7 +128,7 @@ func TestHandleFailure_TeeDisabled(t *testing.T) {
 func TestHandleFailure_PreservesExitCode(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 
 	for _, tc := range []struct {
@@ -379,7 +379,7 @@ func TestConfirmCancellation_EndToEnd(t *testing.T) {
 	}`)
 	require.NoError(t, err)
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := NewCmd(cfg)
 
 	var stdout, stderr bytes.Buffer
@@ -414,7 +414,7 @@ func newRunConfig(t *testing.T) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 func TestRun_ExitCodesAndStreams(t *testing.T) {

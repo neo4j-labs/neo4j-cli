@@ -36,7 +36,7 @@ func cfgWithCreds(t *testing.T, credsJSON string) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, credsJSON)
 	require.NoError(t, err)
-	return clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 // runAdminCapture runs the admin tree with a capturing fakeQueryRunner and
@@ -89,7 +89,7 @@ func TestAdminConn_PasswordPrompt_NonTTY_ReturnsUsageError(t *testing.T) {
 	dbconn.StdinIsTTY = func() bool { return false }
 	t.Cleanup(func() { dbconn.StdinIsTTY = origIsTTY })
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	_, _, err := runAdminWithArgs(t, cfg, []string{"database", "list"})
 
 	require.Error(t, err)
@@ -124,7 +124,7 @@ func TestAdminConn_PasswordPrompt_TTY_PromptsAndProceeds(t *testing.T) {
 		dbconn.PasswordReader = origReader
 	})
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	_, _, err := runAdminWithArgs(t, cfg, []string{"database", "list"})
 
 	// fakeQueryRunner returns empty rows; command exits 0.
@@ -152,7 +152,7 @@ func TestAdminConn_PasswordSupplied_SkipsPrompt(t *testing.T) {
 		dbconn.PasswordReader = origReader
 	})
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	_, _, err := runAdminWithArgs(t, cfg, []string{
 		"database", "list",
 		"--password=supplied-pw",
@@ -185,7 +185,7 @@ func TestAdminConn_PasswordEnvVar_SkipsPrompt(t *testing.T) {
 		dbconn.PasswordReader = origReader
 	})
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test")
 	_, _, err := runAdminWithArgs(t, cfg, []string{"database", "list"})
 
 	require.NoError(t, err)

@@ -71,7 +71,7 @@ func TestSmoke_Lifecycle(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "smoke-test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "smoke-test")
 
 	// Phase 1 — create. --rw is documented as required on write invocations
 	// (see SKILL.md / README); the write gate is not wired into this rig but
@@ -202,7 +202,7 @@ func TestSmoke_PortFallback(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "smoke-test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "smoke-test")
 
 	// Phase 1 — create container A on the chosen pair. After this the host
 	// ports P and Q are genuinely in use, so the next create's listener
@@ -303,7 +303,7 @@ func TestSmoke_DebugEmitsToStderr(t *testing.T) {
 		"embed": {"credentials": [], "default-credential": ""}
 	}`)
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "smoke-test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "smoke-test")
 
 	// runEnv writes the trace to the package-global debugW seam (no
 	// *cobra.Command in scope), NOT cmd.ErrOrStderr(); capture it here.

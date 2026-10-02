@@ -32,7 +32,7 @@ func newEndpointTestConfig(t *testing.T, extraAuraCfg string) *clicfg.Config {
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 
-	return clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	return clicfg.NewConfig(fs, "test")
 }
 
 // newEndpointTestCmd registers the org/project flags and parses args so

@@ -93,7 +93,7 @@ func setPasswordReader(t *testing.T, pw string, err error) {
 
 // newTestCfg returns a clicfg.Config backed by a fresh in-memory filesystem.
 func newTestCfg() *clicfg.Config {
-	return clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	return clicfg.NewConfig(afero.NewMemMapFs(), "test")
 }
 
 // fakeResponse bundles a rows slice and an error for sequential fake exec calls.

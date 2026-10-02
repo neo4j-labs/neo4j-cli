@@ -23,7 +23,7 @@ import (
 var mintToken = mintTokenHTTP
 
 func getToken(ctx context.Context, credential *credentials.AuraCredential, cfg *clicfg.Config, warnW io.Writer) (string, error) {
-	debug := cfg.Aura.Debug()
+	debug := cfg.AuraRuntime.Debug()
 
 	if credential.HasValidAccessToken() {
 		if debug {
@@ -87,7 +87,7 @@ func getToken(ctx context.Context, credential *credentials.AuraCredential, cfg *
 }
 
 func mintTokenHTTP(ctx context.Context, credential *credentials.AuraCredential, cfg *clicfg.Config) (Grant, error) {
-	debug := cfg.Aura.Debug()
+	debug := cfg.AuraRuntime.Debug()
 
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")

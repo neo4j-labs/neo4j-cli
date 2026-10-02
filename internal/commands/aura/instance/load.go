@@ -258,7 +258,7 @@ If the data load fails after the instance was created, the instance is left in p
 func stageViaDocker(ctx context.Context, cfg *clicfg.Config, load datasetStageLoad, target deployTarget, warnOut io.Writer) error {
 	client := docker.NewDeployClient()
 
-	result, err := docker.LoadDumpIntoNewContainer(ctx, cfg, client, docker.NewContainerLoad{
+	result, err := docker.LoadDumpIntoNewContainer(ctx, cfg.DbmsCredentials(), client, docker.NewContainerLoad{
 		Name:       "neo4j-cli-aura-load",
 		Database:   load.Database,
 		Version:    load.Version,
@@ -281,7 +281,7 @@ func stageViaDocker(ctx context.Context, cfg *clicfg.Config, load datasetStageLo
 		}
 	}()
 
-	return docker.PushToAura(ctx, cfg, client, result.Name, load.Database, docker.AuraTarget{
+	return docker.PushToAura(ctx, cfg.DbmsCredentials(), client, result.Name, load.Database, docker.AuraTarget{
 		URI:      target.URI,
 		Username: target.Username,
 		Password: target.Password,

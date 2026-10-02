@@ -15,7 +15,7 @@ import (
 func TestDbmsSetEmbed_WriteAnnotation(t *testing.T) {
 	fs, err := testfs.GetTestFs("{}", "{}")
 	assert.Nil(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(fs, "test")
 	cmd := dbms.NewCmd(cfg)
 	for _, c := range cmd.Commands() {
 		if c.Name() == "set-embed" {

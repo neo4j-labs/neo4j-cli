@@ -47,7 +47,7 @@ func newTestClient(t *testing.T, path string, status int, body string) Client {
 	cfgJSON := fmt.Sprintf(`{"format":"json","aura":{"auth-url":"%s/oauth/token","base-url":"%s"}}`, srv.URL, srv.URL)
 	fs, err := testfs.GetTestFs(cfgJSON, testCredJSON)
 	require.NoError(t, err)
-	return New(clicfg.NewConfig(fs, "test", clicfg.AuraScope))
+	return New(clicfg.NewConfig(fs, "test"))
 }
 
 func TestOrganizationsList(t *testing.T) {
