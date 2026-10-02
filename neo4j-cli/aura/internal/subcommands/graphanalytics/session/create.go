@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
@@ -134,7 +134,7 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 	cmd.Flags().StringVar(&instance_id, instanceIdFlag, "", "The ID of the instance to create the session for.")
 	cmd.Flags().StringVar(&ttl, ttlFlag, "", "This optional parameter specifies the time-to-live of the session. The session will be marked as expired if the session was unused for the provided duration.")
 
-	flags.RegisterWait(cmd, &wait, "Waits until created session is ready.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until created session is ready.")
 
 	return cmd
 }

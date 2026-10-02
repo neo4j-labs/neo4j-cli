@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
@@ -106,7 +106,7 @@ neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organ
 
 	cmd.MarkFlagsOneRequired(sourceInstanceIdFlag, sourceSnapshotIdFlag)
 
-	flags.RegisterWait(cmd, &wait, "Waits until created snapshot is ready")
+	commonflags.RegisterWait(cmd, &wait, "Waits until created snapshot is ready")
 
 	return cmd
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
@@ -154,7 +155,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().BoolVar(&graphAnalyticsPlugin, graphAnalyticsPluginFlag, false, "An optional graph analytics plugin configuration to be set during instance creation")
 
-	flags.RegisterWait(cmd, &wait, "Waits until created instance is ready.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until created instance is ready.")
 
 	cmd.Flags().StringVar(&credentialName, credentialNameFlag, "", "The name to use when storing the credentials locally. Defaults to <instance-id>-default.")
 

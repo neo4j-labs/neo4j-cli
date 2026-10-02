@@ -70,7 +70,11 @@ func (helper *AuraTestHelper) ExecuteCommandE(command string) error {
 
 	cfg.Aura.SetPollingConfig(5, 0)
 
-	cmd := aura.NewStandaloneCmd(cfg)
+	cmd := aura.NewCmd(cfg)
+	flags.RegisterRwFlag(cmd)
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return clierr.NewUsageError("%v", err)
+	})
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
 

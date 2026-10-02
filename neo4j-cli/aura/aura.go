@@ -6,18 +6,14 @@ package aura
 import (
 	"os"
 
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphanalytics"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
-	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/debug"
-	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/agent"
 	apicmd "github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/credential"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/customermanagedkey"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphql"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/instance"
@@ -27,9 +23,10 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/workspace"
 )
 
+// NewCmd returns the aura command tree, mounted as `neo4j-cli aura`.
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "aura-cli",
+		Use:     "aura",
 		Short:   "Allows you to programmatically provision and manage your Aura resources",
 		Long:    "Allows you to programmatically provision and manage your Aura resources. Write operations require --rw.",
 		Version: cfg.Version,
@@ -95,19 +92,4 @@ func applyEnvCredential(cfg *clicfg.Config) error {
 		Ephemeral:    true,
 	})
 	return nil
-}
-
-func NewStandaloneCmd(cfg *clicfg.Config) *cobra.Command {
-	cmd := NewCmd(cfg)
-	flags.RegisterRwFlag(cmd)
-	// Wrap cobra's flag-parse errors (unknown flag, missing value, bad type)
-	// into a typed *clierr.CLIError with exit code 2. Cobra walks up to the
-	// root for FlagErrorFunc, so one registration covers every subcommand
-	// under the standalone tree.
-	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
-		return clierr.NewUsageError("%v", err)
-	})
-	cmd.AddCommand(config.NewCmd(cfg))
-	cmd.AddCommand(credential.NewCmd(cfg))
-	return cmd
 }

@@ -10,8 +10,8 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clievents"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
@@ -165,7 +165,7 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256M
 	cmd.MarkFlagsMutuallyExclusive(typeDefsFlag, typeDefsFileFlag)
 	cmd.MarkFlagsOneRequired(typeDefsFlag, typeDefsFileFlag)
 
-	flags.RegisterWait(cmd, &wait, "Waits until created GraphQL Data API is ready.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until created GraphQL Data API is ready.")
 
 	return cmd
 }

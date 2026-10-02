@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
@@ -125,7 +125,7 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account 
 	cmd.Flags().StringVar(&typeDefsFile, typeDefsFileFlag, "", "Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql")
 	cmd.MarkFlagsMutuallyExclusive(typeDefsFlag, typeDefsFileFlag)
 
-	flags.RegisterWait(cmd, &wait, "Waits until updated GraphQL Data API is ready again.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until updated GraphQL Data API is ready again.")
 
 	return cmd
 }

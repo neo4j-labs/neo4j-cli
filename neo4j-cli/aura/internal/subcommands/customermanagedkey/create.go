@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -120,7 +121,7 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 	cmd.Flags().StringVar(&keyId, keyIdFlag, "", "(required) Encryption Key ARN")
 	cmd.MarkFlagRequired(keyIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	flags.RegisterWait(cmd, &wait, "Waits until created customer managed key is ready.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until created customer managed key is ready.")
 
 	return cmd
 }

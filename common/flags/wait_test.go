@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
+	"github.com/neo4j/cli/common/flags"
 )
 
 func TestRegisterWait(t *testing.T) {

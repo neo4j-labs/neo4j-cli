@@ -9,8 +9,8 @@ import (
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
@@ -82,7 +82,7 @@ neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to create a snapshot of")
 	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	flags.RegisterWait(cmd, &wait, "Waits until created snapshot is ready.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until created snapshot is ready.")
 
 	return cmd
 }

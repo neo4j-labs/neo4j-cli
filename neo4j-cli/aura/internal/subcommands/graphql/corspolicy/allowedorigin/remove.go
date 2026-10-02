@@ -11,8 +11,8 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
@@ -141,7 +141,7 @@ neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com
 	cmd.Flags().StringVar(&dataApiId, dataApiIdFlag, "", "(required) The ID of the GraphQL Data API to remove the CORS allowed origin for")
 	cmd.MarkFlagRequired(dataApiIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	flags.RegisterWait(cmd, &wait, "Waits until updated GraphQL Data API is ready.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until updated GraphQL Data API is ready.")
 
 	return cmd
 }

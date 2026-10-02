@@ -573,7 +573,7 @@ func findAPICmd(t *testing.T) *cobra.Command {
 	fs, err := testfs.GetTestFs(`{"aura":{}}`, "{}")
 	require.NoError(t, err)
 
-	for _, sub := range aura.NewStandaloneCmd(clicfg.NewConfig(fs, "test", clicfg.AuraScope)).Commands() {
+	for _, sub := range aura.NewCmd(clicfg.NewConfig(fs, "test", clicfg.AuraScope)).Commands() {
 		if sub.Name() == "api" {
 			return sub
 		}

@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
@@ -87,6 +87,6 @@ neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-000
 		},
 	}
 
-	flags.RegisterWait(cmd, &wait, "Waits until resumed instance is ready.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until resumed instance is ready.")
 	return cmd
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/clievents"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	auraflags "github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -156,7 +157,7 @@ neo4j-cli aura virtual-graph create --rw --name bq-analytics --data-source-id ds
 
 	cmd.Flags().Int64Var(&maximumBytesBilled, maximumBytesBilledFlag, 0, "Per-query bytes-billed cap for BigQuery data sources. Ignored for other data-source types.")
 
-	auraflags.RegisterWait(cmd, &wait, "Waits until the created virtual graph is running.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until the created virtual graph is running.")
 
 	return cmd
 }

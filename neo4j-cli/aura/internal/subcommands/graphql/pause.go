@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
@@ -79,7 +79,7 @@ neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --wait --organizati
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to pause the Data API for")
 	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	flags.RegisterWait(cmd, &wait, "Waits until GraphQL Data API is paused.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until GraphQL Data API is paused.")
 
 	return cmd
 }

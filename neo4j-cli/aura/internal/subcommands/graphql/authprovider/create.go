@@ -10,6 +10,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clievents"
+	commonflags "github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -147,7 +148,7 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 	msgUrlFlag := fmt.Sprintf("The JWKS URL that you want the bearer tokens in incoming GraphQL requests to be validated against. NOTE: only applicable for Authentication provider type '%s'", api.GraphQLDataApiAuthProviderTypeJwks)
 	cmd.Flags().StringVar(&url, urlFlag, "", msgUrlFlag)
 
-	flags.RegisterWait(cmd, &wait, "Waits until created Authentication provider is ready.")
+	commonflags.RegisterWait(cmd, &wait, "Waits until created Authentication provider is ready.")
 
 	return cmd
 }

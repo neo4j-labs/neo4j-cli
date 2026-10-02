@@ -3,7 +3,7 @@
 Gotchas and conventions about how the repo is laid out — mostly the agent-skill subsystem.
 
 - `neo4j-cli/app/app.go` builds the neo4j-cli cobra tree and exports `Version`. `cmd/neo4j-cli/main.go` is a thin entrypoint. Generators (e.g. skill bundle) import `app` to walk the tree without main-side effects.
-- `neo4j-cli/aura/aura.go` exposes `NewCmd` (super-CLI mount) and `NewStandaloneCmd` (kept for generator/test use, adds credential).
+- `neo4j-cli/aura/aura.go` exposes `NewCmd` (the `neo4j-cli aura` mount); there is no standalone aura binary.
 - `common/skill/` holds shared agent-skill logic (catalog, path expansion, installer). Hermetic-friendly: `DetectAgents(afero.Fs)` takes an FS; tests use `afero.NewMemMapFs` + `t.Setenv("HOME", ...)`.
 - `common/skill/filesystem.go::CopyBundle(dst, dstDir, bundle fs.FS)` walks `bundle` (already scoped — generators do `fs.Sub(Bundle, "bundle")` upstream). Uses `filepath.FromSlash` on each entry so embed.FS forward slashes translate to OS separators on Windows.
 - `common/skill/render.Bundle(root, opts)` returns `map[string][]byte` keyed with forward-slash paths (`SKILL.md`, `references/<sub>.md`). Uses `LocalFlags()` (not `Flags()`) when rendering subcommand flag tables to avoid duplicating root persistent flags shown in SKILL.md "Global Flags". Sorts subcommands + flag rows for byte-determinism. TOC inserted only when reference body >100 lines, between the H1 and the rest of the body.
