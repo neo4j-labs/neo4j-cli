@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'Aura commands now reject organization, project, agent, instance, GraphQL Data API, authentication-provider, virtual-graph, session, snapshot and customer-managed-key IDs that contain path or query characters (such as `/`, `..`, `?` or `#`), with a validation error, before sending any request.'
+time: 2026-10-02T13:58:54+01:00

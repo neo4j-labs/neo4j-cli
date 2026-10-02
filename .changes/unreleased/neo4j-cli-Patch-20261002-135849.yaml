@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'Aura commands no longer crash and exit 0 when the Aura API or its authentication endpoint cannot be reached, times out, or sends an unreadable response. They now report an error and exit 8 (upstream, retryable), and Aura commands reject a malformed API response with an error instead of crashing.'
+time: 2026-10-02T13:58:49+01:00

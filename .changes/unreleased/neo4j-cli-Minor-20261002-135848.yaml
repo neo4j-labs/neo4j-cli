@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Pressing Ctrl-C (SIGINT) or sending SIGTERM now stops a running command promptly: in-flight Aura requests and `--wait` polling are cancelled instead of running to completion, and the command exits with status 130 (143 for SIGTERM). A second Ctrl-C force-quits.'
+time: 2026-10-02T13:58:48+01:00
