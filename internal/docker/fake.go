@@ -14,25 +14,27 @@ import (
 // inject custom return values or simulate failures.
 type FakeClient struct {
 	// Recorded args.
-	RunCalls         [][]string
-	RunEnvCalls      []RunCall
-	StartCalls       []string
-	StopCalls        []string
-	RemoveForceCalls []string
-	PsAllCalls       [][]string
-	InspectCalls     []string
-	ExecCalls        []ExecCall
-	CopyToCalls      []CopyToCall
+	RunCalls          [][]string
+	RunEnvCalls       []RunCall
+	StartCalls        []string
+	StopCalls         []string
+	RemoveForceCalls  []string
+	RemoveVolumeCalls []string
+	PsAllCalls        [][]string
+	InspectCalls      []string
+	ExecCalls         []ExecCall
+	CopyToCalls       []CopyToCall
 
 	// Optional behaviour overrides.
-	RunFn         func(ctx context.Context, args []string) (string, error)
-	StartFn       func(ctx context.Context, name string) error
-	StopFn        func(ctx context.Context, name string) error
-	RemoveForceFn func(ctx context.Context, name string) error
-	PsAllFn       func(ctx context.Context, filters []string) ([]PsEntry, error)
-	InspectFn     func(ctx context.Context, name string) (Container, error)
-	ExecFn        func(ctx context.Context, name string, args []string) (string, error)
-	CopyToFn      func(ctx context.Context, hostPath, name, containerPath string) error
+	RunFn          func(ctx context.Context, args []string) (string, error)
+	StartFn        func(ctx context.Context, name string) error
+	StopFn         func(ctx context.Context, name string) error
+	RemoveForceFn  func(ctx context.Context, name string) error
+	RemoveVolumeFn func(ctx context.Context, name string) error
+	PsAllFn        func(ctx context.Context, filters []string) ([]PsEntry, error)
+	InspectFn      func(ctx context.Context, name string) (Container, error)
+	ExecFn         func(ctx context.Context, name string, args []string) (string, error)
+	CopyToFn       func(ctx context.Context, hostPath, name, containerPath string) error
 
 	// Stored state for default behaviours.
 	Containers map[string]Container
@@ -99,6 +101,14 @@ func (f *FakeClient) Stop(ctx context.Context, name string) error {
 	f.StopCalls = append(f.StopCalls, name)
 	if f.StopFn != nil {
 		return f.StopFn(ctx, name)
+	}
+	return nil
+}
+
+func (f *FakeClient) RemoveVolume(ctx context.Context, name string) error {
+	f.RemoveVolumeCalls = append(f.RemoveVolumeCalls, name)
+	if f.RemoveVolumeFn != nil {
+		return f.RemoveVolumeFn(ctx, name)
 	}
 	return nil
 }

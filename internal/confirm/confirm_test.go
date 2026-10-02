@@ -444,3 +444,76 @@ func TestRequire_ResourceTypeFromParent(t *testing.T) {
 		t.Fatalf("error %q missing resource type/ID", err.Error())
 	}
 }
+
+func TestAsk(t *testing.T) {
+	tests := []struct {
+		name  string
+		tty   bool
+		input string
+		want  bool
+	}{
+		{name: "y on a TTY", tty: true, input: "y\n", want: true},
+		{name: "yes, any case", tty: true, input: "YeS\n", want: true},
+		{name: "n on a TTY", tty: true, input: "n\n", want: false},
+		{name: "just enter defaults to no", tty: true, input: "\n", want: false},
+		{name: "anything else is no", tty: true, input: "sure\n", want: false},
+		{name: "EOF is no", tty: true, input: "", want: false},
+		{name: "an answer without a trailing newline still counts", tty: true, input: "y", want: true},
+		{name: "never asks, and never reads, off a TTY", tty: false, input: "y\n", want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return tc.tty }))
+			cmd, _, errBuf := newTestCmd(t, "docker", tc.input)
+
+			got := confirm.Ask(cmd, "Remove it?")
+
+			if got != tc.want {
+				t.Fatalf("Ask = %v, want %v", got, tc.want)
+			}
+			asked := strings.Contains(errBuf.String(), "Remove it? [y/N]")
+			if asked != tc.tty {
+				t.Fatalf("prompt shown = %v, want %v (stderr=%q)", asked, tc.tty, errBuf.String())
+			}
+		})
+	}
+}
+
+func TestScripted(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want bool
+	}{
+		{nil, false},
+		{[]string{"--yes"}, false},
+		{[]string{"--force"}, false},
+		{[]string{"--yes", "--force"}, true},
+	} {
+		cmd, _, _ := newTestCmd(t, "docker", "")
+		confirm.Register(cmd)
+		if err := cmd.ParseFlags(tc.args); err != nil {
+			t.Fatal(err)
+		}
+		if got := confirm.Scripted(cmd); got != tc.want {
+			t.Fatalf("Scripted(%v) = %v, want %v", tc.args, got, tc.want)
+		}
+	}
+}
+
+// Two prompts in one command read two lines from one stream; the first must not
+// swallow the second's answer.
+func TestPrompts_ShareOneInputStreamWithoutReadingAhead(t *testing.T) {
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
+	cmd, _, _ := newTestCmd(t, "docker", "y\nyes\nn\n")
+	confirm.Register(cmd)
+
+	if err := confirm.Require(cmd, "dev"); err != nil {
+		t.Fatalf("first prompt (y) should proceed: %v", err)
+	}
+	if !confirm.Ask(cmd, "second?") {
+		t.Fatal("second prompt (yes) should be answered from the next line, not EOF")
+	}
+	if confirm.Ask(cmd, "third?") {
+		t.Fatal("third prompt (n) should be no")
+	}
+}

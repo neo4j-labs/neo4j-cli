@@ -83,7 +83,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 Remove a Neo4j container and its dbms credential
 
-Remove a Neo4j Docker container by name and best-effort delete its stored dbms credential. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Destructive: requires `--yes --force` (or a `y` answer at the TTY prompt) when invoked non-interactively. A missing dbms credential is NOT an error — the container is still removed. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
+Remove a Neo4j Docker container by name and best-effort delete its stored dbms credential. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Destructive: requires `--yes --force` (or a `y` answer at the TTY prompt) when invoked non-interactively. A missing dbms credential is NOT an error — the container is still removed. A container made by `docker load` keeps its loaded database in a named data volume (`neo4j-cli-<name>-data`) that outlives the container. Pass --remove-volume to remove that volume as well; on a TTY you are asked (default no); with `--yes --force` and no --remove-volume it is kept and the command to remove it later is printed. Only that CLI-created volume is ever removed — never a volume you attached yourself. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
 
 Usage: `neo4j-cli docker delete <name> [flags]`
 
@@ -92,6 +92,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--remove-volume` | bool | false | Also remove the container's CLI-created data volume (neo4j-cli-<name>-data), which holds a loaded database. Without it the volume is kept (a TTY is asked; the removal command is printed otherwise). |
 | `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
@@ -102,6 +103,9 @@ neo4j-cli docker delete dev --rw
 
 # Skip the prompt (required for scripts / non-TTY callers)
 neo4j-cli docker delete dev --yes --force --rw
+
+# Also remove the data volume a loaded container left behind
+neo4j-cli docker delete movies --remove-volume --yes --force --rw
 
 # Delete and confirm by listing remaining managed containers
 neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format json

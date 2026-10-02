@@ -5,6 +5,8 @@ package docker
 
 import (
 	"errors"
+	"fmt"
+	"github.com/neo4j/cli/internal/clierr"
 	engine "github.com/neo4j/cli/internal/docker"
 	"strings"
 
@@ -31,6 +33,8 @@ const missingCredentialErrorPrefix = "could not find credential with name"
 // removal still succeeded, the credential just wasn't stored. Any OTHER
 // credential-removal error is surfaced verbatim.
 func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
+	var removeVolume bool
+
 	cmd := &cobra.Command{
 		Use:         "delete <name>",
 		Short:       "Remove a Neo4j container and its dbms credential",
@@ -40,6 +44,9 @@ func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 			"return a usage error pointing at `neo4j-cli docker list`. " +
 			"Destructive: requires `--yes --force` (or a `y` answer at the TTY prompt) when invoked non-interactively. " +
 			"A missing dbms credential is NOT an error — the container is still removed. " +
+			"A container made by `docker load` keeps its loaded database in a named data volume (`neo4j-cli-<name>-data`) that outlives the container. " +
+			"Pass --remove-volume to remove that volume as well; on a TTY you are asked (default no); with `--yes --force` and no --remove-volume it is kept and the command to remove it later is printed. " +
+			"Only that CLI-created volume is ever removed — never a volume you attached yourself. " +
 			"Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim " +
 			"and are distinct from the unknown-name error.",
 		Example: `# Delete a managed container; prompts on a TTY
@@ -47,6 +54,9 @@ neo4j-cli docker delete dev --rw
 
 # Skip the prompt (required for scripts / non-TTY callers)
 neo4j-cli docker delete dev --yes --force --rw
+
+# Also remove the data volume a loaded container left behind
+neo4j-cli docker delete movies --remove-volume --yes --force --rw
 
 # Delete and confirm by listing remaining managed containers
 neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format json`,
@@ -97,11 +107,43 @@ neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format
 				}
 			}
 
+			// The data volume `docker load` created outlives the container. It
+			// holds the loaded database, so removing it is a separate, opt-in
+			// step: --remove-volume, or a y/N offer (default no) on a TTY.
+			if volume, ok := engine.ManagedDataVolume(container); ok {
+				return settleDataVolume(cmd, client, name, volume, removeVolume)
+			}
+
 			return nil
 		},
 	}
 
 	confirm.Register(cmd)
+	cmd.Flags().BoolVar(&removeVolume, "remove-volume", false, "Also remove the container's CLI-created data volume (neo4j-cli-<name>-data), which holds a loaded database. Without it the volume is kept (a TTY is asked; the removal command is printed otherwise).")
 
 	return cmd
+}
+
+// settleDataVolume removes the container's data volume when asked to — by flag,
+// or by a TTY answering the offer — and otherwise keeps it and says how to
+// remove it later. The container is already gone by now, so a failure here is
+// reported as a partial success, not a failed delete.
+func settleDataVolume(cmd *cobra.Command, client engine.Client, container, volume string, flagged bool) error {
+	remove := flagged
+	if !remove && !confirm.Scripted(cmd) {
+		remove = confirm.Ask(cmd, fmt.Sprintf("Also remove the data volume %q (it holds the loaded database)?", volume))
+	}
+
+	if !remove {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+			"info: kept data volume %q (it holds the loaded database); remove it with `docker volume rm %s` or delete with --remove-volume next time\n", volume, volume)
+		return nil
+	}
+
+	if err := client.RemoveVolume(cmd.Context(), volume); err != nil {
+		cmd.SilenceUsage = true
+		return clierr.NewFatalError("container %q was removed but its data volume %q could not be: %w. Remove it with `docker volume rm %s`", container, volume, err, volume)
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: removed data volume %q\n", volume)
+	return nil
 }

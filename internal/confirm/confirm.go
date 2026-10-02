@@ -9,9 +9,9 @@
 package confirm
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -101,8 +101,7 @@ func RequireTyped(cmd *cobra.Command, resourceType, resourceID string) error {
 	}
 
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Delete %s? This action is irreversible. [y/N] ", target)
-	reader := bufio.NewReader(cmd.InOrStdin())
-	line, err := reader.ReadString('\n')
+	line, err := readLine(cmd.InOrStdin())
 	if err == nil || line != "" {
 		answer := strings.ToLower(strings.TrimSpace(line))
 		if answer == "y" || answer == "yes" {
@@ -110,6 +109,55 @@ func RequireTyped(cmd *cobra.Command, resourceType, resourceID string) error {
 		}
 	}
 	return cancel(cmd)
+}
+
+// Scripted reports whether the caller passed both --yes and --force, i.e. said
+// up front that nothing should be asked. A leaf that wants to OFFER an optional,
+// additional action (as opposed to gating the main one with Require) should not
+// prompt for it in a scripted run.
+func Scripted(cmd *cobra.Command) bool {
+	yes, _ := cmd.Flags().GetBool("yes")
+	force, _ := cmd.Flags().GetBool("force")
+	return yes && force
+}
+
+// Ask poses an optional yes/no question and reports whether the answer was yes.
+// The default is No: anything but y/yes, a read error, or EOF answers no. It
+// never prompts when stdin is not a terminal, so a non-interactive caller gets
+// false without blocking. Unlike Require it has no flag to bypass it and never
+// cancels the command — declining only skips the optional action.
+func Ask(cmd *cobra.Command, question string) bool {
+	if !stdinIsTerminal() {
+		return false
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s [y/N] ", question)
+	line, err := readLine(cmd.InOrStdin())
+	if err != nil && line == "" {
+		return false
+	}
+	answer := strings.ToLower(strings.TrimSpace(line))
+	return answer == "y" || answer == "yes"
+}
+
+// readLine reads up to and including the next newline, one byte at a time, and
+// never reads past it. A buffered reader would read ahead and swallow the answer
+// to a LATER prompt on the same input (piped or type-ahead input), so two prompts
+// in one command would see EOF for the second.
+func readLine(r io.Reader) (string, error) {
+	var line []byte
+	b := make([]byte, 1)
+	for {
+		n, err := r.Read(b)
+		if n == 1 {
+			line = append(line, b[0])
+			if b[0] == '\n' {
+				return string(line), nil
+			}
+		}
+		if err != nil {
+			return string(line), err
+		}
+	}
 }
 
 // cancel narrates the cancellation to stderr, silences cobra's default

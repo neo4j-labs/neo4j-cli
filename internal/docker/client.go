@@ -91,6 +91,8 @@ type Client interface {
 	Stop(ctx context.Context, name string) error
 	// RemoveForce shells `docker rm -f <name>`.
 	RemoveForce(ctx context.Context, name string) error
+	// RemoveVolume deletes a named volume. It fails if a container still uses it.
+	RemoveVolume(ctx context.Context, name string) error
 	// PsAll shells `docker ps -a --format '{{json .}}'` (optionally with
 	// extra filters). The returned slice contains one parsed entry per
 	// container line on stdout.
@@ -321,6 +323,11 @@ func (c *execClient) Stop(ctx context.Context, name string) error {
 
 func (c *execClient) RemoveForce(ctx context.Context, name string) error {
 	_, err := c.run(ctx, "rm", "-f", name)
+	return err
+}
+
+func (c *execClient) RemoveVolume(ctx context.Context, name string) error {
+	_, err := c.run(ctx, "volume", "rm", name)
 	return err
 }
 
@@ -564,6 +571,11 @@ func parseInspectOutput(name, stdout string) (Container, error) {
 			Labels map[string]string `json:"Labels"`
 			Env    []string          `json:"Env"`
 		} `json:"Config"`
+		Mounts []struct {
+			Type        string `json:"Type"`
+			Name        string `json:"Name"`
+			Destination string `json:"Destination"`
+		} `json:"Mounts"`
 	}
 	var shapes []inspectShape
 	if err := json.Unmarshal([]byte(stdout), &shapes); err != nil {
@@ -574,7 +586,14 @@ func parseInspectOutput(name, stdout string) (Container, error) {
 	}
 	s := shapes[0]
 	labels := s.Config.Labels
+	var volumes []string
+	for _, m := range s.Mounts {
+		if m.Type == "volume" && m.Name != "" {
+			volumes = append(volumes, m.Name)
+		}
+	}
 	return Container{
+		Volumes:   volumes,
 		Name:      strings.TrimPrefix(s.Name, "/"),
 		Status:    s.State.Status,
 		Running:   s.State.Running,

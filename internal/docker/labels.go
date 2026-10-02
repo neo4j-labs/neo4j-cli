@@ -44,6 +44,10 @@ type Container struct {
 	// plugins cannot be added without recreating the container. Like Managed
 	// this is a per-call control bit and not serialised into rendered output.
 	Plugins []string `json:"-"`
+	// Volumes are the names of the named volumes mounted into the container (bind
+	// mounts are not included). `docker delete` uses them to find the data volume
+	// `docker load` created. A per-call control bit, not rendered.
+	Volumes []string `json:"-"`
 	// Running mirrors `docker inspect <name>` top-level `.State.Running` bool
 	// — true while the container is up, false once it has exited. Consumed by
 	// `docker stop --wait` (task-011) to decide when the daemon-side stop has

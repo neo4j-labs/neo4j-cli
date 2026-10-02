@@ -103,7 +103,7 @@ func LoadDumpIntoNewContainer(ctx context.Context, dbms *credentials.DbmsCredent
 		Password: password,
 	}
 	image := spec.Image()
-	volume := "neo4j-cli-" + chosenName + "-data"
+	volume := DataVolumeName(chosenName)
 	spec.Mounts = []Mount{{Source: volume, Target: "/data"}}
 
 	// Stage the dump as <database>.dump in a dedicated dir so the loader
