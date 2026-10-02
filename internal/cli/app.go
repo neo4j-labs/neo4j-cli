@@ -9,6 +9,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -75,6 +76,13 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	// roll can also short-circuit before any network call. None of this
 	// is allowed to fail the foreground command — if any of it errors,
 	// versioncheck swallows silently.
+	versioncheck.SetLatest(func(ctx context.Context, preReleases bool) (string, error) {
+		r, err := update.Latest(ctx, preReleases)
+		if err != nil || r == nil {
+			return "", err
+		}
+		return r.TagName, nil
+	})
 	formatAndRw := flags.ComposeRootPersistentPreRunE(cfg)
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if err := formatAndRw(cmd, args); err != nil {

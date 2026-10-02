@@ -5,6 +5,7 @@ package agentcontext
 
 import (
 	"encoding/json"
+	agentctx "github.com/neo4j/cli/internal/agentcontext"
 
 	"github.com/neo4j/cli/internal/clicfg"
 	commonoutput "github.com/neo4j/cli/internal/output"
@@ -33,7 +34,7 @@ neo4j-cli agent-context --format json | jq '.commands | keys'
 # Inspect the flags exposed by a specific leaf via the envelope
 neo4j-cli agent-context --format json | jq -e '.commands.aura.subcommands.instance.subcommands.list.flags'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := BuildContext(cmd.Root(), version)
+			ctx := agentctx.BuildContext(cmd.Root(), version)
 			switch commonoutput.ResolveOutput(cmd, cfg) {
 			case "toon":
 				return renderToon(cmd, ctx)

@@ -43,7 +43,13 @@ func withNow(t *testing.T, ts time.Time) {
 func withLatest(t *testing.T, fn func(ctx context.Context, preReleases bool) (*update.Release, error)) {
 	t.Helper()
 	prev := latestFn
-	latestFn = fn
+	latestFn = func(ctx context.Context, preReleases bool) (string, error) {
+		r, err := fn(ctx, preReleases)
+		if err != nil || r == nil {
+			return "", err
+		}
+		return r.TagName, nil
+	}
 	t.Cleanup(func() { latestFn = prev })
 }
 

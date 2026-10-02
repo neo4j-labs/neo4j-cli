@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/commands/query/embed"
+	"github.com/neo4j/cli/internal/embed"
 	commonoutput "github.com/neo4j/cli/internal/output"
 )
 

@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/neo4j/cli/internal/agentcontext"
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/commands/agentcontext"
 	"github.com/spf13/afero"
 )
 

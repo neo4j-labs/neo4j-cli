@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/commands/update"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -70,10 +69,18 @@ var (
 	// nowFn shadows time.Now so cache TTL and "checked_at" can be pinned in
 	// tests.
 	nowFn = time.Now
-	// latestFn is the underlying release-lookup; we wrap update.Latest so
-	// tests can assert no network call without swapping the GitHub seam.
-	latestFn = update.Latest
+	// latestFn is the underlying release lookup. It is injected via SetLatest
+	// (internal/cli wires the update command's GitHub lookup) so this package
+	// does not depend on a command package. nil disables the background check.
+	latestFn LatestFunc
 )
+
+// LatestFunc resolves the latest published release tag. preReleases mirrors the
+// `update --pre-releases` flag; the background check always passes false.
+type LatestFunc func(ctx context.Context, preReleases bool) (tag string, err error)
+
+// SetLatest installs the release lookup used by Schedule.
+func SetLatest(fn LatestFunc) { latestFn = fn }
 
 // once guards Schedule so that even if PersistentPreRunE somehow fires twice
 // (composed hooks, traverse) the goroutine only spins up once per process.
@@ -137,16 +144,16 @@ func scheduleOnce(_ context.Context, cfg *clicfg.Config) {
 		ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 		defer cancel()
 
-		release, err := latestFn(ctx, false)
-		if err != nil || release == nil {
+		if latestFn == nil {
 			return
 		}
-		if !semver.IsValid(release.TagName) {
+		tag, err := latestFn(ctx, false)
+		if err != nil || !semver.IsValid(tag) {
 			return
 		}
 		writeCache(fs, cacheEntry{
 			CheckedAt:    nowFn(),
-			LatestStable: release.TagName,
+			LatestStable: tag,
 		})
 	}()
 }

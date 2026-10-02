@@ -6,6 +6,7 @@ package agentcontext
 import (
 	"encoding/json"
 	"fmt"
+	agentctx "github.com/neo4j/cli/internal/agentcontext"
 	"sort"
 	"strings"
 
@@ -18,7 +19,7 @@ import (
 // pattern in internal/output (json.Marshal -> any -> toon.Marshal). The double
 // hop is needed because toon.Marshal walks a plain `any` shape, and going via
 // JSON honours any custom MarshalJSON impls along the way.
-func renderToon(cmd *cobra.Command, ctx Context) error {
+func renderToon(cmd *cobra.Command, ctx agentctx.Context) error {
 	b, err := json.Marshal(ctx)
 	if err != nil {
 		return err
@@ -40,7 +41,7 @@ func renderToon(cmd *cobra.Command, ctx Context) error {
 // cli_version / schema_version / async_flag. The nested commands tree is
 // flattened so a human scanning the table sees every visible subcommand at
 // once, not just the top-level entries.
-func renderTable(cmd *cobra.Command, ctx Context) error {
+func renderTable(cmd *cobra.Command, ctx agentctx.Context) error {
 	t := table.NewWriter()
 	t.AppendHeader(table.Row{"path", "aliases", "short"})
 	rows := flattenCommands(ctx.Binary, ctx.Commands)
@@ -60,7 +61,7 @@ func renderTable(cmd *cobra.Command, ctx Context) error {
 // visible command as [path, aliases, short]. `prefix` is the parent path
 // already built (e.g. "neo4j-cli aura"). Map keys are first-Use tokens so
 // the path is reconstructed by joining keys with spaces.
-func flattenCommands(prefix string, cmds map[string]Command) [][3]string {
+func flattenCommands(prefix string, cmds map[string]agentctx.Command) [][3]string {
 	rows := [][3]string{}
 	keys := make([]string, 0, len(cmds))
 	for k := range cmds {

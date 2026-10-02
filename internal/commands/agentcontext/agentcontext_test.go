@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	agentctx "github.com/neo4j/cli/internal/agentcontext"
 	"github.com/neo4j/cli/internal/cli"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clicmd"
-	"github.com/neo4j/cli/internal/commands/agentcontext"
 	"github.com/neo4j/cli/internal/testutil/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +68,7 @@ func TestAgentContext_Envelope(t *testing.T) {
 	stdout, stderr, err := runAgentContext(t, "--format", "json")
 	require.NoError(t, err, "agent-context --format json must succeed; stderr=%s", stderr.String())
 
-	var ctx agentcontext.Context
+	var ctx agentctx.Context
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &ctx),
 		"stdout must be valid JSON decodable into Context; got: %s", stdout.String())
 
@@ -104,7 +104,7 @@ func TestAgentContext_Envelope(t *testing.T) {
 func TestAgentContext_OutputFormatsParity(t *testing.T) {
 	stdout, _, err := runAgentContext(t, "--format", "json")
 	require.NoError(t, err)
-	var ctx agentcontext.Context
+	var ctx agentctx.Context
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &ctx))
 
 	assert.Equal(t, clicfg.ValidFormatValues[:], ctx.OutputFormats,
@@ -150,12 +150,12 @@ func TestAgentContext_TreeCoverage(t *testing.T) {
 	walkLive(cmd, "")
 
 	// Walk the emitted JSON tree gathering the same path set.
-	var ctx agentcontext.Context
+	var ctx agentctx.Context
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &ctx))
 
 	jsonPaths := map[string]bool{}
-	var walkJSON func(cmds map[string]agentcontext.Command, prefix string)
-	walkJSON = func(cmds map[string]agentcontext.Command, prefix string) {
+	var walkJSON func(cmds map[string]agentctx.Command, prefix string)
+	walkJSON = func(cmds map[string]agentctx.Command, prefix string) {
 		for key, c := range cmds {
 			path := key
 			if prefix != "" {
@@ -195,7 +195,7 @@ func TestAgentContext_FormatRoundTrip(t *testing.T) {
 			assert.NotEmpty(t, strings.TrimSpace(stdout.String()),
 				"agent-context --format %s must write non-empty stdout", format)
 			if format == "json" {
-				var ctx agentcontext.Context
+				var ctx agentctx.Context
 				require.NoError(t, json.Unmarshal(stdout.Bytes(), &ctx),
 					"json output must decode back into Context")
 				assert.Equal(t, 1, ctx.SchemaVersion)

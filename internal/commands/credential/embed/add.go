@@ -6,13 +6,13 @@ package embed
 import (
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
-	embedrt "github.com/neo4j/cli/internal/commands/query/embed"
+	embedrt "github.com/neo4j/cli/internal/embed"
 	"github.com/spf13/cobra"
 )
 
 // validProviders is the closed set of embed providers the CLI supports.
 // Kept here (not exported) because add.go is the only validation site for
-// provider names at storage time; the embed runtime in `internal/commands/query/embed`
+// provider names at storage time; the embed runtime in `internal/embed`
 // does its own switch over provider strings independently.
 var validProviders = []string{"openai", "ollama", "huggingface", "gemini", "vertex"}
 

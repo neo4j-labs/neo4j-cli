@@ -19,8 +19,8 @@ import (
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
-	"github.com/neo4j/cli/internal/commands/query/embed"
 	"github.com/neo4j/cli/internal/dbconn"
+	"github.com/neo4j/cli/internal/embed"
 	"github.com/neo4j/cli/internal/testutil/testfs"
 )
 

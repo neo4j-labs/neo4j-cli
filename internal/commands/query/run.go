@@ -14,8 +14,8 @@ import (
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
-	"github.com/neo4j/cli/internal/commands/query/embed"
 	"github.com/neo4j/cli/internal/dbconn"
+	"github.com/neo4j/cli/internal/embed"
 )
 
 // stdinReader is the test seam for reading piped Cypher from stdin. Production

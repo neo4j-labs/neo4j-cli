@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neo4j/cli/internal/commands/query/embed"
 	"github.com/neo4j/cli/internal/dbconn"
+	"github.com/neo4j/cli/internal/embed"
 )
 
 // TestQueryEmbed_PositionalArg verifies the happy path with a positional
