@@ -6,8 +6,8 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"log"
-	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -71,32 +71,21 @@ neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000
 				return fmt.Errorf("invalid tools JSON: %w", err)
 			}
 
-			path := fmt.Sprintf("/organizations/%s/projects/%s/agents", organizationId, projectId)
-
-			body := map[string]any{
-				"name":           name,
-				"description":    description,
-				"dbid":           dbid,
-				"is_private":     isPrivate,
-				"tools":          tools,
-				"system_prompt":  systemPrompt,
-				"is_mcp_enabled": isMcpEnabled,
-				"enabled":        enabled,
-			}
-
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:   http.MethodPost,
-				PostBody: body,
-				Version:  api.AuraApiVersion2,
+			agent, err := aura.New(cfg).Agents().Create(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, aura.AgentSpec{
+				Name:         name,
+				Description:  description,
+				DBID:         dbid,
+				IsPrivate:    isPrivate,
+				Tools:        tools,
+				SystemPrompt: systemPrompt,
+				IsMCPEnabled: isMcpEnabled,
+				Enabled:      enabled,
 			})
 			if err != nil {
 				return err
 			}
-
-			if api.IsSuccessful(statusCode) {
-				output.PrintRawBody(cmd, cfg, resBody, []string{"id", "name", "description", "dbid", "is_private", "is_mcp_enabled", "enabled"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(agent.Record), []string{"id", "name", "description", "dbid", "is_private", "is_mcp_enabled", "enabled"})
 
 			return nil
 		},

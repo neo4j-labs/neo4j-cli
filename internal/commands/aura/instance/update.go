@@ -5,6 +5,7 @@ package instance
 
 import (
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"strings"
 
@@ -52,7 +53,7 @@ neo4j-cli aura instance update 00000000 --organization-id 00000000-0000-0000-000
 			}
 
 			// Pre-flight ownership check.
-			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
+			if err := aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceID); err != nil {
 				return err
 			}
 

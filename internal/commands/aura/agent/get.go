@@ -4,8 +4,7 @@
 package agent
 
 import (
-	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -47,21 +46,12 @@ neo4j-cli aura agent get 00000000-0000-0000-0000-000000000000 --format json`,
 				return err
 			}
 
-			agentId := args[0]
-			path := fmt.Sprintf("/organizations/%s/projects/%s/agents/%s", organizationId, projectId, agentId)
-
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodGet,
-				Version: api.AuraApiVersion2,
-			})
+			agent, err := aura.New(cfg).Agents().Get(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, args[0])
 			if err != nil {
 				return err
 			}
-
-			if api.IsSuccessful(statusCode) {
-				output.PrintRawBody(cmd, cfg, resBody, []string{"id", "name", "description", "dbid", "is_private", "is_mcp_enabled", "enabled"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(agent.Record), []string{"id", "name", "description", "dbid", "is_private", "is_mcp_enabled", "enabled"})
 
 			return nil
 		},

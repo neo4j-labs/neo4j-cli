@@ -4,8 +4,10 @@
 package utils_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -519,12 +521,12 @@ func TestFetchScopedInstance(t *testing.T) {
 	assert.Contains(t, string(body), `"id": "x"`)
 }
 
-func TestFetchAndVerifyInstanceInProject_OwnershipMismatch(t *testing.T) {
+func TestVerifyInstance_OwnershipMismatch(t *testing.T) {
 	const instanceID = "inst-xyz"
 	srv := buildResourceServer(t, "/v1/instances/"+instanceID, "other-project")
 	cfg := buildTestConfig(t, srv.URL, "")
 
-	_, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, testProjectID)
+	err := aura.New(cfg).Instances().Verify(context.Background(), aura.Scope{ProjectID: testProjectID}, instanceID)
 	require.Error(t, err)
 	assert.Equal(t, fmt.Sprintf("could not find instance %s in project %s", instanceID, testProjectID), err.Error())
 

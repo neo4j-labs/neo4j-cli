@@ -4,8 +4,7 @@
 package instance
 
 import (
-	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -40,30 +39,16 @@ neo4j-cli aura instance pause 00000000 --organization-id 00000000-0000-0000-0000
 			instanceID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			orgID, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
-			// Pre-flight ownership check.
-			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
-				return err
-			}
-
-			path := fmt.Sprintf("/instances/%s/pause", instanceID)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodPost,
-			})
+			inst, err := aura.New(cfg).Instances().Pause(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, instanceID)
 			if err != nil {
 				return err
 			}
-
-			// NOTE: Instance pause should not return OK (200), it always returns 202
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "status", "project_id", "connection_url", "cloud_provider", "region", "type", "memory"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(inst.Record), []string{"id", "name", "status", "project_id", "connection_url", "cloud_provider", "region", "type", "memory"})
 			return nil
 		},
 	}

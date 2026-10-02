@@ -5,6 +5,7 @@ package graphql
 
 import (
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"strings"
 
@@ -62,7 +63,7 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account 
 			if err != nil {
 				return err
 			}
-			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
 				return err
 			}
 

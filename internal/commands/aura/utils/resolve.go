@@ -174,42 +174,6 @@ func FetchScopedInstance(cfg *clicfg.Config, orgID, projectID, instanceID string
 	return resBody, nil
 }
 
-// FetchAndVerifyInstanceInProject performs a GET /instances/{instanceID} and
-// checks that the instance's tenant_id matches projectID. It returns the raw
-// response body so the caller can reuse it for output (avoiding a second
-// round-trip in read-only commands such as "instance get").
-//
-// If the instance exists but belongs to a different project the function
-// returns (nil, "could not find instance {instanceID} in project {projectID}").
-func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID string) ([]byte, error) {
-	path := fmt.Sprintf("/instances/%s", instanceID)
-	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-		Method: http.MethodGet,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d from preflight ownership check", statusCode)
-	}
-
-	responseData := api.ParseBody(resBody)
-	instance, err := responseData.GetSingleOrError()
-	if err != nil {
-		return nil, err
-	}
-
-	tenantID, _ := instance["tenant_id"].(string)
-	if tenantID != projectID {
-		return nil, clierr.NewNotFoundError("could not find instance %s in project %s", instanceID, projectID).
-			WithResource("instance", instanceID).
-			WithSuggestion("Run 'neo4j-cli aura instance list --project-id <id>' to see instances in this project.")
-	}
-
-	return resBody, nil
-}
-
 // FetchScopedSession performs a GET on the v2beta1 org/project-scoped
 // graph-analytics session path
 // (/organizations/{orgID}/projects/{projectID}/graph-analytics/sessions/{sessionID})

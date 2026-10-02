@@ -4,9 +4,8 @@
 package instance
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -49,39 +48,21 @@ neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
-			// Pre-flight ownership check.
-			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
-				return err
-			}
-
-			path := fmt.Sprintf("/instances/%s/resume", instanceID)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodPost,
-			})
+			scope := aura.Scope{OrgID: orgID, ProjectID: projectID}
+			instances := aura.New(cfg).Instances()
+			inst, err := instances.Resume(cmd.Context(), scope, instanceID)
 			if err != nil {
 				return err
 			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(inst.Record), []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 
-			// NOTE: Instance resume should not return OK (200), it always returns 202
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
-
-				if wait {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					var response api.CreateInstanceResponse
-					if err := json.Unmarshal(resBody, &response); err != nil {
-						return err
-					}
-
-					pollResponse, err := api.PollInstance(cfg, orgID, projectID, response.Data.Id, api.InstanceStatusResuming)
-					if err != nil {
-						return err
-					}
-
-					fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+			if wait {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
+				status, err := instances.WaitWhile(cmd.Context(), scope, inst.ID, aura.InstanceStatusResuming)
+				if err != nil {
+					return err
 				}
+				fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 			return nil
 		},

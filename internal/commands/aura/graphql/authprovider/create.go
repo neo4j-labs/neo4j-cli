@@ -6,6 +6,7 @@ package authprovider
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -76,7 +77,7 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 			if err != nil {
 				return err
 			}
-			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
 				return err
 			}
 

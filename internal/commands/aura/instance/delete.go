@@ -5,7 +5,6 @@ package instance
 
 import (
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -55,21 +54,11 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
-			path := api.ScopedInstancePath(orgID, projectID, instanceID)
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodDelete,
-				Version: api.AuraApiVersion2,
-			})
-
+			inst, err := aura.New(cfg).Instances().Delete(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, instanceID)
 			if err != nil {
 				return err
 			}
-			// NOTE: Instance delete should not return OK (200), it always returns 202
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				normalized := utils.NormalizeV2Beta1Response(responseData)
-				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(inst.Record), []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 
 			return nil
 		},

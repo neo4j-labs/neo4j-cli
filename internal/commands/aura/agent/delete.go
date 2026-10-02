@@ -4,10 +4,8 @@
 package agent
 
 import (
-	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/neo4j/cli/internal/confirm"
@@ -58,18 +56,10 @@ neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --fo
 				return err
 			}
 
-			path := fmt.Sprintf("/organizations/%s/projects/%s/agents/%s", organizationId, projectId, agentId)
-			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodDelete,
-				Version: api.AuraApiVersion2,
-			})
-			if err != nil {
+			if err := aura.New(cfg).Agents().Delete(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, agentId); err != nil {
 				return err
 			}
-
-			if api.IsSuccessful(statusCode) {
-				cmd.Println("Agent deleted successfully", agentId)
-			}
+			cmd.Println("Agent deleted successfully", agentId)
 
 			return nil
 		},

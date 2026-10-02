@@ -5,6 +5,7 @@ package snapshot
 
 import (
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"strings"
 
@@ -38,7 +39,7 @@ neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --inst
 				return err
 			}
 
-			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
 				return err
 			}
 

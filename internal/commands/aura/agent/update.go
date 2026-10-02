@@ -6,7 +6,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -68,53 +68,42 @@ neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --description "
 				return err
 			}
 
-			body := map[string]any{}
-
+			var patch aura.AgentPatch
 			if name != "" {
-				body["name"] = name
+				patch.Name = &name
 			}
 			if description != "" {
-				body["description"] = description
+				patch.Description = &description
 			}
 			if dbid != "" {
-				body["dbid"] = dbid
+				patch.DBID = &dbid
 			}
 			if systemPrompt != "" {
-				body["system_prompt"] = systemPrompt
+				patch.SystemPrompt = &systemPrompt
 			}
 			if toolsJSON != "" {
 				var tools []any
 				if err := json.Unmarshal([]byte(toolsJSON), &tools); err != nil {
 					return fmt.Errorf("invalid tools JSON: %w", err)
 				}
-				body["tools"] = tools
+				patch.Tools = tools
 			}
 			if cmd.Flags().Changed(isPrivateFlag) {
-				body["is_private"] = isPrivate
+				patch.IsPrivate = &isPrivate
 			}
 			if cmd.Flags().Changed(isMcpEnabledFlag) {
-				body["is_mcp_enabled"] = isMcpEnabled
+				patch.IsMCPEnabled = &isMcpEnabled
 			}
 			if cmd.Flags().Changed(enabledFlag) {
-				body["enabled"] = enabled
+				patch.Enabled = &enabled
 			}
 
-			agentId := args[0]
-			path := fmt.Sprintf("/organizations/%s/projects/%s/agents/%s", organizationId, projectId, agentId)
-
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:   http.MethodPatch,
-				PostBody: body,
-				Version:  api.AuraApiVersion2,
-			})
+			agent, err := aura.New(cfg).Agents().Update(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, args[0], patch)
 			if err != nil {
 				return err
 			}
-
-			if api.IsSuccessful(statusCode) {
-				output.PrintRawBody(cmd, cfg, resBody, []string{"id", "name", "description", "dbid", "is_private", "is_mcp_enabled", "enabled"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(agent.Record), []string{"id", "name", "description", "dbid", "is_private", "is_mcp_enabled", "enabled"})
 
 			return nil
 		},

@@ -5,6 +5,7 @@ package graphql
 
 import (
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -34,7 +35,7 @@ neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-00
 			if err != nil {
 				return err
 			}
-			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
 				return err
 			}
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql", instanceId)

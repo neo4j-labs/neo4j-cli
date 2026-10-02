@@ -4,49 +4,18 @@
 package agent
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"log"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/commands/aura/utils"
 	commonoutput "github.com/neo4j/cli/internal/output"
 	"github.com/spf13/cobra"
 )
-
-type invokeResponse struct {
-	ID        string          `json:"id"`
-	Type      string          `json:"type"`
-	Role      string          `json:"role"`
-	Content   []invokeContent `json:"content"`
-	Status    string          `json:"status"`
-	EndReason string          `json:"end_reason"`
-	Usage     invokeUsage     `json:"usage"`
-	Error     *invokeError    `json:"error,omitempty"`
-}
-
-type invokeContent struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
-}
-
-type invokeUsage struct {
-	RequestTokens  int `json:"request_tokens"`
-	ResponseTokens int `json:"response_tokens"`
-	TotalTokens    int `json:"total_tokens"`
-}
-
-type invokeError struct {
-	Message    string `json:"message"`
-	Type       string `json:"type"`
-	StatusCode int    `json:"status_code"`
-}
 
 func newInvokeCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
@@ -84,39 +53,12 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 				return err
 			}
 
-			agentId := args[0]
-			path := fmt.Sprintf("/organizations/%s/projects/%s/agents/%s/invoke", organizationId, projectId, agentId)
-
-			body := map[string]any{"input": input}
-
 			cmd.SilenceUsage = true
-			var respHeader http.Header
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:         http.MethodPost,
-				PostBody:       body,
-				Version:        api.AuraApiVersion2,
-				ResponseHeader: &respHeader,
-			})
-			invocationID := respHeader.Get("X-Agent-Invocation-Id")
+			result, err := aura.New(cfg).Agents().Invoke(cmd.Context(), aura.Scope{OrgID: organizationId, ProjectID: projectId}, args[0], input)
 			if err != nil {
-				if statusCode == http.StatusForbidden {
-					return withInvocationID(fmt.Errorf("agent invocation forbidden: agent may be disabled or private"), invocationID)
-				}
-				return withInvocationID(err, invocationID)
+				return err
 			}
-
-			if api.IsSuccessful(statusCode) {
-				var result invokeResponse
-				if err := json.Unmarshal(resBody, &result); err != nil {
-					return fmt.Errorf("unexpected invoke response: %w", err)
-				}
-
-				if err := invokeApplicationError(result); err != nil {
-					return withInvocationID(err, invocationID)
-				}
-
-				printInvokeResult(cmd, cfg, resBody, result, invocationID)
-			}
+			printInvokeResult(cmd, cfg, result)
 
 			return nil
 		},
@@ -135,35 +77,10 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 
 // withInvocationID appends the agent invocation id to err for support/tracing.
 // It is a no-op when err is nil or id is empty.
-func withInvocationID(err error, id string) error {
-	if err == nil || id == "" {
-		return err
-	}
-	// clierr.Render renders a *clierr.CLIError from ce.Message via errors.As, so
-	// %w wrapping would drop the suffix — mutate ce.Message and preserve the code.
-	var ce *clierr.CLIError
-	if errors.As(err, &ce) {
-		ce.Message = fmt.Sprintf("%s (invocation id: %s)", ce.Message, id)
-		return err
-	}
-	return fmt.Errorf("%w (invocation id: %s)", err, id)
-}
-
-// invokeApplicationError returns an error for application-level failures (type "error" with HTTP 200).
-func invokeApplicationError(r invokeResponse) error {
-	if r.Type != "error" {
-		return nil
-	}
-	if r.Error != nil && r.Error.Message != "" {
-		return fmt.Errorf("agent invocation failed: %s", r.Error.Message)
-	}
-	return fmt.Errorf("agent invocation failed")
-}
-
-// printInvokeResult prints the invoke response: raw JSON or text answer + stats line.
-func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, resBody []byte, result invokeResponse, invocationID string) {
+func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, result *aura.AgentInvocation) {
+	invocationID := result.InvocationID
 	if commonoutput.ResolveOutput(cmd, cfg) == "json" {
-		output.PrintRawBody(cmd, cfg, resBody, nil)
+		output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(result.Record), nil)
 		if invocationID != "" {
 			cmd.PrintErrln("Invocation ID: " + invocationID)
 		}

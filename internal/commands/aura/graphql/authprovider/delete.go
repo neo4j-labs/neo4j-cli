@@ -5,6 +5,7 @@ package authprovider
 
 import (
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"strings"
 
@@ -46,7 +47,7 @@ neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --da
 			if err != nil {
 				return err
 			}
-			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
 				return err
 			}
 

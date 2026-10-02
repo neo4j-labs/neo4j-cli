@@ -19,6 +19,7 @@ package aura
 import (
 	"context"
 
+	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/clicfg"
 )
 
@@ -31,6 +32,7 @@ type Scope struct {
 // Client is the entry point to Aura resources.
 type Client interface {
 	Instances() InstanceService
+	Agents() AgentService
 }
 
 // New returns a Client backed by the Aura HTTP API using cfg's credentials and
@@ -39,13 +41,37 @@ func New(cfg *clicfg.Config) Client {
 	return &httpClient{cfg: cfg}
 }
 
-// InstanceService reads Aura instances.
+// Instance statuses callers may wait on. They mirror the API's values.
+const (
+	InstanceStatusResuming = api.InstanceStatusResuming
+)
+
+// InstanceService operates on Aura instances. Callers never see which API
+// version an operation uses: some instance endpoints are still v1 (and need a
+// project-ownership preflight), others are v2beta1-scoped, and that is the
+// implementation's concern.
+//
+// Delete, Pause and Resume return the instance record the API sent back; the
+// instance is usually still transitioning, so use WaitWhile to block until the
+// operation has finished.
 //
 // ctx is accepted so callers and the future SDK adapter can cancel requests;
 // the current HTTP transport does not yet honour it.
 type InstanceService interface {
 	Get(ctx context.Context, scope Scope, id string) (*Instance, error)
 	List(ctx context.Context, scope Scope) ([]Instance, error)
+	Delete(ctx context.Context, scope Scope, id string) (*Instance, error)
+	Pause(ctx context.Context, scope Scope, id string) (*Instance, error)
+	Resume(ctx context.Context, scope Scope, id string) (*Instance, error)
+
+	// Verify returns a not-found error unless the instance belongs to the
+	// scope's project. Use it before operating on an instance through an
+	// endpoint that is not itself project-scoped.
+	Verify(ctx context.Context, scope Scope, id string) error
+
+	// WaitWhile polls until the instance's status is no longer status and
+	// returns the status it settled on.
+	WaitWhile(ctx context.Context, scope Scope, id, status string) (string, error)
 }
 
 type httpClient struct {
@@ -56,7 +82,12 @@ func (c *httpClient) Instances() InstanceService {
 	return instanceService{cfg: c.cfg}
 }
 
+func (c *httpClient) Agents() AgentService {
+	return agentService{cfg: c.cfg}
+}
+
 var (
 	_ Client          = (*httpClient)(nil)
 	_ InstanceService = instanceService{}
+	_ AgentService    = agentService{}
 )
