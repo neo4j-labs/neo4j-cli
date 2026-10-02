@@ -4,6 +4,7 @@
 package api_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -124,7 +125,7 @@ func TestMakeRequest_CredentialResolution(t *testing.T) {
 				cfg.Aura.SetActiveCredential(tc.setActive)
 			}
 
-			_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+			_, _, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 				Method:  http.MethodGet,
 				Version: api.AuraApiVersion1,
 			})
@@ -158,7 +159,7 @@ func TestMakeRequest_EnvCredentialNotPersisted(t *testing.T) {
 	before, err := testfs.GetTestCredentials(cfg.Fs())
 	require.NoError(t, err)
 
-	_, _, err = api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, _, err = api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})
@@ -206,17 +207,18 @@ func TestMakeRequest_Timeout(t *testing.T) {
 		}
 	}`)
 
-	var recovered any
-	func() {
-		defer func() { recovered = recover() }()
-		_, _, _ = api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	var err error
+	require.NotPanics(t, func() {
+		_, _, err = api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 			Method:  http.MethodGet,
 			Version: api.AuraApiVersion1,
 		})
-	}()
+	}, "a timeout must surface as an error, not a panic")
 
-	require.NotNil(t, recovered, "expected panic on timeout")
-	msg := fmt.Sprintf("%v", recovered)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "want a typed error, got %T: %v", err, err)
+	assert.Equal(t, 8, ce.Code, "a timeout is a retryable upstream error")
+	msg := ce.Message
 	assert.True(t,
 		strings.Contains(msg, "deadline exceeded") ||
 			strings.Contains(msg, "Client.Timeout") ||
@@ -255,7 +257,7 @@ func TestMakeRequest_RejectsBlockedBaseURL(t *testing.T) {
 			require.NoError(t, err)
 			cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
-			_, _, err = api.MakeRequest(cfg, "instances", &api.RequestConfig{
+			_, _, err = api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 				Method:  http.MethodGet,
 				Version: api.AuraApiVersion1,
 			})
@@ -285,7 +287,7 @@ func TestMakeRequest_RejectsBlockedAuthURL(t *testing.T) {
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
-	_, _, err = api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, _, err = api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})
@@ -320,7 +322,7 @@ func TestMakeRequest_2xxWithEmbeddedErrors(t *testing.T) {
 		}
 	}`)
 
-	_, _, err := api.MakeRequest(cfg, "instances/x", &api.RequestConfig{
+	_, _, err := api.MakeRequest(context.Background(), cfg, "instances/x", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})
@@ -353,7 +355,7 @@ func TestGetToken_401_AuthError(t *testing.T) {
 		}
 	}`)
 
-	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, _, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})
@@ -393,7 +395,7 @@ func mintStatusConfig(t *testing.T, status int, body string) *clicfg.Config {
 func TestGetToken_403_ForbiddenError(t *testing.T) {
 	cfg := mintStatusConfig(t, http.StatusForbidden, "")
 
-	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, _, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})
@@ -416,7 +418,7 @@ func TestGetToken_OtherNon2xx_NamesStatus(t *testing.T) {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			cfg := mintStatusConfig(t, status, "")
 
-			_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+			_, _, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 				Method:  http.MethodGet,
 				Version: api.AuraApiVersion1,
 			})
@@ -435,7 +437,7 @@ func TestGetToken_OtherNon2xx_NamesStatus(t *testing.T) {
 func TestGetToken_EmptyTokenIsError(t *testing.T) {
 	cfg := mintStatusConfig(t, http.StatusOK, `{"access_token":"","expires_in":3600,"token_type":"bearer"}`)
 
-	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, _, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})

@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -93,7 +94,7 @@ func TestMakeRawRequest_BodyPopulatedForEveryStatus(t *testing.T) {
 			srv, got := rawTestServer(t, tc.status, tc.body)
 			cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-			res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+			res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 				Method:      http.MethodGet,
 				VersionPath: "v2beta1",
 				Path:        "instances",
@@ -130,7 +131,7 @@ func TestMakeRawRequest_VersionPath(t *testing.T) {
 			srv, got := rawTestServer(t, http.StatusOK, `{"data":[]}`)
 			cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-			res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+			res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 				Method:      http.MethodGet,
 				VersionPath: tc.versionPath,
 				Path:        tc.path,
@@ -151,7 +152,7 @@ func TestMakeRawRequest_2xxWithEmbeddedErrors(t *testing.T) {
 	srv, _ := rawTestServer(t, http.StatusOK, body)
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-	res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodGet,
 		VersionPath: "v1",
 		Path:        "instances/x",
@@ -167,7 +168,7 @@ func TestMakeRawRequest_QueryParams(t *testing.T) {
 	srv, got := rawTestServer(t, http.StatusOK, `{"data":[]}`)
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-	_, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	_, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodGet,
 		VersionPath: "v1",
 		Path:        "instances",
@@ -196,7 +197,7 @@ func TestMakeRawRequest_BodySentVerbatim(t *testing.T) {
 			srv, got := rawTestServer(t, http.StatusCreated, `{"data":{}}`)
 			cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-			_, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+			_, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 				Method:      http.MethodPost,
 				VersionPath: "v2beta1",
 				Path:        "databases",
@@ -217,7 +218,7 @@ func TestMakeRawRequest_HeadersOverlaid(t *testing.T) {
 	srv, got := rawTestServer(t, http.StatusOK, `{"data":[]}`)
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-	_, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	_, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodGet,
 		VersionPath: "v1",
 		Path:        "instances",
@@ -243,7 +244,7 @@ func TestMakeRawRequest_TransportFailure(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 	srv.Close()
 
-	res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodGet,
 		VersionPath: "v1",
 		Path:        "instances",
@@ -271,7 +272,7 @@ func TestMakeRawRequest_BodyReadFailure(t *testing.T) {
 
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-	res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodGet,
 		VersionPath: "v1",
 		Path:        "instances",
@@ -288,7 +289,7 @@ func TestMakeRawRequest_401ClearsAccessToken(t *testing.T) {
 	srv, _ := rawTestServer(t, http.StatusUnauthorized, `{"errors":[{"message":"unauthorized"}]}`)
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-	res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodGet,
 		VersionPath: "v1",
 		Path:        "instances",
@@ -331,7 +332,7 @@ func TestMakeRawRequest_401EphemeralCredential(t *testing.T) {
 		ClientSecret: "env-secret",
 	})
 
-	res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodGet,
 		VersionPath: "v1",
 		Path:        "instances",
@@ -353,7 +354,7 @@ func TestMakeRawRequest_MethodRequired(t *testing.T) {
 	srv, got := rawTestServer(t, http.StatusOK, `{"data":[]}`)
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-	res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		VersionPath: "v1",
 		Path:        "instances",
 	})
@@ -373,7 +374,7 @@ func TestMakeRawRequest_RejectsBlockedBaseURL(t *testing.T) {
 			require.NoError(t, err)
 			cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
-			res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+			res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 				Method:      http.MethodGet,
 				VersionPath: "v1",
 				Path:        "instances",
@@ -397,7 +398,7 @@ func TestMakeRawRequest_Debug(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 	cfg.Aura.SetDebug(true)
 
-	_, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	_, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodPost,
 		VersionPath: "v2beta1",
 		Path:        "databases",
@@ -427,7 +428,7 @@ func TestMakeRawRequest_DebugOffEmitsNothing(t *testing.T) {
 
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-	_, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	_, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodGet,
 		VersionPath: "v1",
 		Path:        "instances",

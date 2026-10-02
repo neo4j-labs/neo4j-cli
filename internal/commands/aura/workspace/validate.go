@@ -21,7 +21,7 @@ import (
 //   - the organization or project portion is empty
 //   - the list projects API call fails
 //   - the project ID is not found in the organization's project list
-func ValidateAndSetDefaultWorkspace(cfg *clicfg.Config, slug string) error {
+func ValidateAndSetDefaultWorkspace(ctx context.Context, cfg *clicfg.Config, slug string) error {
 	idx := strings.Index(slug, "/")
 	if idx < 0 {
 		return fmt.Errorf("invalid workspace %q: expected format {organizationId}/{projectId}", slug)
@@ -37,7 +37,7 @@ func ValidateAndSetDefaultWorkspace(cfg *clicfg.Config, slug string) error {
 		return fmt.Errorf("invalid workspace %q: project ID must not be empty", slug)
 	}
 
-	projects, err := aura.New(cfg).Projects().List(context.Background(), orgID)
+	projects, err := aura.New(cfg).Projects().List(ctx, orgID)
 	if err != nil {
 		return fmt.Errorf("failed to validate workspace %q: %w", slug, err)
 	}

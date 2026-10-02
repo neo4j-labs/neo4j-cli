@@ -24,7 +24,7 @@ func ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID
 		return "", "", err
 	}
 
-	if err = validateProjectInOrg(cfg, orgID, projectID); err != nil {
+	if err = validateProjectInOrg(cmd.Context(), cfg, orgID, projectID); err != nil {
 		return "", "", err
 	}
 
@@ -110,8 +110,8 @@ func ResolveProjectID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 
 // validateProjectInOrg confirms that projectID appears in the org's project
 // list, reusing the canonical FetchProjectInOrg lookup.
-func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
-	_, err := aura.New(cfg).Projects().Get(context.Background(), orgID, projectID)
+func validateProjectInOrg(ctx context.Context, cfg *clicfg.Config, orgID, projectID string) error {
+	_, err := aura.New(cfg).Projects().Get(ctx, orgID, projectID)
 	return err
 }
 

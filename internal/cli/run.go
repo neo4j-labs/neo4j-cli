@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -18,7 +19,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// recoverPanic prints a redacted "unexpected error" line to w.
+// recoverPanic prints a redacted "unexpected error" diagnostic to w (stderr: a
+// crash report is not program output).
 // Extracted so the redaction format is unit-testable without invoking main().
 //
 // When the recovered value implements `error`, its `Error()` text is written
@@ -137,25 +139,53 @@ type IO struct {
 
 // Run executes the neo4j-cli command tree with args (excluding the program
 // name) and returns the process exit code. It owns config construction,
-// startup/outcome events, output capture for tee-on-failure, error rendering
-// and last-resort panic recovery; main only forwards the code to os.Exit.
+// startup/outcome events, output capture for tee-on-failure, error rendering,
+// interrupt handling and last-resort panic recovery; main only forwards the code
+// to os.Exit.
 //
-// A recovered panic prints the redacted diagnostic and returns 0 — this
-// preserves the pre-refactor behaviour of main's deferred recover.
-func Run(args []string, stdio IO) (code int) {
+// SIGINT and SIGTERM cancel the context every command receives (cmd.Context()),
+// so in-flight requests and polling stop promptly; the exit code is then 128
+// plus the signal number. A recovered panic is a failure: a typed error is
+// rendered like any returned error, anything else prints a redacted diagnostic
+// to stderr, and either way the exit code is non-zero.
+func Run(args []string, stdio IO) int {
+	ctx, stop := notifyInterrupt(context.Background(), stdio.Err)
+	defer stop()
+
+	return guarded(stdio, args, func() int {
+		return run(ctx, clicfg.NewConfig(afero.NewOsFs(), Version, clicfg.GlobalScope), args, stdio)
+	})
+}
+
+// guarded runs fn and converts a panic escaping it into an exit code.
+func guarded(stdio IO, args []string, fn func() int) (code int) {
 	defer func() {
 		if r := recover(); r != nil {
-			recoverPanic(stdio.Out, args, r)
-			code = 0
+			code = handlePanic(stdio, args, r)
 		}
 	}()
+	return fn()
+}
 
-	return run(clicfg.NewConfig(afero.NewOsFs(), Version, clicfg.GlobalScope), args, stdio)
+// handlePanic turns a recovered panic value into an exit code. A panic carrying
+// a typed *clierr.CLIError (code that panics with one on purpose) is rendered
+// exactly as if it had been returned, with its own exit code; any other value
+// is an unexpected crash: print the redacted diagnostic to stderr and exit 1.
+func handlePanic(stdio IO, args []string, r any) int {
+	if err, ok := r.(error); ok {
+		var ce *clierr.CLIError
+		if errors.As(err, &ce) {
+			clierr.Render(ce, stdio.Out, stdio.Err, resolveFormatForRender(args, ""))
+			return exitCodeFor(ce)
+		}
+	}
+	recoverPanic(stdio.Err, args, r)
+	return 1
 }
 
 // run is Run with the config injected, so tests can supply an in-memory
 // filesystem instead of the developer's real config and credentials.
-func run(cfg *clicfg.Config, args []string, stdio IO) int {
+func run(ctx context.Context, cfg *clicfg.Config, args []string, stdio IO) int {
 	// This is fake command that we use to emit startup.
 	// This event allows us to easily measure installation base
 
@@ -173,12 +203,18 @@ func run(cfg *clicfg.Config, args []string, stdio IO) int {
 
 	// cobra prints the error itself; we only add the hook for errors that bypassed
 	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
-	err := cmd.Execute()
+	err := cmd.ExecuteContext(ctx)
 	clievents.Emit(cfg.Events, args, err == nil)
 	cfg.Events.Flush() // Send out any remaining events
 
 	if err == nil {
 		return 0
+	}
+
+	// A signal ended the command: the hint was already printed when it arrived,
+	// so just exit with the conventional code (no error envelope, no tee).
+	if code, ok := interruptExit(ctx, err); ok {
+		return code
 	}
 
 	// Intercept confirm.ErrCancelled before render: cancellation is exit-0,

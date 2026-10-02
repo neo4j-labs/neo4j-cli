@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -60,12 +61,12 @@ type RawResponse struct {
 // HTTP 401 is the one status handled inline: the stale access token is cleared
 // through formatAuthorizationError so the next invocation mints a fresh one, and
 // that auth error is returned alongside the response.
-func MakeRawRequest(cfg *clicfg.Config, config *RawRequestConfig) (*RawResponse, error) {
+func MakeRawRequest(ctx context.Context, cfg *clicfg.Config, config *RawRequestConfig) (*RawResponse, error) {
 	if config.Method == "" {
 		return nil, clierr.NewUsageError("http method not set for aura api request")
 	}
 
-	req, credential, err := prepareRequest(cfg, config)
+	req, credential, err := prepareRequest(ctx, cfg, config)
 	if err != nil {
 		return nil, err
 	}

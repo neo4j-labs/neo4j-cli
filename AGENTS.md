@@ -145,6 +145,12 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - Both aura AND docker (`internal/docker/`, `[docker-debug] > `/`< ` prefixes) `--debug` traces write to a package-global `debugW` seam, NOT `cmd.ErrOrStderr()` — `runEnv` has no `*cobra.Command`. Tests must capture via `SetDebugWriterForTest(t, &buf)` and assert against `buf`; cobra-captured stderr stays empty (caused a smoke-test CI fail).
 - `desktopclient` (`[desktop-debug] > `/`< `/` ` prefixes) also uses the package-global `debugW` + `debugEnabled` (toggled by `SetDebug`, resolved in the desktop-root `PersistentPreRunE`). Its `SetDebugWriterForTest`/`SetDebugForTest`/`DebugEnabled` live in PRODUCTION `debug.go` (not `export_test.go`) because the external `desktop_test` package drives them through the imported `desktopclient` and can't see `export_test.go` symbols. `debugEnabled` is a process-global: reset (`SetDebug(false)`) between resolution cases and don't `t.Parallel()` them.
 
+## Context, interrupts and panics
+
+- `cli.Run` owns the process context: SIGINT/SIGTERM cancel it (cause `interruptError`), every command receives it as `cmd.Context()`, and the exit code is 128+signal (130 Ctrl-C, 143 SIGTERM — OS convention, deliberately outside the agent-context 0–8 closed set). The first signal prints a hint and restores the default handler, so a second Ctrl-C force-quits a command that does not watch its context yet.
+- Thread `ctx` into anything that blocks: the Aura transport (`api.MakeRequest`/`MakeRawRequest`/`ListAllPages`/`Poll*`, token mint) takes it first and uses `NewRequestWithContext`; polling waits via `sleepCtx`. A cancelled request returns the context error (not an "upstream error"). Use `cmd.Context()` in leaves, never `context.Background()`.
+- A recovered panic is a FAILURE: `cli.guarded` renders a panicked `*clierr.CLIError` like a returned one (its own exit code); anything else prints the redacted diagnostic to stderr and exits 1. Never rely on a panic to signal an error — return a `clierr` (network and token-mint failures are `NewUpstreamError`, exit 8).
+
 ## Tee-on-failure
 
 - Failing commands tee redacted output to `internal/tee` (`ConfigPrefix/neo4j/cli/tee/`); `tee_path` in error envelope. Root sets `SilenceErrors: true`, so `clierr.Render` runs AFTER capture is read in `cli.Run` (`internal/cli/run.go`) — `teeContent` appends `err.Error()` to captured bytes before `tee.Save`. Preserve that or no-intermediate-output failures tee empty.

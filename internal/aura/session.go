@@ -75,7 +75,7 @@ func (s sessionService) check(scope Scope, id string) error {
 	return nil
 }
 
-func (s sessionService) List(_ context.Context, scope Scope, instanceID string) ([]Session, error) {
+func (s sessionService) List(ctx context.Context, scope Scope, instanceID string) ([]Session, error) {
 	if err := s.check(scope, ""); err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (s sessionService) List(_ context.Context, scope Scope, instanceID string) 
 	if instanceID != "" {
 		query = map[string]string{"instanceId": instanceID}
 	}
-	rows, err := v2Rows(s.cfg, http.MethodGet, api.ScopedSessionsPath(scope.OrgID, scope.ProjectID), nil, query, "listing sessions", http.StatusOK)
+	rows, err := v2Rows(ctx, s.cfg, http.MethodGet, api.ScopedSessionsPath(scope.OrgID, scope.ProjectID), nil, query, "listing sessions", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -94,11 +94,11 @@ func (s sessionService) List(_ context.Context, scope Scope, instanceID string) 
 	return out, nil
 }
 
-func (s sessionService) Get(_ context.Context, scope Scope, id string) (*Session, error) {
+func (s sessionService) Get(ctx context.Context, scope Scope, id string) (*Session, error) {
 	if err := s.check(scope, id); err != nil {
 		return nil, err
 	}
-	rows, err := v2Rows(s.cfg, http.MethodGet, api.ScopedSessionPath(scope.OrgID, scope.ProjectID, id), nil, nil, "fetching session", http.StatusOK)
+	rows, err := v2Rows(ctx, s.cfg, http.MethodGet, api.ScopedSessionPath(scope.OrgID, scope.ProjectID, id), nil, nil, "fetching session", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (s sessionService) Get(_ context.Context, scope Scope, id string) (*Session
 	return &sess, nil
 }
 
-func (s sessionService) Create(_ context.Context, scope Scope, spec SessionCreate) (*Session, error) {
+func (s sessionService) Create(ctx context.Context, scope Scope, spec SessionCreate) (*Session, error) {
 	if err := s.check(scope, ""); err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (s sessionService) Create(_ context.Context, scope Scope, spec SessionCreat
 	if spec.Region != "" {
 		body["region"] = spec.Region
 	}
-	rows, err := v2Rows(s.cfg, http.MethodPost, api.ScopedSessionsPath(scope.OrgID, scope.ProjectID), body, nil, "creating session", http.StatusAccepted, http.StatusOK)
+	rows, err := v2Rows(ctx, s.cfg, http.MethodPost, api.ScopedSessionsPath(scope.OrgID, scope.ProjectID), body, nil, "creating session", http.StatusAccepted, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -139,11 +139,11 @@ func (s sessionService) Create(_ context.Context, scope Scope, spec SessionCreat
 	return &sess, nil
 }
 
-func (s sessionService) Delete(_ context.Context, scope Scope, id string) (map[string]any, error) {
+func (s sessionService) Delete(ctx context.Context, scope Scope, id string) (map[string]any, error) {
 	if err := s.check(scope, id); err != nil {
 		return nil, err
 	}
-	body, status, err := api.MakeRequest(s.cfg, api.ScopedSessionPath(scope.OrgID, scope.ProjectID, id), &api.RequestConfig{
+	body, status, err := api.MakeRequest(ctx, s.cfg, api.ScopedSessionPath(scope.OrgID, scope.ProjectID, id), &api.RequestConfig{
 		Method:  http.MethodDelete,
 		Version: api.AuraApiVersion2,
 	})
@@ -163,8 +163,8 @@ func (s sessionService) Delete(_ context.Context, scope Scope, id string) (map[s
 	return single(rows, "deleting session")
 }
 
-func (s sessionService) WaitUntilReady(_ context.Context, scope Scope, id string) (string, error) {
-	resp, err := api.PollGraphAnalyticsSessionReady(s.cfg, scope.OrgID, scope.ProjectID, id, api.GraphAnalyticsSessionWaitingStatus)
+func (s sessionService) WaitUntilReady(ctx context.Context, scope Scope, id string) (string, error) {
+	resp, err := api.PollGraphAnalyticsSessionReady(ctx, s.cfg, scope.OrgID, scope.ProjectID, id, api.GraphAnalyticsSessionWaitingStatus)
 	if err != nil {
 		return "", err
 	}

@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -32,7 +33,7 @@ func TestDebug_StripsControlBytesPreservesWhitespace(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 	cfg.Aura.SetDebug(true)
 
-	_, status, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})

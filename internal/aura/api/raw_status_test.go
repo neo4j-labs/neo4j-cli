@@ -4,6 +4,7 @@
 package api_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -258,7 +259,7 @@ func TestRawStatusError_OnLiveResponse(t *testing.T) {
 	srv, _ := rawTestServer(t, http.StatusUnprocessableEntity, `{"errors":[{"message":"invalid region"}]}`)
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 
-	res, err := api.MakeRawRequest(cfg, &api.RawRequestConfig{
+	res, err := api.MakeRawRequest(context.Background(), cfg, &api.RawRequestConfig{
 		Method:      http.MethodPost,
 		VersionPath: "v2beta1",
 		Path:        "instances/abc/databases",

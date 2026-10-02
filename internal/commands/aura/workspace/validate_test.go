@@ -4,6 +4,7 @@
 package workspace_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -166,7 +167,7 @@ func TestValidateAndSetDefaultWorkspace(t *testing.T) {
 				cfg = buildValidateTestConfig(t, srv.URL)
 			}
 
-			err := workspace.ValidateAndSetDefaultWorkspace(cfg, tc.slug)
+			err := workspace.ValidateAndSetDefaultWorkspace(context.Background(), cfg, tc.slug)
 
 			if tc.wantErr {
 				require.Error(t, err)

@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,7 +22,7 @@ import (
 // package-level seam so tests can count mints and bypass HTTP.
 var mintToken = mintTokenHTTP
 
-func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW io.Writer) (string, error) {
+func getToken(ctx context.Context, credential *credentials.AuraCredential, cfg *clicfg.Config, warnW io.Writer) (string, error) {
 	debug := cfg.Aura.Debug()
 
 	if credential.HasValidAccessToken() {
@@ -61,7 +62,7 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW 
 		debugInfo("no cached access token; fetching new one from %s", authURL)
 	}
 
-	grant, err := mintToken(credential, cfg)
+	grant, err := mintToken(ctx, credential, cfg)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +86,7 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW 
 	return grant.AccessToken, nil
 }
 
-func mintTokenHTTP(credential *credentials.AuraCredential, cfg *clicfg.Config) (Grant, error) {
+func mintTokenHTTP(ctx context.Context, credential *credentials.AuraCredential, cfg *clicfg.Config) (Grant, error) {
 	debug := cfg.Aura.Debug()
 
 	data := url.Values{}
@@ -93,9 +94,9 @@ func mintTokenHTTP(credential *credentials.AuraCredential, cfg *clicfg.Config) (
 
 	authURL := cfg.Aura.AuthUrl()
 
-	req, err := http.NewRequest(http.MethodPost, authURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, authURL, strings.NewReader(data.Encode()))
 	if err != nil {
-		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
+		return Grant{}, clierr.NewFatalError("can't retrieve authentication token. %w", err)
 	}
 
 	req.Header = http.Header{
@@ -108,7 +109,7 @@ func mintTokenHTTP(credential *credentials.AuraCredential, cfg *clicfg.Config) (
 
 	res, err := client.Do(req)
 	if err != nil {
-		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
+		return Grant{}, clierr.NewUpstreamError("can't retrieve authentication token. %w", err)
 	}
 	defer res.Body.Close() //nolint:errcheck // response body close error is not actionable in a defer
 
@@ -129,12 +130,12 @@ func mintTokenHTTP(credential *credentials.AuraCredential, cfg *clicfg.Config) (
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
+		return Grant{}, clierr.NewUpstreamError("can't retrieve authentication token. %w", err)
 	}
 
 	var grant Grant
 	if err := json.Unmarshal(resBody, &grant); err != nil {
-		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
+		return Grant{}, clierr.NewUpstreamError("can't retrieve authentication token: the authentication endpoint returned an unreadable response. %w", err)
 	}
 	if grant.AccessToken == "" {
 		return Grant{}, clierr.NewUpstreamError("can't retrieve authentication token: the authentication endpoint returned an empty token")

@@ -121,8 +121,8 @@ func (s agentService) path(scope Scope, id string, suffix ...string) (string, er
 	return p, nil
 }
 
-func (s agentService) do(method, path string, body map[string]any, doing string) ([]byte, error) {
-	resBody, status, err := api.MakeRequest(s.cfg, path, &api.RequestConfig{
+func (s agentService) do(ctx context.Context, method, path string, body map[string]any, doing string) ([]byte, error) {
+	resBody, status, err := api.MakeRequest(ctx, s.cfg, path, &api.RequestConfig{
 		Method:   method,
 		PostBody: body,
 		Version:  api.AuraApiVersion2,
@@ -136,8 +136,8 @@ func (s agentService) do(method, path string, body map[string]any, doing string)
 	return resBody, nil
 }
 
-func (s agentService) one(method, path string, body map[string]any, doing string) (*Agent, error) {
-	resBody, err := s.do(method, path, body, doing)
+func (s agentService) one(ctx context.Context, method, path string, body map[string]any, doing string) (*Agent, error) {
+	resBody, err := s.do(ctx, method, path, body, doing)
 	if err != nil {
 		return nil, err
 	}
@@ -149,12 +149,12 @@ func (s agentService) one(method, path string, body map[string]any, doing string
 	return &a, nil
 }
 
-func (s agentService) List(_ context.Context, scope Scope) ([]Agent, error) {
+func (s agentService) List(ctx context.Context, scope Scope) ([]Agent, error) {
 	p, err := s.path(scope, "")
 	if err != nil {
 		return nil, err
 	}
-	resBody, err := s.do(http.MethodGet, p, nil, "listing agents")
+	resBody, err := s.do(ctx, http.MethodGet, p, nil, "listing agents")
 	if err != nil {
 		return nil, err
 	}
@@ -169,55 +169,55 @@ func (s agentService) List(_ context.Context, scope Scope) ([]Agent, error) {
 	return out, nil
 }
 
-func (s agentService) Get(_ context.Context, scope Scope, id string) (*Agent, error) {
+func (s agentService) Get(ctx context.Context, scope Scope, id string) (*Agent, error) {
 	p, err := s.path(scope, id)
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodGet, p, nil, "fetching agent")
+	return s.one(ctx, http.MethodGet, p, nil, "fetching agent")
 }
 
-func (s agentService) Create(_ context.Context, scope Scope, spec AgentSpec) (*Agent, error) {
+func (s agentService) Create(ctx context.Context, scope Scope, spec AgentSpec) (*Agent, error) {
 	p, err := s.path(scope, "")
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodPost, p, spec.body(), "creating agent")
+	return s.one(ctx, http.MethodPost, p, spec.body(), "creating agent")
 }
 
-func (s agentService) Replace(_ context.Context, scope Scope, id string, spec AgentSpec) (*Agent, error) {
+func (s agentService) Replace(ctx context.Context, scope Scope, id string, spec AgentSpec) (*Agent, error) {
 	p, err := s.path(scope, id)
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodPut, p, spec.body(), "replacing agent")
+	return s.one(ctx, http.MethodPut, p, spec.body(), "replacing agent")
 }
 
-func (s agentService) Update(_ context.Context, scope Scope, id string, patch AgentPatch) (*Agent, error) {
+func (s agentService) Update(ctx context.Context, scope Scope, id string, patch AgentPatch) (*Agent, error) {
 	p, err := s.path(scope, id)
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodPatch, p, patch.body(), "updating agent")
+	return s.one(ctx, http.MethodPatch, p, patch.body(), "updating agent")
 }
 
-func (s agentService) Delete(_ context.Context, scope Scope, id string) error {
+func (s agentService) Delete(ctx context.Context, scope Scope, id string) error {
 	p, err := s.path(scope, id)
 	if err != nil {
 		return err
 	}
-	_, err = s.do(http.MethodDelete, p, nil, "deleting agent")
+	_, err = s.do(ctx, http.MethodDelete, p, nil, "deleting agent")
 	return err
 }
 
-func (s agentService) Invoke(_ context.Context, scope Scope, id, input string) (*AgentInvocation, error) {
+func (s agentService) Invoke(ctx context.Context, scope Scope, id, input string) (*AgentInvocation, error) {
 	p, err := s.path(scope, id, "invoke")
 	if err != nil {
 		return nil, err
 	}
 
 	var respHeader http.Header
-	resBody, status, err := api.MakeRequest(s.cfg, p, &api.RequestConfig{
+	resBody, status, err := api.MakeRequest(ctx, s.cfg, p, &api.RequestConfig{
 		Method:         http.MethodPost,
 		PostBody:       map[string]any{"input": input},
 		Version:        api.AuraApiVersion2,

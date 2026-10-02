@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -54,7 +55,7 @@ type PagedResult struct {
 //
 // A limit of zero or less means "no limit". A positive limit stops the walk
 // once that many items are gathered and trims the final page to match.
-func ListAllPages(cfg *clicfg.Config, path string, version AuraApiVersion, limit int) (*PagedResult, error) {
+func ListAllPages(ctx context.Context, cfg *clicfg.Config, path string, version AuraApiVersion, limit int) (*PagedResult, error) {
 	result := &PagedResult{Items: []map[string]any{}}
 
 	pageToken := ""
@@ -69,7 +70,7 @@ func ListAllPages(cfg *clicfg.Config, path string, version AuraApiVersion, limit
 			queryParams["page_token"] = pageToken
 		}
 
-		resBody, statusCode, err := MakeRequest(cfg, path, &RequestConfig{
+		resBody, statusCode, err := MakeRequest(ctx, cfg, path, &RequestConfig{
 			Method:      http.MethodGet,
 			Version:     version,
 			QueryParams: queryParams,

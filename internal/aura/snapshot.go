@@ -65,8 +65,8 @@ func (s snapshotService) path(instanceID, id string) (string, error) {
 	return p, nil
 }
 
-func (s snapshotService) rows(method, path string, query map[string]string, doing string, ok ...int) ([]map[string]any, error) {
-	body, status, err := api.MakeRequest(s.cfg, path, &api.RequestConfig{Method: method, QueryParams: query})
+func (s snapshotService) rows(ctx context.Context, method, path string, query map[string]string, doing string, ok ...int) ([]map[string]any, error) {
+	body, status, err := api.MakeRequest(ctx, s.cfg, path, &api.RequestConfig{Method: method, QueryParams: query})
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (s snapshotService) rows(method, path string, query map[string]string, doin
 	return decodeRows(body)
 }
 
-func (s snapshotService) List(_ context.Context, instanceID, date string) ([]Snapshot, error) {
+func (s snapshotService) List(ctx context.Context, instanceID, date string) ([]Snapshot, error) {
 	p, err := s.path(instanceID, "")
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (s snapshotService) List(_ context.Context, instanceID, date string) ([]Sna
 	if date != "" {
 		query = map[string]string{"date": date}
 	}
-	rows, err := s.rows(http.MethodGet, p, query, "listing snapshots", http.StatusOK)
+	rows, err := s.rows(ctx, http.MethodGet, p, query, "listing snapshots", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -102,12 +102,12 @@ func (s snapshotService) List(_ context.Context, instanceID, date string) ([]Sna
 	return out, nil
 }
 
-func (s snapshotService) Get(_ context.Context, instanceID, id string) (*Snapshot, error) {
+func (s snapshotService) Get(ctx context.Context, instanceID, id string) (*Snapshot, error) {
 	p, err := s.path(instanceID, id)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.rows(http.MethodGet, p, nil, "fetching snapshot", http.StatusOK)
+	rows, err := s.rows(ctx, http.MethodGet, p, nil, "fetching snapshot", http.StatusOK)
 	if err != nil {
 		return nil, withNotFoundContext(err, "snapshot", id, "Run 'neo4j-cli aura instance snapshot list --instance-id <id>' to see snapshots for this instance.")
 	}
@@ -119,12 +119,12 @@ func (s snapshotService) Get(_ context.Context, instanceID, id string) (*Snapsho
 	return &snap, nil
 }
 
-func (s snapshotService) Create(_ context.Context, instanceID string) (*Snapshot, error) {
+func (s snapshotService) Create(ctx context.Context, instanceID string) (*Snapshot, error) {
 	p, err := s.path(instanceID, "")
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.rows(http.MethodPost, p, nil, "creating snapshot", http.StatusAccepted, http.StatusOK)
+	rows, err := s.rows(ctx, http.MethodPost, p, nil, "creating snapshot", http.StatusAccepted, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -136,8 +136,8 @@ func (s snapshotService) Create(_ context.Context, instanceID string) (*Snapshot
 	return &snap, nil
 }
 
-func (s snapshotService) WaitWhilePending(_ context.Context, instanceID, id string) (string, error) {
-	resp, err := api.PollSnapshot(s.cfg, instanceID, id)
+func (s snapshotService) WaitWhilePending(ctx context.Context, instanceID, id string) (string, error) {
+	resp, err := api.PollSnapshot(ctx, s.cfg, instanceID, id)
 	if err != nil {
 		return "", err
 	}

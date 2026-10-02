@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -49,7 +50,7 @@ func TestPoll_DebugEmitsLoopContext(t *testing.T) {
 	cfg.Aura.SetDebug(true)
 	cfg.Aura.SetPollingConfig(5, 0)
 
-	res, err := api.PollInstance(cfg, pollTestOrgID, pollTestProjectID, "abc", "creating")
+	res, err := api.PollInstance(context.Background(), cfg, pollTestOrgID, pollTestProjectID, "abc", "creating")
 	require.NoError(t, err)
 	assert.Equal(t, "running", res.Data.Status)
 
@@ -73,7 +74,7 @@ func TestPoll_DebugOffEmitsNoLoopLines(t *testing.T) {
 	// debug not set -> off
 	cfg.Aura.SetPollingConfig(5, 0)
 
-	_, err := api.PollInstance(cfg, pollTestOrgID, pollTestProjectID, "abc", "creating")
+	_, err := api.PollInstance(context.Background(), cfg, pollTestOrgID, pollTestProjectID, "abc", "creating")
 	require.NoError(t, err)
 	assert.NotContains(t, buf.String(), "poll attempt")
 }

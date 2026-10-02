@@ -144,12 +144,12 @@ func (s graphqlService) path(instanceID, id string, suffix ...string) (string, e
 	return p, nil
 }
 
-func (s graphqlService) List(_ context.Context, instanceID string) ([]GraphQLDataAPI, error) {
+func (s graphqlService) List(ctx context.Context, instanceID string) ([]GraphQLDataAPI, error) {
 	p, err := s.path(instanceID, "")
 	if err != nil {
 		return nil, err
 	}
-	rows, err := betaRows(s.cfg, http.MethodGet, p, nil, "listing graphql data apis", http.StatusOK)
+	rows, err := betaRows(ctx, s.cfg, http.MethodGet, p, nil, "listing graphql data apis", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -160,12 +160,12 @@ func (s graphqlService) List(_ context.Context, instanceID string) ([]GraphQLDat
 	return out, nil
 }
 
-func (s graphqlService) Get(_ context.Context, instanceID, id string) (*GraphQLDataAPI, error) {
+func (s graphqlService) Get(ctx context.Context, instanceID, id string) (*GraphQLDataAPI, error) {
 	p, err := s.path(instanceID, id)
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodGet, p, nil, "fetching graphql data api", http.StatusOK)
+	return s.one(ctx, http.MethodGet, p, nil, "fetching graphql data api", http.StatusOK)
 }
 
 func (s graphqlService) Create(ctx context.Context, instanceID string, spec GraphQLCreate) (*GraphQLDataAPI, error) {
@@ -188,7 +188,7 @@ func (s graphqlService) Create(ctx context.Context, instanceID string, spec Grap
 		name = DefaultName("GraphQL", names)
 	}
 	body := spec.body(name)
-	rows, err := betaRows(s.cfg, http.MethodPost, p, body, "creating graphql data api", http.StatusAccepted, http.StatusOK)
+	rows, err := betaRows(ctx, s.cfg, http.MethodPost, p, body, "creating graphql data api", http.StatusAccepted, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -197,45 +197,45 @@ func (s graphqlService) Create(ctx context.Context, instanceID string, spec Grap
 	return &g, nil
 }
 
-func (s graphqlService) Update(_ context.Context, instanceID, id string, patch GraphQLPatch) (*GraphQLDataAPI, error) {
+func (s graphqlService) Update(ctx context.Context, instanceID, id string, patch GraphQLPatch) (*GraphQLDataAPI, error) {
 	p, err := s.path(instanceID, id)
 	if err != nil {
 		return nil, err
 	}
 	body := patch.body()
-	return s.one(http.MethodPatch, p, body, "updating graphql data api", http.StatusAccepted, http.StatusOK)
+	return s.one(ctx, http.MethodPatch, p, body, "updating graphql data api", http.StatusAccepted, http.StatusOK)
 }
 
-func (s graphqlService) Delete(_ context.Context, instanceID, id string) (*GraphQLDataAPI, error) {
+func (s graphqlService) Delete(ctx context.Context, instanceID, id string) (*GraphQLDataAPI, error) {
 	p, err := s.path(instanceID, id)
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodDelete, p, nil, "deleting graphql data api", http.StatusAccepted, http.StatusOK)
+	return s.one(ctx, http.MethodDelete, p, nil, "deleting graphql data api", http.StatusAccepted, http.StatusOK)
 }
 
-func (s graphqlService) Pause(_ context.Context, instanceID, id string) (*GraphQLDataAPI, error) {
+func (s graphqlService) Pause(ctx context.Context, instanceID, id string) (*GraphQLDataAPI, error) {
 	p, err := s.path(instanceID, id, "pause")
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodPost, p, nil, "pausing graphql data api", http.StatusAccepted, http.StatusOK)
+	return s.one(ctx, http.MethodPost, p, nil, "pausing graphql data api", http.StatusAccepted, http.StatusOK)
 }
 
-func (s graphqlService) Resume(_ context.Context, instanceID, id string) (*GraphQLDataAPI, error) {
+func (s graphqlService) Resume(ctx context.Context, instanceID, id string) (*GraphQLDataAPI, error) {
 	p, err := s.path(instanceID, id, "resume")
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodPost, p, nil, "resuming graphql data api", http.StatusAccepted, http.StatusOK)
+	return s.one(ctx, http.MethodPost, p, nil, "resuming graphql data api", http.StatusAccepted, http.StatusOK)
 }
 
-func (s graphqlService) AllowedOrigins(_ context.Context, instanceID, id string) ([]string, error) {
+func (s graphqlService) AllowedOrigins(ctx context.Context, instanceID, id string) ([]string, error) {
 	p, err := s.path(instanceID, id)
 	if err != nil {
 		return nil, err
 	}
-	body, status, err := api.MakeRequest(s.cfg, p, &api.RequestConfig{Method: http.MethodGet, Version: api.AuraApiVersionBeta1})
+	body, status, err := api.MakeRequest(ctx, s.cfg, p, &api.RequestConfig{Method: http.MethodGet, Version: api.AuraApiVersionBeta1})
 	if err != nil {
 		return nil, err
 	}
@@ -257,25 +257,25 @@ func (s graphqlService) AllowedOrigins(_ context.Context, instanceID, id string)
 	return parsed.Data.Security.CorsPolicy.AllowedOrigins, nil
 }
 
-func (s graphqlService) SetAllowedOrigins(_ context.Context, instanceID, id string, origins []string) (*GraphQLDataAPI, error) {
+func (s graphqlService) SetAllowedOrigins(ctx context.Context, instanceID, id string, origins []string) (*GraphQLDataAPI, error) {
 	p, err := s.path(instanceID, id)
 	if err != nil {
 		return nil, err
 	}
 	body := originsBody(origins)
-	return s.one(http.MethodPatch, p, body, "updating graphql data api", http.StatusAccepted, http.StatusOK)
+	return s.one(ctx, http.MethodPatch, p, body, "updating graphql data api", http.StatusAccepted, http.StatusOK)
 }
 
-func (s graphqlService) WaitWhile(_ context.Context, instanceID, id, status string) (string, error) {
-	resp, err := api.PollGraphQLDataApi(s.cfg, instanceID, id, status)
+func (s graphqlService) WaitWhile(ctx context.Context, instanceID, id, status string) (string, error) {
+	resp, err := api.PollGraphQLDataApi(ctx, s.cfg, instanceID, id, status)
 	if err != nil {
 		return "", err
 	}
 	return resp.Data.Status, nil
 }
 
-func (s graphqlService) one(method, path string, body map[string]any, doing string, ok ...int) (*GraphQLDataAPI, error) {
-	rows, err := betaRows(s.cfg, method, path, body, doing, ok...)
+func (s graphqlService) one(ctx context.Context, method, path string, body map[string]any, doing string, ok ...int) (*GraphQLDataAPI, error) {
+	rows, err := betaRows(ctx, s.cfg, method, path, body, doing, ok...)
 	if err != nil {
 		return nil, err
 	}
@@ -313,12 +313,12 @@ func (s authProviderService) path(instanceID, dataAPIID, id string) (string, err
 	return p, nil
 }
 
-func (s authProviderService) List(_ context.Context, instanceID, dataAPIID string) ([]AuthProvider, error) {
+func (s authProviderService) List(ctx context.Context, instanceID, dataAPIID string) ([]AuthProvider, error) {
 	p, err := s.path(instanceID, dataAPIID, "")
 	if err != nil {
 		return nil, err
 	}
-	rows, err := betaRows(s.cfg, http.MethodGet, p, nil, "listing auth providers", http.StatusOK)
+	rows, err := betaRows(ctx, s.cfg, http.MethodGet, p, nil, "listing auth providers", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -329,15 +329,15 @@ func (s authProviderService) List(_ context.Context, instanceID, dataAPIID strin
 	return out, nil
 }
 
-func (s authProviderService) Get(_ context.Context, instanceID, dataAPIID, id string) (*AuthProvider, error) {
+func (s authProviderService) Get(ctx context.Context, instanceID, dataAPIID, id string) (*AuthProvider, error) {
 	p, err := s.path(instanceID, dataAPIID, id)
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodGet, p, nil, "fetching auth provider", http.StatusOK)
+	return s.one(ctx, http.MethodGet, p, nil, "fetching auth provider", http.StatusOK)
 }
 
-func (s authProviderService) Create(_ context.Context, instanceID, dataAPIID string, spec AuthProviderSpec) (*AuthProvider, error) {
+func (s authProviderService) Create(ctx context.Context, instanceID, dataAPIID string, spec AuthProviderSpec) (*AuthProvider, error) {
 	p, err := s.path(instanceID, dataAPIID, "")
 	if err != nil {
 		return nil, err
@@ -350,7 +350,7 @@ func (s authProviderService) Create(_ context.Context, instanceID, dataAPIID str
 	if spec.URL != "" {
 		body["url"] = spec.URL
 	}
-	rows, err := betaRows(s.cfg, http.MethodPost, p, body, "creating auth provider", http.StatusAccepted, http.StatusOK)
+	rows, err := betaRows(ctx, s.cfg, http.MethodPost, p, body, "creating auth provider", http.StatusAccepted, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -359,16 +359,16 @@ func (s authProviderService) Create(_ context.Context, instanceID, dataAPIID str
 	return &ap, nil
 }
 
-func (s authProviderService) Delete(_ context.Context, instanceID, dataAPIID, id string) (*AuthProvider, error) {
+func (s authProviderService) Delete(ctx context.Context, instanceID, dataAPIID, id string) (*AuthProvider, error) {
 	p, err := s.path(instanceID, dataAPIID, id)
 	if err != nil {
 		return nil, err
 	}
-	return s.one(http.MethodDelete, p, nil, "deleting auth provider", http.StatusAccepted, http.StatusOK)
+	return s.one(ctx, http.MethodDelete, p, nil, "deleting auth provider", http.StatusAccepted, http.StatusOK)
 }
 
-func (s authProviderService) one(method, path string, body map[string]any, doing string, ok ...int) (*AuthProvider, error) {
-	rows, err := betaRows(s.cfg, method, path, body, doing, ok...)
+func (s authProviderService) one(ctx context.Context, method, path string, body map[string]any, doing string, ok ...int) (*AuthProvider, error) {
+	rows, err := betaRows(ctx, s.cfg, method, path, body, doing, ok...)
 	if err != nil {
 		return nil, err
 	}
@@ -383,8 +383,8 @@ func (s authProviderService) one(method, path string, body map[string]any, doing
 // betaRows sends a request to a v1beta1 endpoint and decodes the {"data": ...}
 // envelope. status must be one of ok; the result always has at least one row
 // unless a list was requested with GET (which may legitimately be empty).
-func betaRows(cfg *clicfg.Config, method, path string, body map[string]any, doing string, ok ...int) ([]map[string]any, error) {
-	resBody, status, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+func betaRows(ctx context.Context, cfg *clicfg.Config, method, path string, body map[string]any, doing string, ok ...int) ([]map[string]any, error) {
+	resBody, status, err := api.MakeRequest(ctx, cfg, path, &api.RequestConfig{
 		Method:   method,
 		PostBody: body,
 		Version:  api.AuraApiVersionBeta1,

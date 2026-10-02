@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -283,8 +284,8 @@ func singularise(plural string) string {
 	return plural
 }
 
-func getHeaders(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW io.Writer) (http.Header, error) {
-	token, err := getToken(credential, cfg, warnW)
+func getHeaders(ctx context.Context, credential *credentials.AuraCredential, cfg *clicfg.Config, warnW io.Writer) (http.Header, error) {
+	token, err := getToken(ctx, credential, cfg, warnW)
 
 	if err != nil {
 		return nil, err

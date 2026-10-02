@@ -113,7 +113,7 @@ func runRequest(cmd *cobra.Command, cfg *clicfg.Config, endpoint string, reqFlag
 		return err
 	}
 
-	res, err := auraapi.MakeRawRequest(cfg, &auraapi.RawRequestConfig{
+	res, err := auraapi.MakeRawRequest(cmd.Context(), cfg, &auraapi.RawRequestConfig{
 		Method:      method,
 		VersionPath: parsed.versionPath,
 		Path:        parsed.path,

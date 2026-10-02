@@ -4,6 +4,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -47,7 +48,7 @@ func envCfg(t *testing.T, serverURL, clientID, clientSecret string) *clicfg.Conf
 
 func doRequest(t *testing.T, cfg *clicfg.Config) {
 	t.Helper()
-	_, status, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})

@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -61,7 +62,7 @@ func TestDebug_NoSecretLeaksAcrossPaths(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, credJSON)
 	cfg.Aura.SetDebug(true)
 
-	_, status, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:   http.MethodPost,
 		Version:  api.AuraApiVersion1,
 		PostBody: map[string]any{"password": bodyPassword, "name": "prod"},

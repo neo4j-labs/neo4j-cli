@@ -99,11 +99,11 @@ type instanceService struct {
 	cfg *clicfg.Config
 }
 
-func (s instanceService) Get(_ context.Context, scope Scope, id string) (*Instance, error) {
+func (s instanceService) Get(ctx context.Context, scope Scope, id string) (*Instance, error) {
 	if err := ValidateResourceID("instance", id); err != nil {
 		return nil, err
 	}
-	body, err := s.get(api.ScopedInstancePath(scope.OrgID, scope.ProjectID, id), "fetching instance")
+	body, err := s.get(ctx, api.ScopedInstancePath(scope.OrgID, scope.ProjectID, id), "fetching instance")
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +118,8 @@ func (s instanceService) Get(_ context.Context, scope Scope, id string) (*Instan
 	return &inst, nil
 }
 
-func (s instanceService) List(_ context.Context, scope Scope) ([]Instance, error) {
-	body, err := s.get(api.ScopedInstancesPath(scope.OrgID, scope.ProjectID), "listing instances")
+func (s instanceService) List(ctx context.Context, scope Scope) ([]Instance, error) {
+	body, err := s.get(ctx, api.ScopedInstancesPath(scope.OrgID, scope.ProjectID), "listing instances")
 	if err != nil {
 		return nil, err
 	}
@@ -139,12 +139,12 @@ func (s instanceService) List(_ context.Context, scope Scope) ([]Instance, error
 	return out, nil
 }
 
-func (s instanceService) Delete(_ context.Context, scope Scope, id string) (*Instance, error) {
+func (s instanceService) Delete(ctx context.Context, scope Scope, id string) (*Instance, error) {
 	if err := ValidateResourceID("instance", id); err != nil {
 		return nil, err
 	}
 	// v2beta1 answers 202 Accepted with the instance record.
-	return s.mutate(http.MethodDelete, api.ScopedInstancePath(scope.OrgID, scope.ProjectID, id), api.AuraApiVersion2, "deleting instance")
+	return s.mutate(ctx, http.MethodDelete, api.ScopedInstancePath(scope.OrgID, scope.ProjectID, id), api.AuraApiVersion2, "deleting instance")
 }
 
 // Pause and Resume are still v1 endpoints that are not project-scoped, so
@@ -161,14 +161,14 @@ func (s instanceService) transition(ctx context.Context, scope Scope, id, action
 	if err := s.Verify(ctx, scope, id); err != nil {
 		return nil, err
 	}
-	return s.mutate(http.MethodPost, fmt.Sprintf("/instances/%s/%s", id, action), "", action+" instance")
+	return s.mutate(ctx, http.MethodPost, fmt.Sprintf("/instances/%s/%s", id, action), "", action+" instance")
 }
 
-func (s instanceService) Verify(_ context.Context, scope Scope, id string) error {
+func (s instanceService) Verify(ctx context.Context, scope Scope, id string) error {
 	if err := ValidateResourceID("instance", id); err != nil {
 		return err
 	}
-	body, status, err := api.MakeRequest(s.cfg, fmt.Sprintf("/instances/%s", id), &api.RequestConfig{
+	body, status, err := api.MakeRequest(ctx, s.cfg, fmt.Sprintf("/instances/%s", id), &api.RequestConfig{
 		Method: http.MethodGet,
 	})
 	if err != nil {
@@ -192,16 +192,16 @@ func (s instanceService) Verify(_ context.Context, scope Scope, id string) error
 	return nil
 }
 
-func (s instanceService) WaitWhile(_ context.Context, scope Scope, id, status string) (string, error) {
-	resp, err := api.PollInstance(s.cfg, scope.OrgID, scope.ProjectID, id, status)
+func (s instanceService) WaitWhile(ctx context.Context, scope Scope, id, status string) (string, error) {
+	resp, err := api.PollInstance(ctx, s.cfg, scope.OrgID, scope.ProjectID, id, status)
 	if err != nil {
 		return "", err
 	}
 	return resp.Data.Status, nil
 }
 
-func (s instanceService) get(path, doing string) ([]byte, error) {
-	body, status, err := api.MakeRequest(s.cfg, path, &api.RequestConfig{
+func (s instanceService) get(ctx context.Context, path, doing string) ([]byte, error) {
+	body, status, err := api.MakeRequest(ctx, s.cfg, path, &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion2,
 	})
@@ -215,14 +215,14 @@ func (s instanceService) get(path, doing string) ([]byte, error) {
 }
 
 // mutate sends a body-less state-changing request; see send.
-func (s instanceService) mutate(method, path string, version api.AuraApiVersion, doing string) (*Instance, error) {
-	return s.send(method, path, nil, version, doing)
+func (s instanceService) mutate(ctx context.Context, method, path string, version api.AuraApiVersion, doing string) (*Instance, error) {
+	return s.send(ctx, method, path, nil, version, doing)
 }
 
 // send issues a state-changing request that the API answers with 202 Accepted
 // (200 is tolerated) and the instance record.
-func (s instanceService) send(method, path string, reqBody map[string]any, version api.AuraApiVersion, doing string) (*Instance, error) {
-	body, status, err := api.MakeRequest(s.cfg, path, &api.RequestConfig{Method: method, PostBody: reqBody, Version: version})
+func (s instanceService) send(ctx context.Context, method, path string, reqBody map[string]any, version api.AuraApiVersion, doing string) (*Instance, error) {
+	body, status, err := api.MakeRequest(ctx, s.cfg, path, &api.RequestConfig{Method: method, PostBody: reqBody, Version: version})
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ func (s instanceService) Create(ctx context.Context, scope Scope, spec InstanceC
 		spec.Name = DefaultName("Instance", names)
 	}
 
-	body, err := s.send(http.MethodPost, api.ScopedInstancesPath(scope.OrgID, scope.ProjectID), spec.body(scope.ProjectID), api.AuraApiVersion2, "creating instance")
+	body, err := s.send(ctx, http.MethodPost, api.ScopedInstancesPath(scope.OrgID, scope.ProjectID), spec.body(scope.ProjectID), api.AuraApiVersion2, "creating instance")
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +305,7 @@ func (s instanceService) Update(ctx context.Context, scope Scope, id string, pat
 	if patch.Name != "" {
 		body["name"] = patch.Name
 	}
-	return s.send(http.MethodPatch, "/instances/"+id, body, "", "updating instance")
+	return s.send(ctx, http.MethodPatch, "/instances/"+id, body, "", "updating instance")
 }
 
 func (s instanceService) Overwrite(ctx context.Context, scope Scope, id string, src OverwriteSource) (*Instance, error) {
@@ -324,7 +324,7 @@ func (s instanceService) Overwrite(ctx context.Context, scope Scope, id string, 
 		}
 		body["source_snapshot_id"] = src.SnapshotID
 	}
-	return s.send(http.MethodPost, "/instances/"+id+"/overwrite", body, "", "overwriting instance")
+	return s.send(ctx, http.MethodPost, "/instances/"+id+"/overwrite", body, "", "overwriting instance")
 }
 
 // body assembles the POST body from a validated spec. Free instances ignore the

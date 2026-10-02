@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,7 +42,7 @@ func TestMakeRequest_DebugEmitsWireAndTiming(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 	cfg.Aura.SetDebug(true)
 
-	body, status, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	body, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:   http.MethodPost,
 		Version:  api.AuraApiVersion1,
 		PostBody: map[string]any{"name": "prod"},
@@ -80,7 +81,7 @@ func TestMakeRequest_DebugOffEmitsNothing(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, debugTestCredJSON)
 	// debug not set -> off
 
-	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, _, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})

@@ -4,6 +4,7 @@
 package api_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -75,7 +76,7 @@ func TestMakeRequest_DefaultsToV1(t *testing.T) {
 		}
 	}`)
 
-	_, statusCode, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, statusCode, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method: http.MethodGet,
 	})
 	if err != nil {

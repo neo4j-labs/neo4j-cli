@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -33,37 +34,37 @@ func (r *PollResponse) normalize() {
 	}
 }
 
-func PollInstance(cfg *clicfg.Config, orgID, projectID, instanceId string, waitingStatus string) (*PollResponse, error) {
+func PollInstance(ctx context.Context, cfg *clicfg.Config, orgID, projectID, instanceId string, waitingStatus string) (*PollResponse, error) {
 	path := ScopedInstancePath(orgID, projectID, instanceId)
-	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
+	return PollWithVersion(ctx, cfg, path, AuraApiVersion2, func(status string) bool {
 		return status != waitingStatus
 	})
 }
 
-func PollSnapshot(cfg *clicfg.Config, instanceId string, snapshotId string) (*PollResponse, error) {
+func PollSnapshot(ctx context.Context, cfg *clicfg.Config, instanceId string, snapshotId string) (*PollResponse, error) {
 	path := fmt.Sprintf("/instances/%s/snapshots/%s", instanceId, snapshotId)
-	return Poll(cfg, path, func(status string) bool {
+	return Poll(ctx, cfg, path, func(status string) bool {
 		return status != SnapshotStatusPending && status != SnapshotStatusInProgress
 	})
 }
 
-func PollCMK(cfg *clicfg.Config, cmkId string) (*PollResponse, error) {
+func PollCMK(ctx context.Context, cfg *clicfg.Config, cmkId string) (*PollResponse, error) {
 	path := fmt.Sprintf("/customer-managed-keys/%s", cmkId)
-	return Poll(cfg, path, func(status string) bool {
+	return Poll(ctx, cfg, path, func(status string) bool {
 		return status != CMKStatusPending
 	})
 }
 
-func PollGraphQLDataApi(cfg *clicfg.Config, instanceId string, graphQLDataApiId string, waitingStatus string) (*PollResponse, error) {
+func PollGraphQLDataApi(ctx context.Context, cfg *clicfg.Config, instanceId string, graphQLDataApiId string, waitingStatus string) (*PollResponse, error) {
 	path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphQLDataApiId)
-	return PollWithVersion(cfg, path, AuraApiVersionBeta1, func(status string) bool {
+	return PollWithVersion(ctx, cfg, path, AuraApiVersionBeta1, func(status string) bool {
 		return status != waitingStatus
 	})
 }
 
-func PollGraphAnalyticsSessionReady(cfg *clicfg.Config, orgID, projectID, sessionId string, waitingStatus []string) (*PollResponse, error) {
+func PollGraphAnalyticsSessionReady(ctx context.Context, cfg *clicfg.Config, orgID, projectID, sessionId string, waitingStatus []string) (*PollResponse, error) {
 	path := ScopedSessionPath(orgID, projectID, sessionId)
-	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
+	return PollWithVersion(ctx, cfg, path, AuraApiVersion2, func(status string) bool {
 		return !slices.Contains(waitingStatus, status)
 	})
 }
@@ -75,27 +76,32 @@ func PollGraphAnalyticsSessionReady(cfg *clicfg.Config, orgID, projectID, sessio
 // poll's condition trivially true whenever the casing differs from the
 // VirtualGraphStatus* constant, returning immediately so --wait would silently
 // not wait at all.
-func PollVirtualGraph(cfg *clicfg.Config, orgID, projectID, virtualGraphID string, waitingStatus string) (*PollResponse, error) {
+func PollVirtualGraph(ctx context.Context, cfg *clicfg.Config, orgID, projectID, virtualGraphID string, waitingStatus string) (*PollResponse, error) {
 	path := ScopedVirtualGraphPath(orgID, projectID, virtualGraphID)
-	return PollWithVersion(cfg, path, AuraApiVersion2, func(status string) bool {
+	return PollWithVersion(ctx, cfg, path, AuraApiVersion2, func(status string) bool {
 		return !strings.EqualFold(status, waitingStatus)
 	})
 }
 
-func Poll(cfg *clicfg.Config, url string, cond func(status string) bool) (*PollResponse, error) {
-	return PollWithVersion(cfg, url, AuraApiVersion1, cond)
+func Poll(ctx context.Context, cfg *clicfg.Config, url string, cond func(status string) bool) (*PollResponse, error) {
+	return PollWithVersion(ctx, cfg, url, AuraApiVersion1, cond)
 }
 
-func PollWithVersion(cfg *clicfg.Config, url string, version AuraApiVersion, cond func(status string) bool) (*PollResponse, error) {
+func PollWithVersion(ctx context.Context, cfg *clicfg.Config, url string, version AuraApiVersion, cond func(status string) bool) (*PollResponse, error) {
 	debug := cfg.Aura.Debug()
 	pollingConfig := cfg.Aura.PollingConfig()
 	for i := 0; i < pollingConfig.MaxRetries; i++ {
-		time.Sleep(time.Second * time.Duration(pollingConfig.Interval))
-		resBody, statusCode, err := MakeRequest(cfg, url, &RequestConfig{
+		if err := sleepCtx(ctx, time.Second*time.Duration(pollingConfig.Interval)); err != nil {
+			return nil, err
+		}
+		resBody, statusCode, err := MakeRequest(ctx, cfg, url, &RequestConfig{
 			Method:  http.MethodGet,
 			Version: version,
 		})
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			return nil, clierr.NewUpstreamError("error polling: %w", err)
 		}
 
@@ -120,4 +126,20 @@ func PollWithVersion(cfg *clicfg.Config, url string, version AuraApiVersion, con
 	}
 
 	return nil, clierr.NewUpstreamError("hit max retries [%d] polling", pollingConfig.MaxRetries)
+}
+
+// sleepCtx waits for d, returning ctx.Err() as soon as ctx is done. A
+// non-positive d returns immediately (after checking ctx).
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return ctx.Err()
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }

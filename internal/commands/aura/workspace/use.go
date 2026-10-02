@@ -56,7 +56,7 @@ neo4j-cli aura workspace use 00000000-0000-0000-0000-000000000000/11111111-1111-
 			}
 
 			cmd.SilenceUsage = true
-			return ValidateAndSetDefaultWorkspace(cfg, slug)
+			return ValidateAndSetDefaultWorkspace(cmd.Context(), cfg, slug)
 		},
 	}
 

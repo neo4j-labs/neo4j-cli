@@ -5,6 +5,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -53,7 +54,7 @@ type RequestConfig struct {
 	ResponseHeader *http.Header
 }
 
-func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (responseBody []byte, statusCode int, err error) {
+func MakeRequest(ctx context.Context, cfg *clicfg.Config, path string, config *RequestConfig) (responseBody []byte, statusCode int, err error) {
 	client := http.Client{Timeout: httpClientTimeout}
 	var method = config.Method
 	if method == "" {
@@ -66,7 +67,7 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		config.Version = AuraApiVersion1
 	}
 
-	req, credential, err := prepareRequest(cfg, &RawRequestConfig{
+	req, credential, err := prepareRequest(ctx, cfg, &RawRequestConfig{
 		Method:      method,
 		VersionPath: getVersionPath(config.Version),
 		Path:        path,
@@ -83,7 +84,11 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	start := time.Now()
 	res, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		// A cancelled context is the caller's decision, not an upstream fault.
+		if ctx.Err() != nil {
+			return nil, 0, ctx.Err()
+		}
+		return nil, 0, clierr.NewUpstreamError("request to the Aura API failed: %w", err)
 	}
 
 	defer res.Body.Close() //nolint:errcheck // response body close error is not actionable in a defer
@@ -96,7 +101,10 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		responseBody, err = io.ReadAll(res.Body)
 
 		if err != nil {
-			panic(err)
+			if ctx.Err() != nil {
+				return nil, res.StatusCode, ctx.Err()
+			}
+			return nil, res.StatusCode, clierr.NewUpstreamError("reading the Aura API response failed: %w", err)
 		}
 
 		if debug {
@@ -127,7 +135,7 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 // headers before the debug emit, so the trace shows what is actually sent. The
 // returned credential is the one the request was signed with, needed to clear a
 // stale access token on a 401.
-func prepareRequest(cfg *clicfg.Config, config *RawRequestConfig) (*http.Request, *credentials.AuraCredential, error) {
+func prepareRequest(ctx context.Context, cfg *clicfg.Config, config *RawRequestConfig) (*http.Request, *credentials.AuraCredential, error) {
 	baseUrl := cfg.Aura.BaseUrl()
 	if err := urlcheck.ValidateRemoteURL(baseUrl); err != nil {
 		return nil, nil, clierr.NewUsageError("aura base-url rejected: %s", err.Error())
@@ -153,7 +161,7 @@ func prepareRequest(cfg *clicfg.Config, config *RawRequestConfig) (*http.Request
 	// http.NewRequest only fails on a malformed method token or an unparsable
 	// URL, both already screened by the callers; it is returned rather than
 	// panicked on so no entrypoint inherits a panic on user-supplied input.
-	req, err := http.NewRequest(config.Method, urlString, body)
+	req, err := http.NewRequestWithContext(ctx, config.Method, urlString, body)
 	if err != nil {
 		return nil, nil, clierr.NewUsageError("aura request could not be built: %s", err.Error())
 	}
@@ -173,7 +181,7 @@ func prepareRequest(cfg *clicfg.Config, config *RawRequestConfig) (*http.Request
 		warnW = os.Stderr
 	}
 
-	req.Header, err = getHeaders(credential, cfg, warnW)
+	req.Header, err = getHeaders(ctx, credential, cfg, warnW)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"io"
 	"testing"
 	"time"
@@ -47,7 +48,7 @@ func SetTokenCacheDirForTest(t *testing.T, dir string) {
 func SetMintTokenForTest(t *testing.T, fn func() (Grant, error)) {
 	t.Helper()
 	prev := mintToken
-	mintToken = func(_ *credentials.AuraCredential, _ *clicfg.Config) (Grant, error) {
+	mintToken = func(_ context.Context, _ *credentials.AuraCredential, _ *clicfg.Config) (Grant, error) {
 		return fn()
 	}
 	t.Cleanup(func() { mintToken = prev })

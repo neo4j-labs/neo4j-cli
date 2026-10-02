@@ -5,6 +5,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -431,7 +432,7 @@ func TestRun_ExitCodesAndStreams(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			code := run(newRunConfig(t), tc.args, IO{In: strings.NewReader(""), Out: &stdout, Err: &stderr})
+			code := run(context.Background(), newRunConfig(t), tc.args, IO{In: strings.NewReader(""), Out: &stdout, Err: &stderr})
 
 			assert.Equal(t, tc.wantCode, code)
 			assert.Contains(t, stdout.String(), tc.wantStdout)

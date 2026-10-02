@@ -91,18 +91,18 @@ func (s virtualGraphService) scopeCheck(scope Scope) error {
 	return ValidateResourceID("project", scope.ProjectID)
 }
 
-func (s virtualGraphService) request(method, path string, body map[string]any, doing string, ok ...int) ([]map[string]any, error) {
-	return v2Rows(s.cfg, method, path, body, nil, doing, ok...)
+func (s virtualGraphService) request(ctx context.Context, method, path string, body map[string]any, doing string, ok ...int) ([]map[string]any, error) {
+	return v2Rows(ctx, s.cfg, method, path, body, nil, doing, ok...)
 }
 
-func (s virtualGraphService) List(_ context.Context, scope Scope, limit int) (*VirtualGraphPage, error) {
+func (s virtualGraphService) List(ctx context.Context, scope Scope, limit int) (*VirtualGraphPage, error) {
 	if err := s.scopeCheck(scope); err != nil {
 		return nil, err
 	}
 	if limit < 0 {
 		return nil, clierr.NewUsageError("--limit must be zero or greater; zero returns every virtual graph")
 	}
-	res, err := api.ListAllPages(s.cfg, api.ScopedVirtualGraphsPath(scope.OrgID, scope.ProjectID), api.AuraApiVersion2, limit)
+	res, err := api.ListAllPages(ctx, s.cfg, api.ScopedVirtualGraphsPath(scope.OrgID, scope.ProjectID), api.AuraApiVersion2, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -113,14 +113,14 @@ func (s virtualGraphService) List(_ context.Context, scope Scope, limit int) (*V
 	return page, nil
 }
 
-func (s virtualGraphService) Get(_ context.Context, scope Scope, id string) (*VirtualGraph, error) {
+func (s virtualGraphService) Get(ctx context.Context, scope Scope, id string) (*VirtualGraph, error) {
 	if err := s.scopeCheck(scope); err != nil {
 		return nil, err
 	}
 	if err := ValidateResourceID("virtual-graph", id); err != nil {
 		return nil, err
 	}
-	rows, err := s.request(http.MethodGet, api.ScopedVirtualGraphPath(scope.OrgID, scope.ProjectID, id), nil, "fetching virtual graph", http.StatusOK)
+	rows, err := s.request(ctx, http.MethodGet, api.ScopedVirtualGraphPath(scope.OrgID, scope.ProjectID, id), nil, "fetching virtual graph", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (s virtualGraphService) Get(_ context.Context, scope Scope, id string) (*Vi
 	return &vg, nil
 }
 
-func (s virtualGraphService) Create(_ context.Context, scope Scope, spec VirtualGraphCreate) (*VirtualGraph, error) {
+func (s virtualGraphService) Create(ctx context.Context, scope Scope, spec VirtualGraphCreate) (*VirtualGraph, error) {
 	if err := s.scopeCheck(scope); err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (s virtualGraphService) Create(_ context.Context, scope Scope, spec Virtual
 	if spec.MaximumBytesBilled != nil {
 		body["maximum_bytes_billed"] = *spec.MaximumBytesBilled
 	}
-	rows, err := s.request(http.MethodPost, api.ScopedVirtualGraphsPath(scope.OrgID, scope.ProjectID), body, "creating virtual graph", http.StatusAccepted, http.StatusOK)
+	rows, err := s.request(ctx, http.MethodPost, api.ScopedVirtualGraphsPath(scope.OrgID, scope.ProjectID), body, "creating virtual graph", http.StatusAccepted, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (s virtualGraphService) Update(ctx context.Context, scope Scope, id string,
 	}
 	// The PATCH response body is not used (it is not a full record, and may be
 	// empty), so the result is re-read.
-	_, status, err := api.MakeRequest(s.cfg, api.ScopedVirtualGraphPath(scope.OrgID, scope.ProjectID, id), &api.RequestConfig{
+	_, status, err := api.MakeRequest(ctx, s.cfg, api.ScopedVirtualGraphPath(scope.OrgID, scope.ProjectID, id), &api.RequestConfig{
 		Method:   http.MethodPatch,
 		PostBody: body,
 		Version:  api.AuraApiVersion2,
@@ -193,14 +193,14 @@ func (s virtualGraphService) Update(ctx context.Context, scope Scope, id string,
 	return s.Get(ctx, scope, id)
 }
 
-func (s virtualGraphService) Delete(_ context.Context, scope Scope, id string) error {
+func (s virtualGraphService) Delete(ctx context.Context, scope Scope, id string) error {
 	if err := s.scopeCheck(scope); err != nil {
 		return err
 	}
 	if err := ValidateResourceID("virtual-graph", id); err != nil {
 		return err
 	}
-	_, status, err := api.MakeRequest(s.cfg, api.ScopedVirtualGraphPath(scope.OrgID, scope.ProjectID, id), &api.RequestConfig{
+	_, status, err := api.MakeRequest(ctx, s.cfg, api.ScopedVirtualGraphPath(scope.OrgID, scope.ProjectID, id), &api.RequestConfig{
 		Method:  http.MethodDelete,
 		Version: api.AuraApiVersion2,
 	})
@@ -213,19 +213,19 @@ func (s virtualGraphService) Delete(_ context.Context, scope Scope, id string) e
 	return nil
 }
 
-func (s virtualGraphService) AllowedConfigs(_ context.Context, scope Scope) (map[string]any, error) {
+func (s virtualGraphService) AllowedConfigs(ctx context.Context, scope Scope) (map[string]any, error) {
 	if err := s.scopeCheck(scope); err != nil {
 		return nil, err
 	}
-	rows, err := s.request(http.MethodGet, api.ScopedVirtualGraphAllowedConfigsPath(scope.OrgID, scope.ProjectID), nil, "fetching allowed configs", http.StatusOK)
+	rows, err := s.request(ctx, http.MethodGet, api.ScopedVirtualGraphAllowedConfigsPath(scope.OrgID, scope.ProjectID), nil, "fetching allowed configs", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
 	return single(rows, "fetching allowed configs")
 }
 
-func (s virtualGraphService) WaitWhile(_ context.Context, scope Scope, id, status string) (string, error) {
-	resp, err := api.PollVirtualGraph(s.cfg, scope.OrgID, scope.ProjectID, id, status)
+func (s virtualGraphService) WaitWhile(ctx context.Context, scope Scope, id, status string) (string, error) {
+	resp, err := api.PollVirtualGraph(ctx, s.cfg, scope.OrgID, scope.ProjectID, id, status)
 	if err != nil {
 		return "", err
 	}
@@ -235,8 +235,8 @@ func (s virtualGraphService) WaitWhile(_ context.Context, scope Scope, id, statu
 // v2Rows sends a request to a v2beta1 endpoint and decodes the {"data": ...}
 // envelope into records. status must be one of ok. A non-GET request must come
 // back with at least one record.
-func v2Rows(cfg *clicfg.Config, method, path string, body map[string]any, query map[string]string, doing string, ok ...int) ([]map[string]any, error) {
-	resBody, status, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+func v2Rows(ctx context.Context, cfg *clicfg.Config, method, path string, body map[string]any, query map[string]string, doing string, ok ...int) ([]map[string]any, error) {
+	resBody, status, err := api.MakeRequest(ctx, cfg, path, &api.RequestConfig{
 		Method:      method,
 		PostBody:    body,
 		QueryParams: query,

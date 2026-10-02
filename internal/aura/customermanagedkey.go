@@ -61,8 +61,8 @@ func newCMK(raw map[string]any) CustomerManagedKey {
 	return CustomerManagedKey{ID: str(rec, "id"), Name: str(rec, "name"), Status: str(rec, "status"), ProjectID: str(rec, "project_id"), Record: rec}
 }
 
-func (s cmkService) rows(method, path string, body map[string]any, query map[string]string, doing string, ok ...int) ([]map[string]any, error) {
-	resBody, status, err := api.MakeRequest(s.cfg, path, &api.RequestConfig{
+func (s cmkService) rows(ctx context.Context, method, path string, body map[string]any, query map[string]string, doing string, ok ...int) ([]map[string]any, error) {
+	resBody, status, err := api.MakeRequest(ctx, s.cfg, path, &api.RequestConfig{
 		Method:      method,
 		PostBody:    body,
 		QueryParams: query,
@@ -82,11 +82,11 @@ func (s cmkService) rows(method, path string, body map[string]any, query map[str
 	return decodeRows(resBody)
 }
 
-func (s cmkService) List(_ context.Context, scope Scope) ([]CustomerManagedKey, error) {
+func (s cmkService) List(ctx context.Context, scope Scope) ([]CustomerManagedKey, error) {
 	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
 		return nil, err
 	}
-	rows, err := s.rows(http.MethodGet, "/customer-managed-keys", nil, map[string]string{"tenantId": scope.ProjectID}, "listing customer-managed-keys", http.StatusOK)
+	rows, err := s.rows(ctx, http.MethodGet, "/customer-managed-keys", nil, map[string]string{"tenantId": scope.ProjectID}, "listing customer-managed-keys", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +97,11 @@ func (s cmkService) List(_ context.Context, scope Scope) ([]CustomerManagedKey, 
 	return out, nil
 }
 
-func (s cmkService) Get(_ context.Context, scope Scope, id string) (*CustomerManagedKey, error) {
+func (s cmkService) Get(ctx context.Context, scope Scope, id string) (*CustomerManagedKey, error) {
 	if err := ValidateResourceID("customer-managed-key", id); err != nil {
 		return nil, err
 	}
-	rows, err := s.rows(http.MethodGet, "/customer-managed-keys/"+id, nil, nil, "from preflight ownership check", http.StatusOK)
+	rows, err := s.rows(ctx, http.MethodGet, "/customer-managed-keys/"+id, nil, nil, "from preflight ownership check", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (s cmkService) Get(_ context.Context, scope Scope, id string) (*CustomerMan
 	return &k, nil
 }
 
-func (s cmkService) Create(_ context.Context, scope Scope, spec CustomerManagedKeyCreate) (*CustomerManagedKey, error) {
+func (s cmkService) Create(ctx context.Context, scope Scope, spec CustomerManagedKeyCreate) (*CustomerManagedKey, error) {
 	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (s cmkService) Create(_ context.Context, scope Scope, spec CustomerManagedK
 		"key_id":         spec.KeyID,
 		"tenant_id":      scope.ProjectID,
 	}
-	rows, err := s.rows(http.MethodPost, "/customer-managed-keys", body, nil, "creating customer-managed-key", http.StatusAccepted, http.StatusOK)
+	rows, err := s.rows(ctx, http.MethodPost, "/customer-managed-keys", body, nil, "creating customer-managed-key", http.StatusAccepted, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +142,11 @@ func (s cmkService) Create(_ context.Context, scope Scope, spec CustomerManagedK
 	return &k, nil
 }
 
-func (s cmkService) Delete(_ context.Context, id string) error {
+func (s cmkService) Delete(ctx context.Context, id string) error {
 	if err := ValidateResourceID("customer-managed-key", id); err != nil {
 		return err
 	}
-	_, status, err := api.MakeRequest(s.cfg, "/customer-managed-keys/"+id, &api.RequestConfig{Method: http.MethodDelete})
+	_, status, err := api.MakeRequest(ctx, s.cfg, "/customer-managed-keys/"+id, &api.RequestConfig{Method: http.MethodDelete})
 	if err != nil {
 		return err
 	}
@@ -156,8 +156,8 @@ func (s cmkService) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-func (s cmkService) WaitWhilePending(_ context.Context, id string) (string, error) {
-	resp, err := api.PollCMK(s.cfg, id)
+func (s cmkService) WaitWhilePending(ctx context.Context, id string) (string, error) {
+	resp, err := api.PollCMK(ctx, s.cfg, id)
 	if err != nil {
 		return "", err
 	}

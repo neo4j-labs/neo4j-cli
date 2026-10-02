@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestGetToken_DebugReportsCachedReuse(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, cachedTokenCredJSON)
 	cfg.Aura.SetDebug(true)
 
-	_, status, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})
@@ -59,7 +60,7 @@ func TestGetToken_DebugReportsFetchAndStatus(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, noTokenCredJSON)
 	cfg.Aura.SetDebug(true)
 
-	_, status, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, status, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})
@@ -85,7 +86,7 @@ func TestGetToken_DebugOffEmitsNoTokenLines(t *testing.T) {
 	cfg := buildTestConfig(t, srv.URL, noTokenCredJSON)
 	// debug not set -> off
 
-	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+	_, _, err := api.MakeRequest(context.Background(), cfg, "instances", &api.RequestConfig{
 		Method:  http.MethodGet,
 		Version: api.AuraApiVersion1,
 	})

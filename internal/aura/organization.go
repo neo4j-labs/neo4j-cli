@@ -59,8 +59,8 @@ func newProject(rec map[string]any) Project {
 	return Project{ID: str(rec, "id"), Name: str(rec, "name"), Record: rec}
 }
 
-func (s organizationService) List(_ context.Context) ([]Organization, error) {
-	rows, err := v2Rows(s.cfg, http.MethodGet, "/organizations", nil, nil, "listing organizations", http.StatusOK)
+func (s organizationService) List(ctx context.Context) ([]Organization, error) {
+	rows, err := v2Rows(ctx, s.cfg, http.MethodGet, "/organizations", nil, nil, "listing organizations", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -71,11 +71,11 @@ func (s organizationService) List(_ context.Context) ([]Organization, error) {
 	return out, nil
 }
 
-func (s organizationService) Get(_ context.Context, id string) (*Organization, error) {
+func (s organizationService) Get(ctx context.Context, id string) (*Organization, error) {
 	if err := ValidateResourceID("organization", id); err != nil {
 		return nil, err
 	}
-	rows, err := v2Rows(s.cfg, http.MethodGet, "/organizations/"+id, nil, nil, "fetching organization", http.StatusOK)
+	rows, err := v2Rows(ctx, s.cfg, http.MethodGet, "/organizations/"+id, nil, nil, "fetching organization", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -87,11 +87,11 @@ func (s organizationService) Get(_ context.Context, id string) (*Organization, e
 	return &org, nil
 }
 
-func (s projectService) List(_ context.Context, orgID string) ([]Project, error) {
+func (s projectService) List(ctx context.Context, orgID string) ([]Project, error) {
 	if err := ValidateResourceID("organization", orgID); err != nil {
 		return nil, err
 	}
-	rows, err := v2Rows(s.cfg, http.MethodGet, "/organizations/"+orgID+"/projects", nil, nil, "listing projects", http.StatusOK)
+	rows, err := v2Rows(ctx, s.cfg, http.MethodGet, "/organizations/"+orgID+"/projects", nil, nil, "listing projects", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
