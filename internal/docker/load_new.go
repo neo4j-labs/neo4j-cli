@@ -5,12 +5,10 @@ package docker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/neo4j/cli/internal/clicfg/credentials"
@@ -79,29 +77,26 @@ func LoadDumpIntoNewContainer(ctx context.Context, dbms *credentials.DbmsCredent
 		return NewContainerResult{}, err
 	}
 
-	chosenName, err := ResolveContainerName(ctx, client, dbms, load.Name)
+	res, err := Reserve(ctx, client, dbms, Want{Name: load.Name, BoltPort: 7687, HTTPPort: 7474, Password: load.Password}, load.PreflightO)
 	if err != nil {
 		return NewContainerResult{}, err
 	}
-	if chosenName != load.Name {
-		writeInfo(load.PreflightO, "name %q already in use; using %q\n", load.Name, chosenName)
-	}
+	chosenName, boltPort, httpPort, password := res.Name, res.BoltPort, res.HTTPPort, res.Password
 
-	boltPort, httpPort, err := FindFreePortPair(7687, 7474)
-	if err != nil {
-		return NewContainerResult{}, err
+	// The dataset loader always uses the enterprise image so neo4j-admin can load a
+	// dump from any supported source version.
+	spec := ServerSpec{
+		Name:     chosenName,
+		Edition:  EditionEnterprise,
+		Version:  version,
+		BoltPort: boltPort,
+		HTTPPort: httpPort,
+		Plugins:  load.Plugins,
+		Password: password,
 	}
-
-	password := load.Password
-	if password == "" {
-		password, err = GeneratePassword()
-		if err != nil {
-			return NewContainerResult{}, err
-		}
-	}
-
-	image := EnterpriseImage(version)
+	image := spec.Image()
 	volume := "neo4j-cli-" + chosenName + "-data"
+	spec.Mounts = []Mount{{Source: volume, Target: "/data"}}
 
 	// Stage the dump as <database>.dump in a dedicated dir so the loader
 	// container mounts only the single dump file (not the shared host temp dir
@@ -148,24 +143,7 @@ func LoadDumpIntoNewContainer(ctx context.Context, dbms *credentials.DbmsCredent
 	}
 
 	// Long-lived server container reusing the loaded volume.
-	argv := []string{"--name", chosenName}
-	argv = append(argv, "-p", fmt.Sprintf("%d:7474", httpPort))
-	argv = append(argv, "-p", fmt.Sprintf("%d:7687", boltPort))
-	argv = append(argv, "-e", "NEO4J_AUTH")
-	argv = append(argv, "-e", "NEO4J_ACCEPT_LICENSE_AGREEMENT=eval")
-	if pluginsEnv := pluginsEnvValue(load.Plugins); pluginsEnv != "" {
-		argv = append(argv, "-e", "NEO4J_PLUGINS="+pluginsEnv)
-	}
-	argv = append(argv, "-v", volume+":/data")
-	argv = append(argv, "--label", LabelManaged+"=true")
-	argv = append(argv, "--label", LabelEdition+"=enterprise")
-	argv = append(argv, "--label", LabelVersion+"="+version)
-	argv = append(argv, "--label", LabelBoltPort+"="+strconv.Itoa(boltPort))
-	argv = append(argv, "--label", LabelHTTPPort+"="+strconv.Itoa(httpPort))
-	argv = append(argv, "--label", LabelEphemeral+"=false")
-	argv = append(argv, image)
-
-	if _, err := client.RunWithEnv(ctx, argv, []string{"NEO4J_AUTH=neo4j/" + password}); err != nil {
+	if err := StartServer(ctx, client, spec); err != nil {
 		return NewContainerResult{}, err
 	}
 
@@ -213,20 +191,6 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Close()
-}
-
-// pluginsEnvValue renders the manifest plugin slugs into the JSON-array string
-// Neo4j's NEO4J_PLUGINS env var expects (e.g. `["apoc","graph-data-science"]`).
-// An empty slice yields "" so the caller can skip the -e flag entirely.
-func pluginsEnvValue(plugins []string) string {
-	if len(plugins) == 0 {
-		return ""
-	}
-	b, err := json.Marshal(plugins)
-	if err != nil {
-		return ""
-	}
-	return string(b)
 }
 
 // writeInfo emits a single `info:` narration line to w, tolerating a nil writer.
