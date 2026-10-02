@@ -4,8 +4,7 @@
 package organization
 
 import (
-	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -32,17 +31,11 @@ neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format js
 			orgID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, fmt.Sprintf("/organizations/%s", orgID), &api.RequestConfig{
-				Method:  http.MethodGet,
-				Version: api.AuraApiVersion2,
-			})
+			org, err := aura.New(cfg).Organizations().Get(cmd.Context(), orgID)
 			if err != nil {
 				return err
 			}
-
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(org.Record), []string{"id", "name"})
 
 			return nil
 		},

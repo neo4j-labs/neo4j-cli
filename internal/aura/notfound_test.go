@@ -1,14 +1,13 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package utils_test
+package aura
 
 import (
 	"errors"
 	"testing"
 
 	"github.com/neo4j/cli/internal/clierr"
-	"github.com/neo4j/cli/internal/commands/aura/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +25,7 @@ func TestWithNotFoundContext(t *testing.T) {
 		t.Parallel()
 
 		original := clierr.NewNotFoundError("resource not found").WithResource("instance", "inst-1")
-		got := utils.WithNotFoundContext(original, resourceType, resourceID, suggestion)
+		got := withNotFoundContext(original, resourceType, resourceID, suggestion)
 
 		var ce *clierr.CLIError
 		require.True(t, errors.As(got, &ce))
@@ -42,7 +41,7 @@ func TestWithNotFoundContext(t *testing.T) {
 		t.Parallel()
 
 		original := clierr.NewAuthError("unauthorized")
-		got := utils.WithNotFoundContext(original, resourceType, resourceID, suggestion)
+		got := withNotFoundContext(original, resourceType, resourceID, suggestion)
 
 		var ce *clierr.CLIError
 		require.True(t, errors.As(got, &ce))
@@ -56,7 +55,7 @@ func TestWithNotFoundContext(t *testing.T) {
 		t.Parallel()
 
 		original := errors.New("plain error")
-		got := utils.WithNotFoundContext(original, resourceType, resourceID, suggestion)
+		got := withNotFoundContext(original, resourceType, resourceID, suggestion)
 
 		assert.Same(t, original, got)
 	})
@@ -64,7 +63,7 @@ func TestWithNotFoundContext(t *testing.T) {
 	t.Run("nil error: returns nil", func(t *testing.T) {
 		t.Parallel()
 
-		got := utils.WithNotFoundContext(nil, resourceType, resourceID, suggestion)
+		got := withNotFoundContext(nil, resourceType, resourceID, suggestion)
 		assert.NoError(t, got)
 	})
 }

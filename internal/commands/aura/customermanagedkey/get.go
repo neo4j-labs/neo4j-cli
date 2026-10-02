@@ -4,6 +4,7 @@
 package customermanagedkey
 
 import (
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -35,16 +36,11 @@ neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --o
 			if err != nil {
 				return err
 			}
-			resBody, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, projectID)
+			key, err := aura.New(cfg).CustomerManagedKeys().Get(cmd.Context(), aura.Scope{ProjectID: projectID}, cmkID)
 			if err != nil {
 				return err
 			}
-
-			if resBody != nil {
-				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(key.Record), []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
 			return nil
 		},

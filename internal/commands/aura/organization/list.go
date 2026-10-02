@@ -4,7 +4,7 @@
 package organization
 
 import (
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -27,17 +27,16 @@ neo4j-cli aura organization list --format json
 neo4j-cli aura organization list --format json | jq -r '.data[].id'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, "/organizations", &api.RequestConfig{
-				Method:  http.MethodGet,
-				Version: api.AuraApiVersion2,
-			})
+			orgs, err := aura.New(cfg).Organizations().List(cmd.Context())
 			if err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
+			rows := make([]map[string]any, len(orgs))
+			for i, o := range orgs {
+				rows[i] = o.Record
 			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name"})
 
 			return nil
 		},

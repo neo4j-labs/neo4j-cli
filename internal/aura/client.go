@@ -36,6 +36,10 @@ type Client interface {
 	GraphQL() GraphQLService
 	VirtualGraphs() VirtualGraphService
 	Sessions() SessionService
+	Organizations() OrganizationService
+	Projects() ProjectService
+	CustomerManagedKeys() CustomerManagedKeyService
+	Snapshots() SnapshotService
 }
 
 // New returns a Client backed by the Aura HTTP API using cfg's credentials and
@@ -99,6 +103,22 @@ func (c *httpClient) VirtualGraphs() VirtualGraphService {
 
 func (c *httpClient) Sessions() SessionService {
 	return sessionService{cfg: c.cfg}
+}
+
+func (c *httpClient) Organizations() OrganizationService {
+	return organizationService{cfg: c.cfg}
+}
+
+func (c *httpClient) Projects() ProjectService {
+	return projectService{cfg: c.cfg}
+}
+
+func (c *httpClient) CustomerManagedKeys() CustomerManagedKeyService {
+	return cmkService{cfg: c.cfg}
+}
+
+func (c *httpClient) Snapshots() SnapshotService {
+	return snapshotService{cfg: c.cfg}
 }
 
 var (

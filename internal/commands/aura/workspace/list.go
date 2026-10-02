@@ -6,8 +6,8 @@ package workspace
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/spf13/cobra"
@@ -64,7 +64,7 @@ neo4j-cli aura workspace list --format json | jq -r '.data[] | select(.default =
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			orgs, err := api.ListOrganizations(cfg)
+			orgs, err := aura.New(cfg).Organizations().List(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("failed to list organizations: %w", err)
 			}
@@ -72,17 +72,17 @@ neo4j-cli aura workspace list --format json | jq -r '.data[] | select(.default =
 			defaultWorkspace := cfg.Aura.DefaultWorkspace()
 
 			var entries []workspaceEntry
-			for _, org := range orgs.Data {
-				projects, err := api.ListProjects(cfg, org.Id)
+			for _, org := range orgs {
+				projects, err := aura.New(cfg).Projects().List(cmd.Context(), org.ID)
 				if err != nil {
-					return fmt.Errorf("failed to list projects for organization %s: %w", org.Id, err)
+					return fmt.Errorf("failed to list projects for organization %s: %w", org.ID, err)
 				}
-				for _, proj := range projects.Data {
-					slug := org.Id + "/" + proj.Id
+				for _, proj := range projects {
+					slug := org.ID + "/" + proj.ID
 					entries = append(entries, workspaceEntry{
 						Workspace:      slug,
-						OrganizationId: org.Id,
-						ProjectId:      proj.Id,
+						OrganizationId: org.ID,
+						ProjectId:      proj.ID,
 						ProjectName:    proj.Name,
 						Default:        defaultWorkspace != "" && slug == defaultWorkspace,
 					})

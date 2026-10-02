@@ -4,10 +4,8 @@
 package snapshot
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -38,43 +36,24 @@ neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id
 neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
+				return err
+			}
+
+			snap, err := aura.New(cfg).Snapshots().Create(cmd.Context(), instanceId)
 			if err != nil {
 				return err
 			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(snap.Record), []string{"snapshot_id"})
 
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
-				return err
-			}
-
-			path := fmt.Sprintf("/instances/%s/snapshots", instanceId)
-
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodPost,
-			})
-
-			if err != nil {
-				return err
-			}
-
-			if statusCode == http.StatusAccepted {
-				output.PrintBody(cmd, cfg, resBody, []string{"snapshot_id"})
-
-				if wait {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for snapshot to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					var response api.CreateSnapshotResponse
-					if err := json.Unmarshal(resBody, &response); err != nil {
-						return err
-					}
-
-					// Snapshot is not ready after pending
-					pollResponse, err := api.PollSnapshot(cfg, instanceId, response.Data.SnapshotId)
-					if err != nil {
-						return err
-					}
-
-					fmt.Fprintln(cmd.ErrOrStderr(), "Snapshot Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+			if wait {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for snapshot to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
+				status, err := aura.New(cfg).Snapshots().WaitWhilePending(cmd.Context(), instanceId, snap.ID)
+				if err != nil {
+					return err
 				}
+
+				fmt.Fprintln(cmd.ErrOrStderr(), "Snapshot Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 			return nil
 		},

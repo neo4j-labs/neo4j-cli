@@ -526,20 +526,3 @@ func TestVerifyInstance_OwnershipMismatch(t *testing.T) {
 	assert.Equal(t, instanceID, ce.ResourceID)
 	assert.Equal(t, "Run 'neo4j-cli aura instance list --project-id <id>' to see instances in this project.", ce.Suggestion)
 }
-
-func TestFetchAndVerifyCMKInProject_OwnershipMismatch(t *testing.T) {
-	const cmkID = "cmk-xyz"
-	srv := buildResourceServer(t, "/v1/customer-managed-keys/"+cmkID, "other-project")
-	cfg := buildTestConfig(t, srv.URL, "")
-
-	_, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, testProjectID)
-	require.Error(t, err)
-	assert.Equal(t, fmt.Sprintf("could not find customer-managed-key %s in project %s", cmkID, testProjectID), err.Error())
-
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 3, ce.Code)
-	assert.Equal(t, "customer-managed-key", ce.ResourceType)
-	assert.Equal(t, cmkID, ce.ResourceID)
-	assert.Equal(t, "Run 'neo4j-cli aura customer-managed-key list --project-id <id>' to see keys in this project.", ce.Suggestion)
-}

@@ -4,8 +4,8 @@
 package project
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -44,17 +44,13 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 
 			cmd.SilenceUsage = true
 
-			found, err := utils.FetchProjectInOrg(cfg, orgID, projectID)
+			found, err := aura.New(cfg).Projects().Get(cmd.Context(), orgID, projectID)
 			if err != nil {
 				return err
 			}
 
-			resBody, err := json.Marshal(api.GetProjectResponse{Data: *found})
-			if err != nil {
-				return err
-			}
-
-			output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
+			// Only id and name are modelled for a project; output carries exactly those.
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(map[string]any{"id": found.ID, "name": found.Name}), []string{"id", "name"})
 
 			return nil
 		},

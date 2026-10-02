@@ -4,9 +4,8 @@
 package customermanagedkey
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/flags"
@@ -63,42 +62,26 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 				return err
 			}
 
-			body := map[string]any{
-				"region":         region,
-				"name":           name,
-				"instance_type":  instanceType,
-				"cloud_provider": cloudProvider,
-				"key_id":         keyId,
-				"tenant_id":      projectID,
-			}
-			resBody, statusCode, err := api.MakeRequest(cfg, "/customer-managed-keys", &api.RequestConfig{
-				Method:   http.MethodPost,
-				PostBody: body,
+			key, err := aura.New(cfg).CustomerManagedKeys().Create(cmd.Context(), aura.Scope{ProjectID: projectID}, aura.CustomerManagedKeyCreate{
+				Name:          name,
+				Region:        region,
+				InstanceType:  string(instanceType),
+				CloudProvider: string(cloudProvider),
+				KeyID:         keyId,
 			})
 			if err != nil {
 				return err
 			}
-			// NOTE: Instance delete should not return OK (200), it always returns 202
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(key.Record), []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
-				if wait {
-					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for customer managed key to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					var response api.CreateCMKResponse
-					if err := json.Unmarshal(resBody, &response); err != nil {
-						return err
-					}
-
-					pollResponse, err := api.PollCMK(cfg, response.Data.Id)
-					if err != nil {
-						return err
-					}
-
-					fmt.Fprintln(cmd.ErrOrStderr(), "CMK Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+			if wait {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for customer managed key to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
+				status, err := aura.New(cfg).CustomerManagedKeys().WaitWhilePending(cmd.Context(), key.ID)
+				if err != nil {
+					return err
 				}
 
+				fmt.Fprintln(cmd.ErrOrStderr(), "CMK Status:", status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 
 			return nil

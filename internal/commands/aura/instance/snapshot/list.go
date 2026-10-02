@@ -4,9 +4,7 @@
 package snapshot
 
 import (
-	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -33,32 +31,19 @@ neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 0
 neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
+				return err
+			}
+
+			snaps, err := aura.New(cfg).Snapshots().List(cmd.Context(), instanceId, date)
 			if err != nil {
 				return err
 			}
-
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
-				return err
+			rows := make([]map[string]any, len(snaps))
+			for i, sn := range snaps {
+				rows[i] = sn.Record
 			}
-
-			path := fmt.Sprintf("/instances/%s/snapshots", instanceId)
-			var queryParams map[string]string
-			if date != "" {
-				queryParams = make(map[string]string)
-				queryParams["date"] = date
-			}
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:      http.MethodGet,
-				QueryParams: queryParams,
-			})
-			if err != nil {
-				return err
-			}
-
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"snapshot_id", "instance_id", "profile", "status", "timestamp"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"snapshot_id", "instance_id", "profile", "status", "timestamp"})
 			return nil
 		},
 	}

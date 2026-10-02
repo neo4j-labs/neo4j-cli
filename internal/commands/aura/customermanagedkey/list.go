@@ -4,7 +4,7 @@
 package customermanagedkey
 
 import (
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -36,23 +36,16 @@ neo4j-cli aura customer-managed-key list --organization-id 00000000-0000-0000-00
 				return err
 			}
 
-			path := "/customer-managed-keys"
-			queryParams := map[string]string{
-				"tenantId": projectID,
-			}
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:      http.MethodGet,
-				QueryParams: queryParams,
-			})
+			keys, err := aura.New(cfg).CustomerManagedKeys().List(cmd.Context(), aura.Scope{ProjectID: projectID})
 			if err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id"})
+			rows := make([]map[string]any, len(keys))
+			for i, k := range keys {
+				rows[i] = k.Record
 			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "project_id"})
 
 			return nil
 		},

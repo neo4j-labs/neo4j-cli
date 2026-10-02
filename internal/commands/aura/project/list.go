@@ -5,7 +5,7 @@ package project
 
 import (
 	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
@@ -39,17 +39,16 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 			}
 
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, fmt.Sprintf("/organizations/%s/projects", orgID), &api.RequestConfig{
-				Method:  http.MethodGet,
-				Version: api.AuraApiVersion2,
-			})
+			projects, err := aura.New(cfg).Projects().List(cmd.Context(), orgID)
 			if err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
+			rows := make([]map[string]any, len(projects))
+			for i, p := range projects {
+				rows[i] = p.Record
 			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name"})
 
 			return nil
 		},

@@ -4,10 +4,11 @@
 package workspace
 
 import (
+	"context"
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
-	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/clicfg"
 )
 
@@ -36,14 +37,14 @@ func ValidateAndSetDefaultWorkspace(cfg *clicfg.Config, slug string) error {
 		return fmt.Errorf("invalid workspace %q: project ID must not be empty", slug)
 	}
 
-	projects, err := api.ListProjects(cfg, orgID)
+	projects, err := aura.New(cfg).Projects().List(context.Background(), orgID)
 	if err != nil {
 		return fmt.Errorf("failed to validate workspace %q: %w", slug, err)
 	}
 
 	found := false
-	for _, p := range projects.Data {
-		if p.Id == projectID {
+	for _, p := range projects {
+		if p.ID == projectID {
 			found = true
 			break
 		}

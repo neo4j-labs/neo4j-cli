@@ -5,7 +5,7 @@ package customermanagedkey
 
 import (
 	"fmt"
-	"net/http"
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -45,7 +45,7 @@ neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 
 				return err
 			}
 
-			if _, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, projectID); err != nil {
+			if _, err := aura.New(cfg).CustomerManagedKeys().Get(cmd.Context(), aura.Scope{ProjectID: projectID}, cmkID); err != nil {
 				return err
 			}
 
@@ -53,20 +53,14 @@ neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 
 				return err
 			}
 
-			path := fmt.Sprintf("/customer-managed-keys/%s", cmkID)
-			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodDelete,
-			})
-			if err != nil {
+			if err := aura.New(cfg).CustomerManagedKeys().Delete(cmd.Context(), cmkID); err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusNoContent {
-				fmt.Fprintf(cmd.ErrOrStderr(), "customer-managed-key %s deleted\n", cmkID) //nolint:errcheck // narration to stderr; write errors are not actionable
-				output.PrintBodyMap(cmd, cfg,
-					api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": cmkID}),
-					[]string{"deleted", "id"})
-			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "customer-managed-key %s deleted\n", cmkID) //nolint:errcheck // narration to stderr; write errors are not actionable
+			output.PrintBodyMap(cmd, cfg,
+				api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": cmkID}),
+				[]string{"deleted", "id"})
 
 			return nil
 		},

@@ -4,9 +4,7 @@
 package snapshot
 
 import (
-	"fmt"
 	"github.com/neo4j/cli/internal/aura"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
@@ -34,34 +32,16 @@ neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --inst
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-			if err != nil {
-				return err
-			}
-
-			if err = aura.New(cfg).Instances().Verify(cmd.Context(), aura.Scope{ProjectID: projectID}, instanceId); err != nil {
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
 				return err
 			}
 
 			snapshotId := strings.TrimSpace(args[0])
-			path := fmt.Sprintf("/instances/%s/snapshots/%s", instanceId, snapshotId)
-
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodGet,
-			})
+			snap, err := aura.New(cfg).Snapshots().Get(cmd.Context(), instanceId, snapshotId)
 			if err != nil {
-				// On 404 the API layer tags ResourceType="instance" (the first
-				// segment after /instances/) which is misleading when the snapshot
-				// itself is the missing resource. Rewrite the context so the user
-				// gets snapshot-specific Suggestion text. The preflight
-				// FetchAndVerifyInstanceInProject already covers the genuine
-				// instance-not-found path.
-				return utils.WithNotFoundContext(err, "snapshot", snapshotId, "Run 'neo4j-cli aura instance snapshot list --instance-id <id>' to see snapshots for this instance.")
+				return err
 			}
-
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"snapshot_id", "instance_id", "profile", "status", "timestamp", "exportable"})
-			}
+			output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(snap.Record), []string{"snapshot_id", "instance_id", "profile", "status", "timestamp", "exportable"})
 			return nil
 		},
 	}
