@@ -4,6 +4,7 @@
 package virtualgraph
 
 import (
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"strings"
 
@@ -51,7 +52,7 @@ neo4j-cli aura virtual-graph update ge82059a --import-model-id im-xyz789 --rw --
 				return err
 			}
 
-			if err := utils.ValidateResourceID(resourceName, virtualGraphID); err != nil {
+			if err := aura.ValidateResourceID(resourceName, virtualGraphID); err != nil {
 				return err
 			}
 

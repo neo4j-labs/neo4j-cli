@@ -3,7 +3,10 @@
 
 package utils
 
-import "github.com/neo4j/cli/internal/aura/api"
+import (
+	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/aura/api"
+)
 
 // RenameResponseField returns a new ResponseData with the key `from` renamed to
 // `to` across every map in the response. The original data is not modified. If
@@ -25,7 +28,7 @@ import "github.com/neo4j/cli/internal/aura/api"
 // may carry both).
 func RenameResponseField(data api.ResponseData, from, to string) api.ResponseData {
 	return mapResponse(data, func(m map[string]any) map[string]any {
-		return renameMapKey(m, from, to, false)
+		return aura.RenameKey(m, from, to, false)
 	})
 }
 
@@ -44,27 +47,4 @@ func mapResponse(data api.ResponseData, fn func(map[string]any) map[string]any) 
 		}
 		return api.NewListResponseData(mapped)
 	}
-}
-
-// renameMapKey is the single copy-and-rename primitive: it copies m and returns
-// a new map where the key `from` is replaced by `to`. If `from` is absent the
-// map is returned unchanged (still a copy). When preferTo is true and m already
-// holds a native `to` value, that value is kept and `from` is simply dropped;
-// when false, `from`'s value is moved onto `to` (overwriting any native `to`).
-func renameMapKey(m map[string]any, from, to string, preferTo bool) map[string]any {
-	out := make(map[string]any, len(m))
-	for k, v := range m {
-		if k == from || k == to {
-			continue
-		}
-		out[k] = v
-	}
-	if native, ok := m[to]; preferTo && ok {
-		out[to] = native
-	} else if legacy, ok := m[from]; ok {
-		out[to] = legacy
-	} else if native, ok := m[to]; ok {
-		out[to] = native
-	}
-	return out
 }

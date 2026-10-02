@@ -4,6 +4,7 @@
 package session
 
 import (
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"strings"
 
@@ -42,7 +43,7 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 				return err
 			}
 
-			if err := utils.ValidateResourceID("session", sessionID); err != nil {
+			if err := aura.ValidateResourceID("session", sessionID); err != nil {
 				return err
 			}
 

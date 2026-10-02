@@ -4,6 +4,7 @@
 package instance
 
 import (
+	"github.com/neo4j/cli/internal/aura"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -36,20 +37,17 @@ neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-0
 			if err != nil {
 				return err
 			}
-			resBody, err := utils.FetchScopedInstance(cfg, orgID, projectID, instanceId)
+			inst, err := aura.New(cfg).Instances().Get(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID}, instanceId)
 			if err != nil {
 				return err
 			}
 
-			if resBody != nil {
-				responseData := api.ParseBody(resBody)
-				normalized := utils.NormalizeV2Beta1Response(responseData)
-				fields, err := getFields(responseData)
-				if err != nil {
-					return err
-				}
-				output.PrintBodyMap(cmd, cfg, normalized, fields)
+			data := api.NewSingleValueResponseData(inst.Record)
+			fields, err := getFields(data)
+			if err != nil {
+				return err
 			}
+			output.PrintBodyMap(cmd, cfg, data, fields)
 
 			return nil
 		},

@@ -4,6 +4,7 @@
 package virtualgraph
 
 import (
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"strings"
 
@@ -50,7 +51,7 @@ while neo4j-cli aura virtual-graph get ge82059a > /dev/null 2>&1; do sleep 5; do
 				return err
 			}
 
-			if err := utils.ValidateResourceID(resourceName, virtualGraphID); err != nil {
+			if err := aura.ValidateResourceID(resourceName, virtualGraphID); err != nil {
 				return err
 			}
 

@@ -109,7 +109,7 @@ func parseEndpoint(raw string) (*parsedEndpoint, error) {
 	}
 
 	// url.JoinPath resolves "." and ".." against the base URL, so such a segment
-	// would silently retarget the request (the hazard utils.ValidateResourceID
+	// would silently retarget the request (the hazard aura.ValidateResourceID
 	// guards against for IDs). The decoded path is scanned so a percent-encoded
 	// "%2e%2e" is caught too.
 	for _, segment := range strings.Split(u.Path, "/") {

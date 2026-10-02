@@ -4,6 +4,7 @@
 package instance
 
 import (
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
 	"strings"
 
@@ -46,7 +47,7 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 				return err
 			}
 
-			if err := utils.ValidateResourceID("instance", instanceID); err != nil {
+			if err := aura.ValidateResourceID("instance", instanceID); err != nil {
 				return err
 			}
 

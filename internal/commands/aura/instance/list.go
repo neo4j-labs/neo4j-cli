@@ -4,8 +4,7 @@
 package instance
 
 import (
-	"net/http"
-
+	"github.com/neo4j/cli/internal/aura"
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/output"
 	"github.com/neo4j/cli/internal/clicfg"
@@ -35,30 +34,16 @@ neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000
 				return err
 			}
 
-			path := api.ScopedInstancesPath(orgID, projectID)
-
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodGet,
-				Version: api.AuraApiVersion2,
-			})
+			instances, err := aura.New(cfg).Instances().List(cmd.Context(), aura.Scope{OrgID: orgID, ProjectID: projectID})
 			if err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				normalized := utils.NormalizeV2Beta1Response(responseData)
-				// Inject the owning organization so downstream consumers
-				// (e.g. neo4j_cli_list_targets) can surface the relationship.
-				rows := normalized.AsArray()
-				for i := range rows {
-					if _, ok := rows[i]["organization_id"]; !ok {
-						rows[i]["organization_id"] = orgID
-					}
-				}
-				normalized = api.NewListResponseData(rows)
-				output.PrintBodyMap(cmd, cfg, normalized, []string{"id", "name", "status", "organization_id", "project_id", "cloud_provider"})
+			rows := make([]map[string]any, len(instances))
+			for i, inst := range instances {
+				rows[i] = inst.Record
 			}
+			output.PrintBodyMap(cmd, cfg, api.NewListResponseData(rows), []string{"id", "name", "status", "organization_id", "project_id", "cloud_provider"})
 			return nil
 		},
 	}

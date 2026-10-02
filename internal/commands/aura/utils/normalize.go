@@ -3,7 +3,10 @@
 
 package utils
 
-import "github.com/neo4j/cli/internal/aura/api"
+import (
+	"github.com/neo4j/cli/internal/aura"
+	"github.com/neo4j/cli/internal/aura/api"
+)
 
 // NormalizeV2Beta1Response applies the v2beta1 output-contract mapping to an
 // instance or session response so callers present a stable, v1-compatible
@@ -28,7 +31,7 @@ import "github.com/neo4j/cli/internal/aura/api"
 // RenameResponseField's unconditional move.
 func NormalizeV2Beta1Response(data api.ResponseData) api.ResponseData {
 	return mapResponse(data, func(m map[string]any) map[string]any {
-		out := renameMapKey(m, "legacy_status", "status", true)
-		return renameMapKey(out, "tenant_id", "project_id", true)
+		out := aura.RenameKey(m, "legacy_status", "status", true)
+		return aura.RenameKey(out, "tenant_id", "project_id", true)
 	})
 }

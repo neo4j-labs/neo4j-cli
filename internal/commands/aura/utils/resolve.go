@@ -5,8 +5,8 @@ package utils
 
 import (
 	"fmt"
+	"github.com/neo4j/cli/internal/aura"
 	"net/http"
-	"strings"
 
 	"github.com/neo4j/cli/internal/aura/api"
 	"github.com/neo4j/cli/internal/aura/flags"
@@ -14,22 +14,6 @@ import (
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/spf13/cobra"
 )
-
-// ValidateResourceID rejects an ID that would break out of, or malform, the
-// scoped resource path it is interpolated into. Aura resource IDs are opaque
-// UUID/short-hex tokens, so an empty value, a "."/".." path segment, an embedded
-// slash/backslash, or a "?"/"#"/"%" is always invalid. Catching it here turns a
-// silently-retargeted request into a clear validation error: url.JoinPath (used
-// by api.MakeRequest to assemble the URL) resolves "." and ".." path segments
-// against the base, so e.g. an instanceID of "../.." would otherwise point the
-// request at a parent resource rather than failing cleanly, while a "?" would
-// start a query string, a "#" a fragment, and a "%" an escape sequence.
-func ValidateResourceID(resourceType, id string) error {
-	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\?#%`) {
-		return clierr.NewValidationError("invalid %s id %q", resourceType, id)
-	}
-	return nil
-}
 
 // ResolveAndValidateOrgProject resolves the organization and project IDs for
 // Aura commands via ResolveOrgProject (see there for the precedence), then calls
@@ -95,7 +79,7 @@ func ResolveOrgID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 
 	// Reject malformed IDs before they reach a request path, so a "." / ".." /
 	// slash segment can't retarget it (see ValidateResourceID).
-	if err := ValidateResourceID("organization", orgID); err != nil {
+	if err := aura.ValidateResourceID("organization", orgID); err != nil {
 		return "", err
 	}
 
@@ -118,7 +102,7 @@ func ResolveProjectID(cmd *cobra.Command, cfg *clicfg.Config) (string, error) {
 			WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.")
 	}
 
-	if err := ValidateResourceID("project", projectID); err != nil {
+	if err := aura.ValidateResourceID("project", projectID); err != nil {
 		return "", err
 	}
 
@@ -171,7 +155,7 @@ func OrgFromWorkspace(cfg *clicfg.Config) string {
 // instance outside the project surfaces via the v2beta1 path's own 404, which
 // carries the correct resource type, id, and suggestion.
 func FetchScopedInstance(cfg *clicfg.Config, orgID, projectID, instanceID string) ([]byte, error) {
-	if err := ValidateResourceID("instance", instanceID); err != nil {
+	if err := aura.ValidateResourceID("instance", instanceID); err != nil {
 		return nil, err
 	}
 	path := api.ScopedInstancePath(orgID, projectID, instanceID)
@@ -236,7 +220,7 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 // Scoping is native to the path, so no tenant_id comparison is performed: a
 // session outside the project surfaces via the v2beta1 path's own 404.
 func FetchScopedSession(cfg *clicfg.Config, orgID, projectID, sessionID string) ([]byte, error) {
-	if err := ValidateResourceID("session", sessionID); err != nil {
+	if err := aura.ValidateResourceID("session", sessionID); err != nil {
 		return nil, err
 	}
 	path := api.ScopedSessionPath(orgID, projectID, sessionID)
@@ -266,7 +250,7 @@ func FetchScopedSession(cfg *clicfg.Config, orgID, projectID, sessionID string) 
 // virtual graph outside the project surfaces via the v2beta1 path's own 404,
 // which parseResourceFromRequest tags with resourceType "virtual-graph".
 func FetchScopedVirtualGraph(cfg *clicfg.Config, orgID, projectID, virtualGraphID string) ([]byte, error) {
-	if err := ValidateResourceID("virtual-graph", virtualGraphID); err != nil {
+	if err := aura.ValidateResourceID("virtual-graph", virtualGraphID); err != nil {
 		return nil, err
 	}
 	path := api.ScopedVirtualGraphPath(orgID, projectID, virtualGraphID)
