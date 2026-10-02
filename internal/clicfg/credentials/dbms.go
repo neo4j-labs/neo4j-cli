@@ -31,7 +31,11 @@ func (c *DbmsCredentials) Printable() PrintableDbmsCredentials {
 	}
 }
 
-func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string) error {
+// CheckName reports whether name could be added: it is neither reserved for
+// Neo4j Desktop nor already taken. Add enforces the same rule; callers that
+// start a resource BEFORE storing its credential call CheckName first, so a name
+// that is certain to be rejected fails before anything is created.
+func (c *DbmsCredentials) CheckName(name string) error {
 	if name == reservedNameDesktop || strings.HasPrefix(name, reservedConnectionPrefix) {
 		return clierr.NewUsageError(
 			"credential name %q is reserved — 'query --credential desktop' and 'query --credential desktop-connection:<uuid>' resolve against the running Neo4j Desktop 2 instance, not the persisted store. Pick a different name.",
@@ -41,6 +45,13 @@ func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string
 		if credential.Name == name {
 			return clierr.NewUsageError("already have credential with name %s", name)
 		}
+	}
+	return nil
+}
+
+func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string) error {
+	if err := c.CheckName(name); err != nil {
+		return err
 	}
 
 	c.Credentials = append(c.Credentials, &DbmsCredential{

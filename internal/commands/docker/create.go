@@ -6,10 +6,10 @@ package docker
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/neo4j/cli/internal/clicfg/credentials"
 	engine "github.com/neo4j/cli/internal/docker"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -29,10 +29,17 @@ import (
 // package's seams (clientFactory, randSource, listenerFactory, waitForBoltFn).
 var homeDirFn = os.UserHomeDir
 
-// clientFactory is the injectable seam for the dockerClient used by leaves.
-// Production wires the exec-backed client (client.go newClient); tests swap
-// in a fakeDockerClient (helpers_test.go) without touching the leaf code.
+// clientFactory is the injectable seam for the engine.Client used by leaves.
+// Production wires the exec-backed client (engine.NewClient); tests swap in an
+// engine.FakeClient without touching the leaf code.
 var clientFactory = engine.NewClient
+
+// storeCredentialFn records the new container's credential. It is a seam so
+// tests can force the storage failure that can only happen after the container
+// has started.
+var storeCredentialFn = func(dbms *credentials.DbmsCredentials, name, password, uri string) error {
+	return dbms.Add(name, "neo4j", password, "neo4j", uri)
+}
 
 // waitTimeout is the fixed budget for the post-`docker run` Bolt readiness
 // probe when --wait is passed (REQ-F-018). The contract pins this at 60s for
@@ -67,6 +74,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		dataDir           string
 		logsDir           string
 		importDir         string
+		plugins           []string
 	)
 
 	const (
@@ -84,6 +92,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		dataDirFlag           = "data-dir"
 		logsDirFlag           = "logs-dir"
 		importDirFlag         = "import-dir"
+		pluginFlag            = "plugin"
 	)
 
 	cmd := &cobra.Command{
@@ -111,8 +120,12 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"inside the container. Paths support `~` and environment-variable expansion and are resolved to absolute " +
 			"paths; missing directories are created at mode 0o755. All three volume flags are incompatible with " +
 			"--ephemeral. " +
+			"Pass --plugin (repeatable) to install Neo4j plugins such as apoc or graph-data-science; they are set through NEO4J_PLUGINS and installed by the image at startup, so a misspelt name shows up in `docker logs <name>` rather than here. " +
 			"Pass --no-print-password to omit the generated password from stdout output. " +
 			"The stored credential still connects via `--credential <name>` (no plaintext needed). " +
+			"If credential storage is unavailable, or the name is reserved or already stored, the command fails before any container is created. " +
+			"If storing the credential fails after the container has started, a warning is printed and the password is still shown; " +
+			"with --no-print-password a generated password would be unrecoverable, so the container is removed and the command fails. " +
 			"The password is not readable through the CLI. " +
 			"To set a known password, run " +
 			"`admin user set-password neo4j --new-password <s> --credential <name> --rw`, " +
@@ -134,6 +147,9 @@ neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --rw
 
 # Persist data on the host so it survives delete + recreate
 neo4j-cli docker create --name dev --data-dir ~/n4j-data --rw
+
+# Create a container with the APOC and Graph Data Science plugins installed
+neo4j-cli docker create --name gds --plugin apoc --plugin graph-data-science --rw
 
 # Create an enterprise container with the commercial license accepted and a custom password (no credential stored)
 neo4j-cli docker create --name licensed --edition enterprise --accept-license --password mysecret --no-store-credential --rw`,
@@ -209,89 +225,55 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				}
 			}
 
-			// Port-conflict pre-flight (REQ-F-013, REQ-F-001..007). Run BEFORE
-			// any docker side effect so a port clash never leaves a half-
-			// created container behind. Equal-ports check fires first so we
-			// don't confusingly walk the loop with a pair that can never be
-			// valid. On clash we auto-increment BOTH ports by the same
-			// offset (up to maxPortOffset) so the bolt/http delta the
-			// operator picked is preserved.
+			// Fail on everything that can be known up front BEFORE any docker
+			// side effect, so a rejected invocation never leaves a running
+			// container behind.
+			//
+			// Credential storage: a created container whose password cannot be
+			// recorded is a running container nobody can log in to. Check that
+			// the store exists first (storing can still fail later; see below).
+			persistCredential := !noStoreCredential && !ephemeral
+			if persistCredential && cfg.DbmsCredentials() == nil {
+				return clierr.NewUsageError("credential storage is not available; use --%s to skip storing credentials locally", noStoreCredentialFlag)
+			}
+
+			validPlugins, err := engine.ValidatePlugins(plugins)
+			if err != nil {
+				return err
+			}
+
+			// Port-conflict and name-collision pre-flight (REQ-F-013, REQ-F-014),
+			// plus the password. Equal-ports fires first so we don't walk the
+			// fallback loop with a pair that can never be valid.
 			if boltPort == httpPort {
 				return clierr.NewUsageError("--%s and --%s must be different (got %d for both)", boltPortFlag, httpPortFlag, boltPort)
 			}
-			reqBoltPort, reqHTTPPort := boltPort, httpPort
-			resolvedBolt, resolvedHTTP, err := engine.FindFreePortPair(reqBoltPort, reqHTTPPort)
-			if err != nil {
-				return err
-			}
-			boltPort, httpPort = resolvedBolt, resolvedHTTP
-			if boltPort != reqBoltPort || httpPort != reqHTTPPort {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: ports %d/%d in use; using %d/%d (bolt/http)\n", reqBoltPort, reqHTTPPort, boltPort, httpPort)
-			}
-
-			// Name-collision pre-flight (REQ-F-014). Enumerate ALL container
-			// names from docker (managed or not — docker enforces global name
-			// uniqueness) AND every stored dbms credential name. Pick the
-			// requested name when free; otherwise try <name>-1 … <name>-99.
 			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
-			chosenName, err := engine.ResolveContainerName(ctx, client, cfg.DbmsCredentials(), name)
+			res, err := engine.Reserve(ctx, client, cfg.DbmsCredentials(), engine.Want{
+				Name:     name,
+				BoltPort: boltPort,
+				HTTPPort: httpPort,
+				Password: password,
+			}, cmd.ErrOrStderr())
 			if err != nil {
 				return err
 			}
-			if chosenName != name {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: name %q already in use; using %q\n", name, chosenName)
-			}
-
-			// Resolve password: honour --password verbatim, otherwise mint one
-			// (see generatePassword in password.go).
-			resolvedPassword := password
-			if resolvedPassword == "" {
-				resolvedPassword, err = engine.GeneratePassword()
-				if err != nil {
+			chosenName, resolvedPassword := res.Name, res.Password
+			boltPort, httpPort = res.BoltPort, res.HTTPPort
+			if persistCredential {
+				// A name Add is certain to reject (reserved, or already stored)
+				// must fail now, before the container exists.
+				if err := cfg.DbmsCredentials().CheckName(chosenName); err != nil {
 					return err
 				}
 			}
 
-			// Resolve image (REQ-F-011). Tag scheme verified against
-			// https://hub.docker.com/_/neo4j and the v2 tags API:
-			//   - community + any version → neo4j:<version>      (latest, 5, 5.26, 2026.04, …)
-			//   - enterprise + explicit version → neo4j:<version>-enterprise
-			//   - enterprise + "latest" → neo4j:enterprise        (Docker Hub does NOT publish neo4j:latest-enterprise)
-			image := "neo4j:" + version
-			if edition == "enterprise" {
-				image = engine.EnterpriseImage(version)
-			}
-
-			// Build the docker run argv. Order matters for tests asserting
-			// shape; keep ports → env → labels → image (last). When
-			// --ephemeral, prepend --rm so the docker daemon auto-removes
-			// the container on exit and flip the ephemeral label to "true"
-			// so `docker list` / `docker get` surface the choice (REQ-F-017).
-			argv := []string{"--name", chosenName}
-			if ephemeral {
-				argv = append(argv, "--rm")
-			}
-			argv = append(argv, "-p", fmt.Sprintf("%d:7474", httpPort))
-			argv = append(argv, "-p", fmt.Sprintf("%d:7687", boltPort))
-			// Pass NEO4J_AUTH via the docker process environment + `-e NEO4J_AUTH`
-			// passthrough (NAME only) so the generated password never lands in the
-			// host docker CLI argv (world-readable /proc/<pid>/cmdline). It still
-			// reaches the container exactly as before. (Config.Env persistence via
-			// docker inspect is inherent to NEO4J_AUTH provisioning and out of scope.)
-			argv = append(argv, "-e", "NEO4J_AUTH")
-			if edition == "enterprise" {
-				licenseValue := "eval"
-				if acceptLicense {
-					licenseValue = "yes"
-				}
-				argv = append(argv, "-e", "NEO4J_ACCEPT_LICENSE_AGREEMENT="+licenseValue)
-			}
-			// Resolve and mount host directories. Each resolved path goes
-			// through expand-home + ExpandEnv + filepath.Abs + mkdir-if-missing
-			// via resolveHostDir; errors here are fail-loud so the operator
-			// sees the bad path before any docker side effect. Slotted between
-			// env and labels per the documented argv shape.
+			// Resolve and mount host directories. Each path goes through
+			// expand-home + ExpandEnv + filepath.Abs + mkdir-if-missing via
+			// resolveHostDir; errors are fail-loud so the operator sees a bad path
+			// before the container starts.
+			var mounts []engine.Mount
 			for _, vol := range volumeFlags {
 				if vol.value == "" {
 					continue
@@ -300,40 +282,56 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				if err != nil {
 					return err
 				}
-				argv = append(argv, "-v", resolved+":"+vol.container)
+				mounts = append(mounts, engine.Mount{Source: resolved, Target: vol.container})
 			}
-			ephemeralLabelValue := "false"
-			if ephemeral {
-				ephemeralLabelValue = "true"
-			}
-			argv = append(argv, "--label", engine.LabelManaged+"=true")
-			argv = append(argv, "--label", engine.LabelEdition+"="+edition)
-			argv = append(argv, "--label", engine.LabelVersion+"="+version)
-			argv = append(argv, "--label", engine.LabelBoltPort+"="+strconv.Itoa(boltPort))
-			argv = append(argv, "--label", engine.LabelHTTPPort+"="+strconv.Itoa(httpPort))
-			argv = append(argv, "--label", engine.LabelEphemeral+"="+ephemeralLabelValue)
-			argv = append(argv, image)
 
-			if _, err := client.RunWithEnv(ctx, argv, []string{"NEO4J_AUTH=neo4j/" + resolvedPassword}); err != nil {
-				// dockerClient.Run already wraps stderr verbatim (REQ-F-061)
-				// in a clierr.UsageError, so we surface as-is.
+			// The server container. engine.ServerSpec owns the argv shape, the
+			// image tag scheme and the labels; the password reaches the container
+			// through the docker process environment, never argv.
+			spec := engine.ServerSpec{
+				Name:          chosenName,
+				Edition:       engine.Edition(edition),
+				Version:       version,
+				BoltPort:      boltPort,
+				HTTPPort:      httpPort,
+				AcceptLicense: acceptLicense,
+				Ephemeral:     ephemeral,
+				Mounts:        mounts,
+				Plugins:       validPlugins,
+				Password:      resolvedPassword,
+			}
+			image := spec.Image()
+			if err := engine.StartServer(ctx, client, spec); err != nil {
+				// Client.Run already wraps stderr verbatim (REQ-F-061) in a
+				// clierr.UsageError, so we surface as-is.
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			uri := fmt.Sprintf("neo4j://localhost:%d", boltPort)
 
-			// Persist a matching dbms credential unless explicitly opted out
-			// or running ephemerally. Ephemeral containers leave no on-disk
-			// footprint — the credential travels via the env-file blob
-			// emitted below (REQ-F-017). Database name defaults to "neo4j"
-			// for local containers per existing credential conventions.
-			if !noStoreCredential && !ephemeral {
-				if cfg.Credentials == nil || cfg.Credentials.Dbms == nil {
-					return clierr.NewUsageError("credential storage is not available; use --%s to skip storing credentials locally", noStoreCredentialFlag)
-				}
-				if err := cfg.Credentials.Dbms.Add(chosenName, "neo4j", resolvedPassword, "neo4j", uri); err != nil {
-					return err
+			// Persist a matching dbms credential unless opted out or ephemeral
+			// (an ephemeral container leaves no on-disk footprint; its credential
+			// travels in the env-file blob below). The container is already
+			// running, so a failure here must not lose the password:
+			//   - the password is going to be printed (or the operator supplied
+			//     it): warn, keep going, and the operator has it;
+			//   - the password is generated AND hidden (--no-print-password): it
+			//     would be unrecoverable, so remove the container we just created
+			//     and fail instead of leaving an orphan nobody can log in to.
+			if persistCredential {
+				if addErr := storeCredentialFn(cfg.DbmsCredentials(), chosenName, resolvedPassword, uri); addErr != nil {
+					if noPrintPassword && password == "" {
+						rmErr := client.RemoveForce(ctx, chosenName)
+						cmd.SilenceUsage = true
+						msg := "could not store the credential for %q (%s). The generated password cannot be shown with --%s, so the container was removed. Fix credential storage or rerun without --%s"
+						if rmErr != nil {
+							msg = "could not store the credential for %q (%s) and could not remove the container (%s). Remove it with `neo4j-cli docker delete %[1]s --rw`"
+							return clierr.NewFatalError(msg, chosenName, addErr, rmErr)
+						}
+						return clierr.NewFatalError(msg, chosenName, addErr, noPrintPasswordFlag, noPrintPasswordFlag)
+					}
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to store credentials locally (%s). Save the password now — it cannot be retrieved later.\n", addErr)
 				}
 			}
 
@@ -391,6 +389,10 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				row["password"] = resolvedPassword
 				fields = append(fields, "password")
 			}
+			if len(validPlugins) > 0 {
+				row["plugins"] = pluginsForOutput(validPlugins)
+				fields = append(fields, "plugins")
+			}
 			commonoutput.PrintBodyMap(cmd, cfg, singleRow{row: row}, fields)
 
 			return nil
@@ -412,6 +414,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().StringVar(&dataDir, dataDirFlag, "", "Host directory to bind-mount at /data inside the container. Empty = no mount (data lives in the container layer and is lost on delete). Path supports `~` and environment-variable expansion; resolved to an absolute path; created at mode 0o755 if missing. Incompatible with --ephemeral.")
 	cmd.Flags().StringVar(&logsDir, logsDirFlag, "", "Host directory to bind-mount at /logs inside the container. Empty = no mount. Same expansion + mkdir rules as --data-dir. Incompatible with --ephemeral.")
 	cmd.Flags().StringVar(&importDir, importDirFlag, "", "Host directory to bind-mount at /import inside the container (used by Neo4j's LOAD CSV). Empty = no mount. Same expansion + mkdir rules as --data-dir. Incompatible with --ephemeral.")
+	cmd.Flags().StringSliceVar(&plugins, pluginFlag, nil, "Neo4j plugin to install in the container via NEO4J_PLUGINS, e.g. apoc or graph-data-science. Repeat the flag or comma-separate for several. The image installs it at startup and rejects unknown names (see `docker logs <name>`).")
 	flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning.")
 
 	return cmd

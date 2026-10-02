@@ -83,6 +83,14 @@ func LoadDumpIntoNewContainer(ctx context.Context, dbms *credentials.DbmsCredent
 	}
 	chosenName, boltPort, httpPort, password := res.Name, res.BoltPort, res.HTTPPort, res.Password
 
+	// A credential name that is certain to be rejected must fail now, not after
+	// the container exists.
+	if dbms != nil {
+		if err := dbms.CheckName(chosenName); err != nil {
+			return NewContainerResult{}, err
+		}
+	}
+
 	// The dataset loader always uses the enterprise image so neo4j-admin can load a
 	// dump from any supported source version.
 	spec := ServerSpec{
@@ -151,7 +159,10 @@ func LoadDumpIntoNewContainer(ctx context.Context, dbms *credentials.DbmsCredent
 
 	if dbms != nil {
 		if err := dbms.Add(chosenName, "neo4j", password, load.Database, uri); err != nil {
-			return NewContainerResult{}, err
+			// The container is running but nothing records its password, so
+			// nobody could log in to it. Remove it rather than leave an orphan.
+			_ = client.RemoveForce(ctx, chosenName)
+			return NewContainerResult{}, fmt.Errorf("docker load: store the credential for %q (the container was removed): %w", chosenName, err)
 		}
 	}
 
