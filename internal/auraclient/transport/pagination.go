@@ -133,13 +133,15 @@ func ListAllOffsetPages(ctx context.Context, cfg *clicfg.Config, path string, ve
 	result := &PagedResult{Items: []map[string]any{}}
 
 	for page := 1; page <= MaxListPages; page++ {
-		queryParams := map[string]string{
-			"page":      strconv.Itoa(page),
-			"page_size": strconv.Itoa(ListPageSize),
-		}
+		queryParams := map[string]string{}
 		for k, v := range extraQuery {
 			queryParams[k] = v
 		}
+		// Applied after extraQuery so a caller-supplied page/page_size key can
+		// never pin the walk to one page (which would silently return
+		// duplicated items until MaxListPages).
+		queryParams["page"] = strconv.Itoa(page)
+		queryParams["page_size"] = strconv.Itoa(ListPageSize)
 
 		resBody, statusCode, err := MakeRequest(ctx, cfg, path, &RequestConfig{
 			Method:      http.MethodGet,
