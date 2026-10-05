@@ -38,7 +38,7 @@ func TestCommandsImportTheServiceLayerNotTheTransport(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+		if d.IsDir() || !strings.HasSuffix(path, ".go") {
 			return nil
 		}
 		checked++

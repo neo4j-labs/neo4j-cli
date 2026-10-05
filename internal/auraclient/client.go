@@ -64,6 +64,9 @@ func New(cfg *clicfg.Config) Client {
 // that the result may be incomplete.
 const MaxListPages = transport.MaxListPages
 
+// ListPageSize is the page_limit a paginated list asks for on each request.
+const ListPageSize = transport.ListPageSize
+
 // Instance statuses callers may wait on. They mirror the API's values.
 const (
 	InstanceStatusCreating    = transport.InstanceStatusCreating
