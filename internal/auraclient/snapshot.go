@@ -137,6 +137,12 @@ func (s snapshotService) Create(ctx context.Context, instanceID string) (*Snapsh
 }
 
 func (s snapshotService) WaitWhilePending(ctx context.Context, instanceID, id string) (string, error) {
+	if err := ValidateResourceID("instance", instanceID); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("snapshot", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollSnapshot(ctx, s.cfg, instanceID, id)
 	if err != nil {
 		return "", err
