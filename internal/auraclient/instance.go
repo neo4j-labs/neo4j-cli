@@ -193,6 +193,15 @@ func (s instanceService) Verify(ctx context.Context, scope Scope, id string) err
 }
 
 func (s instanceService) WaitWhile(ctx context.Context, scope Scope, id, status string) (string, error) {
+	if err := ValidateResourceID("organization", scope.OrgID); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("instance", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollInstance(ctx, s.cfg, scope.OrgID, scope.ProjectID, id, status)
 	if err != nil {
 		return "", err

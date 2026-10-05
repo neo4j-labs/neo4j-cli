@@ -164,6 +164,9 @@ func (s sessionService) Delete(ctx context.Context, scope Scope, id string) (map
 }
 
 func (s sessionService) WaitUntilReady(ctx context.Context, scope Scope, id string) (string, error) {
+	if err := s.check(scope, id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollGraphAnalyticsSessionReady(ctx, s.cfg, scope.OrgID, scope.ProjectID, id, transport.GraphAnalyticsSessionWaitingStatus)
 	if err != nil {
 		return "", err

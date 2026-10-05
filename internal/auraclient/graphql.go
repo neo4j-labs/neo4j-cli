@@ -267,6 +267,12 @@ func (s graphqlService) SetAllowedOrigins(ctx context.Context, instanceID, id st
 }
 
 func (s graphqlService) WaitWhile(ctx context.Context, instanceID, id, status string) (string, error) {
+	if err := ValidateResourceID("instance", instanceID); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("graphql data api", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollGraphQLDataApi(ctx, s.cfg, instanceID, id, status)
 	if err != nil {
 		return "", err

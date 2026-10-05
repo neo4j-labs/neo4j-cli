@@ -225,6 +225,12 @@ func (s virtualGraphService) AllowedConfigs(ctx context.Context, scope Scope) (m
 }
 
 func (s virtualGraphService) WaitWhile(ctx context.Context, scope Scope, id, status string) (string, error) {
+	if err := s.scopeCheck(scope); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("virtual-graph", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollVirtualGraph(ctx, s.cfg, scope.OrgID, scope.ProjectID, id, status)
 	if err != nil {
 		return "", err

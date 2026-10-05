@@ -157,6 +157,9 @@ func (s cmkService) Delete(ctx context.Context, id string) error {
 }
 
 func (s cmkService) WaitWhilePending(ctx context.Context, id string) (string, error) {
+	if err := ValidateResourceID("customer-managed-key", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollCMK(ctx, s.cfg, id)
 	if err != nil {
 		return "", err
