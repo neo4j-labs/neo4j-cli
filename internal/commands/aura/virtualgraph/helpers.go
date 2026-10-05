@@ -11,8 +11,8 @@ import (
 )
 
 // resourceName is the singular resource label used in validation errors. It
-// matches the singular form api.parseResourceFromRequest derives from the
-// `virtual-graphs` path segment, so CLI-side and API-side 404s agree.
+// matches the singular form transport's parseResourceFromRequest derives from
+// the `virtual-graphs` path segment, so CLI-side and API-side 404s agree.
 const resourceName = "virtual-graph"
 
 // detailFields is the single-resource column projection shared by create, get

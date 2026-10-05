@@ -174,8 +174,7 @@ func TestMakeRequest_EnvCredentialNotPersisted(t *testing.T) {
 // TestMakeRequest_Timeout asserts the http.Client timeout fires when the
 // server stalls past the configured cap. Uses the test seam to dial the cap
 // down to milliseconds so the assertion runs in <1s; production keeps the 60s
-// cap. MakeRequest panics on client.Do errors today, so we recover and inspect
-// the deadline-exceeded marker on the panic value.
+// cap.
 func TestMakeRequest_Timeout(t *testing.T) {
 	transport.SetHTTPClientTimeoutForTest(t, 50*time.Millisecond)
 
