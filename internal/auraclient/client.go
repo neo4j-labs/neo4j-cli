@@ -64,6 +64,9 @@ func New(cfg *clicfg.Config) Client {
 // that the result may be incomplete.
 const MaxListPages = transport.MaxListPages
 
+// ListPageSize is the page_limit a paginated list asks for on each request.
+const ListPageSize = transport.ListPageSize
+
 // Instance statuses callers may wait on. They mirror the API's values.
 const (
 	InstanceStatusCreating    = transport.InstanceStatusCreating
@@ -80,8 +83,8 @@ const (
 // instance is usually still transitioning, so use WaitWhile to block until the
 // operation has finished.
 //
-// ctx is accepted so callers and the future SDK adapter can cancel requests;
-// the current HTTP transport does not yet honour it.
+// ctx is honoured end-to-end: requests, token minting, paging and polling all
+// cancel with it.
 type InstanceService interface {
 	Get(ctx context.Context, scope Scope, id string) (*Instance, error)
 	List(ctx context.Context, scope Scope) ([]Instance, error)

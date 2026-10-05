@@ -82,6 +82,9 @@ func (s cmkService) rows(ctx context.Context, method, path string, body map[stri
 	return decodeRows(resBody)
 }
 
+// List returns the project's customer-managed keys. The v1 API declares no
+// pagination parameters for this endpoint (GET /customer-managed-keys); one
+// GET returns the full collection.
 func (s cmkService) List(ctx context.Context, scope Scope) ([]CustomerManagedKey, error) {
 	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
 		return nil, err
@@ -157,6 +160,9 @@ func (s cmkService) Delete(ctx context.Context, id string) error {
 }
 
 func (s cmkService) WaitWhilePending(ctx context.Context, id string) (string, error) {
+	if err := ValidateResourceID("customer-managed-key", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollCMK(ctx, s.cfg, id)
 	if err != nil {
 		return "", err

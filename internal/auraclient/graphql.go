@@ -144,6 +144,10 @@ func (s graphqlService) path(instanceID, id string, suffix ...string) (string, e
 	return p, nil
 }
 
+// List returns the instance's GraphQL data APIs. The beta API declares no
+// pagination parameters for this endpoint
+// (GET /instances/{id}/data-apis/graphql); one GET returns the full
+// collection.
 func (s graphqlService) List(ctx context.Context, instanceID string) ([]GraphQLDataAPI, error) {
 	p, err := s.path(instanceID, "")
 	if err != nil {
@@ -267,6 +271,12 @@ func (s graphqlService) SetAllowedOrigins(ctx context.Context, instanceID, id st
 }
 
 func (s graphqlService) WaitWhile(ctx context.Context, instanceID, id, status string) (string, error) {
+	if err := ValidateResourceID("instance", instanceID); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("graphql data api", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollGraphQLDataApi(ctx, s.cfg, instanceID, id, status)
 	if err != nil {
 		return "", err
@@ -313,6 +323,10 @@ func (s authProviderService) path(instanceID, dataAPIID, id string) (string, err
 	return p, nil
 }
 
+// List returns the data API's auth providers. The beta API declares no
+// pagination parameters for this endpoint
+// (GET /instances/{id}/data-apis/graphql/{apiId}/auth-providers); one GET
+// returns the full collection.
 func (s authProviderService) List(ctx context.Context, instanceID, dataAPIID string) ([]AuthProvider, error) {
 	p, err := s.path(instanceID, dataAPIID, "")
 	if err != nil {

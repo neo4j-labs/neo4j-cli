@@ -62,8 +62,8 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 	return cmd
 }
 
-// withInvocationID appends the agent invocation id to err for support/tracing.
-// It is a no-op when err is nil or id is empty.
+// printInvokeResult renders the invocation result; in JSON mode the record
+// goes to stdout and the invocation id (when present) to stderr for tracing.
 func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, result *auraclient.AgentInvocation) {
 	invocationID := result.InvocationID
 	if commonoutput.ResolveOutput(cmd, cfg) == "json" {

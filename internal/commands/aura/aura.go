@@ -69,7 +69,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 // applyEnvCredential synthesizes an ephemeral Aura credential from
 // NEO4J_AURA_CLIENT_ID/NEO4J_AURA_CLIENT_SECRET when accept-env-vars is enabled.
-// The credential lives only in memory (cfg.Aura.SetActiveCredential) and is never
+// The credential lives only in memory (cfg.AuraRuntime.SetActiveCredential) and is never
 // persisted to disk or keyring. A partial pair is a usage error naming the missing
 // variable. An explicit --credential flag runs afterwards (its hook is registered
 // on the subcommand) and takes precedence.

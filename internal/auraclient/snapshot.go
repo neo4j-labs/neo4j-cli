@@ -82,6 +82,9 @@ func (s snapshotService) rows(ctx context.Context, method, path string, query ma
 	return decodeRows(body)
 }
 
+// List returns the instance's snapshots. The v1 API declares no pagination
+// parameters for this endpoint (GET /instances/{id}/snapshots); one GET
+// returns the full collection.
 func (s snapshotService) List(ctx context.Context, instanceID, date string) ([]Snapshot, error) {
 	p, err := s.path(instanceID, "")
 	if err != nil {
@@ -137,6 +140,12 @@ func (s snapshotService) Create(ctx context.Context, instanceID string) (*Snapsh
 }
 
 func (s snapshotService) WaitWhilePending(ctx context.Context, instanceID, id string) (string, error) {
+	if err := ValidateResourceID("instance", instanceID); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("snapshot", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollSnapshot(ctx, s.cfg, instanceID, id)
 	if err != nil {
 		return "", err

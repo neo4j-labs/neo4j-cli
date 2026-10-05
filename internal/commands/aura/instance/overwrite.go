@@ -55,7 +55,8 @@ neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organ
 				return err
 			}
 
-			// Pre-flight ownership check.
+			// The service's Overwrite runs the project-ownership preflight
+			// itself; the command only renders the returned record.
 			scope := auraclient.Scope{OrgID: orgID, ProjectID: projectID}
 			inst, err := auraclient.New(cfg).Instances().Overwrite(cmd.Context(), scope, instanceId, auraclient.OverwriteSource{InstanceID: sourceInstanceId, SnapshotID: sourceSnapshotId})
 			if err != nil {

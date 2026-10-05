@@ -118,6 +118,10 @@ func (s instanceService) Get(ctx context.Context, scope Scope, id string) (*Inst
 	return &inst, nil
 }
 
+// List returns the project's instances. The v2beta1 spec declares no
+// pagination parameters for this endpoint
+// (GET /organizations/{o}/projects/{p}/instances) and its 200 schema has no
+// links object; one GET returns the full collection.
 func (s instanceService) List(ctx context.Context, scope Scope) ([]Instance, error) {
 	body, err := s.get(ctx, transport.ScopedInstancesPath(scope.OrgID, scope.ProjectID), "listing instances")
 	if err != nil {
@@ -193,6 +197,15 @@ func (s instanceService) Verify(ctx context.Context, scope Scope, id string) err
 }
 
 func (s instanceService) WaitWhile(ctx context.Context, scope Scope, id, status string) (string, error) {
+	if err := ValidateResourceID("organization", scope.OrgID); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
+		return "", err
+	}
+	if err := ValidateResourceID("instance", id); err != nil {
+		return "", err
+	}
 	resp, err := transport.PollInstance(ctx, s.cfg, scope.OrgID, scope.ProjectID, id, status)
 	if err != nil {
 		return "", err
