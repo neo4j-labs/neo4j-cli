@@ -126,7 +126,3 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256M
 
 	return cmd
 }
-
-// resolveGraphQLName returns the explicit name when non-empty, otherwise it
-// lists the instance's GraphQL data APIs and derives an unused default name
-// (e.g. GraphQL01). Shared by create's auto-naming path.

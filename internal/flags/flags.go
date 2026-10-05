@@ -154,13 +154,13 @@ func ComposeRootPersistentPreRunE(cfg *clicfg.Config) func(*cobra.Command, []str
 
 // RegisterAuraCredentialFlag adds a persistent --credential/-c flag to cmd and
 // wraps any existing PersistentPreRunE with a hook that resolves the named
-// credential from the store and stores it via cfg.Aura.SetActiveCredential.
+// credential from the store and stores it via cfg.AuraRuntime.SetActiveCredential.
 //
 // Hook execution order:
 //  1. Run the pre-existing PersistentPreRunE (if any); abort on error.
 //  2. If --credential was set, look up the credential by name.
 //     On failure, return a usage error hinting the correct credential list command.
-//     On success, call cfg.Aura.SetActiveCredential.
+//     On success, call cfg.AuraRuntime.SetActiveCredential.
 //  3. If --credential was not set, cfg is left unchanged (GetDefault fallback applies).
 func RegisterAuraCredentialFlag(cmd *cobra.Command, cfg *clicfg.Config) {
 	cmd.PersistentFlags().StringP(
