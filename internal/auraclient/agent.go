@@ -149,6 +149,9 @@ func (s agentService) one(ctx context.Context, method, path string, body map[str
 	return &a, nil
 }
 
+// List returns the project's agents. The v2beta1 spec declares no pagination
+// parameters for this endpoint (GET /organizations/{o}/projects/{p}/agents);
+// one GET returns the full collection.
 func (s agentService) List(ctx context.Context, scope Scope) ([]Agent, error) {
 	p, err := s.path(scope, "")
 	if err != nil {

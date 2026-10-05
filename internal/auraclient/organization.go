@@ -59,6 +59,9 @@ func newProject(rec map[string]any) Project {
 	return Project{ID: str(rec, "id"), Name: str(rec, "name"), Record: rec}
 }
 
+// List returns the caller's organizations. The v2beta1 spec declares no
+// pagination parameters for this endpoint (GET /organizations); one GET
+// returns the full collection.
 func (s organizationService) List(ctx context.Context) ([]Organization, error) {
 	rows, err := v2Rows(ctx, s.cfg, http.MethodGet, "/organizations", nil, nil, "listing organizations", http.StatusOK)
 	if err != nil {
@@ -87,6 +90,9 @@ func (s organizationService) Get(ctx context.Context, id string) (*Organization,
 	return &org, nil
 }
 
+// List returns the organization's projects. The v2beta1 spec declares no
+// pagination parameters for this endpoint
+// (GET /organizations/{o}/projects); one GET returns the full collection.
 func (s projectService) List(ctx context.Context, orgID string) ([]Project, error) {
 	if err := ValidateResourceID("organization", orgID); err != nil {
 		return nil, err
