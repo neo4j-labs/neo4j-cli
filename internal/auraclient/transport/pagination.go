@@ -15,29 +15,31 @@ import (
 )
 
 const (
-	// ListPageSize is the page_limit the CLI asks for when walking a
-	// cursor-paginated collection. The API caps page_limit server-side, so
+	// ListPageSize is the page size the CLI asks for when walking a paginated
+	// collection (page_limit on cursor-paginated endpoints, page_size on
+	// offset-paginated ones). The API caps the page size server-side, so
 	// requesting the ceiling keeps the number of round trips low: a 5,000-item
 	// collection is a handful of requests rather than dozens at the API's
 	// smaller default.
 	ListPageSize = 1000
 
-	// MaxListPages bounds a traversal so a cursor that never terminates cannot
-	// hang the CLI indefinitely. At ListPageSize this is far above any real
-	// collection, so reaching it means something is wrong rather than that the
-	// user genuinely has that much data.
+	// MaxListPages bounds a traversal so a cursor or page sequence that never
+	// terminates cannot hang the CLI indefinitely. At ListPageSize this is far
+	// above any real collection, so reaching it means something is wrong
+	// rather than that the user genuinely has that much data.
 	MaxListPages = 100
 )
 
-// PagedResult is the outcome of a ListAllPages traversal. The two stop-reason
-// flags let the caller tell the user that what they are looking at is not the
-// whole collection — a truncated list that looks complete is worse than a slow
-// one.
+// PagedResult is the outcome of a ListAllPages or ListAllOffsetPages
+// traversal. The two stop-reason flags let the caller tell the user that what
+// they are looking at is not the whole collection — a truncated list that
+// looks complete is worse than a slow one.
 type PagedResult struct {
 	// Items is every element gathered across the pages that were walked.
 	Items []map[string]any
 	// LimitReached reports that traversal stopped because the caller's limit was
-	// reached while the API still had more to give.
+	// reached while the API still had more to give. Only ListAllPages takes a
+	// limit, so ListAllOffsetPages never sets this.
 	LimitReached bool
 	// PageCapReached reports that traversal stopped at MaxListPages rather than
 	// at the end of the collection.
@@ -105,6 +107,61 @@ func ListAllPages(ctx context.Context, cfg *clicfg.Config, path string, version 
 		}
 		followed[next] = struct{}{}
 		pageToken = next
+	}
+
+	result.PageCapReached = true
+	return result, nil
+}
+
+// ListAllOffsetPages walks an offset-paginated v2beta1 collection (the
+// page/page_size query parameters the graph-analytics sessions endpoints
+// require, rather than a links.next cursor) from the first page to the last
+// and returns the merged items.
+//
+// Walking by default is deliberate, as with ListAllPages: page and page_size
+// are required query parameters on these endpoints, so a single request
+// returns one server-defaulted page — a prefix indistinguishable from the
+// whole collection. An offset API has no cursor to follow, so a short or
+// empty page is the only end-of-collection signal; a full page means another
+// page may exist.
+//
+// Pages are numbered from 1. extraQuery carries caller filters (e.g. a
+// session's instance filter); the walker's page/page_size keys win any
+// collision. There is no item limit: the endpoints that use this walker have
+// no caller-facing limit.
+func ListAllOffsetPages(ctx context.Context, cfg *clicfg.Config, path string, version AuraApiVersion, extraQuery map[string]string) (*PagedResult, error) {
+	result := &PagedResult{Items: []map[string]any{}}
+
+	for page := 1; page <= MaxListPages; page++ {
+		queryParams := map[string]string{
+			"page":      strconv.Itoa(page),
+			"page_size": strconv.Itoa(ListPageSize),
+		}
+		for k, v := range extraQuery {
+			queryParams[k] = v
+		}
+
+		resBody, statusCode, err := MakeRequest(ctx, cfg, path, &RequestConfig{
+			Method:      http.MethodGet,
+			Version:     version,
+			QueryParams: queryParams,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if statusCode != http.StatusOK {
+			return result, nil
+		}
+
+		items, err := pageItems(resBody)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = append(result.Items, items...)
+
+		if len(items) < ListPageSize {
+			return result, nil
+		}
 	}
 
 	result.PageCapReached = true

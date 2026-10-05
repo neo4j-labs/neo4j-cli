@@ -82,6 +82,9 @@ func (s snapshotService) rows(ctx context.Context, method, path string, query ma
 	return decodeRows(body)
 }
 
+// List returns the instance's snapshots. The v1 API declares no pagination
+// parameters for this endpoint (GET /instances/{id}/snapshots); one GET
+// returns the full collection.
 func (s snapshotService) List(ctx context.Context, instanceID, date string) ([]Snapshot, error) {
 	p, err := s.path(instanceID, "")
 	if err != nil {

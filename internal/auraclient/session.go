@@ -75,6 +75,13 @@ func (s sessionService) check(scope Scope, id string) error {
 	return nil
 }
 
+// List returns the project's sessions, optionally only those attached to
+// instanceID. The sessions endpoints (both the project-scoped
+// GET /organizations/{o}/projects/{p}/graph-analytics/sessions used here and
+// the org-scoped GET /organizations/{o}/graph-analytics/sessions) are
+// offset-paginated with required page/page_size parameters, so the walk goes
+// through transport.ListAllOffsetPages: a single GET would silently return
+// one server-defaulted page.
 func (s sessionService) List(ctx context.Context, scope Scope, instanceID string) ([]Session, error) {
 	if err := s.check(scope, ""); err != nil {
 		return nil, err
@@ -83,12 +90,12 @@ func (s sessionService) List(ctx context.Context, scope Scope, instanceID string
 	if instanceID != "" {
 		query = map[string]string{"instanceId": instanceID}
 	}
-	rows, err := v2Rows(ctx, s.cfg, http.MethodGet, transport.ScopedSessionsPath(scope.OrgID, scope.ProjectID), nil, query, "listing sessions", http.StatusOK)
+	res, err := transport.ListAllOffsetPages(ctx, s.cfg, transport.ScopedSessionsPath(scope.OrgID, scope.ProjectID), transport.AuraApiVersion2, query)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Session, len(rows))
-	for i, r := range rows {
+	out := make([]Session, len(res.Items))
+	for i, r := range res.Items {
 		out[i] = newSession(r)
 	}
 	return out, nil
