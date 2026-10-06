@@ -60,6 +60,7 @@ var AGENTS = []Agent{
 	{Name: "pi", DisplayName: "Pi", DetectDir: "~/.pi/agent", SkillsDir: "~/.pi/agent/skills"},
 	{Name: "opencode", DisplayName: "OpenCode", DetectDir: "$XDG_CONFIG_HOME/opencode", SkillsDir: "$XDG_CONFIG_HOME/opencode/skills"},
 	{Name: "junie", DisplayName: "Junie", DetectDir: "~/.junie", SkillsDir: "~/.junie/skills"},
+	{Name: "kiro", DisplayName: "Kiro", DetectDir: "~/.kiro", SkillsDir: "~/.kiro/skills"},
 	{
 		Name:        "claude-desktop",
 		DisplayName: "Claude Desktop",

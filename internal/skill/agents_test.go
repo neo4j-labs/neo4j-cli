@@ -19,7 +19,7 @@ func TestAGENTSCatalog(t *testing.T) {
 	// `skill list` output across releases.
 	expected := []string{
 		"claude-code", "cursor", "windsurf", "copilot", "antigravity", "gemini-cli",
-		"cline", "codex", "pi", "opencode", "junie", "claude-desktop",
+		"cline", "codex", "pi", "opencode", "junie", "kiro", "claude-desktop",
 	}
 	require.Len(t, AGENTS, len(expected))
 	for i, want := range expected {
@@ -41,7 +41,7 @@ func TestAGENTSCatalog(t *testing.T) {
 func TestAgentNamesIsSkillCapableOnly(t *testing.T) {
 	assert.Equal(t, []string{
 		"claude-code", "cursor", "windsurf", "copilot", "antigravity", "gemini-cli",
-		"cline", "codex", "pi", "opencode", "junie",
+		"cline", "codex", "pi", "opencode", "junie", "kiro",
 	}, agentNames())
 }
 

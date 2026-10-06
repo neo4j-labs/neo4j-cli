@@ -57,7 +57,7 @@ Install a skill bundle into supported AI agents
 
 Without a positional, installs the embedded self-skill into every detected agent. With a [skill-name] positional, installs that named skill (self-skill or a curated catalog skill from github.com/neo4j-contrib/neo4j-skills). Use --all to install the self-skill plus every catalog entry, --agent <name> (case-insensitive) to scope to one agent, and --refresh to force a network fetch of the catalog before installing. Passing an agent name as the positional is a hard error — use --agent <name> instead.
 
-Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie
+Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie, kiro
 
 Usage: `neo4j-cli skill install [skill-name] [flags]`
 
@@ -175,7 +175,7 @@ Remove an installed skill bundle
 
 Removes the named skill (self-skill or catalog skill) from every detected agent. Use --agent <name> (case-insensitive) to scope the removal to one agent. Use --all to remove every curated catalog skill from every detected agent — the embedded self-skill is preserved. Passing 'self' (or the binary-name alias) removes the self-skill and prints a reinstall hint. Idempotent: a name with no installation present exits zero. Passing an agent name as the positional is a hard error — use --agent <name> instead. --all reads only the cached catalog; with no cache it is a no-op.
 
-Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie
+Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie, kiro
 
 Usage: `neo4j-cli skill remove [skill-name] [flags]`
 

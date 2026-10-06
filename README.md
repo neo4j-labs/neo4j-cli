@@ -38,7 +38,7 @@ Installed agent skill bundles are refreshed automatically after a successful swa
 
 `neo4j-cli` installs either the embedded self-skill (`SKILL.md` + per-subcommand references that teach AI coding agents how to drive the CLI) or any skill from the curated catalog at [`github.com/neo4j-contrib/neo4j-skills`](https://github.com/neo4j-contrib/neo4j-skills) (Cypher, modeling, drivers, GraphRAG, GDS, Aura, …). The self-skill is addressable as `self` (canonical) or by the binary name `neo4j-cli` (alias). Passing an agent name as the positional is a hard error — use `--agent <name>` instead.
 
-Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie.
+Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie, Kiro.
 
 ```bash
 neo4j-cli skill install                              # self-skill into every detected agent

@@ -207,7 +207,7 @@ func TestListCmd_Table_InstalledInFormatting(t *testing.T) {
 
 	// Seed three catalog skills with different install patterns.
 	f := newFixture(t, "/home/alice", "table", "claude-code", "cursor", "codex",
-		"windsurf", "copilot", "antigravity", "gemini-cli", "cline", "pi", "opencode", "junie")
+		"windsurf", "copilot", "antigravity", "gemini-cli", "cline", "pi", "opencode", "junie", "kiro")
 	seedCatalogCache(t, f.fs, "1.0.0", "skill-zero", "skill-some", "skill-all")
 
 	// skill-some: installed on claude-code + codex.
@@ -243,11 +243,11 @@ func TestListCmd_Table_InstalledInFormatting(t *testing.T) {
 
 	assert.Contains(t, catalog, "skill-some", "partial catalog skill must render")
 	assert.Contains(t, catalog, "partial", "partial status must render")
-	assert.Contains(t, catalog, "2/11 (claude-code, codex)",
-		"partial install must render 'N/11 (a, b)' in catalog order")
+	assert.Contains(t, catalog, "2/12 (claude-code, codex)",
+		"partial install must render 'N/12 (a, b)' in catalog order")
 
 	assert.Contains(t, catalog, "skill-all", "fully installed catalog skill must render")
-	assert.Contains(t, catalog, "11/11", "fully installed must render '11/11' without parenthetical")
+	assert.Contains(t, catalog, "12/12", "fully installed must render '12/12' without parenthetical")
 	// Sanity: parenthetical must not appear on the all-installed row.
 	skillAllLineIdx := strings.Index(catalog, "skill-all")
 	require.NotEqual(t, -1, skillAllLineIdx)
