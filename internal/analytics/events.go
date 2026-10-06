@@ -15,15 +15,15 @@ import (
 
 // baseProperties are the fields attached to every Mixpanel track event.
 type baseProperties struct {
-	Token        string `json:"token"`
-	Time         int64  `json:"time"`
-	DistinctID   string `json:"distinct_id"`
-	InsertID     string `json:"$insert_id"`
-	Uptime       int64  `json:"uptime"`
-	OS           string `json:"$os"`
-	OSArch       string `json:"os_arch"`
-	CLIVersion   string `json:"cli_version,omitempty"`
-	PprocessPath string `json:"pprocess_path,omitempty"`
+	Token          string `json:"token"`
+	Time           int64  `json:"time"`
+	DistinctID     string `json:"distinct_id"`
+	InsertID       string `json:"$insert_id"`
+	Uptime         int64  `json:"uptime"`
+	OS             string `json:"$os"`
+	OSArch         string `json:"os_arch"`
+	CLIVersion     string `json:"cli_version,omitempty"`
+	PprocessBinary string `json:"pprocess_binary,omitempty"`
 }
 
 // CommandEventProperties carries the command-specific fields for COMMAND_USED
@@ -51,15 +51,15 @@ type TrackEvent struct {
 func (a *Analytics) getBaseProperties() baseProperties {
 	uptime := time.Now().Unix() - a.cfg.startupTime
 	return baseProperties{
-		Token:        a.cfg.token,
-		DistinctID:   a.cfg.distinctID,
-		Time:         time.Now().UnixMilli(),
-		InsertID:     a.newInsertID(),
-		Uptime:       uptime,
-		OS:           runtime.GOOS,
-		OSArch:       runtime.GOARCH,
-		CLIVersion:   a.cfg.cliVersion,
-		PprocessPath: a.cfg.pprocessPath,
+		Token:          a.cfg.token,
+		DistinctID:     a.cfg.distinctID,
+		Time:           time.Now().UnixMilli(),
+		InsertID:       a.newInsertID(),
+		Uptime:         uptime,
+		OS:             runtime.GOOS,
+		OSArch:         runtime.GOARCH,
+		CLIVersion:     a.cfg.cliVersion,
+		PprocessBinary: a.cfg.pprocessBinary,
 	}
 }
 

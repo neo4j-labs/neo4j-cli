@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetParentProcessPath_ReturnsBinaryNameOnly(t *testing.T) {
-	got := GetParentProcessPath()
+func TestGetParentProcess_ReturnsBinaryNameOnly(t *testing.T) {
+	got := GetParentProcess()
 	// "" is acceptable when the parent cannot be resolved (e.g. restricted CI);
 	// otherwise it must be a bare file name with no directory component.
 	assert.False(t, strings.ContainsAny(got, `/\`), "got %q, want no directory", got)
