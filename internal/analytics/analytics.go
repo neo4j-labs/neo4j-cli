@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -289,25 +290,24 @@ func GetMachineID(appName string) string {
 	return id
 }
 
-// Returns full path of the process that
-// called this Go application.  The path includes the binary
+// GetParentProcessPath returns the file name of the binary of the process that
+// called this application (e.g. "zsh", "Code Helper"), without its directory,
+// so no home directory or username reaches analytics. It returns "" when the
+// parent cannot be determined.
 func GetParentProcessPath() string {
-	var ppidname string
-
-	// Get current Process ID and Parent Process ID
-	parentPID := os.Getppid()
-
-	// Get parent process details
-	p, err := ps.FindProcess(parentPID)
+	p, err := ps.FindProcess(os.Getppid())
 	if err != nil {
-		slog.Error("Failed to obtain full path of the parent process ", "error", err)
+		slog.Error("Failed to obtain the parent process", "error", err)
 		return ""
 	}
 
-	ppidname = p.ExecutablePath()
+	path := p.ExecutablePath()
+	if path == "" {
+		return ""
+	}
+	name := filepath.Base(path)
 
-	slog.Debug("Parent process full path ", "path", ppidname)
+	slog.Debug("Parent process binary", "name", name)
 
-	return ppidname
-
+	return name
 }
