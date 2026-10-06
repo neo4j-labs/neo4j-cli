@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/denisbrodbeck/machineid"
 	mixpanel "github.com/mixpanel/mixpanel-go"
+
+	"github.com/tklauser/ps"
 )
 
 // httpClientTransport adapts our HTTPClient interface into an http.RoundTripper,
@@ -43,12 +46,13 @@ func (t *httpClientTransport) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 type analyticsConfig struct {
-	distinctID  string
-	cliVersion  string
-	token       string
-	startupTime int64
-	appName     string
-	mp          *mixpanel.ApiClient
+	pprocessPath string
+	distinctID   string
+	cliVersion   string
+	token        string
+	startupTime  int64
+	appName      string
+	mp           *mixpanel.ApiClient
 }
 
 // eventBufferSize is the capacity of the internal event channel.
@@ -115,6 +119,8 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 		)
 	}
 
+	parentProcessPath := GetParentProcessPath()
+
 	a := &Analytics{
 		log:     log,
 		eventCh: make(chan TrackEvent, eventBufferSize),
@@ -123,11 +129,12 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 			// correlate events across sessions for the same user. It is resolved
 			// when the worker starts (see EmitEvent), not here: the lookup can
 			// shell out, and most Configs never emit an event.
-			cliVersion:  version,
-			token:       mixPanelToken,
-			startupTime: time.Now().Unix(),
-			mp:          mpClient,
-			appName:     appName,
+			cliVersion:   version,
+			token:        mixPanelToken,
+			startupTime:  time.Now().Unix(),
+			mp:           mpClient,
+			appName:      appName,
+			pprocessPath: parentProcessPath,
 		},
 	}
 
@@ -280,4 +287,27 @@ func GetMachineID(appName string) string {
 		return ""
 	}
 	return id
+}
+
+// Returns full path of the process that
+// called this Go application.  The path includes the binary
+func GetParentProcessPath() string {
+	var ppidname string
+
+	// Get current Process ID and Parent Process ID
+	parentPID := os.Getppid()
+
+	// Get parent process details
+	p, err := ps.FindProcess(parentPID)
+	if err != nil {
+		slog.Error("Failed to obtain full path of the parent process ", "error", err)
+		return ""
+	}
+
+	ppidname = p.ExecutablePath()
+
+	slog.Debug("Parent process full path ", "path", ppidname)
+
+	return ppidname
+
 }
