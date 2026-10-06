@@ -17,7 +17,6 @@ import (
 
 func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
-		version              string
 		region               string
 		memory               flags.Memory
 		name                 string
@@ -33,7 +32,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	const (
-		versionFlag              = "version"
 		regionFlag               = "region"
 		memoryFlag               = "memory"
 		nameFlag                 = "name"
@@ -76,7 +74,6 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				memory:              memory,
 				region:              region,
 				cloudProvider:       cloudProvider,
-				version:             version,
 				credentialName:      credentialName,
 				credentialNameSet:   cmd.Flags().Changed(credentialNameFlag),
 				noCredentialStorage: noCredentialStorage,
@@ -99,7 +96,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 			// Auto-generate a default name when --name is omitted.
 			scope := auraclient.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
-			spec := newInstanceCreate(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
+			spec := newInstanceCreate(region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
 
 			instance, err := createAndStoreInstance(cmd.Context(), cfg, scope, spec, credentialOptions{
 				instanceType:        string(_type),
@@ -131,8 +128,6 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVar(&version, versionFlag, "5", "The Neo4j version of the instance.")
 
 	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'neo4j-cli aura api v1/tenants/<project-id>' to see the full list of supported regions for your project.")
 

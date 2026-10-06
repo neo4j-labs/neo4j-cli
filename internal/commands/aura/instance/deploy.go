@@ -103,7 +103,6 @@ func NewDeployCmd(cfg *clicfg.Config) *cobra.Command {
 		database    string
 		desktopPort int
 
-		version              string
 		region               string
 		memory               flags.Memory
 		name                 string
@@ -123,7 +122,6 @@ func NewDeployCmd(cfg *clicfg.Config) *cobra.Command {
 		databaseFlag    = "database"
 		desktopPortFlag = "desktop-port"
 
-		versionFlag             = "version"
 		regionFlag              = "region"
 		memoryFlag              = "memory"
 		nameFlag                = "name"
@@ -163,7 +161,6 @@ The command waits for the instance to be ready and for the data load to finish b
 				memory:              memory,
 				region:              region,
 				cloudProvider:       cloudProvider,
-				version:             version,
 				credentialName:      credentialName,
 				credentialNameSet:   cmd.Flags().Changed(credentialNameFlag),
 				noCredentialStorage: noCredentialStorage,
@@ -194,7 +191,7 @@ The command waits for the instance to be ready and for the data load to finish b
 			}
 
 			scope := auraclient.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
-			spec := newInstanceCreate(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
+			spec := newInstanceCreate(region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
 
 			fmt.Fprintln(errOut, "Creating instance...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
@@ -257,7 +254,6 @@ The command waits for the instance to be ready and for the data load to finish b
 	cmd.Flags().StringVar(&database, databaseFlag, "neo4j", "The name of the source database to clone. The system database cannot be cloned.")
 	cmd.Flags().IntVar(&desktopPort, desktopPortFlag, 0, "Pin the Neo4j Desktop 2 relate API to a specific port instead of probing 44222..44232 (used only with --from-desktop).")
 
-	cmd.Flags().StringVar(&version, versionFlag, "5", "The Neo4j version of the instance.")
 	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'neo4j-cli aura api v1/tenants/<project-id>' to see the full list of supported regions for your project.")
 	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes.")
 	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01).")

@@ -118,12 +118,14 @@ If the data load fails after the instance was created, the instance is left in p
 			if strings.EqualFold(database, "system") {
 				return clierr.NewUsageError(`invalid argument "system" for "--%s" flag: the system database cannot be loaded into`, databaseFlag)
 			}
+			if version != "4" && version != "5" {
+				return fmt.Errorf(`invalid argument "%s" for "--version" flag: must be one of "4" or "5"`, version)
+			}
 			return validateInstanceFlags(cmd, cfg, instanceFlags{
 				instanceType:        _type,
 				memory:              memory,
 				region:              region,
 				cloudProvider:       cloudProvider,
-				version:             version,
 				credentialName:      credentialName,
 				credentialNameSet:   cmd.Flags().Changed(credentialNameFlag),
 				noCredentialStorage: noCredentialStorage,
@@ -168,7 +170,7 @@ If the data load fails after the instance was created, the instance is left in p
 			}
 
 			scope := auraclient.Scope{OrgID: resolvedOrgID, ProjectID: resolvedProjectID}
-			createSpec := newInstanceCreate(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
+			createSpec := newInstanceCreate(region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin)
 
 			fmt.Fprintln(errOut, "Creating instance...") //nolint:errcheck // narration to stderr; write errors are not actionable
 

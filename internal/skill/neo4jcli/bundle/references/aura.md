@@ -1127,7 +1127,6 @@ Flags:
 | `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'neo4j-cli aura api v1/tenants/<project-id>' to see the full list of supported regions for your project. |
 | `--type` | type | - | (required) The type of the instance. Must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud". The former names "free-db", "professional-db", and "enterprise-db" are still accepted. |
 | `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
-| `--version` | string | 5 | The Neo4j version of the instance. |
 | `--wait` | bool | false | Waits until created instance is ready. |
 
 Examples:
@@ -1210,7 +1209,6 @@ Flags:
 | `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'neo4j-cli aura api v1/tenants/<project-id>' to see the full list of supported regions for your project. |
 | `--type` | type | - | (required) The type of the instance. Must be one of "free", "professional", "business-critical", or "virtual-dedicated-cloud". The former names "free-db", "professional-db", and "enterprise-db" are still accepted. |
 | `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
-| `--version` | string | 5 | The Neo4j version of the instance. |
 
 Examples:
 

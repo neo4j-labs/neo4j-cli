@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +18,8 @@ import (
 
 	"github.com/denisbrodbeck/machineid"
 	mixpanel "github.com/mixpanel/mixpanel-go"
+
+	"github.com/tklauser/ps"
 )
 
 // httpClientTransport adapts our HTTPClient interface into an http.RoundTripper,
@@ -43,12 +47,13 @@ func (t *httpClientTransport) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 type analyticsConfig struct {
-	distinctID  string
-	cliVersion  string
-	token       string
-	startupTime int64
-	appName     string
-	mp          *mixpanel.ApiClient
+	pprocessBinary string
+	distinctID     string
+	cliVersion     string
+	token          string
+	startupTime    int64
+	appName        string
+	mp             *mixpanel.ApiClient
 }
 
 // eventBufferSize is the capacity of the internal event channel.
@@ -115,6 +120,8 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 		)
 	}
 
+	parentProcess := GetParentProcess()
+
 	a := &Analytics{
 		log:     log,
 		eventCh: make(chan TrackEvent, eventBufferSize),
@@ -123,11 +130,12 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 			// correlate events across sessions for the same user. It is resolved
 			// when the worker starts (see EmitEvent), not here: the lookup can
 			// shell out, and most Configs never emit an event.
-			cliVersion:  version,
-			token:       mixPanelToken,
-			startupTime: time.Now().Unix(),
-			mp:          mpClient,
-			appName:     appName,
+			cliVersion:     version,
+			token:          mixPanelToken,
+			startupTime:    time.Now().Unix(),
+			mp:             mpClient,
+			appName:        appName,
+			pprocessBinary: parentProcess,
 		},
 	}
 
@@ -280,4 +288,26 @@ func GetMachineID(appName string) string {
 		return ""
 	}
 	return id
+}
+
+// GetParentProcess returns the file name of the binary of the process that
+// called this application (e.g. "zsh", "Code Helper"), without its directory,
+// so no home directory or username reaches analytics. It returns "" when the
+// parent cannot be determined.
+func GetParentProcess() string {
+	p, err := ps.FindProcess(os.Getppid())
+	if err != nil {
+		slog.Error("Failed to obtain the parent process", "error", err)
+		return ""
+	}
+
+	path := p.ExecutablePath()
+	if path == "" {
+		return ""
+	}
+	name := filepath.Base(path)
+
+	slog.Debug("Parent process binary", "name", name)
+
+	return name
 }

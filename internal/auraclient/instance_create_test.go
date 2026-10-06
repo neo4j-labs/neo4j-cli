@@ -25,7 +25,7 @@ import (
 
 func TestInstanceCreateBody(t *testing.T) {
 	paid := InstanceCreate{
-		Name: "n", Version: "5", Region: "europe-west1", Type: "professional", CloudProvider: "aws",
+		Name: "n", Region: "europe-west1", Type: "professional", CloudProvider: "aws",
 		Memory: "8GB", VectorOptimized: true,
 	}
 
@@ -34,19 +34,16 @@ func TestInstanceCreateBody(t *testing.T) {
 		assert.Equal(t, "8GB", b["memory"])
 		assert.Equal(t, "europe-west1", b["region"])
 		assert.Equal(t, "aws", b["cloud_provider"])
-		assert.Equal(t, "5", b["version"])
-		assert.Equal(t, "proj-1", b["tenant_id"])
 		assert.Equal(t, true, b["vector_optimized"])
 		assert.NotContains(t, b, "graph_analytics")
 		assert.NotContains(t, b, "customer_managed_key_id")
 	})
 
 	t.Run("free ignores sizing flags and uses the free-tier contract", func(t *testing.T) {
-		b := InstanceCreate{Name: "n", Type: "free", Version: "4", Region: "mars", CloudProvider: "azure", Memory: "64GB"}.body("p")
+		b := InstanceCreate{Name: "n", Type: "free", Region: "mars", CloudProvider: "azure", Memory: "64GB"}.body("p")
 		assert.Equal(t, "1GB", b["memory"])
 		assert.Equal(t, "europe-west1", b["region"])
 		assert.Equal(t, "gcp", b["cloud_provider"])
-		assert.Equal(t, "5", b["version"])
 		assert.NotContains(t, b, "vector_optimized")
 	})
 
@@ -113,7 +110,7 @@ func TestInstancesCreate_RegistersPasswordAndReturnsRecord(t *testing.T) {
 	const password = "generated-pw-Zq81-unique"
 	api := &instanceAPI{postReply: `{"data":{"id":"abc","name":"mine","tenant_id":"proj-1","username":"neo4j","password":"` + password + `","connection_url":"neo4j+s://x"}}`}
 
-	inst, err := api.client(t).Instances().Create(context.Background(), createScope, InstanceCreate{Name: "mine", Type: "professional", Version: "5", Region: "r", CloudProvider: "gcp", Memory: "4GB"})
+	inst, err := api.client(t).Instances().Create(context.Background(), createScope, InstanceCreate{Name: "mine", Type: "professional", Region: "r", CloudProvider: "gcp", Memory: "4GB"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "abc", inst.ID)
@@ -122,7 +119,6 @@ func TestInstancesCreate_RegistersPasswordAndReturnsRecord(t *testing.T) {
 	assert.NotContains(t, clievents.RedactText("output: "+password), password, "and is registered for redaction as soon as it is received")
 	assert.Equal(t, []string{http.MethodPost}, api.calls, "an explicit name needs no list call")
 	assert.Equal(t, "mine", api.posted["name"])
-	assert.Equal(t, "proj-1", api.posted["tenant_id"])
 }
 
 func TestInstancesCreate_DefaultsTheNameFromExistingInstances(t *testing.T) {
@@ -131,7 +127,7 @@ func TestInstancesCreate_DefaultsTheNameFromExistingInstances(t *testing.T) {
 		postReply: `{"data":{"id":"abc","name":"Instance03"}}`,
 	}
 
-	_, err := api.client(t).Instances().Create(context.Background(), createScope, InstanceCreate{Type: "free", Version: "5"})
+	_, err := api.client(t).Instances().Create(context.Background(), createScope, InstanceCreate{Type: "free"})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{http.MethodGet, http.MethodPost}, api.calls)

@@ -69,7 +69,6 @@ func newInstance(raw map[string]any) Instance {
 // Name is replaced by the lowest unused InstanceNN name in the project.
 type InstanceCreate struct {
 	Name                 string
-	Version              string
 	Region               string
 	Type                 string
 	CloudProvider        string
@@ -351,19 +350,16 @@ func (s instanceService) Overwrite(ctx context.Context, scope Scope, id string, 
 // field and lets the API apply that default.
 func (c InstanceCreate) body(projectID string) map[string]any {
 	body := map[string]any{
-		"version":        c.Version,
 		"region":         c.Region,
 		"name":           c.Name,
 		"type":           c.Type,
 		"cloud_provider": c.CloudProvider,
-		"tenant_id":      projectID,
 	}
 
 	if c.Type == "free" {
 		body["memory"] = "1GB"
 		body["region"] = "europe-west1"
 		body["cloud_provider"] = "gcp"
-		body["version"] = "5"
 	} else {
 		body["memory"] = c.Memory
 		body["region"] = c.Region
