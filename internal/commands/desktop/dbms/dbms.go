@@ -21,8 +21,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dbms",
 		Short: "Manage local DBMSes under a Neo4j Desktop 2 install",
-		Long: "Manage local Neo4j DBMSes running under a Neo4j Desktop 2 install — list, create, delete, start, stop, upgrade. " +
-			"Write commands (`create`, `delete`, `start`, `stop`, `upgrade`) require `--rw`. " +
+		Long: "Manage local Neo4j DBMSes running under a Neo4j Desktop 2 install — list, create, delete, start, stop, upgrade, update. " +
+			"Write commands (`create`, `delete`, `start`, `stop`, `upgrade`, `update`) require `--rw`. " +
 			"For a composed view of DBMSes plus saved remote connections see `neo4j-cli desktop list`.",
 	}
 
@@ -35,6 +35,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(newStartCmd(cfg))
 	cmd.AddCommand(newStopCmd(cfg))
 	cmd.AddCommand(newUpgradeCmd(cfg))
+	cmd.AddCommand(newUpdateCmd(cfg))
 	cmd.AddCommand(plugin.NewCmd(cfg))
 
 	return cmd

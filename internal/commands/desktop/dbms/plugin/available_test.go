@@ -16,7 +16,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/desktop/dbms"
-	"github.com/neo4j/cli/internal/commands/desktop/dbms/plugin"
 	"github.com/neo4j/cli/internal/desktopclient"
 	"github.com/neo4j/cli/internal/flags"
 	"github.com/neo4j/cli/internal/testutil/testfs"
@@ -61,7 +60,7 @@ func (h *availableHelper) withHandler(handler http.HandlerFunc) *httptest.Server
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
 
-	h.t.Cleanup(plugin.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv

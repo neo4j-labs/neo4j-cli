@@ -49,14 +49,14 @@ func mountDesktopUnderRoot(t *testing.T, cfg *clicfg.Config) *cobra.Command {
 	return root
 }
 
-// pinDesktopClient backs the dbms-leaf newDesktopClientFn seam with a real
+// pinDesktopClient backs the shared `desktopclient.Connect` seam with a real
 // desktopclient.Client wired to the supplied httptest server, so the leaf
 // exercises the production wire-tracing path in doRaw.
 func pinDesktopClient(t *testing.T, srvURL string) {
 	t.Helper()
 	t.Cleanup(desktopclient.SetUUIDFnForTest(func() string { return debugClientID }))
 	t.Cleanup(desktopclient.SetNowFnForTest(func() time.Time { return time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC) }))
-	t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srvURL}, debugSalt)
 	}))
 }

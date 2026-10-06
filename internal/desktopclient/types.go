@@ -14,7 +14,7 @@ type DbmsInfo struct {
 	Name          string         `json:"name"`
 	Description   string         `json:"description,omitempty"`
 	Tags          []string       `json:"tags,omitempty"`
-	Project       string         `json:"project,omitempty"`
+	Projects      []string       `json:"projects,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
 	ConnectionURI string         `json:"connectionUri,omitempty"`
 	RootPath      string         `json:"rootPath,omitempty"`
@@ -68,7 +68,7 @@ type Connection struct {
 	Name          string         `json:"name"`
 	Description   string         `json:"description,omitempty"`
 	Tags          []string       `json:"tags,omitempty"`
-	Project       string         `json:"project,omitempty"`
+	Projects      []string       `json:"projects,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
 	ConnectionURI string         `json:"connectionUri,omitempty"`
 	CreatedAt     string         `json:"createdAt,omitempty"`
@@ -89,14 +89,67 @@ type ConnectionCreateArgs struct {
 
 // ConnectionUpdateArgs are the optional inputs to UpdateConnection. Every
 // field is a pointer so the client can distinguish "caller didn't set this"
-// (nil) from "caller wants to clear this" (non-nil empty string). The PATCH
-// body contains ONLY the keys the caller populated.
+// (nil) from "caller wants to clear this" (non-nil empty string / empty
+// slice). The PATCH body contains ONLY the keys the caller populated.
 type ConnectionUpdateArgs struct {
 	Name          *string
 	ConnectionURI *string
 	Username      *string
 	Password      *string
 	Description   *string
+	Tags          *[]string
+	Projects      *[]string
+}
+
+// DbmsUpdateArgs are the optional inputs to UpdateDbms. Every field is a
+// pointer so the client can distinguish "caller didn't set this" (nil) from
+// "caller wants to clear this" (non-nil empty string / empty slice). The
+// PATCH body contains ONLY the keys the caller populated.
+type DbmsUpdateArgs struct {
+	Name        *string
+	Description *string
+	Tags        *[]string
+	Projects    *[]string
+}
+
+// Project mirrors one entry in the `GET /projects` response. `CreatedAt` is
+// an optional unix-milliseconds timestamp Desktop omits for legacy entries.
+type Project struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt int64  `json:"createdAt,omitempty"`
+}
+
+// ProjectsState is the full project catalog returned by every `/projects`
+// route — reads AND mutations (POST/PATCH/DELETE all respond with the
+// post-mutation state). `CurrentProject` names the project Desktop's UI has
+// selected; omitted when nothing is selected.
+type ProjectsState struct {
+	Projects       []Project `json:"projects"`
+	CurrentProject string    `json:"currentProject,omitempty"`
+}
+
+// Tag mirrors one entry in the `GET /tags` response. `Color` is optional and,
+// when present, is one of the string enum values "1".."12" (Desktop's palette
+// index, NOT a hex colour).
+type Tag struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color,omitempty"`
+}
+
+// TagFilter is the optional `filter` object on the tags state — the tag
+// selection Desktop's UI filters the DBMS list by.
+type TagFilter struct {
+	SelectedTagIds []string `json:"selectedTagIds"`
+}
+
+// TagsState is the full tag catalog returned by every `/tags` route — reads
+// AND mutations (POST/PATCH/DELETE all respond with the post-mutation
+// state).
+type TagsState struct {
+	Tags   []Tag      `json:"tags"`
+	Filter *TagFilter `json:"filter,omitempty"`
 }
 
 // DbmsPlugin is one entry from the relate `dbms-plugins` routes. `Version` is

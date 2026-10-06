@@ -5,48 +5,13 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/desktopclient"
-	"github.com/spf13/afero"
 )
-
-// newDesktopClientFn is the per-subtree test seam. Each leaf-subtree under `desktop`
-// keeps its own so a test pinning one can't accidentally override another's.
-var newDesktopClientFn = newDesktopClient
-
-func newDesktopClient(ctx context.Context, fs afero.Fs, port int) (*desktopclient.Client, error) {
-	// Discover runs first so its origin can be threaded into ResolveDataDir.
-	probe, err := desktopclient.Discover(ctx, port)
-	if err != nil {
-		if errors.Is(err, desktopclient.ErrNoDesktop) {
-			return nil, desktopclient.UnreachableError()
-		}
-		return nil, clierr.NewFatalError("desktop: probe failed: %s", err.Error())
-	}
-	dataDir, err := desktopclient.ResolveDataDir(ctx, fs, probe)
-	if err != nil {
-		return nil, clierr.NewFatalError("desktop: could not resolve relate data dir: %s", err.Error())
-	}
-	salt, err := desktopclient.LoadSalt(fs, dataDir)
-	if err != nil {
-		// Missing/unreadable salt = Desktop has not finished first-run auth setup.
-		// Route to the same canonical hint as a probe miss.
-		return nil, desktopclient.UnreachableError()
-	}
-	return desktopclient.NewClient(probe, salt)
-}
-
-// SetNewDesktopClientFnForTest overrides newDesktopClientFn for a test; returns a restore func.
-func SetNewDesktopClientFnForTest(fn func(context.Context, afero.Fs, int) (*desktopclient.Client, error)) func() {
-	prev := newDesktopClientFn
-	newDesktopClientFn = fn
-	return func() { newDesktopClientFn = prev }
-}
 
 // Mirrors the live Status strings Desktop reports — do NOT reintroduce
 // `online`/`offline` aliases. Duplicated here because importing the sibling

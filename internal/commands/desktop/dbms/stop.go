@@ -75,7 +75,7 @@ neo4j-cli desktop dbms stop my-dbms-id --wait --format json --rw`,
 			port, _ := cmd.Flags().GetInt(portFlag)
 			id := args[0]
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

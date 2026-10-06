@@ -17,7 +17,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/desktop"
-	"github.com/neo4j/cli/internal/commands/desktop/dbms"
 	"github.com/neo4j/cli/internal/desktopclient"
 	"github.com/neo4j/cli/internal/flags"
 	"github.com/neo4j/cli/internal/testutil/testfs"
@@ -57,7 +56,7 @@ func (h *listHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	h.t.Cleanup(desktopclient.SetNowFnForTest(func() time.Time { return time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC) }))
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
-	h.t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
@@ -172,7 +171,7 @@ func TestDbmsList_5xx_SurfacesError(t *testing.T) {
 func TestDbmsList_PortFlagPropagatesToClientConstructor(t *testing.T) {
 	h := newListHelper(t)
 	var seenPort int
-	t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
 		seenPort = port
 		return nil, errors.New("stop here; we already captured the port")
 	}))

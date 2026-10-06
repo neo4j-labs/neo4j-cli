@@ -6,7 +6,6 @@ package dbms
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -14,45 +13,8 @@ import (
 
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/desktopclient"
-	"github.com/spf13/afero"
 	"golang.org/x/sync/errgroup"
 )
-
-// newDesktopClient probes the port range, resolves the data dir, loads the
-// salt, and signs the JWT. A probe miss or missing/unreadable salt (Desktop
-// hasn't finished first-run auth setup) both surface as the canonical
-// "Desktop unreachable" hint.
-var newDesktopClientFn = newDesktopClient
-
-func newDesktopClient(ctx context.Context, fs afero.Fs, port int) (*desktopclient.Client, error) {
-	// Discover runs first so its origin can feed ResolveDataDir's /info/app
-	// discovery step.
-	probe, err := desktopclient.Discover(ctx, port)
-	if err != nil {
-		if errors.Is(err, desktopclient.ErrNoDesktop) {
-			return nil, desktopclient.UnreachableError()
-		}
-		return nil, clierr.NewFatalError("desktop: probe failed: %s", err.Error())
-	}
-	dataDir, err := desktopclient.ResolveDataDir(ctx, fs, probe)
-	if err != nil {
-		return nil, clierr.NewFatalError("desktop: could not resolve relate data dir: %s", err.Error())
-	}
-	salt, err := desktopclient.LoadSalt(fs, dataDir)
-	if err != nil {
-		// Missing/unreadable salt ⇒ Desktop hasn't finished first-run auth
-		// setup; route through the same "unreachable" hint as a probe miss.
-		return nil, desktopclient.UnreachableError()
-	}
-	return desktopclient.NewClient(probe, salt)
-}
-
-// SetNewDesktopClientFnForTest overrides the shared client constructor for tests.
-func SetNewDesktopClientFnForTest(fn func(context.Context, afero.Fs, int) (*desktopclient.Client, error)) func() {
-	prev := newDesktopClientFn
-	newDesktopClientFn = fn
-	return func() { newDesktopClientFn = prev }
-}
 
 type statusPoller interface {
 	GetDbms(ctx context.Context, id string) (*desktopclient.DbmsInfo, error)

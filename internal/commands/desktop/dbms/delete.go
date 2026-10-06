@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/confirm"
+	"github.com/neo4j/cli/internal/desktopclient"
 	"github.com/neo4j/cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +40,7 @@ neo4j-cli desktop dbms delete my-dbms-id --yes --force --format json --rw`,
 			port, _ := cmd.Flags().GetInt(portFlag)
 			id := args[0]
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

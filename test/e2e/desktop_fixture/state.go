@@ -133,11 +133,11 @@ type dbmsVersion struct {
 // The fixture round-trips every field; the production client only renders a
 // subset by default.
 type connection struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Description   string `json:"description,omitempty"`
-	Project       string `json:"project,omitempty"`
-	ConnectionURI string `json:"connectionUri"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description,omitempty"`
+	Projects      []string `json:"projects,omitempty"`
+	ConnectionURI string   `json:"connectionUri"`
 }
 
 // creds is the wire-shape returned by `GET /fastify/api/credentials/:key`.

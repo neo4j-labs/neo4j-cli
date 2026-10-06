@@ -66,7 +66,7 @@ func (h *loadHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	h.t.Cleanup(desktopclient.SetNowFnForTest(func() time.Time { return time.Date(2026, 6, 4, 12, 0, 0, 0, time.UTC) }))
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
-	h.t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
