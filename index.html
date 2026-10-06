@@ -1064,7 +1064,7 @@
 <section class="hero">
   <div class="container inner">
     <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill">
-      <span class="pill-tag" style="text-transform:none">v1.15.0</span>
+      <span class="pill-tag" style="text-transform:none">v1.16.0</span>
       <span>open source · neo4j-labs</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;opacity:0.6">
         <path d="M5 12h14M13 6l6 6-6 6"></path>
@@ -1124,7 +1124,7 @@
         </button>
       </div>
       <div class="cmd-hint">
-        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.15.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
+        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.16.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
       </div>
     </div>
   </div>
@@ -1494,7 +1494,7 @@
 <span class="comment"># pipe result to jq to filter and reshape</span>
 <span class="prompt">$</span> neo4j-cli query \
     <span class="string">'MATCH (p:Person) RETURN p.name AS name, p.born AS born ORDER BY p.born DESC LIMIT 3'</span> \
-    | jq <span class="string">'.rows[] | {name, born}'</span>
+    <span class="flag">--format</span> json | jq <span class="string">'.rows[] | {name, born}'</span>
 
 <span class="out">{<span class="string">"name"</span>: <span class="string">"Carol"</span>, <span class="string">"born"</span>: <span class="num">1992</span>}
 {<span class="string">"name"</span>: <span class="string">"Alice"</span>, <span class="string">"born"</span>: <span class="num">1990</span>}
@@ -2088,7 +2088,7 @@
 <footer>
   <div class="container inner">
     <div class="meta">
-      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.15.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
+      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.16.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
     </div>
     <div class="links">
       <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">GitHub</a>
@@ -2360,7 +2360,7 @@
     docker: 'neo4j-cli docker create --name dev --wait --rw',
     query: 'neo4j-cli query \'MATCH (d:Person)-[:DIRECTED]->(m:Movie) RETURN d.name AS director, count(m) AS movies, max(m.released) AS year ORDER BY movies DESC LIMIT 3\'',
     schema: 'neo4j-cli query :schema',
-    pipe: 'neo4j-cli query \'MATCH (p:Person) RETURN p.name AS name, p.born AS born ORDER BY p.born DESC LIMIT 3\' | jq \'.rows[] | {name, born}\'',
+    pipe: 'neo4j-cli query \'MATCH (p:Person) RETURN p.name AS name, p.born AS born ORDER BY p.born DESC LIMIT 3\' --format json | jq \'.rows[] | {name, born}\'',
     skill: 'neo4j-cli skill install --rw',
     embed: 'neo4j-cli query --param \'q:embed=sci-fi movies\' --param k=5 "CALL db.index.vector.queryNodes(\'plot_idx\', $k, $q) YIELD node, score RETURN node.title, score"',
     desktop: 'neo4j-cli desktop dbms create --name dev --wait --rw',
