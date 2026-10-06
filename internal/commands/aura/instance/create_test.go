@@ -80,7 +80,7 @@ func TestCreateFreeInstance(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","type":"free"}`)
 
 	helper.AssertErr("")
 	// For free with a non-"neo4j" username, the database name stored in credentials is the username.
@@ -126,7 +126,7 @@ func TestCreateProfessionalInstance(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","type":"professional","vector_optimized":false}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -170,7 +170,7 @@ func TestCreateProfessionalInstanceVectorOptimizedGraphAnalyticsPlugin(t *testin
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":true,"graph_analytics":"plugin"}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","type":"professional","vector_optimized":true,"graph_analytics":"plugin"}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -286,21 +286,21 @@ func TestCreateAcceptsLegacyInstanceTypeAliases(t *testing.T) {
 			name:             "free-db is sent as free",
 			legacyType:       "free-db",
 			canonicalType:    "free",
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","type":"free"}`,
 		},
 		{
 			name:             "professional-db is sent as professional",
 			legacyType:       "professional-db",
 			canonicalType:    "professional",
 			extraFlags:       " --region europe-west1 --cloud-provider gcp --memory 4GB",
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"professional","version":"5","vector_optimized":false}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"4GB","name":"Instance01","region":"europe-west1","type":"professional","vector_optimized":false}`,
 		},
 		{
 			name:             "enterprise-db is sent as virtual-dedicated-cloud",
 			legacyType:       "enterprise-db",
 			canonicalType:    "virtual-dedicated-cloud",
 			extraFlags:       " --region europe-west1 --cloud-provider gcp --memory 16GB",
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"16GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"virtual-dedicated-cloud","version":"5","vector_optimized":false}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"16GB","name":"Instance01","region":"europe-west1","type":"virtual-dedicated-cloud","vector_optimized":false}`,
 		},
 	}
 
@@ -343,20 +343,6 @@ func TestCreateRejectsRetiredDataScienceInstanceTypes(t *testing.T) {
 `)
 		})
 	}
-}
-
-func TestCreateProfessionalInstanceInvalidVersion(t *testing.T) {
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	mockHandler := helper.NewRequestHandlerMock(createInstancesPath, http.StatusOK, "")
-
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional --memory 1GB --cloud-provider gcp --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --version 6 --rw")
-
-	mockHandler.AssertCalledTimes(0)
-
-	helper.AssertErr(`Error: invalid argument "6" for "--version" flag: must be one of "4" or "5"
-`)
 }
 
 func TestCreateFreeInstanceWithMemory(t *testing.T) {
@@ -496,7 +482,7 @@ func TestInstanceWithCmkId(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"16GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"virtual-dedicated-cloud","version":"5","customer_managed_key_id":"UUID_OF_YOUR_KEY","vector_optimized":false}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"16GB","name":"Instance01","region":"europe-west1","type":"virtual-dedicated-cloud","customer_managed_key_id":"UUID_OF_YOUR_KEY","vector_optimized":false}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -540,7 +526,7 @@ func TestCreateFreeInstanceWithDefaultWorkspace(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`)
+	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","type":"free"}`)
 
 	helper.AssertOutJson(`{
 	  "data": {
@@ -594,7 +580,7 @@ func TestCreateFreeInstanceWithWait(t *testing.T) {
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)
-	createMock.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`)
+	createMock.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","type":"free"}`)
 
 	getMock.AssertCalledTimes(2)
 	getMock.AssertCalledWithMethod(http.MethodGet)
@@ -1120,7 +1106,7 @@ func TestCreateDefaultNameGeneration(t *testing.T) {
 				"data": []
 			}`,
 			listCalledTimes:  1,
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","type":"free"}`,
 		},
 		{
 			name:    "Instance01 already exists generates Instance02",
@@ -1131,14 +1117,14 @@ func TestCreateDefaultNameGeneration(t *testing.T) {
 				]
 			}`,
 			listCalledTimes:  1,
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance02","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance02","region":"europe-west1","type":"free"}`,
 		},
 		{
 			name:             "explicit --name skips the list GET call",
 			command:          "instance create --name MyInstance --type free --organization-id " + testCreateOrgID + " --project-id " + testCreateProjectID + " --no-credential-storage --rw",
 			listResponseBody: `{"data": []}`,
 			listCalledTimes:  0,
-			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"MyInstance","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free","version":"5"}`,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"MyInstance","region":"europe-west1","type":"free"}`,
 		},
 	}
 

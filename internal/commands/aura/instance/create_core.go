@@ -23,7 +23,6 @@ type instanceFlags struct {
 	memory              flags.Memory
 	region              string
 	cloudProvider       flags.CloudProvider
-	version             string
 	credentialName      string
 	credentialNameSet   bool
 	noCredentialStorage bool
@@ -31,7 +30,7 @@ type instanceFlags struct {
 
 // validateInstanceFlags is the shared PreRunE body for the create and deploy
 // leaves: it marks the sizing flags required for non-free instances (rejecting
-// them for free), validates the version, and enforces the credential-flag
+// them for free), and enforces the credential-flag
 // rules. Callers layer their own leaf-specific checks around it (create adds
 // the --graph-analytics-plugin rule, deploy adds the --database system reject).
 func validateInstanceFlags(cmd *cobra.Command, cfg *clicfg.Config, f instanceFlags) error {
@@ -49,10 +48,6 @@ func validateInstanceFlags(cmd *cobra.Command, cfg *clicfg.Config, f instanceFla
 		if f.cloudProvider != "" {
 			return fmt.Errorf(`invalid argument "%s" for "--cloud-provider" flag: must not be set when "--type" flag is set to "free"`, f.cloudProvider)
 		}
-	}
-
-	if f.version != "4" && f.version != "5" {
-		return fmt.Errorf(`invalid argument "%s" for "--version" flag: must be one of "4" or "5"`, f.version)
 	}
 
 	if f.credentialNameSet && f.noCredentialStorage {
@@ -101,7 +96,6 @@ func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[s
 // service's create spec. The "type" value is the canonical v2beta1 tier name:
 // flags.InstanceType.Set has already normalised any legacy v1 alias.
 func newInstanceCreate(
-	version string,
 	region string,
 	name string,
 	_type flags.InstanceType,
@@ -113,7 +107,6 @@ func newInstanceCreate(
 ) auraclient.InstanceCreate {
 	return auraclient.InstanceCreate{
 		Name:                 name,
-		Version:              version,
 		Region:               region,
 		Type:                 string(_type),
 		CloudProvider:        string(cloudProvider),

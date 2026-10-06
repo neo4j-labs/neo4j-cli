@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: '`aura instance create` and `aura instance deploy` no longer accept the `--version` flag'
+time: 2026-10-06T15:02:08.363811+02:00
