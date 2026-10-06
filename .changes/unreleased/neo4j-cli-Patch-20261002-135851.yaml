@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'A corrupt or unreadable `config.json` now produces a clear error naming the file (exit 1) instead of a crash.'
-time: 2026-10-02T13:58:51+01:00

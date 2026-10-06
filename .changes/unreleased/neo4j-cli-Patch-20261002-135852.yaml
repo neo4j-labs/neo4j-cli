@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: '`docker create` no longer leaves a running container whose password is lost. A missing credential store, or a reserved or already-stored credential name (for example `desktop`), now fails before the container is created. If storing the credential fails after the container starts, the password is still shown with a warning; with `--no-print-password` and a generated password the container is removed and the command fails. `docker load` and `aura instance load` apply the same checks.'
-time: 2026-10-02T13:58:52+01:00

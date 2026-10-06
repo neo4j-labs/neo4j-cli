@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'An unexpected internal crash now exits with status 1 (it previously exited 0, so a failed command could look successful) and prints its diagnostic to stderr instead of stdout.'
-time: 2026-10-02T13:58:50+01:00
