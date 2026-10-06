@@ -4,6 +4,7 @@
 package desktopclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -65,10 +66,25 @@ func (c *Client) DeleteProject(ctx context.Context, id string) (*ProjectsState, 
 	return decodeState[ProjectsState](body, "deleted project state")
 }
 
+// User-visible message when a Desktop version predating the projects/tags
+// routes answers them with the SPA fallback (HTTP 200 + index.html).
+const errCatalogUnsupported = "This version of Neo4j Desktop 2 does not support projects and tags. Upgrade Neo4j Desktop 2 to the latest version and try again."
+
 // decodeState is the shared JSON decoder for the full-catalog-state bodies
 // that every /projects and /tags route responds with. `what` names the
 // decoded payload for the error message (e.g. "created project state").
+//
+// Desktop versions predating the projects/tags routes answer unknown
+// /fastify/api/* routes with the SPA fallback: HTTP 200 with the index.html
+// body. A 2xx body whose trimmed form starts with '<' is therefore treated
+// as "this Desktop is too old" and gets the friendly upgrade message instead
+// of a raw JSON decode error. Undecodable bodies that do NOT look like
+// markup keep the detailed decode error — they indicate a genuine protocol
+// break worth reporting, not a missing route.
 func decodeState[T any](body []byte, what string) (*T, error) {
+	if bytes.HasPrefix(bytes.TrimSpace(body), []byte("<")) {
+		return nil, clierr.NewFatalError("%s", errCatalogUnsupported)
+	}
 	var out T
 	if err := json.Unmarshal(body, &out); err != nil {
 		return nil, clierr.NewFatalError("desktop: failed to decode %s: %s", what, err.Error())

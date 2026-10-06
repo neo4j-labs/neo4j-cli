@@ -572,3 +572,118 @@ func TestNonEmptyStrings(t *testing.T) {
 		})
 	}
 }
+
+// TestClient_ProjectTagEndpoints_UnsupportedDesktopVersion covers Desktop
+// versions predating the projects/tags routes: they answer unknown
+// /fastify/api/* routes with the SPA fallback (HTTP 200, text/html,
+// index.html body). Every catalog method — and the name→ID resolvers, which
+// fetch the catalog before any PATCH — must surface the friendly upgrade
+// message, never a raw decode error or leaked HTML.
+func TestClient_ProjectTagEndpoints_UnsupportedDesktopVersion(t *testing.T) {
+	const salt, clientID = "salt", "cid"
+	pinClientSeams(t, clientID, time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC))
+
+	const spaFallback = "<!DOCTYPE html>\n<html><head><title>Neo4j Desktop</title></head><body><div id=\"root\"></div></body></html>"
+
+	cases := []struct {
+		name string
+		call func(cl *Client) error
+	}{
+		{name: "ListProjects", call: func(cl *Client) error { _, err := cl.ListProjects(context.Background()); return err }},
+		{name: "CreateProject", call: func(cl *Client) error { _, err := cl.CreateProject(context.Background(), "P"); return err }},
+		{name: "UpdateProject", call: func(cl *Client) error { _, err := cl.UpdateProject(context.Background(), "p1", "P"); return err }},
+		{name: "DeleteProject", call: func(cl *Client) error { _, err := cl.DeleteProject(context.Background(), "p1"); return err }},
+		{name: "ListTags", call: func(cl *Client) error { _, err := cl.ListTags(context.Background()); return err }},
+		{name: "CreateTag", call: func(cl *Client) error { _, err := cl.CreateTag(context.Background(), "T", ""); return err }},
+		{name: "UpdateTag", call: func(cl *Client) error { _, err := cl.UpdateTag(context.Background(), "t1", "T", ""); return err }},
+		{name: "DeleteTag", call: func(cl *Client) error { _, err := cl.DeleteTag(context.Background(), "t1"); return err }},
+		{
+			name: "ResolveProjectIDs inherits the error",
+			call: func(cl *Client) error {
+				_, err := cl.ResolveProjectIDs(context.Background(), []string{"Prod"})
+				return err
+			},
+		},
+		{
+			name: "ResolveTagIDs inherits the error",
+			call: func(cl *Client) error { _, err := cl.ResolveTagIDs(context.Background(), []string{"Prod"}); return err },
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, probe := newAuthedServer(t, salt, clientID, func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				_, _ = w.Write([]byte(spaFallback))
+			})
+			_ = srv
+
+			cl, err := NewClient(probe, salt)
+			if err != nil {
+				t.Fatalf("NewClient: %v", err)
+			}
+			err = tc.call(cl)
+			if err == nil {
+				t.Fatalf("expected unsupported-version error, got nil")
+			}
+			var ce *clierr.CLIError
+			if !errors.As(err, &ce) || ce.Code != 1 {
+				t.Fatalf("error = %v (%T), want clierr fatal error (exit 1)", err, err)
+			}
+			if !strings.Contains(ce.Message, "does not support projects and tags") ||
+				!strings.Contains(ce.Message, "Upgrade Neo4j Desktop 2 to the latest version") {
+				t.Fatalf("message = %q, want friendly upgrade message", ce.Message)
+			}
+			if strings.Contains(ce.Message, "<") {
+				t.Fatalf("message must not leak response HTML, got %q", ce.Message)
+			}
+			if strings.Contains(ce.Message, "invalid character") {
+				t.Fatalf("message must not leak the raw decode error, got %q", ce.Message)
+			}
+		})
+	}
+}
+
+// TestClient_ProjectTagEndpoints_CorruptJSONKeepsDecodeError pins the decode
+// policy: only bodies that look like markup (trimmed body starts with '<')
+// get the friendly upgrade message; other undecodable bodies keep the
+// detailed decode error, since they indicate a genuine protocol break worth
+// reporting rather than a missing route.
+func TestClient_ProjectTagEndpoints_CorruptJSONKeepsDecodeError(t *testing.T) {
+	const salt, clientID = "salt", "cid"
+	pinClientSeams(t, clientID, time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC))
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "truncated JSON", body: `{"projects": [`},
+		{name: "plain text", body: `not json at all`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, probe := newAuthedServer(t, salt, clientID, func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(tc.body))
+			})
+			_ = srv
+
+			cl, err := NewClient(probe, salt)
+			if err != nil {
+				t.Fatalf("NewClient: %v", err)
+			}
+			_, err = cl.ListProjects(context.Background())
+			if err == nil {
+				t.Fatalf("expected decode error, got nil")
+			}
+			var ce *clierr.CLIError
+			if !errors.As(err, &ce) || ce.Code != 1 {
+				t.Fatalf("error = %v (%T), want clierr fatal error (exit 1)", err, err)
+			}
+			if !strings.Contains(ce.Message, "desktop: failed to decode project list") {
+				t.Fatalf("message = %q, want the detailed decode error", ce.Message)
+			}
+			if strings.Contains(ce.Message, "does not support projects and tags") {
+				t.Fatalf("non-markup body must not get the upgrade message, got %q", ce.Message)
+			}
+		})
+	}
+}
