@@ -1,0 +1,51 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package graphql
+
+import (
+	"github.com/neo4j/cli/internal/auraclient"
+
+	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/output"
+	"github.com/neo4j/cli/internal/commands/aura/utils"
+	"github.com/spf13/cobra"
+)
+
+func NewListCmd(cfg *clicfg.Config) *cobra.Command {
+	var instanceId string
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "Returns a list of GraphQL Data APIs",
+		Example: `# List GraphQL Data APIs of an instance (using flags)
+neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List GraphQL Data APIs using a configured default workspace
+neo4j-cli aura graphql list --instance-id 00000000
+
+# List GraphQL Data APIs as JSON for scripting
+neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			if _, err := utils.ResolveAndVerifyInstance(cmd, cfg, instanceId); err != nil {
+				return err
+			}
+			apis, err := auraclient.New(cfg).GraphQL().List(cmd.Context(), instanceId)
+			if err != nil {
+				return err
+			}
+			rows := make([]map[string]any, len(apis))
+			for i, a := range apis {
+				rows[i] = a.Record
+			}
+			output.PrintRecords(cmd, cfg, rows, []string{"id", "name", "status", "url"})
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to list the GraphQL Data APIs of")
+	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+
+	return cmd
+}

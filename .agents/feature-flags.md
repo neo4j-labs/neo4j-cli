@@ -6,7 +6,7 @@ How we name, gate, test, and retire experimental behaviour in `neo4j-cli`; imple
 
 - Prefix `flag.`, then `<area>-<feature>` (lowercase kebab). One area token, one feature token.
 - Examples: `flag.docker-command`, `flag.secrets-os-keystore`.
-- Runtime source of truth: the `Registry` map in `common/clicfg/flags.go`. This doc is the narrative reference.
+- Runtime source of truth: the `Registry` map in `internal/clicfg/flags.go`. This doc is the narrative reference.
 
 ## Defaults & lifecycle
 
@@ -28,7 +28,7 @@ Explicit: no `--flag` CLI option. CI / one-shot use is covered by the env var at
 
 - Every flag ships with tests for BOTH states while it lives.
 - CI runs the flag-on path explicitly (test build step or env var) until the flag is removed.
-- Aura-side tests toggle flags by writing the dotted key (e.g. `flag.aura-beta`) into the helper config JSON via `helper.SetConfigValue` in `neo4j-cli/aura/internal/test/testutils/auratesthelper.go`; the registry's viper binding picks it up — no Go-side bridge.
+- Aura-side tests toggle flags by writing the dotted key (e.g. `flag.aura-beta`) into the helper config JSON via `helper.SetConfigValue` in `internal/commands/aura/testutils/auratesthelper.go`; the registry's viper binding picks it up — no Go-side bridge.
 
 ## Unknown / removed keys
 
@@ -38,7 +38,7 @@ Explicit: no `--flag` CLI option. CI / one-shot use is covered by the env var at
 
 ## Migrating aura.beta-enabled
 
-- Migration completed in CLI-136; flag retired in CLI-154. Both `flag.aura-beta` and legacy `aura.beta-enabled` are stripped from user configs by config-migration v1 (`common/configmigrate/migrations.go:32`).
+- Migration completed in CLI-136; flag retired in CLI-154. Both `flag.aura-beta` and legacy `aura.beta-enabled` are stripped from user configs by config-migration v1 (`internal/configmigrate/migrations.go:32`).
 
 ## See also
 

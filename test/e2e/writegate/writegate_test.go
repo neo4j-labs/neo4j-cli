@@ -6,7 +6,7 @@
 // end-to-end.
 //
 // Today the gate is unit-tested through the detectAgent / stdoutIsTerminal
-// seams in common/flags. This package closes the remaining gap by exercising
+// seams in internal/flags. This package closes the remaining gap by exercising
 // the production wiring with real env vars + a real (non-TTY) stdout, so a
 // future drift between agent.Detect() and the gate or a typo in the agent
 // env-var list would surface in CI.
@@ -14,7 +14,7 @@
 // Scope: the regression-dangerous paths (gate blocks an agent or a piped
 // script). The TTY-success path is intentionally out of scope because
 // synthesising a PTY in pure Go test requires a new dependency
-// (creack/pty); the unit-level gate-matrix test in common/flags already
+// (creack/pty); the unit-level gate-matrix test in internal/flags already
 // covers stdoutIsTerminal == true.
 package writegate_test
 
@@ -29,12 +29,12 @@ import (
 	"testing"
 )
 
-// agentEnvVars enumerates every env var that common/agent inspects. The
+// agentEnvVars enumerates every env var that internal/agent inspects. The
 // child process needs all of them stripped to reproduce the "no agent, no
 // TTY" branch reliably — leaking even one (e.g. a dev shell with
 // CLAUDECODE=1) flips the gate to "agent detected" and the piped_blocks
 // assertion would still pass but for the wrong reason. Keep this list in
-// sync with common/agent/agent.go.
+// sync with internal/agent/agent.go.
 var agentEnvVars = []string{
 	"CLAUDECODE",
 	"CLAUDE_CODE",
@@ -115,7 +115,7 @@ func runMain(m *testing.M) (int, error) {
 	}
 	out := filepath.Join(dir, name)
 
-	cmd := exec.Command("go", "build", "-o", out, "./neo4j-cli")
+	cmd := exec.Command("go", "build", "-o", out, "./cmd/neo4j-cli")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if combined, buildErr := cmd.CombinedOutput(); buildErr != nil {
@@ -131,7 +131,7 @@ func runMain(m *testing.M) (int, error) {
 // test/e2e/exitcodes; see the comment there for the per-OS rationale.
 //
 // IMPORTANT: on darwin the binary uses os/user.Current() (via
-// common/clicfg/darwin.go) which reads from the passwd database rather
+// internal/clicfg/darwin.go) which reads from the passwd database rather
 // than $HOME. Setting HOME has NO EFFECT on the resolved ConfigPrefix.
 // Callers that require true write-isolation on darwin must skip the
 // subtest (see redirectsConfigDir).
@@ -170,7 +170,7 @@ func configDirFor(dir string) string {
 // redirectsConfigDir reports whether the running platform honours an
 // env-var-only redirect of clicfg.ConfigPrefix. Returns false on darwin
 // where os/user.Current() resolves homedir via the passwd database and
-// silently ignores $HOME — there is no env-var seam in common/clicfg to
+// silently ignores $HOME — there is no env-var seam in internal/clicfg to
 // route around it, so the agent_with_rw_succeeds subtest cannot run in
 // isolation without mutating the dev's real credentials.json.
 func redirectsConfigDir() bool {

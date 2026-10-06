@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: '`docker create` gains `--plugin` (repeatable, or comma-separated) to install Neo4j plugins such as `apoc` or `graph-data-science` in the new container via `NEO4J_PLUGINS`; the command''s result lists them. Plugin names are lower-case letters, digits and hyphens, and a name the image does not know shows up in `docker logs <name>` when the container starts.'
+time: 2026-10-02T13:58:47+01:00

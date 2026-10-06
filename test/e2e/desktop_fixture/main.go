@@ -6,7 +6,7 @@
 // localhost port so CI runners can exercise `bin/neo4j-cli desktop ...` and
 // `query -c desktop[-connection:<uuid>]` end-to-end without installing the
 // real Desktop app. The neo4j-cli binary under test is built with the
-// `-tags e2e_desktop_seams` build (see neo4j-cli/internal/desktopclient/
+// `-tags e2e_desktop_seams` build (see internal/desktopclient/
 // seams_e2e.go in task-013) so the port probe, salt loader, data-dir lookup,
 // and HTTP-origin lookup are all redirected to the fixture URL + a fixed
 // test salt instead of the real Desktop discovery paths.

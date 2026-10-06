@@ -4,7 +4,7 @@
 // Command release_fixture is the CI-only fixture server for the tier-1 e2e
 // test of `neo4j-cli update check`. It impersonates the GitHub releases API
 // against a single localhost port, driven by the e2e_seams build of
-// neo4j-cli (see neo4j-cli/internal/subcommands/update/seams_e2e.go).
+// neo4j-cli (see internal/commands/update/seams_e2e.go).
 //
 // Layout: pure stdlib, no module deps. Two canned release lists are embedded
 // at compile time from testdata/ and selected via --scenario. Unlike its

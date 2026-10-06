@@ -1,0 +1,26 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package query
+
+import (
+	"os"
+	"testing"
+
+	commonoutput "github.com/neo4j/cli/internal/output"
+)
+
+// TestMain seeds the package-level internal/output.StdoutIsTerminal seam to
+// return true for the entire query test suite. Production ResolveOutput
+// auto-detects: TTY → table, non-TTY → JSON. Existing renderRows /
+// renderSchema tests assert on table output without ever attaching a real
+// *os.File, so without this seed the new auto-detect default would flip them
+// to JSON and break unrelated assertions. Individual tests that want to
+// exercise the non-TTY branch override the seam locally via withStdoutIsTerminal.
+// IsAgent is seeded false because the dev/CI-under-Claude env sets CLAUDECODE,
+// which agent.Detect() reads — left true it would flip defaults to toon.
+func TestMain(m *testing.M) {
+	commonoutput.StdoutIsTerminal = func() bool { return true }
+	commonoutput.IsAgent = func() bool { return false }
+	os.Exit(m.Run())
+}

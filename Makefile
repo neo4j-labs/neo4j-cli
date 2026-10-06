@@ -8,7 +8,7 @@ build: build-neo4j
 
 ## build-neo4j: build the neo4j-cli binary into bin/
 build-neo4j:
-	go build -o bin/neo4j-cli ./neo4j-cli
+	go build -o bin/neo4j-cli ./cmd/neo4j-cli
 
 ## snapshot: release build for current platform only (uses goreleaser, outputs to bin/)
 snapshot:
@@ -46,7 +46,7 @@ license-check:
 
 ## run-neo4j: run the neo4j-cli without building
 run-neo4j:
-	go run ./neo4j-cli
+	go run ./cmd/neo4j-cli
 
 ## clean: remove the bin/ directory
 clean:

@@ -5,7 +5,7 @@
 ## What's reflected vs hand-coded
 
 - Adding a new command/flag automatically surfaces in the next `agent-context` invocation. No regen step, no `make generate-check` involvement for the JSON itself. (Skill-bundle `references/<cmd>.md` still needs `go generate` per the existing rules.)
-- Hand-coded constants live in `neo4j-cli/internal/subcommands/agentcontext/build.go`: `schemaVersion`, `exitCodes`, `errorCodes`, `asyncFlag`. Update these when adding a new error category, exit code, or async-flag convention.
+- Hand-coded constants live in `internal/commands/agentcontext/build.go`: `schemaVersion`, `exitCodes`, `errorCodes`, `asyncFlag`. Update these when adding a new error category, exit code, or async-flag convention.
 - `output_formats` is sourced from `clicfg.ValidFormatValues` — do NOT duplicate the list in agent-context.
 
 ## Schema versioning

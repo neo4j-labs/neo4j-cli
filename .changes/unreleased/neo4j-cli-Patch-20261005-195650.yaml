@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: '`aura graph-analytics session list` now returns all pages of sessions instead of only the first server-defaulted page, so sessions beyond that first page are no longer missing from the output.'
+time: 2026-10-05T19:56:50.982923+02:00

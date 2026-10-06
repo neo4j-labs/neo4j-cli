@@ -92,7 +92,7 @@ func runMain(m *testing.M) (int, error) {
 	binPath = filepath.Join(dir, cliName)
 	fixtureBin = filepath.Join(dir, fixName)
 
-	build := exec.Command("go", "build", "-tags", "e2e_desktop_seams", "-o", binPath, "./neo4j-cli")
+	build := exec.Command("go", "build", "-tags", "e2e_desktop_seams", "-o", binPath, "./cmd/neo4j-cli")
 	build.Dir = root
 	build.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if combined, buildErr := build.CombinedOutput(); buildErr != nil {
@@ -1211,7 +1211,7 @@ func TestPluginList_Empty(t *testing.T) {
 		t.Fatalf("expected empty JSON array; got %q", stdout)
 	}
 
-	// Default format under non-TTY is JSON (see common/output.ResolveOutput);
+	// Default format under non-TTY is JSON (see internal/output.ResolveOutput);
 	// pass `--format table` explicitly to assert the empty-table render with
 	// the column header + `(none)` placeholder. CI runs the e2e suite under
 	// non-TTY, so we must opt INTO table mode to exercise the placeholder.

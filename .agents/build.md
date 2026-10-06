@@ -14,14 +14,14 @@ All targets are `.PHONY`. Run `make <target>`:
 
 | Target | Description |
 |--------|-------------|
-| `build` | Build `bin/neo4j-cli` from `./neo4j-cli` |
-| `build-neo4j` | Same as `build` — build `bin/neo4j-cli` from `./neo4j-cli` |
+| `build` | Build `bin/neo4j-cli` from `./cmd/neo4j-cli` |
+| `build-neo4j` | Same as `build` — build `bin/neo4j-cli` from `./cmd/neo4j-cli` |
 | `snapshot` | Release build for current platform with ldflags baked in; copies to `bin/` |
 | `test` | Run `go test ./...` |
 | `lint` | Run `golangci-lint run ./...` |
 | `fmt` | Run `go fmt ./...` |
 | `license-check` | Verify all `.go` files carry the Neo4j copyright header (**Unix-only**) |
-| `run-neo4j` | Run `neo4j-cli` without building (`go run ./neo4j-cli`) |
+| `run-neo4j` | Run `neo4j-cli` without building (`go run ./cmd/neo4j-cli`) |
 | `clean` | Remove `bin/` and `dist/` directories |
 | `changelog` | Create a changie entry — interactive prompt for kind |
 

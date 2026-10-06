@@ -87,7 +87,7 @@ func buildBinary(t *testing.T) string {
 	}
 	out := filepath.Join(dir, name)
 
-	cmd := exec.Command("go", "build", "-o", out, "./neo4j-cli")
+	cmd := exec.Command("go", "build", "-o", out, "./cmd/neo4j-cli")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if combined, err := cmd.CombinedOutput(); err != nil {

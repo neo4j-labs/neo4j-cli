@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: '`docker delete` can now remove the data volume that a `docker load` container leaves behind (`neo4j-cli-<name>-data`, which holds the loaded database): pass `--remove-volume`, or answer the new prompt on a terminal (default no). With `--yes --force` and no `--remove-volume` the volume is kept and the command to remove it later is printed. Only the volume the CLI created for that container is ever removed.'
+time: 2026-10-02T14:58:31+01:00

@@ -5,7 +5,7 @@
 // test of `neo4j-cli update`. It impersonates the GitHub releases API and
 // the GoReleaser archive-download URLs against a single localhost port,
 // driven by the e2e_seams build of neo4j-cli (see
-// neo4j-cli/internal/subcommands/update/seams_e2e.go).
+// internal/commands/update/seams_e2e.go).
 //
 // Layout: pure stdlib + golang.org/x/mod/semver, no new module deps. The
 // fake binary inside each archive is compiled on the fly (via `go build`)

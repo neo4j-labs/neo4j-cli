@@ -10,6 +10,47 @@ linters:
     - errcheck
     - staticcheck
     - unused
+    - depguard
+    - forbidigo
+
+  settings:
+    forbidigo:
+      forbid:
+        # log.Fatal exits the process directly, skipping clierr.Render, panic
+        # recovery, event flushing and secret redaction. Return an error instead
+        # (or //nolint:errcheck for MarkFlagRequired, which cannot fail for a
+        # flag that exists).
+        - pattern: '^log\.(Fatal|Fatalf|Fatalln)$'
+          msg: return an error instead of log.Fatal so the error pipeline (render, flush, redaction) runs
+    depguard:
+      rules:
+        # Layering: service/domain packages (aura api, dbconn, clicfg, ...) must
+        # not depend on the cobra surface. Only internal/commands/** and
+        # internal/cli (the root builder) may import command packages. (The
+        # reverse, commands importing internal/cli, is already a compile-time
+        # import cycle.)
+        services-not-commands:
+          list-mode: lax
+          files:
+            - "**/internal/**"
+            - "!**/internal/commands/**"
+            - "!**/internal/cli/**"
+            - "!**/internal/skill/neo4jcli/gen/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/neo4j/cli/internal/commands
+              desc: service packages must not import command packages
+        # Command trees stay independent: shared logic goes in a service package.
+        aura-commands-not-siblings:
+          list-mode: lax
+          files:
+            - "**/internal/commands/aura/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/neo4j/cli/internal/commands/docker
+              desc: extract shared engine code instead of importing a sibling command tree
+            - pkg: github.com/neo4j/cli/internal/commands/query
+              desc: extract shared code instead of importing a sibling command tree
 
 formatters:
   enable:

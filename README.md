@@ -182,7 +182,7 @@ Aura Agent — LLM-backed assistants bound to a database. Manage them from the t
 
 Seven leaves: `list`, `get`, `create`, `update`, `replace`, `delete`, `invoke`. `--organization-id`/`--project-id` honour the default workspace from [`workspace use`](#setting-a-default-workspace).
 
-`--tools` accepts a JSON array of tool objects shaped `{type, name, description, config}` — the `type` discriminator is **camelCase**: `text2cypher`, `cypherTemplate`, `similaritySearch`. Full per-type JSON shapes (including `post_processing_cypher` for `similaritySearch`) live in [`neo4j-cli/internal/skill/additions.md`](neo4j-cli/internal/skill/additions.md) and the [Aura v2beta1 spec](https://neo4j.com/docs/aura/platform/api/specification/?urls.primaryName=Aura%20v2beta1#/agents).
+`--tools` accepts a JSON array of tool objects shaped `{type, name, description, config}` — the `type` discriminator is **camelCase**: `text2cypher`, `cypherTemplate`, `similaritySearch`. Full per-type JSON shapes (including `post_processing_cypher` for `similaritySearch`) live in [`internal/skill/neo4jcli/additions.md`](internal/skill/neo4jcli/additions.md) and the [Aura v2beta1 spec](https://neo4j.com/docs/aura/platform/api/specification/?urls.primaryName=Aura%20v2beta1#/agents).
 
 ```bash
 # List agents in the current workspace

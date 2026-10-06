@@ -5,33 +5,24 @@
 The CLI is built as a tree of Cobra commands, one file per leaf command. Directory structure mirrors the command hierarchy.
 
 ```
-neo4j-cli/
-  aura/
-    cmd/main.go              # Binary entrypoint
-    aura.go                  # Root cobra command, registers top-level subcommands
-    internal/
-      api/                   # HTTP client wrapping the Neo4j Aura REST API
+cmd/neo4j-cli/main.go        # Binary entrypoint (calls cli.Run)
+internal/
+  cli/                       # Root cobra command + hooks (NewCmd, Version)
+  commands/                  # Cobra surface: one directory per resource, one file per action
+    aura/                    # `neo4j-cli aura` root (aura.go) and its resources
+      instance/
+        list.go
+        get.go
+        create.go
+        ...
+        snapshot/
+      project/ organization/ agent/ graphql/ graphanalytics/ customermanagedkey/ ...
       flags/                 # Reusable custom flag types (memory, cloud provider, etc.)
-      output/                # JSON and table output rendering
-      subcommands/           # One directory per resource, one file per action
-        instance/
-          list.go
-          get.go
-          create.go
-          ...
-          snapshot/
-            list.go
-            ...
-        credential/
-        tenant/
-        config/
-        deployment/
-        dataapi/graphql/
-        graphanalytics/
-        import/
-        customermanagedkey/
-      test/testutils/        # Shared test helpers
-common/
+      output/                # Aura record printing (PrintRecord / PrintRecords)
+      testutils/             # Shared aura test helpers
+    docker/ desktop/ admin/ query/ ...
+  auraclient/                # Aura service layer: auraclient.New(cfg).Instances()/Agents()/...
+    transport/               # HTTP client wrapping the Neo4j Aura REST API (SDK swap point)
   clicfg/                    # Config struct, credential and project management
   clierr/                    # Shared error types
 ```
@@ -52,11 +43,11 @@ common/
 - Active credential
 - Project-level configuration
 
-Config file location is OS-specific (handled by `common/clicfg/darwin.go`, `linux.go`, `windows.go`).
+Config file location is OS-specific (handled by `internal/clicfg/darwin.go`, `linux.go`, `windows.go`).
 
 ## toon-go Notes
 
 - Module: `github.com/toon-format/toon-go` — imported as `toon "github.com/toon-format/toon-go"` in Go source
 - Key API: `toon.Marshal(v any, opts ...toon.EncoderOption) ([]byte, error)` and `toon.WithLengthMarkers(bool) toon.EncoderOption`
-- `printToon` in `common/output/output.go` uses a JSON round-trip (marshal → unmarshal to `any` → toon.Marshal) to honour custom MarshalJSON implementations on concrete ResponseData types before encoding to TOON
+- `printToon` in `internal/output/output.go` uses a JSON round-trip (marshal → unmarshal to `any` → toon.Marshal) to honour custom MarshalJSON implementations on concrete ResponseData types before encoding to TOON
 - `go mod tidy` promotes toon-go from `// indirect` to a direct dependency automatically once the import is added

@@ -1,0 +1,261 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package mcp
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+
+	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/commands/mcp/server"
+	commonoutput "github.com/neo4j/cli/internal/output"
+	"github.com/neo4j/cli/internal/skill"
+	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
+)
+
+// installResult is the JSON shape emitted by mcp install and mcp remove.
+type installResult struct {
+	Agent       string `json:"agent"`
+	DisplayName string `json:"display_name"`
+	Method      string `json:"method"`
+}
+
+// openFileFn is a test seam for the bundle open operation.
+var openFileFn = openFile
+
+func (r installResult) asArrayRow() map[string]any {
+	return map[string]any{
+		"agent":        r.Agent,
+		"display_name": r.DisplayName,
+		"method":       r.Method,
+	}
+}
+
+func newInstallCmd(cfg *clicfg.Config) *cobra.Command {
+	var (
+		agentFilter string
+		installAll  bool
+		useBundle   bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "install",
+		Short: "Install neo4j-cli as an MCP server",
+		Long: "Installs neo4j-cli as an MCP server into supported agents. " +
+			"Two install methods are available.\n\n" +
+			"Config mode (default) writes mcpServers.\"neo4j-cli\" into the agent's " +
+			"config file. The env block controlling server capabilities is part of " +
+			"the entry and can be hand-edited later.\n\n" +
+			"Bundle mode (--bundle) generates a .mcpb file and opens it into the " +
+			"Desktop extension installer. The extension registers as \"Neo4j CLI\" " +
+			"with a settings screen where the same gates are toggles. The display " +
+			"name and settings screen are bundle-only -- a mcpServers entry " +
+			"cannot display them.\n\n" +
+			"Capability gates control what the server is allowed to do:\n\n" +
+			"  --allow-writes            allow write operations (modify databases)\n" +
+			"  --allow-aura              allow creating, modifying or deleting Aura\n" +
+			"                            resources (costs money)\n" +
+			"  --allow-credential-write  allow adding or removing stored credentials\n\n" +
+			"--rw lets this command modify your config file, and by implication " +
+			"enables all three capabilities above. Naming any single " +
+			"--allow-* flag switches to explicit mode: only the capabilities you " +
+			"name are enabled. In bundle mode the flags seed the initial toggle " +
+			"state in the extension's settings screen, which still controls the " +
+			"gates afterward.\n\n" +
+			"If opening the bundle file fails for any reason, install falls back to " +
+			"the config write and reports the method it actually used.\n\n" +
+			"Use --agent <name> (case-insensitive) to scope to one agent, or omit " +
+			"to install into every detected MCP-capable agent. " +
+			"\n\nSupported agents: " + strings.Join(skill.MCPAgentNames(), ", "),
+		Example: `# Install into every detected agent, enabling all three capabilities
+neo4j-cli mcp install --rw
+
+# Install into a single agent, explicit mode: only allow writes, not aura or credentials
+neo4j-cli mcp install --agent claude-desktop --rw --allow-writes
+
+# Generate a .mcpb bundle and open the Desktop extension installer
+neo4j-cli mcp install --agent claude-desktop --bundle --rw
+
+# Install into a single agent and emit the result as JSON
+neo4j-cli mcp install --agent claude-desktop --format json --rw`,
+		Args:        cobra.NoArgs,
+		Annotations: map[string]string{"write": "true"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			return runInstallCmd(cfg, cmd, agentFilter, installAll, useBundle)
+		},
+	}
+
+	cmd.Flags().StringVar(&agentFilter, "agent", "", "Restrict install to a single MCP agent (case-insensitive). See --help for supported agents.")
+	cmd.Flags().BoolVar(&installAll, "all", false, "Install into every detected MCP agent.")
+	cmd.Flags().BoolVar(&useBundle, "bundle", false, "Generate a .mcpb bundle and open it instead of writing the config directly.")
+	cmd.Flags().Bool("allow-writes", false,
+		"Allow write operations through MCP server")
+	cmd.Flags().Bool(server.AllowAuraFlag, false,
+		"Allow Aura resource operations through MCP server")
+	cmd.Flags().Bool(server.AllowCredentialWriteFlag, false,
+		"Allow credential writes through MCP server")
+	return cmd
+}
+
+// resolveInstallGates resolves the MCP capability gates from the install flags.
+//
+// When any --allow-* flag is explicitly passed, the three literal flag values are
+// used as-is. Otherwise all three take the VALUE of --rw.
+//
+// --rw is read by VALUE (not Changed) because RequireWriteAccess never sets the
+// flag—it only waives the requirement interactively. Using Changed would falsely
+// enable all three gates on an explicit --rw=false. The --allow-* flags are read
+// by Changed because they have no interactive waiver and their default-false is
+// the correct fallback when absent.
+func resolveInstallGates(cmd *cobra.Command) skill.MCPGates {
+	rw, _ := strconv.ParseBool(cmd.Flag("rw").Value.String())
+
+	anyAllowChanged := cmd.Flags().Changed("allow-writes") ||
+		cmd.Flags().Changed(server.AllowAuraFlag) ||
+		cmd.Flags().Changed(server.AllowCredentialWriteFlag)
+
+	if anyAllowChanged {
+		writes, _ := strconv.ParseBool(cmd.Flag("allow-writes").Value.String())
+		aura, _ := strconv.ParseBool(cmd.Flag(server.AllowAuraFlag).Value.String())
+		cred, _ := strconv.ParseBool(cmd.Flag(server.AllowCredentialWriteFlag).Value.String())
+		return skill.MCPGates{
+			AllowWrites:          writes,
+			AllowAura:            aura,
+			AllowCredentialWrite: cred,
+		}
+	}
+
+	return skill.MCPGates{
+		AllowWrites:          rw,
+		AllowAura:            rw,
+		AllowCredentialWrite: rw,
+	}
+}
+
+func runInstallCmd(cfg *clicfg.Config, cmd *cobra.Command, agentFilter string, installAll, useBundle bool) error {
+	fs := cfg.Fs()
+	gates := resolveInstallGates(cmd)
+
+	if agentFilter != "" {
+		a := skill.FindAgent(agentFilter)
+		if a == nil {
+			return clierr.NewUsageError("unknown MCP agent: %q\nvalid agents: %s", agentFilter, strings.Join(skill.MCPAgentNames(), ", "))
+		}
+		if !a.SupportsMCP() {
+			return clierr.NewUsageError("%q is a skill-only agent; use 'skill install' instead", a.Name)
+		}
+		if !installAll {
+			return runInstallAndRender(fs, cfg, cmd, a, useBundle, gates)
+		}
+	}
+
+	var targets []*skill.Agent
+	if agentFilter != "" {
+		targets = []*skill.Agent{skill.FindAgent(agentFilter)}
+	} else {
+		detected := skill.DetectMCPAgents(fs)
+		if len(detected) == 0 {
+			return clierr.NewUsageError("no MCP-capable agents detected\nvalid agents: %s", strings.Join(skill.MCPAgentNames(), ", "))
+		}
+		targets = detected
+	}
+
+	var rows resultRows[installResult]
+	for _, a := range targets {
+		method, err := runInstallOne(fs, a, useBundle, gates)
+		if err != nil {
+			return err
+		}
+		rows = append(rows, installResult{
+			Agent:       a.Name,
+			DisplayName: a.DisplayName,
+			Method:      method,
+		})
+	}
+
+	renderInstallResults(cmd, cfg, rows)
+	return nil
+}
+
+func runInstallAndRender(fs afero.Fs, cfg *clicfg.Config, cmd *cobra.Command, a *skill.Agent, useBundle bool, gates skill.MCPGates) error {
+	method, err := runInstallOne(fs, a, useBundle, gates)
+	if err != nil {
+		return err
+	}
+	rows := resultRows[installResult]{{Agent: a.Name, DisplayName: a.DisplayName, Method: method}}
+	renderInstallResults(cmd, cfg, rows)
+	return nil
+}
+
+func runInstallOne(fs afero.Fs, a *skill.Agent, useBundle bool, gates skill.MCPGates) (string, error) {
+	binPath, err := os.Executable()
+	if err != nil {
+		return "", clierr.NewFatalError("cannot resolve binary path: %s", err.Error())
+	}
+	if useBundle {
+		return runInstallBundle(a, binPath, fs, gates)
+	}
+	return "config", runInstallConfig(fs, a, binPath, gates)
+}
+
+// runInstallBundle generates a .mcpb in a cache directory and opens it.
+func runInstallBundle(a *skill.Agent, binPath string, fs afero.Fs, gates skill.MCPGates) (string, error) {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		return "", clierr.NewFatalError("cannot resolve user cache directory: %s", err.Error())
+	}
+	bundleDir := filepath.Join(cacheDir, "neo4j-cli-mcp")
+	if err := os.MkdirAll(bundleDir, 0755); err != nil {
+		return "", clierr.NewFatalError("cannot create bundle directory: %s", err.Error())
+	}
+	bundlePath := filepath.Join(bundleDir, "neo4j-cli.mcpb")
+	if err := GenerateBundle(bundlePath, gates); err != nil {
+		return "", clierr.NewFatalError("cannot generate MCP bundle: %s", err.Error())
+	}
+	if err := openFileFn(bundlePath); err != nil {
+		// openFile unavailable; fall back to config write.
+		if cfgErr := runInstallConfig(fs, a, binPath, gates); cfgErr != nil {
+			// Both paths failed: return the original open error -- it is more useful.
+			return "", clierr.NewFatalError("cannot open bundle file: %s; it is at %s", err.Error(), bundlePath)
+		}
+		fmt.Fprintf(os.Stderr, "Bundle file at %s; open it manually to complete the install.\n", bundlePath)
+		return "config", nil
+	}
+	return "mcpb", nil
+}
+
+// runInstallConfig writes the neo4j-cli server entry into the agent's config.
+func runInstallConfig(fs afero.Fs, a *skill.Agent, binPath string, gates skill.MCPGates) error {
+	return skill.InstallMCPConfig(fs, a, binPath, gates)
+}
+
+// openFile opens a file with the system default handler (macOS open, Windows
+// start, Linux xdg-open). Runs in the background (Start, not Run) so the CLI
+// returns immediately rather than blocking on the desktop application.
+func openFile(path string) error {
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", path).Start()
+	case "windows":
+		return exec.Command("cmd", "/c", "start", "", path).Start()
+	default:
+		return exec.Command("xdg-open", path).Start()
+	}
+}
+
+func renderInstallResults(cmd *cobra.Command, cfg *clicfg.Config, rows resultRows[installResult]) {
+	if len(rows) == 0 && commonoutput.ResolveOutput(cmd, cfg) != "json" {
+		cmd.Printf("No agents to install into.\n")
+		return
+	}
+	commonoutput.PrintBodyMap(cmd, cfg, rows, []string{"agent", "display_name", "method"})
+}

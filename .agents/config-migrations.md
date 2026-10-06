@@ -1,6 +1,6 @@
 # Config Migration
 
-Forward-only schema migrations for `config.json`. Lives in `common/configmigrate/`. Wired from `common/clicfg/clicfg.go:NewConfig` (synchronous, between the first and a second `Viper.ReadInConfig()` so migrated values are visible).
+Forward-only schema migrations for `config.json`. Lives in `internal/configmigrate/`. Wired from `internal/clicfg/clicfg.go:NewConfig` (synchronous, between the first and a second `Viper.ReadInConfig()` so migrated values are visible).
 
 Origin: CLI-134. First concrete use case: cleaning up retired feature-flag keys after a flag graduates (see `.agents/feature-flags.md`).
 
@@ -13,7 +13,7 @@ Origin: CLI-134. First concrete use case: cleaning up retired feature-flag keys 
 
 ## Registry shape
 
-`var migrations = []Migration{}` in `common/configmigrate/migrations.go`. Each `Migration`:
+`var migrations = []Migration{}` in `internal/configmigrate/migrations.go`. Each `Migration`:
 
 - `Version int` — monotonic, 1-indexed, contiguous. `init()` panics via `validateMigrations` on gap, duplicate, or non-1 start.
 - `Description string` — short human label; appears in stderr warnings.
@@ -37,15 +37,15 @@ Happy path is silent — no "migrated config to v1" banner.
 
 `runWith(fs, configPath, stderr, ms []Migration)` is the unexported test entry point. Tests inject fixture migrations via this — never touch the package-level `migrations` slice. Use `bytes.Buffer` as stderr sink and assert on the exact warning string.
 
-Tests cannot import `common/clicfg` or `test/utils/testfs` (transitively imports clicfg) — that creates a test-time import cycle once `clicfg` depends on `configmigrate`. Use a local fs seeder with a hard-coded relative path.
+Tests cannot import `internal/clicfg` or `internal/testutil/testfs` (transitively imports clicfg) — that creates a test-time import cycle once `clicfg` depends on `configmigrate`. Use a local fs seeder with a hard-coded relative path.
 
-## Internal-package gotcha
+## Import-cycle gotcha
 
-Package lives under `common/`, NOT `neo4j-cli/internal/`. Go's internal-package rule blocks `common/clicfg` (and anything else under `common/`) from importing `neo4j-cli/internal/*`. Anything wired from `clicfg.NewConfig` must live under `common/`.
+`internal/clicfg` is the base of the graph: anything wired from `clicfg.NewConfig` (like `configmigrate`) must not import `clicfg` back.
 
 ## See also
 
 - `.agents/feature-flags.md` — owns the user-side cleanup motivation.
-- `common/configmigrate/configmigrate.go` — engine.
-- `common/configmigrate/migrations.go` — registry + validator.
-- `common/configmigrate/configmigrate_test.go` — scenario coverage + validator unit tests.
+- `internal/configmigrate/configmigrate.go` — engine.
+- `internal/configmigrate/migrations.go` — registry + validator.
+- `internal/configmigrate/configmigrate_test.go` — scenario coverage + validator unit tests.

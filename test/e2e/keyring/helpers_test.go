@@ -67,7 +67,7 @@ func binaryPath(t *testing.T) string {
 }
 
 // configEnvForDir returns the env-var assignments that point the CLI at
-// dir for its config/credentials. On Linux the init() in common/clicfg/linux.go
+// dir for its config/credentials. On Linux the init() in internal/clicfg/linux.go
 // reads XDG_CONFIG_HOME at process startup, so we must pass that env var to the
 // subprocess to redirect its config directory. HOME is also set for completeness.
 func configEnvForDir(dir string) []string {

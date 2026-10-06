@@ -45,7 +45,7 @@ Pick the commits in the range that look user-facing — new command trees, new f
 For each candidate, inspect the diff:
 
 ```bash
-git show <sha> -- README.md AGENTS.md neo4j-cli/app/app.go 'neo4j-cli/aura/internal/subcommands/**' 'common/skill/**'
+git show <sha> -- README.md AGENTS.md internal/cli/app.go 'internal/commands/aura/**' 'internal/skill/**'
 ```
 
 Use `git show <sha>` (no path filter) only if the path-filtered form returns nothing and you still suspect the commit is user-facing.
@@ -54,9 +54,9 @@ Use `git show <sha>` (no path filter) only if the path-filtered form returns not
 
 When you write an `Example:` block in a highlight, the command and flags MUST exist in the cobra tree at `${RELEASE_TAG}`. Cross-check by reading:
 
-- `neo4j-cli/app/app.go` — the root command tree.
-- `neo4j-cli/aura/internal/subcommands/**` — per-resource command trees.
-- `neo4j-cli/internal/subcommands/**` — top-level command trees (e.g. `query`, `credential`, `docker`, `skill`).
+- `internal/cli/app.go` — the root command tree.
+- `internal/commands/aura/**` — per-resource command trees.
+- `internal/commands/**` — top-level command trees (e.g. `query`, `credential`, `docker`, `skill`).
 - `README.md` — canonical usage examples.
 
 Do NOT invent flags. Do NOT cite a flag you cannot find in the source. If you are unsure whether a flag exists, omit the example.

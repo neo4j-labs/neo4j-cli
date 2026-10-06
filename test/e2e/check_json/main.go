@@ -28,7 +28,7 @@
 //   - --schema-only: shape + types + post-swap-absence + enum membership
 //     (channel ∈ {stable, pre-release}, install_method ∈
 //     {binary, homebrew, npm, pipx, uv} per
-//     neo4j-cli/internal/subcommands/update/install_method.go). Skips
+//     internal/commands/update/install_method.go). Skips
 //     value-coupling so the live-API smoke step is calendar-immune.
 //
 // Flags:
@@ -67,7 +67,7 @@ var validChannels = map[string]struct{}{
 
 // validInstallMethods is the enum used by schema-only mode to assert
 // `install_method` membership. The values mirror the InstallMethod constants
-// declared in neo4j-cli/internal/subcommands/update/install_method.go:45-49
+// declared in internal/commands/update/install_method.go:45-49
 // and are stable across the production binary's JSON output (REQ-F-018).
 var validInstallMethods = map[string]struct{}{
 	"binary":   {},
