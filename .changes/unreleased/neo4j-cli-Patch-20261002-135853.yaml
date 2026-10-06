@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: '`aura agent` commands now report a missing organization or project with the standard `no organization specified; set a default workspace ...` usage error (exit 2) instead of `required flag(s) ... not set`, and the `--organization-id` and `--project-id` flags are documented once on the `agent` group instead of on every subcommand.'
-time: 2026-10-02T13:58:53+01:00

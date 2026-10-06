@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'The `docker` commands now work when `docker` is aliased to podman. Listing containers (used by `docker create`, `list`, `get` and `load`) failed with a JSON parse error because podman reports container names and labels in a different shape.'
-time: 2026-10-02T14:43:30+01:00
