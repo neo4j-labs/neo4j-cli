@@ -2,7 +2,7 @@
 
 > A super CLI for Neo4j. Team up with your agents to build graph apps from your terminal.
 
-neo4j-cli is an open-source command-line tool for managing Neo4j resources, executing Cypher queries via the Bolt protocol, and integrating with AI agent frameworks (Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie).
+neo4j-cli is an open-source command-line tool for managing Neo4j resources, executing Cypher queries via the Bolt protocol, and integrating with AI agent frameworks (Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie, Kiro).
 
 ## Installation
 
@@ -27,7 +27,7 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli aura instance create` — provision a new Aura instance (`--name` optional; auto-generates `InstanceNN` if omitted)
 - `neo4j-cli aura instance get <id>` — get instance details
 - `neo4j-cli aura agent list|get|create|update|replace|delete|invoke` — manage Aura Agents (LLM assistants bound to a database); `--tools` accepts a JSON array of `{type, name, description, config}` with camelCase types (`text2cypher`, `cypherTemplate`, `similaritySearch`)
-- `neo4j-cli docker create|list|get|start|stop|delete` — run a local Neo4j container by shelling out to `docker` (or `podman` aliased to `docker`); persistent flow stores a `dbms` credential, ephemeral flow emits an env-file consumable by `query --env`
+- `neo4j-cli docker create|list|get|start|stop|delete` — run a local Neo4j container by shelling out to `docker` (or `podman` aliased to `docker`); persistent flow stores a `dbms` credential, ephemeral flow emits an env-file consumable by `query --env`; `create --plugin <name>` (repeatable) installs plugins such as `apoc` / `graph-data-science` via `NEO4J_PLUGINS`; `delete --remove-volume` also removes the `neo4j-cli-<name>-data` volume a `docker load` container leaves behind
 - `neo4j-cli desktop install|list|doctor` — manage a local Neo4j Desktop 2 install: install the app, list managed DBMSes + saved connections, run a structured health check
 - `neo4j-cli desktop dbms list|create|start|stop|delete` — lifecycle local DBMSes under Neo4j Desktop 2 (enterprise-only; one DBMS runs at a time on port 7687); `--wait` blocks until `status=started`
 - `neo4j-cli desktop dbms plugin available|list|install|uninstall` — manage plugins on a Desktop DBMS
@@ -49,7 +49,7 @@ npm install -g @neo4j-labs/cli
 
 ## Connection
 
-Connection precedence: flag → environment variable → `.env` file → stored default.
+Connection precedence: flag → environment variable → `.env` file → stored default. Credential env vars (`NEO4J_URI`/`NEO4J_USERNAME`/`NEO4J_PASSWORD`/`NEO4J_DATABASE`, `NEO4J_EMBED_*`, `NEO4J_AURA_CLIENT_*`) are ignored unless `accept-env-vars` is enabled (`neo4j-cli config set accept-env-vars true --rw`, or `NEO4J_CLI_ACCEPT_ENV_VARS=1` per invocation); flags and `.env` files are never gated. An override of a stored credential must supply all three of URI/username/password.
 
 Default URI: `neo4j://localhost:7687`, username: `neo4j`, database: `neo4j`.
 

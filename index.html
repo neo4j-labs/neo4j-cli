@@ -1064,7 +1064,7 @@
 <section class="hero">
   <div class="container inner">
     <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill">
-      <span class="pill-tag" style="text-transform:none">v1.14.0</span>
+      <span class="pill-tag" style="text-transform:none">v1.15.0</span>
       <span>open source · neo4j-labs</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;opacity:0.6">
         <path d="M5 12h14M13 6l6 6-6 6"></path>
@@ -1124,7 +1124,7 @@
         </button>
       </div>
       <div class="cmd-hint">
-        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.14.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
+        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.15.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
       </div>
     </div>
   </div>
@@ -1505,9 +1505,9 @@
     <span class="string">'UNWIND $p AS r CREATE (:Person {name:r.name,born:r.born})'</span> \
     <span class="flag">--param</span> <span class="string">'p=[{"name":"Alice","born":1990},{"name":"Bob","born":1985}]'</span>
 
-<span class="comment"># connection via env or .env (auto-discovered)</span>
-<span class="prompt">$</span> NEO4J_URI=neo4j+s://f1ab…b2.databases.neo4j.io \
-  NEO4J_PASSWORD=<span class="string">$AURA_PW</span> \
+<span class="comment"># connection via .env (auto-discovered) or env vars (opt-in: accept-env-vars)</span>
+<span class="prompt">$</span> NEO4J_CLI_ACCEPT_ENV_VARS=1 NEO4J_URI=neo4j+s://f1ab…b2.databases.neo4j.io \
+  NEO4J_USERNAME=neo4j NEO4J_PASSWORD=<span class="string">$AURA_PW</span> \
   neo4j-cli query <span class="string">'MATCH (n) RETURN count(n)'</span>
 </pre>
       </div>
@@ -1537,6 +1537,7 @@
 <span class="info">○</span> pi              not detected — skipped
 <span class="ok">✓</span> opencode        installed (v1.3.0)
 <span class="info">○</span> junie           not detected — skipped
+<span class="ok">✓</span> kiro            installed (v1.3.0)
 
 <span class="comment"># full catalog — Cypher, GDS, GraphRAG, modeling, drivers, import, …</span>
 <span class="prompt">$</span> neo4j-cli skill install <span class="flag">--all</span> <span class="flag">--rw</span>
@@ -1778,13 +1779,13 @@
 <span class="prompt">$</span> neo4j-cli config set telemetry false <span class="flag">--rw</span>               <span class="comment"># same effect as DO_NOT_TRACK=1</span>
 <span class="prompt">$</span> neo4j-cli config set skill-auto-refresh false <span class="flag">--rw</span>      <span class="comment"># disable post-update skill refresh</span>
 <span class="prompt">$</span> neo4j-cli config set default-output-format json <span class="flag">--rw</span>    <span class="comment"># change default --format</span></pre>
-          <p class="ref-sub"><span class="keyword">Connection env vars</span> — override or supplement stored credentials:</p>
+          <p class="ref-sub"><span class="keyword">Connection env vars</span> — override stored credentials. Ignored by default; opt in with <code>neo4j-cli config set accept-env-vars true --rw</code> or <code>NEO4J_CLI_ACCEPT_ENV_VARS=1</code>. An override needs all three of URI / username / password:</p>
           <pre><span class="keyword">NEO4J_URI</span>=neo4j+s://host:7687
 <span class="keyword">NEO4J_USERNAME</span>=neo4j
 <span class="keyword">NEO4J_PASSWORD</span>=secret
 <span class="keyword">NEO4J_DATABASE</span>=neo4j
 <span class="keyword">NEO4J_DEBUG</span>=1          <span class="comment"># enable driver diagnostics on stderr (same as --debug)</span></pre>
-          <p class="ref-sub"><span class="keyword">Embedding env vars</span>:</p>
+          <p class="ref-sub"><span class="keyword">Embedding env vars</span> (also gated by <code>accept-env-vars</code>):</p>
           <pre><span class="keyword">NEO4J_EMBED_PROVIDER</span>=openai          <span class="comment"># openai | ollama | huggingface | gemini | vertex</span>
 <span class="keyword">NEO4J_EMBED_MODEL</span>=text-embedding-3-small
 <span class="keyword">NEO4J_EMBED_API_KEY</span>=sk-…             <span class="comment"># also reads OPENAI_API_KEY / HF_TOKEN</span>
@@ -1792,7 +1793,7 @@
           <p class="ref-sub"><span class="keyword">Installer &amp; telemetry env vars</span>:</p>
           <pre><span class="keyword">DO_NOT_TRACK</span>=1                        <span class="comment"># disable telemetry for this invocation only</span>
 <span class="keyword">NEO4J_CLI_AUTO_INSTALL_SKILL</span>=1        <span class="comment"># installer prefix: runs skill install --rw post-install</span></pre>
-          <p>All env vars are also read from a <code>.env</code> file, which the CLI locates by walking up from the current directory to the git root.</p>
+          <p>The same keys are also read from a <code>.env</code> file, which the CLI locates by walking up from the current directory to the git root. <code>.env</code> files and explicit flags are not affected by the <code>accept-env-vars</code> gate.</p>
         </div>
       </div>
       <!-- END:docs:config -->
@@ -1815,7 +1816,7 @@
           <p class="ref-sub"><span class="keyword">Connection resolution</span> (highest priority first):</p>
           <ul>
             <li><code>--uri</code> / <code>--username</code> / <code>--password</code> / <code>--database</code> flags</li>
-            <li>Env vars: <code>NEO4J_URI</code>, <code>NEO4J_USERNAME</code>, <code>NEO4J_PASSWORD</code>, <code>NEO4J_DATABASE</code></li>
+            <li>Env vars: <code>NEO4J_URI</code>, <code>NEO4J_USERNAME</code>, <code>NEO4J_PASSWORD</code>, <code>NEO4J_DATABASE</code> — only read when <code>accept-env-vars</code> is enabled</li>
             <li><code>.env</code> file (walks up to git root)</li>
             <li><code>--credential &lt;name&gt;</code> or default stored dbms credential</li>
             <li>Built-in defaults: <code>neo4j://localhost:7687</code>, user <code>neo4j</code>, db <code>neo4j</code></li>
@@ -1837,7 +1838,7 @@
 
 <span class="prompt">$</span> neo4j-cli query :embed <span class="string">"hello world"</span> <span class="flag">--format</span> json   <span class="comment"># standalone, no DB needed</span></pre>
           <p>Providers and defaults: <span class="keyword">openai</span> (<code>api.openai.com/v1</code>) · <span class="keyword">ollama</span> (<code>localhost:11434</code>, no key) · <span class="keyword">huggingface</span> (serverless; set <code>--embed-base-url</code> for dedicated endpoint) · <span class="keyword">gemini</span> (<code>GEMINI_API_KEY</code> / <code>GOOGLE_API_KEY</code>) · <span class="keyword">vertex</span> (Application Default Credentials; needs <code>--vertex-project</code> + <code>--vertex-location</code>).</p>
-          <p>Settings resolution (highest first): flag (<code>--embed-provider</code>, <code>--embed-model</code>, …) → env (<code>NEO4J_EMBED_PROVIDER</code>, <code>NEO4J_EMBED_MODEL</code>, …) → <code>.env</code> → stored embed credential → provider defaults.</p>
+          <p>Settings resolution (highest first): flag (<code>--embed-provider</code>, <code>--embed-model</code>, …) → env (<code>NEO4J_EMBED_PROVIDER</code>, <code>NEO4J_EMBED_MODEL</code>, …; requires <code>accept-env-vars</code>) → <code>.env</code> → stored embed credential → provider defaults.</p>
           <p>API-key priority: <code>OPENAI_API_KEY</code> / <code>HF_TOKEN</code> → <code>NEO4J_EMBED_API_KEY</code> → <code>.env</code> → stored credential. One <code>--credential dbms</code> can drive both connection and embedding when the dbms profile carries an embed link.</p>
         </div>
       </div>
@@ -1864,20 +1865,20 @@
 <span class="prompt">$</span> neo4j-cli aura instance deploy <span class="flag">--from-docker</span> dev <span class="flag">--type</span> free <span class="flag">--rw</span>   <span class="comment"># clone a local DB into a new Aura instance</span></pre>
           <p><code>--type</code> takes the Aura tier names <code>free</code>, <code>professional</code>, <code>business-critical</code> and <code>virtual-dedicated-cloud</code>. The former <code>free-db</code> / <code>professional-db</code> / <code>enterprise-db</code> names are still accepted and mapped to their current equivalents.</p>
           <p><code>instance create</code> auto-stores DB credentials as a <code>dbms</code> credential named <code>&lt;instance-id&gt;-default</code> so <code>query</code> connects immediately. Pass <code>--no-credential-storage</code> to skip. <code>--wait</code> polls until the instance status is <code>running</code>; <code>--timeout</code> sets the deadline in seconds (default: 300).</p>
-          <p class="ref-sub"><span class="keyword">aura snapshot</span> — on-demand backups and restores:</p>
-          <pre><span class="prompt">$</span> neo4j-cli aura snapshot list <span class="flag">--instance-id</span> &lt;id&gt;
-<span class="prompt">$</span> neo4j-cli aura snapshot create <span class="flag">--instance-id</span> &lt;id&gt; <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli aura snapshot restore &lt;snapshot-id&gt; <span class="flag">--instance-id</span> &lt;id&gt; <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli aura snapshot delete &lt;snapshot-id&gt; <span class="flag">--instance-id</span> &lt;id&gt; <span class="flag">--rw</span></pre>
-          <p class="ref-sub"><span class="keyword">aura graph-analytics</span> — run GDS algorithm jobs against an instance:</p>
-          <pre><span class="prompt">$</span> neo4j-cli aura graph-analytics list <span class="flag">--instance-id</span> &lt;id&gt;
-<span class="prompt">$</span> neo4j-cli aura graph-analytics create <span class="flag">--instance-id</span> &lt;id&gt; <span class="flag">--algorithm</span> pageRank <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli aura graph-analytics get &lt;job-id&gt; <span class="flag">--instance-id</span> &lt;id&gt;
-<span class="prompt">$</span> neo4j-cli aura graph-analytics delete &lt;job-id&gt; <span class="flag">--instance-id</span> &lt;id&gt; <span class="flag">--rw</span></pre>
+          <p class="ref-sub"><span class="keyword">aura instance snapshot</span> — on-demand backups; restore by overwriting an instance from a snapshot:</p>
+          <pre><span class="prompt">$</span> neo4j-cli aura instance snapshot list <span class="flag">--instance-id</span> &lt;id&gt;
+<span class="prompt">$</span> neo4j-cli aura instance snapshot create <span class="flag">--instance-id</span> &lt;id&gt; <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura instance snapshot get &lt;snapshot-id&gt; <span class="flag">--instance-id</span> &lt;id&gt;
+<span class="prompt">$</span> neo4j-cli aura instance overwrite &lt;id&gt; <span class="flag">--source-snapshot-id</span> &lt;snapshot-id&gt; <span class="flag">--rw</span>   <span class="comment"># restore from a snapshot</span></pre>
+          <p class="ref-sub"><span class="keyword">aura graph-analytics session</span> — Graph Analytics (GDS) sessions, standalone or attached to an instance:</p>
+          <pre><span class="prompt">$</span> neo4j-cli aura graph-analytics session list <span class="flag">--instance-id</span> &lt;id&gt;
+<span class="prompt">$</span> neo4j-cli aura graph-analytics session create <span class="flag">--name</span> my-session <span class="flag">--memory</span> 8GB <span class="flag">--instance-id</span> &lt;id&gt; <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura graph-analytics session get &lt;session-id&gt;
+<span class="prompt">$</span> neo4j-cli aura graph-analytics session delete &lt;session-id&gt; <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span></pre>
           <p class="ref-sub"><span class="keyword">aura cmk</span> — customer-managed encryption keys:</p>
           <pre><span class="prompt">$</span> neo4j-cli aura cmk list
 <span class="prompt">$</span> neo4j-cli aura cmk get &lt;cmk-id&gt;
-<span class="prompt">$</span> neo4j-cli aura cmk create <span class="flag">--name</span> my-key <span class="flag">--provider</span> aws <span class="flag">--key-arn</span> arn:… <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura cmk create <span class="flag">--name</span> my-key <span class="flag">--type</span> enterprise-db <span class="flag">--cloud-provider</span> aws <span class="flag">--region</span> us-east-1 <span class="flag">--key-id</span> arn:aws:kms:… <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli aura cmk delete &lt;cmk-id&gt; <span class="flag">--rw</span></pre>
           <p class="ref-sub"><span class="keyword">aura agent</span> — LLM-backed assistants bound to an instance. Seven leaves: <code>list</code>, <code>get</code>, <code>create</code>, <code>update</code>, <code>replace</code>, <code>delete</code>, <code>invoke</code>. Every leaf except <code>list</code> takes the agent id as a <strong>positional argument</strong>:</p>
           <pre><span class="prompt">$</span> neo4j-cli aura agent list <span class="flag">--format</span> json
@@ -1907,11 +1908,13 @@
           <p>Run Neo4j locally by shelling out to the host <code>docker</code> CLI. Requires Docker Desktop (or any Docker-compatible runtime aliased to <code>docker</code>) on PATH. Managed containers carry an <code>org.neo4j.cli.managed=true</code> label — no separate state file.</p>
           <pre><span class="prompt">$</span> neo4j-cli docker create <span class="flag">--name</span> dev <span class="flag">--wait</span> <span class="flag">--rw</span>          <span class="comment"># enterprise eval; stores dbms cred</span>
 <span class="prompt">$</span> neo4j-cli docker create <span class="flag">--name</span> dev <span class="flag">--edition</span> community <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli docker create <span class="flag">--name</span> gds <span class="flag">--plugin</span> apoc <span class="flag">--plugin</span> graph-data-science <span class="flag">--rw</span>   <span class="comment"># plugins via NEO4J_PLUGINS</span>
 <span class="prompt">$</span> neo4j-cli docker list <span class="flag">--format</span> table
 <span class="prompt">$</span> neo4j-cli docker get dev
 <span class="prompt">$</span> neo4j-cli docker stop dev <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli docker start dev <span class="flag">--wait</span> <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>    <span class="comment"># removes container + stored credential</span></pre>
+<span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>    <span class="comment"># removes container + stored credential</span>
+<span class="prompt">$</span> neo4j-cli docker delete movies <span class="flag">--remove-volume</span> <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>   <span class="comment"># also drop the data volume a docker load left</span></pre>
           <p><code>create</code> auto-stores a <code>dbms</code> credential (named after <code>--name</code>) so <code>neo4j-cli query --credential dev</code> connects immediately. Host ports default to 7474/7687 and auto-increment when taken. Pass <code>--version 5.26.0</code> to pin a Neo4j version; <code>--accept-license</code> upgrades to the commercial license.</p>
           <p><code>--wait</code> polls the Bolt port every second until the container accepts connections. <code>--timeout &lt;seconds&gt;</code> sets the deadline (default: 60). Without <code>--wait</code>, the command returns immediately after <code>docker run</code> exits — the DB may not be ready yet.</p>
           <p><strong>Ephemeral containers</strong> (<code>--ephemeral</code>) run with <code>docker run --rm</code> — no credential is persisted. Pass <code>--env-out-file &lt;path&gt;</code> to write an env-file for <code>query --env</code>:</p>
@@ -2012,7 +2015,7 @@
           <p class="ref-sub"><span class="keyword">--force</span> — skip safety checks that would otherwise abort a command due to a conflicting resource. Required alongside <code>--yes</code> for all destructive leaves in non-TTY contexts.</p>
           <pre><span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>      <span class="comment"># delete even if running</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms start &lt;id&gt; <span class="flag">--force</span> <span class="flag">--rw</span>       <span class="comment"># stop conflicting DBMS first</span></pre>
-          <p class="ref-sub"><span class="keyword">--yes</span> — suppress interactive confirmation prompts in destructive operations. In non-TTY contexts (agents, CI, scripts) destructive leaves (<code>… delete</code> / <code>… remove</code> — Aura instance/agent/CMK/snapshot/graph-analytics, <code>docker delete</code>, <code>desktop dbms/connection delete</code>, <code>credential … remove</code>) require <strong>both</strong> <code>--yes</code> and <code>--force</code>; missing either exits with code 2.</p>
+          <p class="ref-sub"><span class="keyword">--yes</span> — suppress interactive confirmation prompts in destructive operations. In non-TTY contexts (agents, CI, scripts) destructive leaves (<code>… delete</code> / <code>… remove</code> — Aura instance/agent/CMK/graph-analytics session, <code>docker delete</code>, <code>desktop dbms/connection delete</code>, <code>credential … remove</code>) require <strong>both</strong> <code>--yes</code> and <code>--force</code>; missing either exits with code 2.</p>
           <pre><span class="prompt">$</span> neo4j-cli desktop connection delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli aura instance delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span></pre>
           <p>Disable telemetry without writing config: <code>DO_NOT_TRACK=1 neo4j-cli …</code></p>
@@ -2068,7 +2071,9 @@
 <span class="prompt">$</span> neo4j-cli skill check                                <span class="comment"># version drift vs running binary</span>
 <span class="prompt">$</span> neo4j-cli skill remove neo4j-cypher-skill <span class="flag">--rw</span>      <span class="comment"># remove a catalog skill</span>
 <span class="prompt">$</span> neo4j-cli skill remove self <span class="flag">--agent</span> windsurf <span class="flag">--rw</span>   <span class="comment"># remove self-skill from one agent</span></pre>
-          <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie. Self-skill bundles refresh automatically on binary version change; opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>.</p>
+          <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie, Kiro. Self-skill bundles refresh automatically on binary version change; opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>.</p>
+          <p class="ref-sub"><span class="keyword">agent-context</span> — emit the full command tree (commands, flags, exit codes, output formats) as a stable JSON envelope for agent discovery:</p>
+          <pre><span class="prompt">$</span> neo4j-cli agent-context <span class="flag">--format</span> json | jq <span class="string">'.commands | keys'</span></pre>
         </div>
       </div>
       <!-- END:docs:skills -->
@@ -2083,7 +2088,7 @@
 <footer>
   <div class="container inner">
     <div class="meta">
-      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.14.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
+      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.15.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
     </div>
     <div class="links">
       <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">GitHub</a>
@@ -2353,9 +2358,9 @@
   const paneCommands = {
     aura: 'neo4j-cli aura instance list --format table',
     docker: 'neo4j-cli docker create --name dev --wait --rw',
-    query: 'neo4j-cli query \'MATCH (p:Person {name:$name})-[:ACTED_IN]->(m) RETURN m.title\' --param name=Alice',
+    query: 'neo4j-cli query \'MATCH (d:Person)-[:DIRECTED]->(m:Movie) RETURN d.name AS director, count(m) AS movies, max(m.released) AS year ORDER BY movies DESC LIMIT 3\'',
     schema: 'neo4j-cli query :schema',
-    pipe: 'echo \'MATCH (n) RETURN count(n) AS n\' | neo4j-cli query',
+    pipe: 'neo4j-cli query \'MATCH (p:Person) RETURN p.name AS name, p.born AS born ORDER BY p.born DESC LIMIT 3\' | jq \'.rows[] | {name, born}\'',
     skill: 'neo4j-cli skill install --rw',
     embed: 'neo4j-cli query --param \'q:embed=sci-fi movies\' --param k=5 "CALL db.index.vector.queryNodes(\'plot_idx\', $k, $q) YIELD node, score RETURN node.title, score"',
     desktop: 'neo4j-cli desktop dbms create --name dev --wait --rw',
@@ -2368,7 +2373,7 @@
     schema: "What's in my database? Show all labels, relationships, and indexes.",
     pipe: 'Seed the database from seeds/people.cypher, then show me the 3 youngest people as JSON',
     skill: 'Install the neo4j skill for all my agents, then verify it\'s up to date everywhere',
-    embed: 'Add an OpenAI embedding credential, link it to my dbms profile, then find the 5 most similar movies to "sci-fi movies"',
+    embed: 'Find the 5 movies most similar to "sci-fi movies" using vector search on the plot index',
     desktop: 'Set up Neo4j Desktop 2, spin up a local DBMS called dev, run a query against it, then list everything Desktop manages',
     admin: 'Create an analyst user, give it a read-only role on the movies graph, then show me who has what',
   };
@@ -2381,7 +2386,7 @@
         btn.classList.add('copied');
         const original = btn.innerHTML;
         btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> copied';
-        showToast('Copied');
+        showToast('Copied: ' + text.slice(0, 40) + (text.length > 40 ? '…' : ''));
         setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = original; }, 1600);
       }
     });
