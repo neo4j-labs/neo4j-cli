@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/confirm"
+	"github.com/neo4j/cli/internal/desktopclient"
 	"github.com/neo4j/cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +54,7 @@ neo4j-cli desktop connection delete f4e2f3c0-1111-2222-3333-444455556666 --yes -
 			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt("port")
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

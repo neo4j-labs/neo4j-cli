@@ -61,7 +61,7 @@ func (h *updateHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	h.t.Cleanup(desktopclient.SetNowFnForTest(func() time.Time { return time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC) }))
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
-	h.t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
@@ -89,7 +89,7 @@ func TestUpdate_RejectsNonUUID(t *testing.T) {
 	h := newUpdateHelper(t)
 	// Pin the client constructor to a noisy stub so a stray HTTP call would
 	// fail the test instead of silently succeeding against a real probe.
-	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		t.Fatalf("must not construct client when id is not a UUID")
 		return nil, nil
 	}))
@@ -111,7 +111,7 @@ func TestUpdate_RejectsNonUUID(t *testing.T) {
 // HTTP call.
 func TestUpdate_NoMutatingFlags_Errors(t *testing.T) {
 	h := newUpdateHelper(t)
-	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		t.Fatalf("must not construct client when no mutating flags supplied")
 		return nil, nil
 	}))
@@ -261,7 +261,7 @@ func TestUpdate_EmptyPassword_PromptsOnTTY(t *testing.T) {
 func TestUpdate_EmptyPassword_NonTTYErrors(t *testing.T) {
 	h := newUpdateHelper(t)
 	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
-	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		t.Fatalf("must not construct client when --password is empty on non-TTY")
 		return nil, nil
 	}))
@@ -281,7 +281,7 @@ func TestUpdate_SuccessRendersConnection(t *testing.T) {
 	h := newUpdateHelper(t)
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPatch {
-			_, _ = w.Write([]byte(`{"id":"` + validUpdateID + `","name":"renamed","connectionUri":"neo4j+s://abc","project":"proj-1"}`))
+			_, _ = w.Write([]byte(`{"id":"` + validUpdateID + `","name":"renamed","connectionUri":"neo4j+s://abc","projects":["proj-1"]}`))
 			return
 		}
 		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
@@ -299,6 +299,140 @@ func TestUpdate_SuccessRendersConnection(t *testing.T) {
 	}
 	if got["name"] != "renamed" {
 		t.Fatalf("expected name=renamed in output, got %v", got["name"])
+	}
+}
+
+// TestUpdate_ProjectTags_FlagToPatchBody covers the flag→PATCH-body mapping:
+// --project/--tags elements resolve against the Desktop catalogs (names →
+// IDs, UUIDs verbatim) and the resolved arrays land in the body under
+// `projects`/`tags`.
+func TestUpdate_ProjectTags_FlagToPatchBody(t *testing.T) {
+	h := newUpdateHelper(t)
+	const (
+		prodProjectID = "11111111-2222-3333-4444-555555555555"
+		tagID         = "66666666-7777-8888-9999-aaaaaaaaaaaa"
+	)
+	var capturedBody map[string]any
+	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/projects":
+			_, _ = w.Write([]byte(`{"projects":[{"id":"` + prodProjectID + `","name":"Prod"}]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/tags":
+			_, _ = w.Write([]byte(`{"tags":[{"id":"` + tagID + `","name":"backend"}]}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/fastify/api/connections/"+validUpdateID:
+			capturedBody = readPostBody(t, r)
+			_, _ = w.Write([]byte(`{"id":"` + validUpdateID + `","name":"n"}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	if err := h.run(`connection update ` + validUpdateID + ` --project Prod --tags backend --format json`); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(capturedBody) != 2 {
+		t.Fatalf("expected PATCH body to contain exactly projects+tags; got %d keys: %v", len(capturedBody), capturedBody)
+	}
+	projects, ok := capturedBody["projects"].([]any)
+	if !ok || len(projects) != 1 || projects[0] != prodProjectID {
+		t.Fatalf("expected projects=[%s] in body, got %v", prodProjectID, capturedBody["projects"])
+	}
+	tags, ok := capturedBody["tags"].([]any)
+	if !ok || len(tags) != 1 || tags[0] != tagID {
+		t.Fatalf("expected tags=[%s] in body, got %v", tagID, capturedBody["tags"])
+	}
+}
+
+// TestUpdate_ProjectTags_UUIDPassthrough covers the no-catalog-fetch path:
+// all-UUID --project/--tags input must reach the PATCH body verbatim without
+// any GET against the project/tag catalogs.
+func TestUpdate_ProjectTags_UUIDPassthrough(t *testing.T) {
+	h := newUpdateHelper(t)
+	const (
+		projectID = "11111111-2222-3333-4444-555555555555"
+		tagID     = "66666666-7777-8888-9999-aaaaaaaaaaaa"
+	)
+	var capturedBody map[string]any
+	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			t.Errorf("unexpected catalog fetch %s %s — all-UUID input must not fetch catalogs", r.Method, r.URL.Path)
+			return
+		}
+		if r.Method == http.MethodPatch {
+			capturedBody = readPostBody(t, r)
+			_, _ = w.Write([]byte(`{"id":"` + validUpdateID + `","name":"n"}`))
+			return
+		}
+		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+
+	if err := h.run(`connection update ` + validUpdateID + ` --project ` + projectID + ` --tags ` + tagID + ` --format json`); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	projects, ok := capturedBody["projects"].([]any)
+	if !ok || len(projects) != 1 || projects[0] != projectID {
+		t.Fatalf("expected projects=[%s] in body, got %v", projectID, capturedBody["projects"])
+	}
+	tags, ok := capturedBody["tags"].([]any)
+	if !ok || len(tags) != 1 || tags[0] != tagID {
+		t.Fatalf("expected tags=[%s] in body, got %v", tagID, capturedBody["tags"])
+	}
+}
+
+// TestUpdate_ProjectTags_EmptyValueClears covers the clearing form:
+// `--tags ""` resolves to a non-nil empty slice which must serialize as []
+// so Desktop clears the connection's tag assignments.
+func TestUpdate_ProjectTags_EmptyValueClears(t *testing.T) {
+	h := newUpdateHelper(t)
+	var capturedBody map[string]any
+	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			capturedBody = readPostBody(t, r)
+			_, _ = w.Write([]byte(`{"id":"` + validUpdateID + `","name":"n"}`))
+			return
+		}
+		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+
+	if err := h.run(`connection update ` + validUpdateID + ` --tags "" --format json`); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	tags, has := capturedBody["tags"].([]any)
+	if !has {
+		t.Fatalf("expected tags key to be present when --tags \"\" supplied; got %v", capturedBody)
+	}
+	if len(tags) != 0 {
+		t.Fatalf("expected tags=[] in body, got %v", capturedBody["tags"])
+	}
+}
+
+// TestUpdate_ProjectTags_ResolutionFailure covers the resolver failure path:
+// an unknown project name must surface as a usage error BEFORE the PATCH is
+// sent.
+func TestUpdate_ProjectTags_ResolutionFailure(t *testing.T) {
+	h := newUpdateHelper(t)
+	patchSent := false
+	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/projects":
+			_, _ = w.Write([]byte(`{"projects":[{"id":"11111111-2222-3333-4444-555555555555","name":"Prod"}]}`))
+		case r.Method == http.MethodPatch:
+			patchSent = true
+			_, _ = w.Write([]byte(`{"id":"` + validUpdateID + `","name":"n"}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	err := h.run(`connection update ` + validUpdateID + ` --project Nope --format json`)
+	if err == nil {
+		t.Fatalf("expected usage error for unknown project name")
+	}
+	if !strings.Contains(err.Error(), `unknown project "Nope"`) {
+		t.Fatalf("expected 'unknown project' in error, got: %v", err)
+	}
+	if patchSent {
+		t.Fatalf("PATCH must not be sent when project resolution fails")
 	}
 }
 

@@ -58,7 +58,7 @@ neo4j-cli desktop connection list --port 44225`,
 			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt("port")
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

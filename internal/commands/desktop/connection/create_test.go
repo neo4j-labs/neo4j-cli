@@ -26,7 +26,7 @@ import (
 )
 
 // createHelper wires `desktop.NewCmd` against an in-memory FS, with the
-// connection subtree's `newDesktopClientFn` seam pinned to a desktopclient.
+// connection subtree's `desktopclient.Connect` seam pinned to a desktopclient.
 // Client backed by an httptest server. Mirrors the createHelper pattern in
 // the parent `desktop` package's tests so the connection leaves get the same
 // hermetic end-to-end coverage.
@@ -74,7 +74,7 @@ func (h *createHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
 
-	h.t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
@@ -145,7 +145,7 @@ func TestCreate_SuccessfulCreate(t *testing.T) {
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/fastify/api/connections" {
 			capturedBody = readPostBody(t, r)
-			_, _ = w.Write([]byte(`{"id":"f4e2f3c0-1111-2222-3333-444455556666","name":"aura-prod","connectionUri":"neo4j+s://abc.databases.neo4j.io","project":"proj-1"}`))
+			_, _ = w.Write([]byte(`{"id":"f4e2f3c0-1111-2222-3333-444455556666","name":"aura-prod","connectionUri":"neo4j+s://abc.databases.neo4j.io","projects":["proj-1"]}`))
 			return
 		}
 		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
@@ -343,7 +343,7 @@ func TestCreate_Example_FlushLeft(t *testing.T) {
 func TestCreate_PortFlagPropagates(t *testing.T) {
 	h := newCreateHelper(t)
 	var gotPort int
-	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
 		gotPort = port
 		return nil, desktopclient.UnreachableError()
 	}))
@@ -358,7 +358,7 @@ func TestCreate_PortFlagPropagates(t *testing.T) {
 // canonical error mapping when Desktop is not running.
 func TestCreate_DesktopUnreachable_ReturnsCanonicalError(t *testing.T) {
 	h := newCreateHelper(t)
-	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return nil, desktopclient.UnreachableError()
 	}))
 

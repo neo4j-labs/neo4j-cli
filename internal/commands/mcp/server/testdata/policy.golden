@@ -159,10 +159,21 @@ desktop dbms plugin list	allow
 desktop dbms plugin uninstall	write
 desktop dbms start	write
 desktop dbms stop	write
+desktop dbms update	write
 desktop dbms upgrade	write
 desktop doctor	allow
 desktop install	write
 desktop list	allow
+desktop project	allow
+desktop project create	write
+desktop project delete	write
+desktop project list	allow
+desktop project update	write
+desktop tag	allow
+desktop tag create	write
+desktop tag delete	write
+desktop tag list	allow
+desktop tag update	write
 docker	allow
 docker create	write
 docker delete	write

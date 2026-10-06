@@ -27,7 +27,7 @@ import (
 )
 
 // installHelper wires `dbms.NewCmd` (which mounts the plugin subtree) against
-// an in-memory FS, with the plugin package's `newDesktopClientFn` seam pinned
+// an in-memory FS, with the plugin package's `desktopclient.Connect` seam pinned
 // to a desktopclient.Client backed by an httptest server. Mirrors the
 // listHelper / availableHelper shape — each leaf-subtree owns its own test
 // surface so the seams stay isolated and re-runs don't pollute each other.
@@ -68,7 +68,7 @@ func (h *installHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
 
-	h.t.Cleanup(plugin.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv

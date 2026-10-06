@@ -57,7 +57,7 @@ neo4j-cli desktop dbms plugin uninstall my-dbms-id --plugin apoc --format json -
 				return clierr.NewUsageError("--%s is required", pluginFlag)
 			}
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

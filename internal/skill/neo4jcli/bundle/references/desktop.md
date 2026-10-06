@@ -19,14 +19,25 @@
 - [neo4j-cli desktop dbms plugin uninstall](#neo4j-cli-desktop-dbms-plugin-uninstall)
 - [neo4j-cli desktop dbms start](#neo4j-cli-desktop-dbms-start)
 - [neo4j-cli desktop dbms stop](#neo4j-cli-desktop-dbms-stop)
+- [neo4j-cli desktop dbms update](#neo4j-cli-desktop-dbms-update)
 - [neo4j-cli desktop dbms upgrade](#neo4j-cli-desktop-dbms-upgrade)
 - [neo4j-cli desktop doctor](#neo4j-cli-desktop-doctor)
 - [neo4j-cli desktop install](#neo4j-cli-desktop-install)
 - [neo4j-cli desktop list](#neo4j-cli-desktop-list)
+- [neo4j-cli desktop project](#neo4j-cli-desktop-project)
+- [neo4j-cli desktop project create](#neo4j-cli-desktop-project-create)
+- [neo4j-cli desktop project delete](#neo4j-cli-desktop-project-delete)
+- [neo4j-cli desktop project list](#neo4j-cli-desktop-project-list)
+- [neo4j-cli desktop project update](#neo4j-cli-desktop-project-update)
+- [neo4j-cli desktop tag](#neo4j-cli-desktop-tag)
+- [neo4j-cli desktop tag create](#neo4j-cli-desktop-tag-create)
+- [neo4j-cli desktop tag delete](#neo4j-cli-desktop-tag-delete)
+- [neo4j-cli desktop tag list](#neo4j-cli-desktop-tag-list)
+- [neo4j-cli desktop tag update](#neo4j-cli-desktop-tag-update)
 
 Manage DBMSes under a local Neo4j Desktop 2 install
 
-Manage Neo4j Desktop 2 — local DBMSes (`dbms`), saved remote connections (`connection`), and install the Desktop app itself (`install`). `desktop list` shows DBMSes and saved connections together; use `desktop dbms list` or `desktop connection list` for single-resource views. Write commands (`dbms create/delete/start/stop`, `connection create/update/delete`, `install`) require `--rw`.
+Manage Neo4j Desktop 2 — local DBMSes (`dbms`), saved remote connections (`connection`), the project catalog (`project`), the tag catalog (`tag`), and install the Desktop app itself (`install`). `desktop list` shows DBMSes and saved connections together; use `desktop dbms list` or `desktop connection list` for single-resource views. Write commands (`dbms create/update/delete/start/stop`, `connection create/update/delete`, `project create/update/delete`, `tag create/update/delete`, `install`) require `--rw`.
 
 Usage: `neo4j-cli desktop`
 
@@ -129,7 +140,7 @@ neo4j-cli desktop connection list --port 44225
 
 Update a saved remote DB connection registered with Neo4j Desktop 2
 
-Update a saved remote DB connection profile by id. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. At least one of `--name --uri --username --password --description` must be supplied; the PATCH body contains ONLY the keys you set, so empty-string is a legitimate update for `--description`. `--password` with an empty value prompts interactively (no echo) on a TTY and fails with a usage error on a non-TTY, mirroring `desktop connection create`. Find connection ids with `neo4j-cli desktop list`.
+Update a saved remote DB connection profile by id. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. At least one of `--name --uri --username --password --description --project --tags` must be supplied; the PATCH body contains ONLY the keys you set, so empty-string is a legitimate update for `--description`. `--password` with an empty value prompts interactively (no echo) on a TTY and fails with a usage error on a non-TTY, mirroring `desktop connection create`. `--project`/`--tags` have REPLACE semantics: each element is a project/tag name or UUID resolved against the Desktop catalog, and the resolved arrays become the connection's entire project/tag assignments (pass an empty value to clear them). Find connection ids with `neo4j-cli desktop list`.
 
 Usage: `neo4j-cli desktop connection update <id> [flags]`
 
@@ -140,6 +151,8 @@ Flags:
 | `--description` | string | - | New description for the saved connection. Pass an empty string to clear the existing description |
 | `--name` | string | - | New human-readable name for the saved connection |
 | `--password` | string | - | New password for the remote DB. Pass an empty value on a TTY to be prompted (no echo); fails on non-TTY |
+| `--project` | stringSlice | [] | Replace the connection's project assignments; each element is a project name or UUID (repeatable/comma-separated). Pass an empty value to clear all project assignments |
+| `--tags` | stringSlice | [] | Replace the connection's tag assignments; each element is a tag name or UUID (repeatable/comma-separated). Pass an empty value to clear all tag assignments |
 | `--uri` | string | - | New Bolt URI for the remote DB (e.g. neo4j+s://abc.databases.neo4j.io) |
 | `--username` | string | - | New username used to authenticate against the remote DB |
 
@@ -154,13 +167,16 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --uri n
 
 # Clear the description by sending an empty string and emit the updated Connection as JSON
 neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --description "" --format json --rw
+
+# Reassign the connection to a project and replace its tags (names or UUIDs)
+neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --project Prod --tags backend,oncall --rw
 ```
 
 ## neo4j-cli desktop dbms
 
 Manage local DBMSes under a Neo4j Desktop 2 install
 
-Manage local Neo4j DBMSes running under a Neo4j Desktop 2 install — list, create, delete, start, stop, upgrade. Write commands (`create`, `delete`, `start`, `stop`, `upgrade`) require `--rw`. For a composed view of DBMSes plus saved remote connections see `neo4j-cli desktop list`.
+Manage local Neo4j DBMSes running under a Neo4j Desktop 2 install — list, create, delete, start, stop, upgrade, update. Write commands (`create`, `delete`, `start`, `stop`, `upgrade`, `update`) require `--rw`. For a composed view of DBMSes plus saved remote connections see `neo4j-cli desktop list`.
 
 Usage: `neo4j-cli desktop dbms`
 
@@ -454,6 +470,39 @@ neo4j-cli desktop dbms stop my-dbms-id --wait --rw
 neo4j-cli desktop dbms stop my-dbms-id --wait --format json --rw
 ```
 
+### neo4j-cli desktop dbms update
+
+Update a DBMS managed by the local Neo4j Desktop 2 install
+
+Update a DBMS managed by the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. At least one of `--name --description --project --tags` must be supplied; the PATCH body contains ONLY the keys you set, so empty-string is a legitimate update for `--description`. `--project` and `--tags` have REPLACE semantics: the values you pass become the entire set (re-run with the full list when adding one); pass an empty value (`--tags ""`) to clear the set. Each value is a Desktop catalog name or ID — names are resolved against Desktop's project/tag catalogs before the PATCH, a UUID passes through verbatim. Find DBMS ids with `neo4j-cli desktop list`.
+
+Usage: `neo4j-cli desktop dbms update <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--description` | string | - | New description for the DBMS. Pass an empty string to clear the existing description |
+| `--name` | string | - | New human-readable name for the DBMS |
+| `--project` | stringSlice | [] | Replace the DBMS's project set with the given Desktop project names or IDs (comma-separated or repeated). Pass an empty value to clear. |
+| `--tags` | stringSlice | [] | Replace the DBMS's tag set with the given Desktop tag names or IDs (comma-separated or repeated). Pass an empty value to clear. |
+
+Examples:
+
+```
+# Rename a DBMS
+neo4j-cli desktop dbms update my-dbms-id --name my-renamed-dbms --rw
+
+# Replace the tag set (names resolve against Desktop's tag catalog)
+neo4j-cli desktop dbms update my-dbms-id --tags prod,eu --rw
+
+# Move a DBMS into a project and emit the updated DbmsInfo as JSON
+neo4j-cli desktop dbms update my-dbms-id --project "Customer 360" --format json --rw
+
+# Clear all tags from a DBMS
+neo4j-cli desktop dbms update my-dbms-id --tags "" --rw
+```
+
 ### neo4j-cli desktop dbms upgrade
 
 Upgrade a DBMS managed by the local Neo4j Desktop 2 install
@@ -560,5 +609,213 @@ neo4j-cli desktop list --format json
 
 # List against a pinned port instead of probing 44222..44232
 neo4j-cli desktop list --port 44225
+```
+
+## neo4j-cli desktop project
+
+Manage projects in the local Neo4j Desktop 2 install
+
+Manage the project catalog of the local Neo4j Desktop 2 install via its local relate API on http://localhost:<port>/fastify/api — Desktop must be running. Projects are Desktop's grouping mechanism for local DBMSes and saved remote connections. Every read and mutation round-trips the full project catalog; `list` shows it, and `create`/`update`/`delete` print the affected entry. Write commands (`create`, `update`, `delete`) require `--rw`.
+
+Usage: `neo4j-cli desktop project`
+
+### neo4j-cli desktop project create
+
+Create a project in the local Neo4j Desktop 2 install
+
+Create a project in the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. Prints the created project (`id`, `name`, `created_at` as RFC3339 UTC) resolved from the post-create catalog state Desktop returns.
+
+Usage: `neo4j-cli desktop project create <name>`
+
+Examples:
+
+```
+# Create a Desktop project
+neo4j-cli desktop project create my-project --rw
+
+# Create a Desktop project and emit the created entry as JSON
+neo4j-cli desktop project create my-project --format json --rw
+```
+
+### neo4j-cli desktop project delete
+
+Delete a project from the local Neo4j Desktop 2 install
+
+Delete a project from the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. `<project>` accepts a project UUID or an exact project name from the Desktop catalog (see `neo4j-cli desktop project list`). Destructive: requires `--yes --force` (or a `y` answer at the TTY prompt) when invoked non-interactively. Prints a minimal confirmation envelope carrying the removed id.
+
+Usage: `neo4j-cli desktop project delete <project> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete a Desktop project by exact name with an interactive y/N confirmation
+neo4j-cli desktop project delete my-project --rw
+
+# Delete a Desktop project by UUID without prompting (scripts, CI, non-TTY shells)
+neo4j-cli desktop project delete f4e2f3c0-1111-2222-3333-444455556666 --yes --force --rw
+
+# Delete a Desktop project and emit a machine-readable confirmation for scripting
+neo4j-cli desktop project delete my-project --yes --force --format json --rw
+```
+
+### neo4j-cli desktop project list
+
+List projects in the local Neo4j Desktop 2 install
+
+List the project catalog of the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. Each row carries `id`, `name` and `created_at`; `created_at` is Desktop's unix-milliseconds timestamp rendered as RFC3339 UTC (empty when Desktop omits it for legacy entries). `--format json` emits a JSON array of projects; `--format toon` mirrors the JSON shape.
+
+Usage: `neo4j-cli desktop project list`
+
+Examples:
+
+```
+# List Desktop projects as a table
+neo4j-cli desktop project list
+
+# List Desktop projects as JSON (agent-friendly)
+neo4j-cli desktop project list --format json
+
+# List Desktop projects against a pinned port instead of probing 44222..44232
+neo4j-cli desktop project list --port 44225
+```
+
+### neo4j-cli desktop project update
+
+Rename a project in the local Neo4j Desktop 2 install
+
+Rename a project in the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. `<project>` accepts a project UUID or an exact project name from the Desktop catalog (see `neo4j-cli desktop project list`). `--name` is required: Desktop's ProjectUpdateSchema demands a name on every PATCH. Prints the updated project (`id`, `name`, `created_at` as RFC3339 UTC) resolved from the post-update catalog state Desktop returns.
+
+Usage: `neo4j-cli desktop project update <project> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--name` | string | - | (required) New name for the project |
+
+Examples:
+
+```
+# Rename a Desktop project addressed by its exact name
+neo4j-cli desktop project update my-project --name my-renamed-project --rw
+
+# Rename a Desktop project addressed by UUID, emitting the updated entry as JSON
+neo4j-cli desktop project update f4e2f3c0-1111-2222-3333-444455556666 --name my-renamed-project --format json --rw
+```
+
+## neo4j-cli desktop tag
+
+Manage the tag catalog of a Neo4j Desktop 2 install
+
+Manage the tag catalog of the local Neo4j Desktop 2 install — list, create, update, delete. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. Tags organise DBMSes and saved remote connections in Desktop's UI; a tag's color is one of Desktop's palette indices "1".."12" (not a hex colour). Write commands (`create`, `update`, `delete`) require `--rw`.
+
+Usage: `neo4j-cli desktop tag`
+
+### neo4j-cli desktop tag create
+
+Create a tag in the local Neo4j Desktop 2 install
+
+Create a tag in the tag catalog of the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. `--color` is optional and accepts only Desktop's palette indices "1".."12" (not a hex colour); when omitted the POST body carries no color key and Desktop picks a default. Prints the created tag (`id`, `name`, `color`) resolved from the post-create catalog state Desktop returns.
+
+Usage: `neo4j-cli desktop tag create <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--color` | string | - | Optional tag color: one of Desktop's palette indices "1".."12" (not a hex colour). Omitted from the POST body when unset |
+
+Examples:
+
+```
+# Create a tag and let Desktop pick the default color
+neo4j-cli desktop tag create production --rw
+
+# Create a tag with an explicit palette color
+neo4j-cli desktop tag create staging --color 5 --rw
+
+# Create a tag and emit the created tag as JSON
+neo4j-cli desktop tag create staging --color 5 --format json --rw
+```
+
+### neo4j-cli desktop tag delete
+
+Delete a tag from the local Neo4j Desktop 2 install
+
+Delete a tag from the tag catalog of the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. The positional `<tag>` accepts a tag UUID or an exact tag name (find both with `neo4j-cli desktop tag list`). Destructive: requires `--yes --force` (or a `y` answer at the TTY prompt) when invoked non-interactively; the confirmation fires before any Desktop contact. Prints a minimal confirmation envelope carrying the removed id.
+
+Usage: `neo4j-cli desktop tag delete <tag> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete a tag by name with an interactive y/N confirmation
+neo4j-cli desktop tag delete staging --rw
+
+# Delete a tag by UUID without prompting (scripts, CI, non-TTY shells)
+neo4j-cli desktop tag delete f4e2f3c0-1111-2222-3333-444455556666 --yes --force --rw
+
+# Delete a tag and emit a machine-readable confirmation for scripting
+neo4j-cli desktop tag delete staging --yes --force --format json --rw
+```
+
+### neo4j-cli desktop tag list
+
+List tags in the local Neo4j Desktop 2 install
+
+List the tag catalog of the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. One row per tag with `id`, `name` and `color` (Desktop's palette index "1".."12"; empty when the tag carries no color). `--format json` emits a JSON array of `Tag` objects. `--format toon` mirrors the JSON shape.
+
+Usage: `neo4j-cli desktop tag list`
+
+Examples:
+
+```
+# List tags as a table
+neo4j-cli desktop tag list
+
+# List tags as JSON (full Tag payload, agent-friendly)
+neo4j-cli desktop tag list --format json
+
+# List tags against a pinned port instead of probing 44222..44232
+neo4j-cli desktop tag list --port 44225
+```
+
+### neo4j-cli desktop tag update
+
+Update a tag in the local Neo4j Desktop 2 install
+
+Update a tag in the tag catalog of the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. The positional `<tag>` accepts a tag UUID or an exact tag name (find both with `neo4j-cli desktop tag list`). `--name` is required (Desktop's TagUpdateSchema demands it); `--color` accepts only Desktop's palette indices "1".."12" and is omitted from the PATCH body when unset. Prints the updated tag (`id`, `name`, `color`) resolved from the post-update catalog state Desktop returns.
+
+Usage: `neo4j-cli desktop tag update <tag> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--color` | string | - | New tag color: one of Desktop's palette indices "1".."12" (not a hex colour). Omitted from the PATCH body when unset |
+| `--name` | string | - | (required) New name for the tag |
+
+Examples:
+
+```
+# Rename a tag selected by name
+neo4j-cli desktop tag update staging --name pre-prod --rw
+
+# Rename and recolor a tag selected by UUID, emitting the updated tag as JSON
+neo4j-cli desktop tag update f4e2f3c0-1111-2222-3333-444455556666 --name pre-prod --color 7 --format json --rw
 ```
 

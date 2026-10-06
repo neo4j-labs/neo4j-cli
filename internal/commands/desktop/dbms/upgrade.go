@@ -78,7 +78,7 @@ neo4j-cli desktop dbms upgrade my-dbms-id --version 5.26.1 --format json --rw`,
 			port, _ := cmd.Flags().GetInt(portFlag)
 			id := args[0]
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

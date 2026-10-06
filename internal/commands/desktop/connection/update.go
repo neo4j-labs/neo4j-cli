@@ -25,6 +25,8 @@ func newUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		username    string
 		password    string
 		description string
+		projects    []string
+		tags        []string
 	)
 
 	const (
@@ -33,6 +35,8 @@ func newUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		usernameFlag    = "username"
 		passwordFlag    = "password"
 		descriptionFlag = "description"
+		projectFlag     = "project"
+		tagsFlag        = "tags"
 	)
 
 	cmd := &cobra.Command{
@@ -40,8 +44,9 @@ func newUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Update a saved remote DB connection registered with Neo4j Desktop 2",
 		Long: "Update a saved remote DB connection profile by id. " +
 			"Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. " +
-			"At least one of `--name --uri --username --password --description` must be supplied; the PATCH body contains ONLY the keys you set, so empty-string is a legitimate update for `--description`. " +
+			"At least one of `--name --uri --username --password --description --project --tags` must be supplied; the PATCH body contains ONLY the keys you set, so empty-string is a legitimate update for `--description`. " +
 			"`--password` with an empty value prompts interactively (no echo) on a TTY and fails with a usage error on a non-TTY, mirroring `desktop connection create`. " +
+			"`--project`/`--tags` have REPLACE semantics: each element is a project/tag name or UUID resolved against the Desktop catalog, and the resolved arrays become the connection's entire project/tag assignments (pass an empty value to clear them). " +
 			"Find connection ids with `neo4j-cli desktop list`.",
 		Example: `# Rename a saved connection
 neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --name aura-prod-renamed --rw
@@ -50,7 +55,10 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --name 
 neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --uri neo4j+s://new-host.databases.neo4j.io --password new-secret --rw
 
 # Clear the description by sending an empty string and emit the updated Connection as JSON
-neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --description "" --format json --rw`,
+neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --description "" --format json --rw
+
+# Reassign the connection to a project and replace its tags (names or UUIDs)
+neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --project Prod --tags backend,oncall --rw`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,9 +78,11 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --descr
 			usernameSet := cmd.Flag(usernameFlag).Changed
 			passwordSet := cmd.Flag(passwordFlag).Changed
 			descriptionSet := cmd.Flag(descriptionFlag).Changed
-			if !nameSet && !uriSet && !usernameSet && !passwordSet && !descriptionSet {
+			projectSet := cmd.Flag(projectFlag).Changed
+			tagsSet := cmd.Flag(tagsFlag).Changed
+			if !nameSet && !uriSet && !usernameSet && !passwordSet && !descriptionSet && !projectSet && !tagsSet {
 				return clierr.NewUsageError(
-					"at least one of --name, --uri, --username, --password, --description must be supplied")
+					"at least one of --name, --uri, --username, --password, --description, --project, --tags must be supplied")
 			}
 
 			ctx := cmd.Context()
@@ -90,7 +100,7 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --descr
 				password = pw
 			}
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}
@@ -115,6 +125,23 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --descr
 			if descriptionSet {
 				updateArgs.Description = &description
 			}
+			if projectSet {
+				// Replace semantics: the resolved IDs become the connection's
+				// ENTIRE project assignment. Resolution errors are already
+				// usage errors — propagate as-is.
+				resolved, err := client.ResolveProjectIDs(ctx, desktopclient.NonEmptyStrings(projects))
+				if err != nil {
+					return err
+				}
+				updateArgs.Projects = &resolved
+			}
+			if tagsSet {
+				resolved, err := client.ResolveTagIDs(ctx, desktopclient.NonEmptyStrings(tags))
+				if err != nil {
+					return err
+				}
+				updateArgs.Tags = &resolved
+			}
 
 			updated, err := client.UpdateConnection(ctx, id, updateArgs)
 			if err != nil {
@@ -131,6 +158,8 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --descr
 	cmd.Flags().StringVar(&username, usernameFlag, "", "New username used to authenticate against the remote DB")
 	cmd.Flags().StringVar(&password, passwordFlag, "", "New password for the remote DB. Pass an empty value on a TTY to be prompted (no echo); fails on non-TTY")
 	cmd.Flags().StringVar(&description, descriptionFlag, "", "New description for the saved connection. Pass an empty string to clear the existing description")
+	cmd.Flags().StringSliceVar(&projects, projectFlag, nil, "Replace the connection's project assignments; each element is a project name or UUID (repeatable/comma-separated). Pass an empty value to clear all project assignments")
+	cmd.Flags().StringSliceVar(&tags, tagsFlag, nil, "Replace the connection's tag assignments; each element is a tag name or UUID (repeatable/comma-separated). Pass an empty value to clear all tag assignments")
 
 	return cmd
 }

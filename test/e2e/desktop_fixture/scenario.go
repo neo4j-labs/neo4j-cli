@@ -88,7 +88,7 @@ func scenarioPutConnection(s *state, w http.ResponseWriter, r *http.Request) {
 		ID            string          `json:"id"`
 		Name          string          `json:"name"`
 		Description   string          `json:"description"`
-		Project       string          `json:"project"`
+		Projects      []string        `json:"projects"`
 		ConnectionURI string          `json:"connectionUri"`
 		Creds         json.RawMessage `json:"creds"`
 	}
@@ -105,7 +105,7 @@ func scenarioPutConnection(s *state, w http.ResponseWriter, r *http.Request) {
 	}
 	s.connections[body.ID] = &connection{
 		ID: body.ID, Name: body.Name, Description: body.Description,
-		Project: body.Project, ConnectionURI: body.ConnectionURI,
+		Projects: body.Projects, ConnectionURI: body.ConnectionURI,
 	}
 	if body.Creds != nil {
 		trimmed := strings.TrimSpace(string(body.Creds))

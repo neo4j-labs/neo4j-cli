@@ -184,7 +184,7 @@ neo4j-cli desktop dbms create --name my-dbms --version 5.21.0 --password superse
 			fs := cfg.Fs()
 			port, _ := cmd.Flags().GetInt(portFlag)
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

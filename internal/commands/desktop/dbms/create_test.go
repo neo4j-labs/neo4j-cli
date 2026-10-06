@@ -29,7 +29,7 @@ import (
 )
 
 // createHelper wires dbms.NewCmd against an in-memory FS, with the shared
-// `newDesktopClientFn` seam pinned to a desktopclient.Client backed by an
+// `desktopclient.Connect` seam pinned to a desktopclient.Client backed by an
 // httptest server. End-to-end: cobra flag parse → leaf RunE → desktopclient →
 // httptest handler. Poll sleeps are pinned to no-op so the 30s timeout doesn't
 // burn wall-clock time on the failure paths.
@@ -68,7 +68,7 @@ func newCreateHelper(t *testing.T) *createHelper {
 	}
 }
 
-// withHandler swaps the `newDesktopClientFn` seam to a closure that returns
+// withHandler swaps the `desktopclient.Connect` seam to a closure that returns
 // a desktopclient.Client wired to the supplied httptest handler. The handler
 // receives every request the leaf sends.
 func (h *createHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
@@ -82,7 +82,7 @@ func (h *createHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
 
-	h.t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
@@ -439,7 +439,7 @@ func TestCreate_NoEditionFlag(t *testing.T) {
 func TestCreate_PortFlagPropagatesToClientConstructor(t *testing.T) {
 	h := newCreateHelper(t)
 	var gotPort int
-	t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
 		gotPort = port
 		return nil, errors.New("stop here; we already captured the port")
 	}))
@@ -452,7 +452,7 @@ func TestCreate_PortFlagPropagatesToClientConstructor(t *testing.T) {
 
 func TestCreate_DesktopUnreachable_ReturnsCanonicalError(t *testing.T) {
 	h := newCreateHelper(t)
-	t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return nil, desktopclient.UnreachableError()
 	}))
 
