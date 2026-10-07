@@ -69,9 +69,8 @@ before stamping it onto the wheel:
 Worked example: the `v0.1.0-alpha.6` tag (the most recent prerelease in this
 repo) publishes as `0.1.0a6` on PyPI. The binary inside the wheel still reports
 `0.1.0-alpha.6` from `neo4j-cli --version` — only the wheel package version is
-PEP 440-shaped. See REQ-F-006 in
-[`../../.plans/prd-release-to-pypi.md`](../../.plans/prd-release-to-pypi.md)
-for the rationale.
+PEP 440-shaped, keeping PyPI's version parser happy while the binary reports
+the git tag verbatim.
 
 Anything outside this contract (e.g. `v0.1.0-pre.6`, `v0.1.0.alpha.6`) makes
 the workflow fail at the version-normalisation step before any wheel is built.
@@ -169,8 +168,7 @@ after rotation.
 **Follow-up — OIDC trusted publishing.** PyPI now supports OIDC-based trusted
 publishing (analogous to npm's Trusted Publishers), which would remove
 `PYPI_API_TOKEN` from the repo secret store. Migration is **out of scope for
-the initial PyPI release** but tracked as a follow-up — see "Open Questions"
-in [`../../.plans/prd-release-to-pypi.md`](../../.plans/prd-release-to-pypi.md).
+the initial PyPI release** but tracked as a follow-up.
 
 ## See also
 

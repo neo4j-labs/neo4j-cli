@@ -1,7 +1,7 @@
 # Lints distribution/installation-scripts/install-neo4j-cli.sh on every PR.
 #
-# Scope is the install script only — npm/pypi shell scripts are out of scope
-# (see .plans/prd-fix-install-checksum-macos-tahoe.md). We limit `scandir`
+# Scope is the install script only — npm/pypi shell scripts are out of scope.
+# We limit `scandir`
 # to `distribution/installation-scripts` so the action's recursive *.sh
 # discovery doesn't pick up `distribution/npm/*.sh`, `.github/scripts/*.sh`,
 # or `.research/**/*.sh`.
