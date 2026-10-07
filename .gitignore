@@ -42,5 +42,8 @@ test-api/
 # gbuild feature graphs + node checkpoints (agent planning scratch)
 /.gbuild/
 
+# agent plan artifacts (local scratch, not repo content)
+/.plans/
+
 # macOS Finder metadata
 .DS_Store
