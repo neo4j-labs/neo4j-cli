@@ -1,5 +1,9 @@
 # Neo4j CLI
 
+## Neo4j Labs
+
+This is an early-stage, community-driven tool and not part of Neo4j's supported product lineup. It's a great way to experiment, but it doesn't come with Neo4j's standard support or warranty commitments. See the [Neo4j Labs disclaimer](./LABS_DISCLAIMER.txt).
+
 ## Installation
 
 ```bash
