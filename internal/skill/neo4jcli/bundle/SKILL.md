@@ -22,7 +22,7 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 | Command | Description |
 |---------|-------------|
 | [`admin`](references/admin.md) | Manage Neo4j databases, users, roles, and privileges |
-| [`agent-context`](references/agent-context.md) | Emit the full CLI shape as JSON for AI-agent discovery |
+| [`agent-context`](references/agent-context.md) | Emit a command index (or one command's details) as JSON for AI-agent discovery |
 | [`aura`](references/aura.md) | Allows you to programmatically provision and manage your Aura resources |
 | [`config`](references/config.md) | Manage and view global configuration values |
 | [`credential`](references/credential.md) | Manage and view credential values |
