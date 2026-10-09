@@ -31,7 +31,7 @@ import (
 // Bump on any breaking shape change: renaming a top-level key, changing a
 // field's Go type, dropping a documented exit/error code, or changing the
 // recursion structure of `commands`. See AGENTS.md "Agent Context Notes".
-const schemaVersion = 1
+const schemaVersion = 2
 
 // asyncFlag is the canonical async-flag name in this repo post-CLI-87.
 const asyncFlag = "--wait"
@@ -215,4 +215,113 @@ func firstToken(use string) string {
 		use = use[:i]
 	}
 	return strings.ToLower(use)
+}
+
+// IndexEntry is one row of the compact command index: the space-joined command
+// path below the binary (e.g. "aura instance list") and its one-line summary.
+type IndexEntry struct {
+	Path  string `json:"path"`
+	Short string `json:"short"`
+}
+
+// Index is the compact default envelope: the hand-coded CLI constants plus a
+// flat command index. Details for one command come from BuildDetail.
+type Index struct {
+	SchemaVersion int               `json:"schema_version"`
+	CliVersion    string            `json:"cli_version"`
+	Binary        string            `json:"binary"`
+	Commands      []IndexEntry      `json:"commands"`
+	ExitCodes     map[string]string `json:"exit_codes"`
+	ErrorCodes    map[string]string `json:"error_codes"`
+	OutputFormats []string          `json:"output_formats"`
+	AsyncFlag     string            `json:"async_flag"`
+	Detail        string            `json:"detail"`
+}
+
+// Detail is the full description of a single command; its subcommands are
+// listed as an index so a group command stays small.
+type Detail struct {
+	SchemaVersion int          `json:"schema_version"`
+	CliVersion    string       `json:"cli_version"`
+	Binary        string       `json:"binary"`
+	Path          string       `json:"path"`
+	Use           string       `json:"use"`
+	Short         string       `json:"short"`
+	Long          string       `json:"long"`
+	Example       string       `json:"example"`
+	Aliases       []string     `json:"aliases"`
+	Deprecated    string       `json:"deprecated"`
+	Flags         []Flag       `json:"flags"`
+	Subcommands   []IndexEntry `json:"subcommands"`
+}
+
+// BuildIndex returns the compact envelope for the tree rooted at `root`.
+func BuildIndex(root *cobra.Command, cliVersion string) Index {
+	return Index{
+		SchemaVersion: schemaVersion,
+		CliVersion:    cliVersion,
+		Binary:        "neo4j-cli",
+		Commands:      flattenIndex("", root, 0),
+		ExitCodes:     exitCodes,
+		ErrorCodes:    errorCodes,
+		OutputFormats: clicfg.ValidFormatValues[:],
+		AsyncFlag:     asyncFlag,
+		Detail:        "neo4j-cli agent-context <command path...> returns long, example, flags and subcommands for one command; --full returns everything",
+	}
+}
+
+// BuildDetail resolves `path` (command names below the root, e.g. ["aura",
+// "instance", "list"]) and returns that command's full description. ok is
+// false when no available command matches.
+func BuildDetail(root *cobra.Command, cliVersion string, path []string) (Detail, bool) {
+	cmd := root
+	for _, name := range path {
+		var next *cobra.Command
+		for _, sub := range cmd.Commands() {
+			if sub.IsAvailableCommand() && firstToken(sub.Use) == strings.ToLower(name) {
+				next = sub
+				break
+			}
+		}
+		if next == nil {
+			return Detail{}, false
+		}
+		cmd = next
+	}
+	prefix := strings.ToLower(strings.Join(path, " "))
+	return Detail{
+		SchemaVersion: schemaVersion,
+		CliVersion:    cliVersion,
+		Binary:        "neo4j-cli",
+		Path:          prefix,
+		Use:           cmd.Use,
+		Short:         cmd.Short,
+		Long:          cmd.Long,
+		Example:       cmd.Example,
+		Aliases:       append([]string{}, cmd.Aliases...),
+		Deprecated:    cmd.Deprecated,
+		Flags:         collectFlags(cmd),
+		Subcommands:   flattenIndex(prefix, cmd, 0),
+	}, true
+}
+
+// flattenIndex lists every available descendant of `parent` as path + short,
+// depth-first in cobra's (alphabetical) order. `prefix` is the parent's path.
+func flattenIndex(prefix string, parent *cobra.Command, depth int) []IndexEntry {
+	out := []IndexEntry{}
+	if depth >= maxDepth {
+		return out
+	}
+	for _, sub := range parent.Commands() {
+		if !sub.IsAvailableCommand() {
+			continue
+		}
+		path := firstToken(sub.Use)
+		if prefix != "" {
+			path = prefix + " " + path
+		}
+		out = append(out, IndexEntry{Path: path, Short: sub.Short})
+		out = append(out, flattenIndex(path, sub, depth+1)...)
+	}
+	return out
 }

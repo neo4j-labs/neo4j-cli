@@ -52,10 +52,11 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Version: Version,
 		// Cobra's built-in "Error: <msg>" print is suppressed; run.go's
 		// clierr.Render is the single point of error output so JSON/plaintext
-		// envelope rendering stays consistent. SilenceUsage stays unset — the
-		// existing silenceUsageOnError hook in internal/flags handles RunE-side
-		// usage suppression.
+		// envelope rendering stays consistent. SilenceUsage is set too: cobra
+		// would otherwise append the full help (examples included) after every
+		// error; usage errors carry a one-line usage + --help hint instead.
 		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
 
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -64,8 +65,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	// Wrap cobra's flag-parse errors (unknown flag, missing value, bad type)
 	// into a typed *clierr.CLIError with exit code 2. Cobra walks up to the
 	// root for FlagErrorFunc, so one registration covers every subcommand.
-	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
-		return clierr.NewUsageError("%v", err)
+	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		return clierr.NewUsageError("%v", err).WithSuggestion(clicmd.UsageHint(c))
 	})
 
 	// Compose the root PersistentPreRunE: bind --format, enforce --rw,

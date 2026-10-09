@@ -1,6 +1,6 @@
 # Agent Context Notes
 
-`neo4j-cli agent-context` emits the full CLI shape as JSON for AI-agent discovery (Layer 2 per `agent-cli-auditor.md` §7.2). Reflected from the live cobra tree at runtime — no static artifact to keep in sync.
+`neo4j-cli agent-context` emits a compact command index (default), one command's details (`agent-context <path...>`), or the full recursive tree (`--full`) for AI-agent discovery (Layer 2 per `agent-cli-auditor.md` §7.2). Reflected from the live cobra tree at runtime — no static artifact to keep in sync.
 
 ## What's reflected vs hand-coded
 
@@ -10,6 +10,7 @@
 
 ## Schema versioning
 
+- The default output must stay compact (index = path + short only; `TestAgentContext_DefaultIsCompactIndex` caps it at 40 KB). Put per-command detail behind the path argument, never in the index.
 - Bump `schemaVersion` on breaking JSON-shape changes (rename a top-level key, change a field type, drop a documented code).
 
 ## Tests

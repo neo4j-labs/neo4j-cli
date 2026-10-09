@@ -82,7 +82,7 @@ func TestBuildContext_Envelope(t *testing.T) {
 	root := newSyntheticTree()
 	ctx := BuildContext(root, "v9.9.9-test")
 
-	assert.Equal(t, 1, ctx.SchemaVersion)
+	assert.Equal(t, 2, ctx.SchemaVersion)
 	assert.Equal(t, "v9.9.9-test", ctx.CliVersion)
 	assert.Equal(t, "neo4j-cli", ctx.Binary)
 	assert.Equal(t, "--wait", ctx.AsyncFlag)
@@ -246,4 +246,31 @@ func TestFirstToken(t *testing.T) {
 			assert.Equal(t, tc.want, firstToken(tc.in))
 		})
 	}
+}
+
+func TestBuildIndex_FlatPathsSkipHidden(t *testing.T) {
+	idx := BuildIndex(newSyntheticTree(), "dev")
+	var paths []string
+	for _, e := range idx.Commands {
+		paths = append(paths, e.Path)
+	}
+	assert.Equal(t, []string{"visible", "visible nested"}, paths)
+	assert.Equal(t, 2, idx.SchemaVersion)
+}
+
+func TestBuildDetail(t *testing.T) {
+	root := newSyntheticTree()
+	d, ok := BuildDetail(root, "dev", []string{"Visible", "nested"})
+	require.True(t, ok)
+	assert.Equal(t, "visible nested", d.Path)
+	assert.Equal(t, "nested leaf", d.Short)
+	assert.Empty(t, d.Subcommands)
+
+	d, ok = BuildDetail(root, "dev", []string{"visible"})
+	require.True(t, ok)
+	require.Len(t, d.Subcommands, 1)
+	assert.Equal(t, "visible nested", d.Subcommands[0].Path)
+
+	_, ok = BuildDetail(root, "dev", []string{"buried"})
+	assert.False(t, ok, "hidden commands are not addressable")
 }

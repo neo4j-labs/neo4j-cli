@@ -1,25 +1,31 @@
 # neo4j-cli agent-context
 
-Emit the full CLI shape as JSON for AI-agent discovery
+Emit a command index (or one command's details) as JSON for AI-agent discovery
 
-Emit a stable JSON envelope describing the neo4j-cli command tree, exit codes, error categories, supported output formats, and the canonical async flag — intended for AI agents discovering the CLI's surface.
+Emit a stable envelope describing the neo4j-cli command surface, intended for AI agents discovering it.
 
-The envelope (schema_version 1) carries: schema_version, cli_version, binary, commands (recursive tree of every visible subcommand with use/short/long/example/aliases/deprecated/flags/subcommands), exit_codes, error_codes, output_formats, and async_flag. The commands tree is reflected from the live cobra tree at every invocation — adding a new subcommand, flag, or alias auto-surfaces with no regen step.
+With no arguments the envelope (schema_version 2) is compact: schema_version, cli_version, binary, commands (a flat index of every visible command as path + short), exit_codes, error_codes, output_formats and async_flag. Pass a command path (for example "aura instance list") to get that command's long description, example, aliases, flags and subcommand index. Use --full for the complete recursive tree with every command's details (several hundred KB).
 
-JSON is the canonical machine view. On a TTY, --format defaults to a degraded flat command-list table. The same envelope is also available via --format toon. See AGENTS.md "Agent Context Notes" for the schema-versioning rules and the hand-coded constants that live in build.go.
+The index and details are reflected from the live cobra tree at every invocation — adding a new subcommand, flag, or alias auto-surfaces with no regen step. JSON is the canonical machine view; --format toon carries the same data. On a TTY, --format defaults to a flat command-list table. See AGENTS.md "Agent Context Notes" for the schema-versioning rules and the hand-coded constants that live in build.go.
 
-Usage: `neo4j-cli agent-context`
+Usage: `neo4j-cli agent-context [command-path...] [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--full` | bool | false | Emit the complete recursive command tree with all details (large) |
 
 Examples:
 
 ```
-# Emit the agent-context envelope as JSON (default when piped)
-neo4j-cli agent-context
+# List every command as a compact index (default when piped)
+neo4j-cli agent-context --format json
 
-# Emit the envelope as JSON and list the top-level commands
-neo4j-cli agent-context --format json | jq '.commands | keys'
+# Get the long description, example and flags of one command
+neo4j-cli agent-context aura instance list --format json
 
-# Inspect the flags exposed by a specific leaf via the envelope
-neo4j-cli agent-context --format json | jq -e '.commands.aura.subcommands.instance.subcommands.list.flags'
+# Dump the complete recursive tree (large)
+neo4j-cli agent-context --full --format json | jq '.commands | keys'
 ```
 

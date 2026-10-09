@@ -42,7 +42,14 @@ func SuggestSubcommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	return clierr.NewUsageError("unknown command %q for %q%s", args[0], cmd.CommandPath(), suggestionsSuffix(cmd, args[0]))
+	return clierr.NewUsageError("unknown command %q for %q%s", args[0], cmd.CommandPath(), suggestionsSuffix(cmd, args[0])).
+		WithSuggestion(UsageHint(cmd))
+}
+
+// UsageHint is the compact follow-up for a usage error: the command's one-line
+// usage and a pointer to its scoped --help, instead of the full help text.
+func UsageHint(cmd *cobra.Command) string {
+	return fmt.Sprintf("Usage: %s\nRun '%s --help' for details.", cmd.UseLine(), cmd.CommandPath())
 }
 
 // suggestionsSuffix replicates the cobra (unexported) findSuggestions

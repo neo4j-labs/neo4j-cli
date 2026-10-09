@@ -440,3 +440,31 @@ func TestRun_ExitCodesAndStreams(t *testing.T) {
 		})
 	}
 }
+
+// TestRun_UsageErrorsAreCompact asserts a bad flag or unknown command prints the
+// error, a one-line usage and a scoped --help hint — not the full help text.
+func TestRun_UsageErrorsAreCompact(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantHint string
+	}{
+		{name: "unknown flag on leaf", args: []string{"query", "--bogus"}, wantHint: "Run 'neo4j-cli query --help' for details."},
+		{name: "unknown flag at root", args: []string{"--bogus"}, wantHint: "Run 'neo4j-cli --help' for details."},
+		{name: "unknown nested command", args: []string{"aura", "instance", "nonesuch"}, wantHint: "Run 'neo4j-cli aura instance --help' for details."},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := run(context.Background(), newRunConfig(t), tc.args, IO{In: strings.NewReader(""), Out: &stdout, Err: &stderr})
+
+			assert.Equal(t, 2, code)
+			out := stdout.String() + stderr.String()
+			assert.Contains(t, out, tc.wantHint)
+			assert.Contains(t, out, "Usage: neo4j-cli")
+			assert.NotContains(t, out, "Examples:")
+			assert.NotContains(t, out, "Available Commands:")
+			assert.Less(t, len(out), 1000, "usage errors must stay compact")
+		})
+	}
+}
