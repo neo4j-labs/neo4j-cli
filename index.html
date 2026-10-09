@@ -327,6 +327,10 @@
     transition: all 0.1s;
   }
   .pill:hover { border-color: var(--border-strong); color: var(--fg); }
+  .pill { padding-right: 12px; }
+  .pill a { color: inherit; text-decoration: none; }
+  .pill span a:hover { color: var(--fg); text-decoration: underline; }
+  .pill a.pill-tag { color: #fff; }
   .pill .pill-tag {
     background: var(--accent);
     color: #fff;
@@ -904,6 +908,8 @@
   footer .links { display: flex; gap: 20px; flex-wrap: wrap; }
   footer .meta { font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted); }
   footer .meta a { text-decoration: underline; }
+  footer .disclaimer { flex-basis: 100%; font-size: 12px; color: var(--fg-faint); line-height: 1.5; }
+  footer .disclaimer a { text-decoration: underline; }
 
   /* ---------- Cursor ---------- */
   .cursor {
@@ -1063,13 +1069,10 @@
 <!-- ============== HERO ============== -->
 <section class="hero">
   <div class="container inner">
-    <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill">
-      <span class="pill-tag" style="text-transform:none">v1.16.0</span>
-      <span>open source · neo4j-labs</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;opacity:0.6">
-        <path d="M5 12h14M13 6l6 6-6 6"></path>
-      </svg>
-    </a>
+    <div class="pill">
+      <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill-tag" style="text-transform:none">v1.16.0</a>
+      <span><a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">open source</a> · <a href="https://neo4j.com/labs/" target="_blank" rel="noopener">neo4j-labs</a></span>
+    </div>
 
     <h1 class="hero-title">
       The graph database,<br>
@@ -2097,6 +2100,9 @@
       <a href="https://neo4j.com/aura/" target="_blank" rel="noopener">Aura</a>
       <a href="https://skills.sh/neo4j-contrib/neo4j-skills" target="_blank" rel="noopener">Agent Skills</a>
     </div>
+    <p class="disclaimer">
+      This is an early-stage, community-driven tool and not part of Neo4j's supported product lineup. It's a great way to experiment, but it doesn't come with Neo4j's standard support or warranty commitments. See the <a href="https://github.com/neo4j-labs/neo4j-cli/blob/main/LABS_DISCLAIMER.txt" target="_blank" rel="noopener">Neo4j Labs disclaimer</a>.
+    </p>
   </div>
 </footer>
 

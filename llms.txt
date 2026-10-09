@@ -87,3 +87,4 @@ Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-sk
 - Neo4j Docs: https://neo4j.com/docs/
 - Aura Console: https://console.neo4j.io/
 - Neo4j Agent Skills: https://skills.sh/neo4j-contrib/neo4j-skills
+- Neo4j Labs disclaimer: https://github.com/neo4j-labs/neo4j-cli/blob/main/LABS_DISCLAIMER.txt
