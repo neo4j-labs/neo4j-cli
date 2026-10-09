@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'agent-context now prints a compact command index (about 18 KB instead of about 465 KB) by default; pass a command path (e.g. `agent-context aura instance list`) for that command''s details, or --full for the previous complete tree. schema_version is now 2 and `commands` is a flat list of path/short entries by default.'
+time: 2026-10-09T10:00:00+00:00

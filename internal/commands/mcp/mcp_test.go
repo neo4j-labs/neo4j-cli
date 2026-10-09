@@ -68,16 +68,19 @@ func TestMCPGroup_AgentContextReflectsFlag(t *testing.T) {
 			require.NoError(t, err, "stderr=%s", stderr.String())
 
 			var envelope struct {
-				Commands map[string]struct {
-					Subcommands map[string]any `json:"subcommands"`
+				Commands []struct {
+					Path string `json:"path"`
 				} `json:"commands"`
 			}
 			require.NoError(t, json.Unmarshal(stdout.Bytes(), &envelope))
 
-			group, ok := envelope.Commands["mcp"]
-			assert.Equal(t, tc.enabled, ok, "commands.mcp presence must track the flag")
+			paths := map[string]bool{}
+			for _, c := range envelope.Commands {
+				paths[c.Path] = true
+			}
+			assert.Equal(t, tc.enabled, paths["mcp"], "the mcp command index entry must track the flag")
 			if tc.enabled {
-				assert.Contains(t, group.Subcommands, "tool")
+				assert.True(t, paths["mcp tool"])
 			}
 		})
 	}

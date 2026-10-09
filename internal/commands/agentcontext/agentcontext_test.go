@@ -14,6 +14,7 @@ import (
 	"github.com/neo4j/cli/internal/cli"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clicmd"
+	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/testutil/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -65,14 +66,14 @@ func runAgentContext(t *testing.T, extraArgs ...string) (stdout, stderr *bytes.B
 // TestAgentContext_Envelope covers REQ-V-001: the JSON envelope carries
 // every documented top-level field with the right cardinality.
 func TestAgentContext_Envelope(t *testing.T) {
-	stdout, stderr, err := runAgentContext(t, "--format", "json")
+	stdout, stderr, err := runAgentContext(t, "--full", "--format", "json")
 	require.NoError(t, err, "agent-context --format json must succeed; stderr=%s", stderr.String())
 
 	var ctx agentctx.Context
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &ctx),
 		"stdout must be valid JSON decodable into Context; got: %s", stdout.String())
 
-	assert.Equal(t, 1, ctx.SchemaVersion, "schema_version must be 1")
+	assert.Equal(t, 2, ctx.SchemaVersion, "schema_version must be 2")
 	assert.NotEmpty(t, ctx.CliVersion, "cli_version must be non-empty")
 	assert.Equal(t, "neo4j-cli", ctx.Binary)
 	assert.NotEmpty(t, ctx.Commands, "commands tree must be non-empty (live app has subcommands)")
@@ -102,7 +103,7 @@ func TestAgentContext_Envelope(t *testing.T) {
 // output_formats slice must be the live clicfg.ValidFormatValues — no
 // duplicated literal. reflect.DeepEqual via assert.Equal is sufficient.
 func TestAgentContext_OutputFormatsParity(t *testing.T) {
-	stdout, _, err := runAgentContext(t, "--format", "json")
+	stdout, _, err := runAgentContext(t, "--full", "--format", "json")
 	require.NoError(t, err)
 	var ctx agentctx.Context
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &ctx))
@@ -122,7 +123,7 @@ func TestAgentContext_OutputFormatsParity(t *testing.T) {
 // same instance — both halves see the post-init shape.
 func TestAgentContext_TreeCoverage(t *testing.T) {
 	cmd := newAppCmd(t)
-	cmd.SetArgs([]string{"agent-context", "--format", "json"})
+	cmd.SetArgs([]string{"agent-context", "--full", "--format", "json"})
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd.SetOut(stdout)
@@ -190,7 +191,7 @@ func TestAgentContext_TreeCoverage(t *testing.T) {
 func TestAgentContext_FormatRoundTrip(t *testing.T) {
 	for _, format := range []string{"json", "toon", "table"} {
 		t.Run(format, func(t *testing.T) {
-			stdout, stderr, err := runAgentContext(t, "--format", format)
+			stdout, stderr, err := runAgentContext(t, "--full", "--format", format)
 			require.NoError(t, err, "agent-context --format %s must succeed; stderr=%s", format, stderr.String())
 			assert.NotEmpty(t, strings.TrimSpace(stdout.String()),
 				"agent-context --format %s must write non-empty stdout", format)
@@ -198,7 +199,7 @@ func TestAgentContext_FormatRoundTrip(t *testing.T) {
 				var ctx agentctx.Context
 				require.NoError(t, json.Unmarshal(stdout.Bytes(), &ctx),
 					"json output must decode back into Context")
-				assert.Equal(t, 1, ctx.SchemaVersion)
+				assert.Equal(t, 2, ctx.SchemaVersion)
 			}
 		})
 	}
@@ -307,4 +308,60 @@ func countExampleInvocations(example string) int {
 		}
 	}
 	return n
+}
+
+// TestAgentContext_DefaultIsCompactIndex locks LABS-227: the default output is a
+// flat command index, far smaller than the full tree, with every visible
+// command present as path + short.
+func TestAgentContext_DefaultIsCompactIndex(t *testing.T) {
+	stdout, stderr, err := runAgentContext(t, "--format", "json")
+	require.NoError(t, err, "stderr=%s", stderr.String())
+	assert.Less(t, stdout.Len(), 40_000, "default agent-context output must stay compact")
+
+	var idx agentctx.Index
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &idx))
+	assert.Equal(t, 2, idx.SchemaVersion)
+	assert.NotEmpty(t, idx.Detail, "index must point at the per-command detail form")
+
+	paths := map[string]string{}
+	for _, e := range idx.Commands {
+		paths[e.Path] = e.Short
+	}
+	assert.Contains(t, paths, "aura instance list")
+	assert.NotEmpty(t, paths["query"])
+	assert.NotContains(t, stdout.String(), `"example"`, "the index must not carry per-command examples")
+}
+
+// TestAgentContext_CommandDetail covers `agent-context <path...>`.
+func TestAgentContext_CommandDetail(t *testing.T) {
+	stdout, stderr, err := runAgentContext(t, "aura", "instance", "list", "--format", "json")
+	require.NoError(t, err, "stderr=%s", stderr.String())
+
+	var d agentctx.Detail
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &d))
+	assert.Equal(t, "aura instance list", d.Path)
+	assert.NotEmpty(t, d.Example)
+	assert.NotEmpty(t, d.Flags)
+
+	stdout, _, err = runAgentContext(t, "aura", "--format", "json")
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &d))
+	assert.Equal(t, "aura", d.Path)
+	var subs []string
+	for _, e := range d.Subcommands {
+		subs = append(subs, e.Path)
+	}
+	assert.Contains(t, subs, "aura instance list", "a group's detail lists its descendants as an index")
+}
+
+func TestAgentContext_UnknownPathAndFullConflict(t *testing.T) {
+	_, _, err := runAgentContext(t, "no", "such", "command")
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.ErrorAs(t, err, &ce)
+	assert.Equal(t, 3, ce.Code)
+
+	_, _, err = runAgentContext(t, "--full", "aura")
+	require.ErrorAs(t, err, &ce)
+	assert.Equal(t, 2, ce.Code)
 }

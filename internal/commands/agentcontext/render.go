@@ -19,8 +19,8 @@ import (
 // pattern in internal/output (json.Marshal -> any -> toon.Marshal). The double
 // hop is needed because toon.Marshal walks a plain `any` shape, and going via
 // JSON honours any custom MarshalJSON impls along the way.
-func renderToon(cmd *cobra.Command, ctx agentctx.Context) error {
-	b, err := json.Marshal(ctx)
+func renderToon(cmd *cobra.Command, payload any) error {
+	b, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}

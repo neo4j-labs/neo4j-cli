@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'Unknown flags and unknown commands now print the error, a one-line usage and a `Run ''<command> --help''` hint instead of the full help text with all examples.'
+time: 2026-10-09T10:01:00+00:00
