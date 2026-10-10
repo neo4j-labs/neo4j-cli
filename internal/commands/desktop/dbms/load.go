@@ -126,7 +126,7 @@ neo4j-cli desktop dbms load neo4j-graph-examples/recommendations --name recs --p
 					)
 				}
 				cmd.SilenceUsage = true
-				client, err := newDesktopClientFn(ctx, fs, port)
+				client, err := desktopclient.Connect(ctx, fs, port)
 				if err != nil {
 					return err
 				}
@@ -141,7 +141,7 @@ neo4j-cli desktop dbms load neo4j-graph-examples/recommendations --name recs --p
 				password = pw
 			}
 			cmd.SilenceUsage = true
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

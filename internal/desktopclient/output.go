@@ -15,7 +15,7 @@ type DbmsInfoOutput struct {
 	Name          string         `json:"name"`
 	Description   string         `json:"description,omitempty"`
 	Tags          []string       `json:"tags,omitempty"`
-	Project       string         `json:"project,omitempty"`
+	Projects      []string       `json:"projects,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
 	ConnectionURI string         `json:"connection_uri,omitempty"`
 	RootPath      string         `json:"root_path,omitempty"`
@@ -46,7 +46,7 @@ type ConnectionOutput struct {
 	Name          string         `json:"name"`
 	Description   string         `json:"description,omitempty"`
 	Tags          []string       `json:"tags,omitempty"`
-	Project       string         `json:"project,omitempty"`
+	Projects      []string       `json:"projects,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
 	ConnectionURI string         `json:"connection_uri,omitempty"`
 	CreatedAt     string         `json:"created_at,omitempty"`

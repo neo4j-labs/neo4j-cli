@@ -361,6 +361,36 @@ func (c *Client) DeleteDbms(ctx context.Context, id string) (*DbmsInfo, error) {
 	return &out, nil
 }
 
+// UpdateDbms PATCHes only the populated keys among name / description /
+// tags / projects — `nil` pointer fields are dropped from the body so
+// Desktop's server-side values for those keys are left untouched. Tags and
+// projects carry Desktop catalog IDs (resolve names via ResolveTagIDs /
+// ResolveProjectIDs first).
+func (c *Client) UpdateDbms(ctx context.Context, id string, args DbmsUpdateArgs) (*DbmsInfo, error) {
+	payload := map[string]any{}
+	if args.Name != nil {
+		payload["name"] = *args.Name
+	}
+	if args.Description != nil {
+		payload["description"] = *args.Description
+	}
+	if args.Tags != nil {
+		payload["tags"] = *args.Tags
+	}
+	if args.Projects != nil {
+		payload["projects"] = *args.Projects
+	}
+	body, err := c.do(ctx, http.MethodPatch, "/dbmss/"+url.PathEscape(id), payload)
+	if err != nil {
+		return nil, err
+	}
+	var out DbmsInfo
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, clierr.NewFatalError("desktop: failed to decode updated dbms: %s", err.Error())
+	}
+	return &out, nil
+}
+
 // StartDbms issues `POST /dbmss/:id/start`. Desktop's body is a stringified
 // shell output, discarded here — callers poll GetDbms for `status=started`.
 func (c *Client) StartDbms(ctx context.Context, id string) error {
@@ -471,6 +501,12 @@ func (c *Client) UpdateConnection(ctx context.Context, id string, args Connectio
 	}
 	if args.Description != nil {
 		payload["description"] = *args.Description
+	}
+	if args.Tags != nil {
+		payload["tags"] = *args.Tags
+	}
+	if args.Projects != nil {
+		payload["projects"] = *args.Projects
 	}
 	body, err := c.do(ctx, http.MethodPatch, "/connections/"+url.PathEscape(id), payload)
 	if err != nil {

@@ -18,7 +18,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/commands/desktop"
-	"github.com/neo4j/cli/internal/commands/desktop/connection"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/neo4j/cli/internal/confirm/confirmtest"
 	"github.com/neo4j/cli/internal/desktopclient"
@@ -67,7 +66,7 @@ func (h *deleteHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	h.t.Cleanup(desktopclient.SetNowFnForTest(func() time.Time { return time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC) }))
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
-	h.t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
@@ -93,7 +92,7 @@ func (h *deleteHelper) run(command string) error {
 // fail with a usage error pointing at `desktop list` BEFORE any HTTP call.
 func TestDelete_RejectsNonUUID(t *testing.T) {
 	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		t.Fatalf("must not construct client when id is not a UUID")
 		return nil, nil
 	}))
@@ -442,7 +441,7 @@ func TestDelete_PortFlagPropagates(t *testing.T) {
 	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	var gotPort int
-	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
 		gotPort = port
 		return nil, desktopclient.UnreachableError()
 	}))
@@ -458,7 +457,7 @@ func TestDelete_PortFlagPropagates(t *testing.T) {
 func TestDelete_DesktopUnreachable_ReturnsCanonicalError(t *testing.T) {
 	h := newDeleteHelper(t)
 	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
-	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return nil, desktopclient.UnreachableError()
 	}))
 

@@ -66,7 +66,7 @@ func (h *deleteHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
 
-	h.t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
@@ -506,7 +506,7 @@ func TestDelete_PortFlagPropagatesToClientConstructor(t *testing.T) {
 	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	var gotPort int
-	t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
 		gotPort = port
 		return nil, desktopclient.UnreachableError()
 	}))
@@ -520,7 +520,7 @@ func TestDelete_PortFlagPropagatesToClientConstructor(t *testing.T) {
 func TestDelete_DesktopUnreachable_ReturnsCanonicalError(t *testing.T) {
 	h := newDeleteHelper(t)
 	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
-	t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return nil, desktopclient.UnreachableError()
 	}))
 

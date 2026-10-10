@@ -4,9 +4,7 @@
 package connection
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 
@@ -15,7 +13,6 @@ import (
 	"github.com/neo4j/cli/internal/clievents"
 	"github.com/neo4j/cli/internal/desktopclient"
 	"github.com/neo4j/cli/internal/output"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -23,38 +20,6 @@ import (
 // connectionCreateFields is the default column order for table / toon output;
 // JSON output emits the full Connection wire payload.
 var connectionCreateFields = []string{"id", "name", "connection_uri"}
-
-// newDesktopClientFn is the test seam for desktop client construction.
-var newDesktopClientFn = newDesktopClient
-
-func newDesktopClient(ctx context.Context, fs afero.Fs, port int) (*desktopclient.Client, error) {
-	// Discover runs first so its origin can be threaded into ResolveDataDir.
-	probe, err := desktopclient.Discover(ctx, port)
-	if err != nil {
-		if errors.Is(err, desktopclient.ErrNoDesktop) {
-			return nil, desktopclient.UnreachableError()
-		}
-		return nil, clierr.NewFatalError("desktop: probe failed: %s", err.Error())
-	}
-	dataDir, err := desktopclient.ResolveDataDir(ctx, fs, probe)
-	if err != nil {
-		return nil, clierr.NewFatalError("desktop: could not resolve relate data dir: %s", err.Error())
-	}
-	salt, err := desktopclient.LoadSalt(fs, dataDir)
-	if err != nil {
-		// Missing/unreadable salt = Desktop has not finished first-run auth
-		// setup. Route to the same canonical hint as a probe miss.
-		return nil, desktopclient.UnreachableError()
-	}
-	return desktopclient.NewClient(probe, salt)
-}
-
-// SetNewDesktopClientFnForTest overrides the client constructor for tests and returns a restore func.
-func SetNewDesktopClientFnForTest(fn func(context.Context, afero.Fs, int) (*desktopclient.Client, error)) func() {
-	prev := newDesktopClientFn
-	newDesktopClientFn = fn
-	return func() { newDesktopClientFn = prev }
-}
 
 // stdinIsTTYFn is the test seam for stdin TTY detection.
 var stdinIsTTYFn = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
@@ -177,7 +142,7 @@ neo4j-cli desktop connection create --name aura-dev --uri neo4j+s://xyz789.datab
 				password = pw
 			}
 
-			client, err := newDesktopClientFn(ctx, fs, port)
+			client, err := desktopclient.Connect(ctx, fs, port)
 			if err != nil {
 				return err
 			}

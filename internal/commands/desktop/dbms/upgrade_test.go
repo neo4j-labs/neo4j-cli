@@ -27,7 +27,7 @@ import (
 )
 
 // upgradeHelper mirrors createHelper/startHelper: dbms.NewCmd wired against an
-// in-memory FS, with `newDesktopClientFn` pinned to a desktopclient.Client
+// in-memory FS, with `desktopclient.Connect` pinned to a desktopclient.Client
 // backed by an httptest server. Poll sleeps are no-ops so the force/stop poll
 // runs instantly.
 type upgradeHelper struct {
@@ -64,7 +64,7 @@ func (h *upgradeHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
 
-	h.t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv

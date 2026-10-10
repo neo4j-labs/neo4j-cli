@@ -28,7 +28,7 @@ import (
 )
 
 // startHelper wires dbms.NewCmd against an in-memory FS, with the shared
-// `newDesktopClientFn` seam pinned to a desktopclient.Client backed by an
+// `desktopclient.Connect` seam pinned to a desktopclient.Client backed by an
 // httptest server. Same shape as createHelper; kept colocated with the
 // start leaf so each leaf's test surface stays self-contained.
 type startHelper struct {
@@ -66,7 +66,7 @@ func (h *startHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	srv := httptest.NewServer(handler)
 	h.t.Cleanup(srv.Close)
 
-	h.t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
@@ -338,7 +338,7 @@ func TestStart_Annotated_Write(t *testing.T) {
 func TestStart_PortFlagPropagatesToClientConstructor(t *testing.T) {
 	h := newStartHelper(t)
 	var gotPort int
-	t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
 		gotPort = port
 		return nil, errors.New("stop here; we already captured the port")
 	}))
@@ -645,7 +645,7 @@ func TestStart_Force_StopPollTimeoutAbortsStart(t *testing.T) {
 
 func TestStart_DesktopUnreachable_ReturnsCanonicalError(t *testing.T) {
 	h := newStartHelper(t)
-	t.Cleanup(dbms.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return nil, desktopclient.UnreachableError()
 	}))
 

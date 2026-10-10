@@ -28,7 +28,7 @@ import (
 )
 
 // listHelper wires desktop.NewCmd against an in-memory FS, with the new
-// `newDesktopClientFn` seam pinned to a desktopclient.Client backed by an
+// `desktopclient.Connect` seam pinned to a desktopclient.Client backed by an
 // httptest server. End-to-end: cobra flag parse → leaf RunE → desktopclient
 // → httptest handler. No real filesystem, no real port range.
 type listHelper struct {
@@ -61,7 +61,7 @@ func newListHelper(t *testing.T) *listHelper {
 	}
 }
 
-// withHandler swaps the `newDesktopClientFn` seam to a closure that returns
+// withHandler swaps the `desktopclient.Connect` seam to a closure that returns
 // a desktopclient.Client wired to the supplied httptest handler. The handler
 // receives every request the leaf sends; recordings live in
 // listHelper.handlerCalls for assertion.
@@ -79,7 +79,7 @@ func (h *listHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 	}))
 	h.t.Cleanup(srv.Close)
 
-	h.t.Cleanup(desktop.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return desktopclient.NewClient(desktopclient.ProbeResult{Origin: srv.URL}, salt)
 	}))
 	return srv
@@ -90,7 +90,7 @@ func (h *listHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 // real httptest server (e.g. empty-list hint when Desktop is off).
 func (h *listHelper) pinClientUnreachable() {
 	h.t.Helper()
-	h.t.Cleanup(desktop.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
+	h.t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return nil, desktopclient.UnreachableError()
 	}))
 }
@@ -148,7 +148,7 @@ func TestList_JSON_BothPopulated(t *testing.T) {
 		{"id":"b","name":"Bob"}
 	]`
 	connections := `[
-		{"id":"c1","name":"Aura prod","connectionUri":"neo4j+s://abc.databases.neo4j.io","project":"my-proj"},
+		{"id":"c1","name":"Aura prod","connectionUri":"neo4j+s://abc.databases.neo4j.io","projects":["my-proj"]},
 		{"id":"c2","name":"Sandbox","connectionUri":"neo4j+s://xyz.databases.neo4j.io"}
 	]`
 	h.withHandler(defaultListHandler(t, slim, perID, connections))
@@ -188,13 +188,14 @@ func TestList_JSON_BothPopulated(t *testing.T) {
 		t.Fatalf("expected tags=[x], got %v (raw: %s)", out.Dbmss[0]["tags"], h.out.String())
 	}
 	// Connections section carries the full Connection wire shape, including
-	// `project` when populated — JSON exposes every wire field even though the
+	// `projects` when populated — JSON exposes every wire field even though the
 	// column subset does not.
 	if out.Connections[0]["id"] != "c1" || out.Connections[0]["name"] != "Aura prod" {
 		t.Fatalf("expected first connection c1/Aura prod, got %v", out.Connections[0])
 	}
-	if out.Connections[0]["project"] != "my-proj" {
-		t.Fatalf("expected project=my-proj on JSON wire payload, got %v", out.Connections[0]["project"])
+	projects, ok := out.Connections[0]["projects"].([]any)
+	if !ok || len(projects) != 1 || projects[0] != "my-proj" {
+		t.Fatalf("expected projects=[my-proj] on JSON wire payload, got %v", out.Connections[0]["projects"])
 	}
 }
 
@@ -343,7 +344,7 @@ func TestList_Table_TwoSections_BothPopulated(t *testing.T) {
 	}
 	h.withHandler(defaultListHandler(t,
 		`[{"id":"a","name":"Alice"}]`, perID,
-		`[{"id":"c1","name":"Aura prod","connectionUri":"neo4j+s://abc.databases.neo4j.io","project":"my-proj"}]`))
+		`[{"id":"c1","name":"Aura prod","connectionUri":"neo4j+s://abc.databases.neo4j.io","projects":["my-proj"]}]`))
 
 	if err := h.run("list --format table"); err != nil {
 		t.Fatalf("run: %v", err)
@@ -368,10 +369,10 @@ func TestList_Table_TwoSections_BothPopulated(t *testing.T) {
 		}
 	}
 	// Connections section uses the connection column set (excludes
-	// VERSION/STATUS and PROJECT — `project` rides the wire on `--format json`
+	// VERSION/STATUS and PROJECTS — `projects` rides the wire on `--format json`
 	// only, never as a column per the PRD non-goals).
-	if strings.Contains(out, "PROJECT") {
-		t.Fatalf("expected NO PROJECT column header, got: %s", out)
+	if strings.Contains(out, "PROJECTS") {
+		t.Fatalf("expected NO PROJECTS column header, got: %s", out)
 	}
 	// Both row payloads visible.
 	if !strings.Contains(out, "Alice") {
@@ -381,7 +382,7 @@ func TestList_Table_TwoSections_BothPopulated(t *testing.T) {
 		t.Fatalf("expected connection row name 'Aura prod', got: %s", out)
 	}
 	if strings.Contains(out, "my-proj") {
-		t.Fatalf("expected NO project value rendered in table output, got: %s", out)
+		t.Fatalf("expected NO projects value rendered in table output, got: %s", out)
 	}
 }
 
@@ -511,7 +512,7 @@ func TestList_NoArgs(t *testing.T) {
 func TestList_PortFlagPropagatesToClientConstructor(t *testing.T) {
 	h := newListHelper(t)
 	var gotPort int
-	t.Cleanup(desktop.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
+	t.Cleanup(desktopclient.SetConnectFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
 		gotPort = port
 		return nil, errors.New("stop here, we already captured the port")
 	}))
