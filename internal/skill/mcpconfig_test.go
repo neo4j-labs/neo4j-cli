@@ -16,7 +16,7 @@ import (
 
 func TestWriteMCPConfig_SurgicalMerge(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	t.Setenv("HOME", "/Users/test")
+	setHomeForTest(t, "/Users/test")
 
 	// Simulate a realistic claude_desktop_config.json with preferences,
 	// globalShortcut and a pre-existing mcpServers entry.
@@ -82,7 +82,7 @@ func TestWriteMCPConfig_SurgicalMerge(t *testing.T) {
 
 func TestWriteMCPConfig_AtomicWritePreservesMode(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	t.Setenv("HOME", "/Users/test")
+	setHomeForTest(t, "/Users/test")
 
 	a := &Agent{
 		Name:      "claude-desktop",
@@ -107,7 +107,7 @@ func TestWriteMCPConfig_AtomicWritePreservesMode(t *testing.T) {
 
 func TestWriteMCPConfig_NewFileCreated(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	t.Setenv("HOME", "/Users/test")
+	setHomeForTest(t, "/Users/test")
 
 	a := &Agent{
 		Name:      "claude-desktop",
@@ -154,7 +154,7 @@ func TestRemoveMCPConfig_Idempotent(t *testing.T) {
 
 func TestRemoveMCPConfig_RemovesEntry(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	t.Setenv("HOME", "/Users/test")
+	setHomeForTest(t, "/Users/test")
 
 	config := map[string]any{
 		"preferences": map[string]any{"theme": "light"},
@@ -202,7 +202,7 @@ func TestMCPList_OrderAndDetection(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	// Set HOME and create a detect dir for claude-desktop to emulate detection
-	t.Setenv("HOME", "/Users/test")
+	setHomeForTest(t, "/Users/test")
 	a := &Agent{
 		Name:      "claude-desktop",
 		DetectDir: "$APP_SUPPORT/Claude",
@@ -225,7 +225,7 @@ func TestMCPList_OrderAndDetection(t *testing.T) {
 
 func TestMCPList_NotDetected(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	t.Setenv("HOME", "/Users/test")
+	setHomeForTest(t, "/Users/test")
 
 	installs := MCPList(fs)
 	require.Len(t, installs, 1, "only claude-desktop is MCP-capable")
@@ -239,7 +239,7 @@ func TestMCPList_NotDetected(t *testing.T) {
 // This is the acceptance-criteria golden test referenced in the task.
 func TestMCPConfig_SurgicalMergeGolden(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	t.Setenv("HOME", "/Users/test")
+	setHomeForTest(t, "/Users/test")
 
 	// Realistic config with all the things that must survive
 	existing := map[string]any{
@@ -347,34 +347,32 @@ func (e *mockErr) Is(target error) bool { return target == e.err }
 // is portable.
 func TestWriteMCPConfig_CrossPlatform(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		goos string
-		env  map[string]string
+		name    string
+		goos    string
+		home    string
+		appData string
 	}{
 		{
 			name: "darwin",
 			goos: "darwin",
-			env:  map[string]string{"HOME": "/Users/test", "APPDATA": ""},
+			home: "/Users/test",
 		},
 		{
-			name: "windows",
-			goos: "windows",
-			env: map[string]string{
-				"HOME":    filepath.FromSlash("C:/Users/test"),
-				"APPDATA": filepath.FromSlash("C:/Users/test/AppData/Roaming"),
-			},
+			name:    "windows",
+			goos:    "windows",
+			home:    filepath.FromSlash("C:/Users/test"),
+			appData: filepath.FromSlash("C:/Users/test/AppData/Roaming"),
 		},
 		{
 			name: "linux",
 			goos: "linux",
-			env:  map[string]string{"HOME": "/home/test", "APPDATA": ""},
+			home: "/home/test",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setGOOSForTest(t, tc.goos)
-			for k, v := range tc.env {
-				t.Setenv(k, v)
-			}
+			setHomeForTest(t, tc.home)
+			t.Setenv("APPDATA", tc.appData)
 			t.Setenv("XDG_CONFIG_HOME", "")
 
 			fs := afero.NewMemMapFs()
@@ -440,7 +438,7 @@ func TestWriteMCPConfig_CrossPlatform(t *testing.T) {
 
 func TestReadMCPConfigEnv(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	t.Setenv("HOME", "/Users/test")
+	setHomeForTest(t, "/Users/test")
 
 	a := &Agent{
 		Name:      "claude-desktop",
@@ -457,7 +455,7 @@ func TestReadMCPConfigEnv(t *testing.T) {
 	// Write config with neo4j-cli entry but no env block
 	t.Run("no env block", func(t *testing.T) {
 		fs2 := afero.NewMemMapFs()
-		t.Setenv("HOME", "/Users/test")
+		setHomeForTest(t, "/Users/test")
 		cp, ok := a.MCPConfigPath()
 		require.True(t, ok)
 		require.NoError(t, fs2.MkdirAll(filepath.Dir(cp), 0755))
@@ -477,7 +475,7 @@ func TestReadMCPConfigEnv(t *testing.T) {
 
 	t.Run("env block missing manifest marker", func(t *testing.T) {
 		fs2 := afero.NewMemMapFs()
-		t.Setenv("HOME", "/Users/test")
+		setHomeForTest(t, "/Users/test")
 		cp, ok := a.MCPConfigPath()
 		require.True(t, ok)
 		require.NoError(t, fs2.MkdirAll(filepath.Dir(cp), 0755))
@@ -500,7 +498,7 @@ func TestReadMCPConfigEnv(t *testing.T) {
 
 	t.Run("env block with manifest marker", func(t *testing.T) {
 		fs2 := afero.NewMemMapFs()
-		t.Setenv("HOME", "/Users/test")
+		setHomeForTest(t, "/Users/test")
 		cp, ok := a.MCPConfigPath()
 		require.True(t, ok)
 		require.NoError(t, fs2.MkdirAll(filepath.Dir(cp), 0755))
@@ -523,7 +521,7 @@ func TestReadMCPConfigEnv(t *testing.T) {
 
 	t.Run("entry absent", func(t *testing.T) {
 		fs2 := afero.NewMemMapFs()
-		t.Setenv("HOME", "/Users/test")
+		setHomeForTest(t, "/Users/test")
 		cp, ok := a.MCPConfigPath()
 		require.True(t, ok)
 		require.NoError(t, fs2.MkdirAll(filepath.Dir(cp), 0755))

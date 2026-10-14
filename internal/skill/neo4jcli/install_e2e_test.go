@@ -52,7 +52,7 @@ func TestBundleWalkAtRoot(t *testing.T) {
 // {{VERSION}}.
 func TestInstallE2E(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Cleanup(commonskill.SetHomeDirFnForTest(func() (string, error) { return home, nil }))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg"))
 
 	memFs := afero.NewMemMapFs()

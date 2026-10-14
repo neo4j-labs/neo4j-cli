@@ -40,7 +40,7 @@ body
 // (cursor) so DetectAgents returns those two. Returns the configured fs.
 func setupHomeWithAgents(t *testing.T, home string, names ...string) afero.Fs {
 	t.Helper()
-	t.Setenv("HOME", home)
+	setHomeForTest(t, home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg"))
 
 	memFs := afero.NewMemMapFs()
@@ -83,7 +83,7 @@ func TestSkillOpsRejectMCPOnlyAgent(t *testing.T) {
 }
 
 func TestInstallNoAgentsDetected(t *testing.T) {
-	t.Setenv("HOME", "/home/alice")
+	setHomeForTest(t, "/home/alice")
 	t.Setenv("XDG_CONFIG_HOME", "")
 
 	memFs := afero.NewMemMapFs()
@@ -144,7 +144,7 @@ func TestInstallUnknownAgent(t *testing.T) {
 }
 
 func TestInstallSingleAgentNotDetected(t *testing.T) {
-	t.Setenv("HOME", "/home/alice")
+	setHomeForTest(t, "/home/alice")
 	t.Setenv("XDG_CONFIG_HOME", "")
 	memFs := afero.NewMemMapFs() // no agent dirs created
 
