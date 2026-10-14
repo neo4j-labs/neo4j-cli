@@ -6,6 +6,7 @@ package skill
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -91,7 +92,7 @@ func TestClaudeDesktopPathsPerPlatform(t *testing.T) {
 			wantOk:     true,
 		},
 		{
-			name:       "windows falls back to HOME/AppData/Roaming when APPDATA is unset",
+			name:       "windows falls back to the home directory when APPDATA is unset",
 			goos:       "windows",
 			home:       filepath.FromSlash("/Users/alice"),
 			wantDetect: filepath.Join("/Users/alice", "AppData", "Roaming", "Claude"),
@@ -107,13 +108,13 @@ func TestClaudeDesktopPathsPerPlatform(t *testing.T) {
 			wantOk:     true,
 		},
 		{
-			name:   "darwin with no HOME is unresolvable",
+			name:   "darwin with no home is unresolvable",
 			goos:   "darwin",
 			home:   "",
 			wantOk: false,
 		},
 		{
-			name:   "windows with neither APPDATA nor HOME is unresolvable",
+			name:   "windows with neither APPDATA nor home is unresolvable",
 			goos:   "windows",
 			home:   "",
 			wantOk: false,
@@ -181,14 +182,14 @@ func TestExpandPath(t *testing.T) {
 		wantOk   bool
 	}{
 		{
-			name:   "bare tilde expands to HOME",
+			name:   "bare tilde expands to the home directory",
 			path:   "~",
 			home:   "/home/alice",
 			want:   "/home/alice",
 			wantOk: true,
 		},
 		{
-			name:   "tilde slash prefix expands to HOME/sub",
+			name:   "tilde slash prefix expands under the home directory",
 			path:   "~/.claude",
 			home:   "/home/alice",
 			want:   filepath.Join("/home/alice", ".claude"),
@@ -202,13 +203,13 @@ func TestExpandPath(t *testing.T) {
 			wantOk: true,
 		},
 		{
-			name:   "bare tilde with no HOME returns ok=false",
+			name:   "bare tilde with no home returns ok=false",
 			path:   "~",
 			home:   "",
 			wantOk: false,
 		},
 		{
-			name:   "tilde slash with no HOME returns ok=false",
+			name:   "tilde slash with no home returns ok=false",
 			path:   "~/.claude",
 			home:   "",
 			wantOk: false,
@@ -226,7 +227,7 @@ func TestExpandPath(t *testing.T) {
 			wantOk: true,
 		},
 		{
-			name:     "XDG unset falls back to HOME/.config",
+			name:     "XDG unset falls back to <home>/.config",
 			path:     "$XDG_CONFIG_HOME/opencode",
 			home:     "/home/alice",
 			xdgUnset: true,
@@ -234,7 +235,7 @@ func TestExpandPath(t *testing.T) {
 			wantOk:   true,
 		},
 		{
-			name:     "XDG empty string falls back to HOME/.config",
+			name:     "XDG empty string falls back to <home>/.config",
 			path:     "$XDG_CONFIG_HOME/opencode",
 			home:     "/home/alice",
 			xdg:      "",
@@ -243,7 +244,7 @@ func TestExpandPath(t *testing.T) {
 			wantOk:   true,
 		},
 		{
-			name:     "XDG fallback with no HOME returns ok=false",
+			name:     "XDG fallback with no home returns ok=false",
 			path:     "$XDG_CONFIG_HOME/opencode",
 			home:     "",
 			xdgUnset: true,
@@ -470,29 +471,29 @@ func TestDetectAgentsWindowsHomeFromSeam(t *testing.T) {
 	assert.Equal(t, "codex", got[0].Name)
 }
 
-// TestExpandPathWindowsIgnoresHomeEnv pins the core of the CLI-243 fix on
-// any host: with the ambient HOME cleared and the seam supplying a
-// Windows-shaped home, a tilde path still resolves. The pre-fix code read
-// HOME directly, so this returned ok=false.
-func TestExpandPathWindowsIgnoresHomeEnv(t *testing.T) {
-	// Indirection keeps this file free of a literal HOME env assignment:
-	// home injection goes through the seam. This test clears the env
-	// deliberately, to prove the env is no longer load-bearing.
-	const homeEnvVar = "HOME"
-	home := filepath.FromSlash("C:/Users/alice")
-	setHomeForTest(t, home)
+// TestExpandPathNativeHomeResolution exercises the unmocked homeDirFn
+// (os.UserHomeDir) on the host's real OS, mirroring
+// desktopclient.TestDefaultDataDir_NativeOS: each CI matrix entry asserts
+// its own native resolution. HOME is set to a control path that must NOT
+// steer resolution on Windows (os.UserHomeDir reads %USERPROFILE% there)
+// but MUST steer it on unix. Rewiring homeDirFn back to os.Getenv("HOME")
+// re-ships CLI-243 and fails this test on windows-latest.
+func TestExpandPathNativeHomeResolution(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Setenv("HOME", filepath.FromSlash("C:/control/home-env"))
+		profile := filepath.FromSlash("C:/control/user-profile")
+		t.Setenv("USERPROFILE", profile)
 
-	prev, had := os.LookupEnv(homeEnvVar)
-	require.NoError(t, os.Unsetenv(homeEnvVar))
-	t.Cleanup(func() {
-		if had {
-			require.NoError(t, os.Setenv(homeEnvVar, prev))
-			return
-		}
-		require.NoError(t, os.Unsetenv(homeEnvVar))
-	})
+		got, ok := expandPath("~/.codex")
+		require.True(t, ok)
+		assert.Equal(t, filepath.Join(profile, ".codex"), got)
+		return
+	}
+
+	home := filepath.FromSlash("/control/home-env")
+	t.Setenv("HOME", home)
 
 	got, ok := expandPath("~/.codex")
-	require.True(t, ok, "tilde path must resolve from the seam even without a HOME env var")
+	require.True(t, ok)
 	assert.Equal(t, filepath.Join(home, ".codex"), got)
 }

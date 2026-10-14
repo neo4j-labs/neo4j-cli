@@ -5,6 +5,7 @@ package skill_test
 
 import (
 	"bytes"
+	"errors"
 	"io/fs"
 	"path/filepath"
 	"testing"
@@ -25,10 +26,16 @@ const testSkillName = "neo4j-cli"
 // setHomeForTest points the skill package's homeDirFn seam at homeDir for
 // the duration of the test. The seam is used instead of mutating the process
 // environment, which is not cross-platform: Windows PowerShell sessions don't
-// set HOME and os.UserHomeDir reads %USERPROFILE% there.
+// set HOME and os.UserHomeDir reads %USERPROFILE% there. An empty home makes
+// the seam return an error, matching the internal-package helper's semantics.
 func setHomeForTest(t *testing.T, homeDir string) {
 	t.Helper()
-	restore := skill.SetHomeDirFnForTest(func() (string, error) { return homeDir, nil })
+	restore := skill.SetHomeDirFnForTest(func() (string, error) {
+		if homeDir == "" {
+			return "", errors.New("no home directory")
+		}
+		return homeDir, nil
+	})
 	t.Cleanup(restore)
 }
 

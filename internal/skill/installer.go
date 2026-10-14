@@ -176,7 +176,7 @@ func resolveTargets(filesystem afero.Fs, agentFilter string) ([]*Agent, error) {
 	}
 	dp, ok := a.DetectPath()
 	if !ok {
-		return nil, fmt.Errorf("%w: %s (cannot resolve HOME)", ErrAgentNotDetected, a.Name)
+		return nil, fmt.Errorf("%w: %s (cannot resolve the home directory)", ErrAgentNotDetected, a.Name)
 	}
 	exists, _ := afero.DirExists(filesystem, dp)
 	if !exists {
