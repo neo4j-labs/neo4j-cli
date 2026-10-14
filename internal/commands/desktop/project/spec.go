@@ -87,6 +87,8 @@ neo4j-cli desktop project delete my-project --yes --force --format json --rw`,
 	FindByName: desktopclient.FindProjectByName,
 	FindByID:   desktopclient.FindProjectByID,
 
-	RowJSON:   func(p desktopclient.Project) any { return toProjectOutput(p) },
-	RowValues: func(p desktopclient.Project) []string { return []string{p.ID, p.Name, formatCreatedAt(p.CreatedAt)} },
+	RowJSON: func(p desktopclient.Project) any { return toProjectOutput(p) },
+	RowValues: func(p desktopclient.Project) []string {
+		return []string{p.ID, p.Name, desktopclient.FormatUnixMsRFC3339(p.CreatedAt)}
+	},
 }

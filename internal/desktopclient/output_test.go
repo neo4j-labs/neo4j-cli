@@ -9,6 +9,25 @@ import (
 	"time"
 )
 
+func TestFormatUnixMsRFC3339(t *testing.T) {
+	tests := []struct {
+		name   string
+		unixMs int64
+		want   string
+	}{
+		{name: "positive unix-ms renders RFC3339 UTC", unixMs: 1747843200000, want: "2025-05-21T16:00:00Z"},
+		{name: "zero renders empty", unixMs: 0, want: ""},
+		{name: "negative renders empty", unixMs: -1, want: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := FormatUnixMsRFC3339(tc.unixMs); got != tc.want {
+				t.Fatalf("FormatUnixMsRFC3339(%d) = %q, want %q", tc.unixMs, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestConnectionOutputs_CreatedAtRendering(t *testing.T) {
 	// Desktop 2.3 reports createdAt as unix-milliseconds; the CLI renders it
 	// as RFC3339 UTC under `created_at`, omitted when Desktop does not report

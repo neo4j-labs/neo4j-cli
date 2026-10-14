@@ -69,14 +69,16 @@ func (c Connection) ToOutput() ConnectionOutput {
 		Projects:      c.Projects,
 		Metadata:      c.Metadata,
 		ConnectionURI: c.ConnectionURI,
-		CreatedAt:     formatCreatedAtMs(c.CreatedAt),
+		CreatedAt:     FormatUnixMsRFC3339(c.CreatedAt),
 		ManifestPath:  c.ManifestPath,
 	}
 }
 
-// formatCreatedAtMs renders a unix-milliseconds timestamp as RFC3339 UTC;
-// a zero/absent timestamp renders as "" so `omitempty` drops the key.
-func formatCreatedAtMs(unixMs int64) string {
+// FormatUnixMsRFC3339 renders a unix-milliseconds timestamp as RFC3339 UTC;
+// a non-positive (zero/absent) timestamp renders as "" so `omitempty` drops
+// the key. This is the single unix-ms → RFC3339 formatter shared by every CLI
+// projection of a Desktop timestamp.
+func FormatUnixMsRFC3339(unixMs int64) string {
 	if unixMs <= 0 {
 		return ""
 	}

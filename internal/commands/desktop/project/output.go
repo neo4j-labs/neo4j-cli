@@ -4,8 +4,6 @@
 package project
 
 import (
-	"time"
-
 	"github.com/neo4j/cli/internal/desktopclient"
 )
 
@@ -21,14 +19,5 @@ type projectOutput struct {
 }
 
 func toProjectOutput(p desktopclient.Project) projectOutput {
-	return projectOutput{ID: p.ID, Name: p.Name, CreatedAt: formatCreatedAt(p.CreatedAt)}
-}
-
-// formatCreatedAt renders a unix-milliseconds timestamp as RFC3339 UTC;
-// a zero/absent timestamp renders as "".
-func formatCreatedAt(unixMs int64) string {
-	if unixMs <= 0 {
-		return ""
-	}
-	return time.UnixMilli(unixMs).UTC().Format(time.RFC3339)
+	return projectOutput{ID: p.ID, Name: p.Name, CreatedAt: desktopclient.FormatUnixMsRFC3339(p.CreatedAt)}
 }
