@@ -148,7 +148,7 @@ func TestList_JSON_BothPopulated(t *testing.T) {
 		{"id":"b","name":"Bob"}
 	]`
 	connections := `[
-		{"id":"c1","name":"Aura prod","connectionUri":"neo4j+s://abc.databases.neo4j.io","projects":["my-proj"]},
+		{"id":"c1","name":"Aura prod","connectionUri":"neo4j+s://abc.databases.neo4j.io","projects":["my-proj"],"createdAt":1747843200000},
 		{"id":"c2","name":"Sandbox","connectionUri":"neo4j+s://xyz.databases.neo4j.io"}
 	]`
 	h.withHandler(defaultListHandler(t, slim, perID, connections))
@@ -196,6 +196,15 @@ func TestList_JSON_BothPopulated(t *testing.T) {
 	projects, ok := out.Connections[0]["projects"].([]any)
 	if !ok || len(projects) != 1 || projects[0] != "my-proj" {
 		t.Fatalf("expected projects=[my-proj] on JSON wire payload, got %v", out.Connections[0]["projects"])
+	}
+	// Desktop 2.3's numeric createdAt decodes and renders as RFC3339 UTC;
+	// the key is omitted entirely when Desktop does not report one.
+	wantCreatedAt := time.UnixMilli(1747843200000).UTC().Format(time.RFC3339)
+	if out.Connections[0]["created_at"] != wantCreatedAt {
+		t.Fatalf("expected created_at=%q, got %v", wantCreatedAt, out.Connections[0]["created_at"])
+	}
+	if _, ok := out.Connections[1]["created_at"]; ok {
+		t.Fatalf("expected created_at omitted when absent on the wire, got %v", out.Connections[1])
 	}
 }
 

@@ -738,6 +738,51 @@ func TestClient_ListConnections_SendsAuthHeadersAndDecodes(t *testing.T) {
 	}
 }
 
+func TestClient_ListConnections_CreatedAtDecode(t *testing.T) {
+	// Desktop 2.3 changed the createdAt wire field from an RFC3339 string to
+	// a numeric unix-milliseconds epoch; older Desktop versions omit the
+	// field entirely. Both shapes must decode.
+	tests := []struct {
+		name    string
+		payload string
+		want    int64
+	}{
+		{
+			name:    "numeric createdAt (Desktop 2.3)",
+			payload: `[{"id":"c1","name":"aura","connectionUri":"neo4j+s://abc.databases.neo4j.io","createdAt":1747843200000}]`,
+			want:    1747843200000,
+		},
+		{
+			name:    "createdAt absent (older Desktop)",
+			payload: `[{"id":"c1","name":"aura","connectionUri":"neo4j+s://abc.databases.neo4j.io"}]`,
+			want:    0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			const salt, clientID = "salt", "cid"
+			pinClientSeams(t, clientID, time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC))
+
+			srv, probe := newAuthedServer(t, salt, clientID, func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(tc.payload))
+			})
+			_ = srv
+
+			cl, _ := NewClient(probe, salt)
+			got, err := cl.ListConnections(context.Background())
+			if err != nil {
+				t.Fatalf("ListConnections: %v", err)
+			}
+			if len(got) != 1 {
+				t.Fatalf("len = %d, want 1", len(got))
+			}
+			if got[0].CreatedAt != tc.want {
+				t.Fatalf("CreatedAt = %d, want %d", got[0].CreatedAt, tc.want)
+			}
+		})
+	}
+}
+
 func TestClient_ListConnections_EmptyResponse(t *testing.T) {
 	const salt, clientID = "salt", "cid"
 	pinClientSeams(t, clientID, time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC))

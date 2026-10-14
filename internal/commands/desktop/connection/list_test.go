@@ -85,7 +85,7 @@ func TestConnectionList_JSON_RendersConnectionArray(t *testing.T) {
 			return
 		}
 		_, _ = w.Write([]byte(`[
-			{"id":"c1","name":"aura-dev","connectionUri":"neo4j+s://abc.databases.neo4j.io"},
+			{"id":"c1","name":"aura-dev","connectionUri":"neo4j+s://abc.databases.neo4j.io","createdAt":1747843200000},
 			{"id":"c2","name":"self-hosted","connectionUri":"neo4j://10.0.0.1:7687"}
 		]`))
 	})
@@ -101,6 +101,15 @@ func TestConnectionList_JSON_RendersConnectionArray(t *testing.T) {
 	}
 	if got[0]["id"] != "c1" || got[1]["id"] != "c2" {
 		t.Fatalf("expected ids [c1 c2], got %v", got)
+	}
+	// Desktop 2.3's numeric createdAt renders as RFC3339 UTC; the key is
+	// omitted entirely when Desktop does not report one.
+	wantCreatedAt := time.UnixMilli(1747843200000).UTC().Format(time.RFC3339)
+	if got[0]["created_at"] != wantCreatedAt {
+		t.Fatalf("expected created_at=%q, got %v", wantCreatedAt, got[0]["created_at"])
+	}
+	if _, ok := got[1]["created_at"]; ok {
+		t.Fatalf("expected created_at omitted when absent on the wire, got %v", got[1])
 	}
 }
 

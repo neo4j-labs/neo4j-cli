@@ -62,7 +62,8 @@ type Credentials struct {
 // Connection is a saved remote DB connection profile (Aura URI / remote Neo4j
 // endpoint) the user has registered with Desktop. Optional fields are
 // `omitempty` so they disappear from `--format json` output when Desktop
-// doesn't populate them.
+// doesn't populate them. `CreatedAt` is an optional unix-milliseconds
+// timestamp (Desktop 2.3+); older Desktop versions omit it.
 type Connection struct {
 	ID            string         `json:"id"`
 	Name          string         `json:"name"`
@@ -71,7 +72,7 @@ type Connection struct {
 	Projects      []string       `json:"projects,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
 	ConnectionURI string         `json:"connectionUri,omitempty"`
-	CreatedAt     string         `json:"createdAt,omitempty"`
+	CreatedAt     int64          `json:"createdAt,omitempty"`
 	ManifestPath  string         `json:"manifestPath,omitempty"`
 }
 

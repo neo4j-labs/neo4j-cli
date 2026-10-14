@@ -3,6 +3,8 @@
 
 package desktopclient
 
+import "time"
+
 // This file holds OUTPUT projections only. The wire structs in types.go keep
 // Desktop's camelCase tags because they both parse Desktop's HTTP responses and
 // serialize request bodies. These projections re-tag the CLI-rendered output as
@@ -41,6 +43,8 @@ func DbmsInfoOutputs(items []DbmsInfo) []DbmsInfoOutput {
 }
 
 // ConnectionOutput is the snake_case CLI-rendered projection of Connection.
+// CreatedAt is Desktop's unix-milliseconds timestamp rendered as RFC3339 UTC,
+// omitted when Desktop does not report one.
 type ConnectionOutput struct {
 	ID            string         `json:"id"`
 	Name          string         `json:"name"`
@@ -53,8 +57,31 @@ type ConnectionOutput struct {
 	ManifestPath  string         `json:"manifest_path,omitempty"`
 }
 
-// ToOutput projects a Connection onto its snake_case render shape.
-func (c Connection) ToOutput() ConnectionOutput { return ConnectionOutput(c) }
+// ToOutput projects a Connection onto its snake_case render shape. Unlike
+// DbmsInfo this is NOT a straight struct conversion: the wire's int64
+// unix-milliseconds CreatedAt is rendered as an RFC3339 UTC string.
+func (c Connection) ToOutput() ConnectionOutput {
+	return ConnectionOutput{
+		ID:            c.ID,
+		Name:          c.Name,
+		Description:   c.Description,
+		Tags:          c.Tags,
+		Projects:      c.Projects,
+		Metadata:      c.Metadata,
+		ConnectionURI: c.ConnectionURI,
+		CreatedAt:     formatCreatedAtMs(c.CreatedAt),
+		ManifestPath:  c.ManifestPath,
+	}
+}
+
+// formatCreatedAtMs renders a unix-milliseconds timestamp as RFC3339 UTC;
+// a zero/absent timestamp renders as "" so `omitempty` drops the key.
+func formatCreatedAtMs(unixMs int64) string {
+	if unixMs <= 0 {
+		return ""
+	}
+	return time.UnixMilli(unixMs).UTC().Format(time.RFC3339)
+}
 
 // ConnectionOutputs projects a slice, returning a non-nil empty slice for nil
 // input so JSON renders `[]` rather than `null`.
