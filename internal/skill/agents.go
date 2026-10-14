@@ -15,6 +15,24 @@ import (
 	"github.com/spf13/afero"
 )
 
+// homeDirFn is overridable for hermetic tests; production wires it to
+// os.UserHomeDir, which reads $HOME on Unix and %USERPROFILE% on Windows.
+// We never read the HOME env var directly: Windows PowerShell sessions do
+// not set it, and a test that mutates the process environment to inject a
+// home is not cross-platform.
+var homeDirFn = os.UserHomeDir
+
+// SetHomeDirFnForTest overrides the internal home-directory resolver for the
+// duration of a test and returns a restore function. External tests
+// (neo4jcli/install_e2e_test.go) use it to inject a home without mutating the
+// process environment, which is not cross-platform (Windows resolves the
+// home via %USERPROFILE%).
+func SetHomeDirFnForTest(fn func() (string, error)) func() {
+	prev := homeDirFn
+	homeDirFn = fn
+	return func() { homeDirFn = prev }
+}
+
 // MCPFormat identifies the on-disk shape of an agent's MCP server config,
 // so a writer can be selected without special-casing agent names. Only
 // meaningful when Agent.MCPConfig is set. Unrelated to the CLI's
@@ -71,8 +89,8 @@ var AGENTS = []Agent{
 }
 
 // DetectPath returns the expanded DetectDir and ok=true if expansion
-// succeeded. ok=false signals that no $HOME is available, in which case
-// the agent should be treated as not-detected.
+// succeeded. ok=false signals that no home directory is available, in
+// which case the agent should be treated as not-detected.
 func (a Agent) DetectPath() (string, bool) {
 	return expandPath(a.DetectDir)
 }
@@ -187,10 +205,10 @@ var currentGOOS = runtime.GOOS
 
 // expandPath resolves a path containing `~`, `$XDG_CONFIG_HOME` or
 // `$APP_SUPPORT`.
-//   - `~` alone -> $HOME
-//   - `~/foo`   -> $HOME/foo
-//   - `$XDG_CONFIG_HOME` -> that env var, falling back to $HOME/.config
-//     when unset or empty
+//   - `~` alone -> the user home directory (homeDirFn)
+//   - `~/foo`   -> the home directory joined with foo
+//   - `$XDG_CONFIG_HOME` -> that env var, falling back to the home
+//     directory's .config when unset or empty
 //   - `$APP_SUPPORT` -> the per-platform application-support root (see
 //     appSupportDir)
 //   - other paths are returned unchanged
@@ -198,7 +216,13 @@ var currentGOOS = runtime.GOOS
 // Returns ok=false only when the environment cannot supply the base the
 // path needs.
 func expandPath(path string) (string, bool) {
-	home := os.Getenv("HOME")
+	// A seam error (e.g. HOME unset on Unix, %USERPROFILE% missing on
+	// Windows) leaves home empty so tilde paths stay unresolvable rather
+	// than silently expanding against a relative base.
+	home, err := homeDirFn()
+	if err != nil {
+		home = ""
+	}
 
 	if path == "~" {
 		if home == "" {
@@ -239,8 +263,8 @@ func substituteToken(path, token, base string) string {
 	return filepath.FromSlash(strings.ReplaceAll(path, token, base))
 }
 
-// xdgConfigDir resolves $XDG_CONFIG_HOME, falling back to $HOME/.config
-// when unset or empty.
+// xdgConfigDir resolves $XDG_CONFIG_HOME, falling back to the home
+// directory's .config when unset or empty.
 func xdgConfigDir(home string) (string, bool) {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return xdg, true
@@ -260,8 +284,9 @@ func xdgConfigDir(home string) (string, bool) {
 // darwin and windows have official Claude Desktop builds; an absent
 // directory already resolves to not-detected.
 //
-// Reads $HOME rather than user.Current so subprocess tests stay isolated,
-// following internal/clicfg/darwin.go.
+// Reads home through the homeDirFn seam rather than user.Current so
+// subprocess tests stay isolated and the Windows branch is reachable on any
+// host.
 func appSupportDir(home string) (string, bool) {
 	switch currentGOOS {
 	case "darwin":
