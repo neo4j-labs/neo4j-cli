@@ -15,7 +15,8 @@
 //   - update.go        — cobra wiring + RunE flow that ties the modules
 //     together. The flow follows REQ-F-002…REQ-F-016 in
 //     prd-self-update-command.md.
-//   - release.go       — GitHub release discovery + asset URL builder.
+//   - release.go       — release discovery via the static releases.json
+//     metadata served from neo4j.sh + GoReleaser-style asset URL builder.
 //   - install_method.go— is the running binary under a known package-manager
 //     prefix? + the rich passthrough hint.
 //   - swap.go          — download + verify + extract + atomic rename.
