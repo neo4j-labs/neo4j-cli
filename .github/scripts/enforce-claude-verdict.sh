@@ -34,14 +34,18 @@ export LC_ALL=C.UTF-8
 # Env vars (required): REVIEW_KIND, PR_NUMBER,
 #                      GITHUB_REPOSITORY, GH_TOKEN
 # Env var (optional):  MODE — "detect" runs the same tier
-#                      cascade but always exits 0 and writes
-#                      exactly one line, verdict=pass|fail|none,
-#                      to $GITHUB_OUTPUT (none = no tier produced
-#                      a verdict). Any other value (or unset)
-#                      keeps the fail-closed enforce semantics.
-#                      In detect mode an unset GITHUB_OUTPUT
-#                      falls back to /dev/stdout (local runs);
-#                      enforce mode never touches GITHUB_OUTPUT.
+#                      cascade and writes exactly one line,
+#                      verdict=pass|fail|none, to $GITHUB_OUTPUT
+#                      (none = no tier produced a verdict),
+#                      exiting 0 for all three verdict outcomes.
+#                      Infrastructure failures still exit 1:
+#                      missing required env vars, missing gh/jq,
+#                      or a gh api failure. Any other value (or
+#                      unset) keeps the fail-closed enforce
+#                      semantics. In detect mode an unset
+#                      GITHUB_OUTPUT falls back to /dev/stdout
+#                      (local runs); enforce mode never touches
+#                      GITHUB_OUTPUT.
 # Env var (optional):  HEAD_SHA — when non-empty, a marker
 #                      comment is accepted only if its body
 #                      carries <!-- claude-head-sha: <sha> -->
