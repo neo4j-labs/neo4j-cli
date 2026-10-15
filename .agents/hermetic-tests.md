@@ -36,7 +36,7 @@ Gotchas for keeping tests deterministic and isolated from the host machine.
 
 ## Update-check e2e
 
-- Tier-1 e2e for `update check` uses the `e2e_seams` build tag + `test/e2e/release_fixture` to cover both `channel: stable` and `channel: pre-release` deterministically (two scenarios, sequential restarts). A sibling `Update e2e (schema-only live smoke)` step pipes real-api.github.com output through `check_json --schema-only` as a calendar-immune contract canary.
+- Tier-1 e2e for `update check` uses the `e2e_seams` build tag + `test/e2e/release_fixture` to cover both `channel: stable` and `channel: pre-release` deterministically (two scenarios, sequential restarts). The fixture serves `GET /releases.json` (schema_version 1) from scenario testdata; the `e2e_seams`-only env vars point the CLI at it: `NEO4J_CLI_UPDATE_E2E_METADATA_URL` overrides the metadata base URL (it replaced the retired `NEO4J_CLI_UPDATE_E2E_API_URL` when discovery moved from the GitHub API to the static `releases.json` document), `NEO4J_CLI_UPDATE_E2E_DL_URL` overrides the download base URL, and `NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP` drops the HTTPS requirement for `127.0.0.1`/`localhost`. The tier-2 `update_fixture` serves `/releases.json` plus the download endpoints on one port. A sibling `Update e2e (schema-only live smoke)` step sets no metadata override and no `GH_TOKEN`, so it hits the production `https://neo4j.sh/releases.json` and pipes the output through `check_json --schema-only` as a calendar-immune contract canary.
 
 ## Cobra completion injection
 

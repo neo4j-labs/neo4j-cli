@@ -21,27 +21,30 @@ so we can triage quickly.
 
 ## Supply-chain trust root for `neo4j-cli update`
 
-`neo4j-cli update` downloads a replacement binary from GitHub
-releases and atomically swaps it for the running one. When you run
-`update`, you are extending trust to the following links:
+`neo4j-cli update` discovers available releases from a static
+metadata document on `neo4j.sh`, downloads a replacement binary from
+GitHub releases, and atomically swaps it for the running one. When you
+run `update`, you are extending trust to the following links:
 
 1. **Go's TLS stack against the host root certificate store.** All
    HTTPS connections made by `update` use Go's standard `crypto/tls`
    verification against the operating-system root store. If the host
    root store is compromised, TLS verification is compromised.
 
-2. **TLS certificates for the five-host GitHub allowlist.** `update`
+2. **TLS certificates for the five-host allowlist.** `update`
    will only connect to the following hosts; any redirect or URL
    pointing elsewhere is rejected before a connection is opened:
 
+   - `neo4j.sh` (release metadata)
    - `github.com`
-   - `api.github.com`
    - `codeload.github.com`
    - `objects.githubusercontent.com`
    - `release-assets.githubusercontent.com`
 
-   These are listed explicitly rather than as a wildcard so that a
-   network operator can reason precisely about firewall posture.
+   The GitHub hosts serve the release assets; `neo4j.sh` serves only
+   the release-metadata document. These are listed explicitly rather
+   than as a wildcard so that a network operator can reason precisely
+   about firewall posture.
 
 3. **Integrity of GitHub release-assets storage for
    `neo4j-labs/neo4j-cli`.** The release archive and its
