@@ -63,9 +63,9 @@ var (
 	// uses internal/skill.List; tests swap to seed installed/uninstalled
 	// agents without touching disk.
 	listSkillsFn = commonskill.List
-	// listReleasesFn fetches the 30 latest releases from the GitHub API for
-	// changelog rendering after a successful swap. Tests swap to control the
-	// returned release list without network.
+	// listReleasesFn fetches the release list from the releases.json metadata
+	// document for changelog rendering after a successful swap. Tests swap to
+	// control the returned release list without network.
 	listReleasesFn = ListReleases
 	// installSkillFn refreshes a single agent's bundle. Production uses
 	// internal/skill.Install with a one-agent filter; tests swap to assert

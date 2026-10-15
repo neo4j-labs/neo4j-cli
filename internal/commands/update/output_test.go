@@ -161,7 +161,7 @@ func TestRunUpdate_Changelog_PropagatesPreReleases(t *testing.T) {
 	withListReleases(t, func(ctx context.Context, preReleases bool) ([]Release, error) {
 		gotPreReleases = preReleases
 		return []Release{
-			{TagName: "v1.2.0-alpha.1", Prerelease: true, Body: "Alpha notes"},
+			{TagName: "v1.2.0-alpha.1", Body: "Alpha notes"},
 			{TagName: "v1.1.0", Body: "Stable notes"},
 		}, nil
 	})

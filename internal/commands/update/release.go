@@ -3,13 +3,13 @@
 
 // Package update implements the `neo4j-cli update` self-update command.
 //
-// release.go owns the GitHub release discovery side of the package: fetching
-// releases from the GitHub API, filtering them by --pre-releases via
-// golang.org/x/mod/semver, and constructing GoReleaser-style archive +
-// checksum URLs. Production callers use Latest, BuildAssetURLs, and
-// ValidateVersionTag; the package-level test seams (apiBaseURL, dlBaseURL,
-// goosFn, goarchFn, httpDoFn) let tests drive the path against an httptest
-// server without touching real GitHub.
+// release.go owns the release discovery side of the package: fetching the
+// static releases.json metadata document served from neo4j.sh, filtering
+// releases by --pre-releases via golang.org/x/mod/semver, and constructing
+// GoReleaser-style archive + checksum URLs. Production callers use Latest,
+// BuildAssetURLs, and ValidateVersionTag; the package-level test seams
+// (metadataBaseURL, dlBaseURL, goosFn, goarchFn, httpDoFn) let tests drive
+// the path against an httptest server without touching real network hosts.
 package update
 
 import (
@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,17 +31,29 @@ import (
 // constant rather than a flag — REQ "no support for forks" in the PRD.
 const repoSlug = "neo4j-labs/neo4j-cli"
 
-// httpTimeout caps any single GitHub HTTP call. Network failures surface as
-// errors rather than hanging indefinitely, but the timeout is generous enough
-// that a slow connection on the release-list call (which paginates 30 entries
-// of metadata) still completes.
+// httpTimeout caps any single metadata/download HTTP call. Network failures
+// surface as errors rather than hanging indefinitely, but the timeout is
+// generous enough that a slow connection on the release-metadata call still
+// completes.
 const httpTimeout = 30 * time.Second
 
+// maxMetadataBytes caps the releases.json body size. All published releases
+// of metadata are well under 1 MiB; an oversized body indicates either a
+// misconfigured proxy or a malicious server impersonating neo4j.sh, and must
+// fail the whole fetch rather than be truncated into a partial decode.
+const maxMetadataBytes = 4 << 20 // 4 MiB
+
+// metadataSchemaVersion is the only releases.json schema version this CLI
+// understands. Any other value hard-fails the fetch — a silently
+// mis-decoded document is worse than a loud error.
+const metadataSchemaVersion = 1
+
 // Test seams. Production fills with the real values; tests swap via the
-// withApiBaseURL / withDlBaseURL / withGoos / withGoarch helpers below.
+// withMetadataBaseURL / withDlBaseURL / withGoos / withGoarch helpers below.
 var (
-	// apiBaseURL is the GitHub REST API root used for release discovery.
-	apiBaseURL = "https://api.github.com"
+	// metadataBaseURL is the static host serving the releases.json release
+	// metadata document used for release discovery.
+	metadataBaseURL = "https://neo4j.sh"
 	// dlBaseURL is the host for release download URLs (archives + checksums).
 	dlBaseURL = "https://github.com"
 	// goosFn / goarchFn shadow runtime.GOOS / runtime.GOARCH so the asset URL
@@ -62,18 +74,31 @@ var (
 // hint per REQ-F-006.
 var ErrNoStableRelease = errors.New("no stable release published yet")
 
-// ErrTagNotFound is returned by GetByTag when the named tag does not match a
-// non-draft release on the API. The RunE flow surfaces this as a clear "tag
-// not found" error per the task-006 acceptance criteria.
+// ErrTagNotFound is returned by GetByTag when the named tag does not match
+// any release in the metadata document. The RunE flow surfaces this as a
+// clear "tag not found" error per the task-006 acceptance criteria.
 var ErrTagNotFound = errors.New("release tag not found")
 
-// Release is the slim subset of the GitHub release JSON the package needs.
-// Field names match the REST API; extra fields are ignored.
+// Release is the slim subset of a releases.json entry the package needs.
+// Field names match the releases.json schema (schema_version 1); extra
+// fields (name, prerelease, published_at, …) are ignored. The body is the
+// GitHub release markdown verbatim — trimReleaseBody in changelog.go remains
+// the single trimming point. Drafts never appear: the generator excludes
+// them, so the schema carries no draft key.
 type Release struct {
-	TagName    string `json:"tag_name"`
-	Draft      bool   `json:"draft"`
-	Prerelease bool   `json:"prerelease"`
-	Body       string `json:"body"`
+	TagName string `json:"tag"`
+	Body    string `json:"body"`
+}
+
+// releasesMetadata mirrors the releases.json document (schema_version 1).
+// generated_at / repository are informational only — the CLI never acts on
+// them. Releases is a pointer so a missing or null "releases" key is
+// distinguishable from an empty array and fails the whole fetch.
+type releasesMetadata struct {
+	SchemaVersion int        `json:"schema_version"`
+	GeneratedAt   string     `json:"generated_at"`
+	Repository    string     `json:"repository"`
+	Releases      *[]Release `json:"releases"`
 }
 
 // AssetURLs is the pair of URLs needed to fetch + verify a release asset.
@@ -83,8 +108,8 @@ type AssetURLs struct {
 }
 
 // Latest returns the head release matching the stable / pre-release filter.
-// preReleases=false keeps tags where semver.Prerelease(tag) == ""; true accepts
-// any non-draft release. Returns ErrNoStableRelease when the stable filter
+// preReleases=false keeps tags where semver.Prerelease(tag) == ""; true
+// accepts any release. Returns ErrNoStableRelease when the stable filter
 // yields zero matches.
 func Latest(ctx context.Context, preReleases bool) (*Release, error) {
 	releases, err := fetchReleases(ctx)
@@ -103,18 +128,15 @@ func Latest(ctx context.Context, preReleases bool) (*Release, error) {
 	return &r, nil
 }
 
-// GetByTag returns the named release, or ErrTagNotFound when the tag does not
-// match any non-draft release. The caller is expected to have validated the
-// tag via ValidateVersionTag before calling this.
+// GetByTag returns the named release, or ErrTagNotFound when the tag does
+// not match any release in the metadata document. The caller is expected to
+// have validated the tag via ValidateVersionTag before calling this.
 func GetByTag(ctx context.Context, tag string) (*Release, error) {
 	releases, err := fetchReleases(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for _, r := range releases {
-		if r.Draft {
-			continue
-		}
 		if r.TagName == tag {
 			rr := r
 			return &rr, nil
@@ -123,9 +145,10 @@ func GetByTag(ctx context.Context, tag string) (*Release, error) {
 	return nil, ErrTagNotFound
 }
 
-// ListReleases returns all non-draft releases matching the pre-release filter,
-// newest first (API order). Applies the same three filters Latest uses: skip
-// drafts, skip non-semver tags, skip prereleases unless preReleases is true.
+// ListReleases returns all releases matching the pre-release filter, newest
+// first (semver descending — file order is never trusted). Applies the same
+// two filters Latest uses: skip non-semver tags, skip prereleases unless
+// preReleases is true.
 func ListReleases(ctx context.Context, preReleases bool) ([]Release, error) {
 	releases, err := fetchReleases(ctx)
 	if err != nil {
@@ -134,14 +157,11 @@ func ListReleases(ctx context.Context, preReleases bool) ([]Release, error) {
 	return filterReleases(releases, preReleases), nil
 }
 
-// filterReleases applies the three-check release filter (drafts, non-semver,
+// filterReleases applies the two-check release filter (non-semver,
 // prereleases) without aliasing the input slice's backing array.
 func filterReleases(releases []Release, preReleases bool) []Release {
 	filtered := make([]Release, 0, len(releases))
 	for _, r := range releases {
-		if r.Draft {
-			continue
-		}
 		if !semver.IsValid(r.TagName) {
 			continue
 		}
@@ -153,79 +173,75 @@ func filterReleases(releases []Release, preReleases bool) []Release {
 	return filtered
 }
 
-// fetchReleases hits the GitHub REST API and decodes the response. Honors
-// GH_TOKEN / GITHUB_TOKEN for ratelimit relief; the token value is never
-// included in any returned error string.
+// fetchReleases downloads the static releases.json metadata document and
+// decodes it. No authentication is sent or read from the environment — the
+// document is public and anonymous by design (CLI-244).
 func fetchReleases(ctx context.Context) ([]Release, error) {
-	url := fmt.Sprintf("%s/repos/%s/releases?per_page=30", apiBaseURL, repoSlug)
+	url := metadataBaseURL + "/releases.json"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build releases request: %w", err)
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "neo4j-cli-update")
-	if tok := releaseAuthToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
 
 	resp, err := httpDoFn(req)
 	if err != nil {
-		// req.URL is the public GitHub API endpoint; no token leakage risk
-		// because Authorization is in headers, not the URL. Net/http's
-		// *url.Error wrapping does not echo request headers either.
+		// req.URL is the public metadata endpoint; no secret leakage risk
+		// because no credentials are attached to the request at all.
 		return nil, fmt.Errorf("fetch releases: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// REQ-S-001 / defense-in-depth against a hijacked GitHub API: validate the
-	// FINAL URL host after net/http transparently followed any redirects. The
-	// stdlib already strips the Authorization header on cross-host redirects,
-	// but pinning the response host means we never read or decode a JSON
-	// payload from an unexpected origin. Reuses the swap.go allowedDownloadHosts
-	// allowlist (which already includes api.github.com); tests that point
-	// apiBaseURL at httptest.NewServer add the loopback host via
-	// withAllowedHost as they do for the swap path.
+	// REQ-S-001 / defense-in-depth against a hijacked metadata host: validate
+	// the FINAL URL host after net/http transparently followed any redirects.
+	// Pinning the response host means we never read or decode a JSON payload
+	// from an unexpected origin. Reuses the swap.go allowedDownloadHosts
+	// allowlist (which includes neo4j.sh); tests that point metadataBaseURL
+	// at httptest.NewServer add the loopback host via withAllowedHost as they
+	// do for the swap path.
 	if resp.Request != nil && resp.Request.URL != nil {
 		if err := assertAllowedHostURL(resp.Request.URL); err != nil {
 			return nil, fmt.Errorf("fetch releases: %w", err)
 		}
 	}
 
-	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
-		// Drain a small amount of body for diagnostic context but do NOT
-		// echo headers (the Authorization header would have a token).
-		_, _ = io.CopyN(io.Discard, resp.Body, 1<<10)
-		return nil, fmt.Errorf("github api rate-limited (status %d); set GH_TOKEN or GITHUB_TOKEN to raise the limit", resp.StatusCode)
-	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+		// Drain a small amount of body for diagnostic context. No token hint
+		// here — there is no credential to configure; a non-200 (including a
+		// 404 for a missing releases.json) is a plain upstream failure.
+		_, _ = io.CopyN(io.Discard, resp.Body, 1<<10)
+		return nil, fmt.Errorf("releases metadata fetch returned status %d", resp.StatusCode)
 	}
 
-	// Cap the body size to a sane upper bound. 30 releases of metadata is
-	// well under 1 MiB; an oversized body indicates either a misconfigured
-	// proxy or a malicious server impersonating GitHub.
-	const maxBody = 4 << 20 // 4 MiB
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxMetadataBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("read releases response: %w", err)
 	}
+	if int64(len(body)) > maxMetadataBytes {
+		return nil, fmt.Errorf("releases metadata exceeds cap of %d bytes", maxMetadataBytes)
+	}
 
-	var releases []Release
-	if err := json.Unmarshal(body, &releases); err != nil {
+	var meta releasesMetadata
+	if err := json.Unmarshal(body, &meta); err != nil {
 		return nil, fmt.Errorf("decode releases response: %w", err)
 	}
-	return releases, nil
-}
-
-// releaseAuthToken returns the GitHub auth token from GH_TOKEN or GITHUB_TOKEN,
-// preferring GH_TOKEN. The value is returned verbatim — callers that surface
-// errors must NEVER include this string in error messages.
-func releaseAuthToken() string {
-	if v := os.Getenv("GH_TOKEN"); v != "" {
-		return v
+	if meta.SchemaVersion != metadataSchemaVersion {
+		return nil, fmt.Errorf("unsupported releases metadata schema_version %d (expected %d)", meta.SchemaVersion, metadataSchemaVersion)
 	}
-	return os.Getenv("GITHUB_TOKEN")
+	if meta.Releases == nil {
+		return nil, fmt.Errorf("releases metadata is missing the releases key")
+	}
+
+	releases := *meta.Releases
+	// NEVER trust file order: sort semver descending so Latest/ListReleases
+	// see newest first regardless of how the generator ordered the document.
+	// Non-semver tags (included by the generator, filtered out later by
+	// filterReleases) compare below every valid tag and sink to the bottom.
+	sort.SliceStable(releases, func(i, j int) bool {
+		return semver.Compare(releases[i].TagName, releases[j].TagName) > 0
+	})
+	return releases, nil
 }
 
 // BuildAssetURLs constructs the archive + checksum download URLs for a given

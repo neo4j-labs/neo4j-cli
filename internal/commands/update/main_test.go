@@ -12,13 +12,13 @@ import (
 )
 
 // TestMain installs a guard on the package-level httpDoFn seam that blocks
-// requests to non-localhost hosts. Any test that reaches real GitHub without
-// stubbing httpDoFn (via withHttpDo) or pointing apiBaseURL at a test server
-// (via withApiBaseURL) fails loudly instead of silently hitting
-// api.github.com.
+// requests to non-localhost hosts. Any test that reaches real network without
+// stubbing httpDoFn (via withHttpDo) or pointing metadataBaseURL at a test
+// server (via withMetadataBaseURL) fails loudly instead of silently hitting
+// neo4j.sh.
 //
 // Tests that use withHttpDo save the guard and restore it via t.Cleanup, so
-// per-test stubbing still wins. Tests that use withApiBaseURL point at an
+// per-test stubbing still wins. Tests that use withMetadataBaseURL point at an
 // httptest server (localhost / 127.0.0.1), so the guard passes through to
 // the real client.
 func TestMain(m *testing.M) {
@@ -37,7 +37,7 @@ func guardHTTPDo(next func(*http.Request) (*http.Response, error)) func(*http.Re
 			if host != "" && !isLocalhost(host) {
 				return nil, fmt.Errorf(
 					"httpDoFn guard: unexpected network call to %s; "+
-						"stub httpDoFn via withHttpDo or use withApiBaseURL to point at a test server",
+						"stub httpDoFn via withHttpDo or use withMetadataBaseURL to point at a test server",
 					req.URL,
 				)
 			}

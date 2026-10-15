@@ -6,6 +6,7 @@
 internal/skill/render/testdata/** text eol=lf
 internal/commands/mcp/**/testdata/** text eol=lf
 internal/commands/mcp/testdata/** text eol=lf
+internal/commands/update/testdata/** text eol=lf
 internal/skill/neo4jcli/bundle/** text eol=lf
 internal/skill/neo4jcli/additions.md text eol=lf
 internal/skill/neo4jcli/query-additions.md text eol=lf
