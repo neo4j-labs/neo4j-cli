@@ -226,7 +226,16 @@ func TestRun_IdempotentRewrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
-	raw = bytes.TrimSuffix(raw, []byte("]\n"))
+	// Splice the new release into the fixture's single JSON array. Trim
+	// trailing whitespace BEFORE the closing ']': the fixture is not pinned
+	// to LF in .gitattributes, so a Windows checkout (core.autocrlf=true)
+	// ends it with "]\r\n" and an LF-only TrimSuffix would not strip the
+	// ']' — the appended ",{...}]" would then follow a complete array,
+	// making the stream "[...]\r\n,{...}]" whose second top-level value
+	// starts with ',' ("invalid character ',' looking for beginning of
+	// value").
+	raw = bytes.TrimSpace(raw)
+	raw = bytes.TrimSuffix(raw, []byte("]"))
 	raw = append(raw, `,{"tag_name":"v1.18.0","name":"v1.18.0","draft":false,"prerelease":true,"published_at":"2026-10-15T12:30:00Z","body":"new"}]`...)
 	raw = append(raw, '\n')
 	if err := os.WriteFile(changed, raw, 0o644); err != nil {
