@@ -515,7 +515,14 @@ func windowsSwap(currentAbs, tmpNew string) error {
 }
 
 // downloadCapped fetches a URL via httpDoFn with a body cap and host pin.
-// Returns the body bytes on success.
+// It is the SINGLE REQ-S-001 download pipeline for the whole self-update
+// flow: the releases.json metadata document (fetchReleases) and the release
+// archive + checksums (Swap) all go through it, so no fetch path is weaker
+// than another. Returns the body bytes on success.
+//
+// The Accept: application/json header is sent unconditionally: the metadata
+// endpoint wants it, and the GitHub asset endpoints ignore content
+// negotiation on /releases/download/ URLs, so it is harmless there.
 func downloadCapped(ctx context.Context, rawURL string, cap int64) ([]byte, error) {
 	if err := assertAllowedHost(rawURL); err != nil {
 		return nil, err
@@ -525,6 +532,7 @@ func downloadCapped(ctx context.Context, rawURL string, cap int64) ([]byte, erro
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("User-Agent", "neo4j-cli-update")
+	req.Header.Set("Accept", "application/json")
 	// We deliberately do NOT send an Authorization header here. Public
 	// release assets don't require auth and avoiding the header keeps
 	// credentials out of any redirected request the runtime might issue.
