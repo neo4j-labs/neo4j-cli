@@ -141,6 +141,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_KIND: "Conventions review"
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           # Paired with the github_token escape hatch above — uncomment both or neither.
           VERDICT_BOT_LOGIN: "github-actions[bot]"
         run: .github/scripts/enforce-claude-verdict.sh
