@@ -22,8 +22,38 @@ export LC_ALL=C.UTF-8
 # and may include the HTML comment; this script falls
 # through until it reaches a verdict or exits 1.
 #
+# When Tier 1 finds no verdict file, the comment fetch is
+# retried: the review agent has been observed to exit 0
+# before its summary comment lands, and on a re-push the
+# newest marker comment can still be the previous push's.
+# The fetch repeats up to POLL_ATTEMPTS times, sleeping
+# POLL_INTERVAL_SECONDS between fetches, until a marker
+# comment acceptable for the current head appears (a hit on
+# the first fetch adds no delay).
+#
 # Env vars (required): REVIEW_KIND, PR_NUMBER,
 #                      GITHUB_REPOSITORY, GH_TOKEN
+# Env var (optional):  MODE — "detect" runs the same tier
+#                      cascade but always exits 0 and writes
+#                      exactly one line, verdict=pass|fail|none,
+#                      to $GITHUB_OUTPUT (none = no tier produced
+#                      a verdict). Any other value (or unset)
+#                      keeps the fail-closed enforce semantics.
+#                      In detect mode an unset GITHUB_OUTPUT
+#                      falls back to /dev/stdout (local runs);
+#                      enforce mode never touches GITHUB_OUTPUT.
+# Env var (optional):  HEAD_SHA — when non-empty, a marker
+#                      comment is accepted only if its body
+#                      carries <!-- claude-head-sha: <sha> -->
+#                      with sha equal to HEAD_SHA
+#                      (case-insensitive hex match). A missing
+#                      or mismatched sha counts as absent.
+#                      Empty/unset skips the check (legacy).
+# Env var (optional):  POLL_ATTEMPTS (default 6) — maximum
+#                      number of comment fetches when Tier 1
+#                      finds no verdict file.
+# Env var (optional):  POLL_INTERVAL_SECONDS (default 15) —
+#                      sleep between fetches.
 # Env var (optional):  VERDICT_FILE
 #                      (default /tmp/claude-verdict.txt)
 # Env var (optional):  VERDICT_BOT_LOGIN
@@ -46,6 +76,16 @@ for cmd in gh jq; do
   fi
 done
 
+# MODE=detect reports the verdict instead of enforcing it. Any other value
+# (including unset) keeps the fail-closed enforce semantics unchanged.
+detect_mode=0
+if [ "${MODE:-}" = "detect" ]; then
+  detect_mode=1
+  # GitHub Actions provides GITHUB_OUTPUT as a file path; fall back to
+  # stdout for local runs so the verdict line is still observable.
+  : "${GITHUB_OUTPUT:=/dev/stdout}"
+fi
+
 : "${VERDICT_FILE:=/tmp/claude-verdict.txt}"
 
 # Author whose comment carries the verdict. Defaults to the Claude GitHub App.
@@ -53,6 +93,13 @@ done
 # (see the `github_token` note in the review workflows) — a wider value lets a
 # third party author a comment the gate will trust.
 : "${VERDICT_BOT_LOGIN:=claude[bot]}"
+
+# Optional head-sha binding for comment verdicts; empty disables the check.
+: "${HEAD_SHA:=}"
+
+# Comment-fetch polling knobs (see header). Only used when Tier 1 is empty.
+: "${POLL_ATTEMPTS:=6}"
+: "${POLL_INTERVAL_SECONDS:=15}"
 
 verdict=""
 
@@ -62,35 +109,77 @@ if [ -s "$VERDICT_FILE" ]; then
   echo "Tier 1 (verdict file): verdict='${verdict}'"
 fi
 
-# --- Tiers 2-4: comment fetch and analysis ---
+# --- Tiers 2-4: comment fetch (polled) and analysis ---
 if [ -z "$verdict" ]; then
-  # Fetch raw API JSON separately so a gh failure produces a clear message
-  # instead of a bare set -e abort (REQ-NF-005).
-  api_json=""
-  if ! api_json="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
-                    --paginate --slurp)"; then
-    echo "::error::Failed to fetch PR comments from GitHub API"
-    exit 1
-  fi
-
-  # Extract the latest review-bot body containing the kind marker.
-  # --slurp + --paginate yields [[page1...],[page2...]] hence .[][] to flatten.
-  # --arg passes the marker to jq; never shell-interpolate REVIEW_KIND into a
-  # jq filter string (quoting/injection hazard).
   body=""
-  if ! body="$(printf '%s\n' "$api_json" | jq -r --arg marker "**${REVIEW_KIND}:**" \
-                                              --arg login "$VERDICT_BOT_LOGIN" '
-    [ .[][] | select(.user.login == $login
-                     and (.body | contains($marker))) ]
-    | sort_by(.created_at) | last | .body // ""
-  ')"; then
-    echo "::error::Failed to parse PR comments with jq"
-    exit 1
-  fi
+  attempt=1
+  while true; do
+    # Fetch raw API JSON separately so a gh failure produces a clear message
+    # instead of a bare set -e abort (REQ-NF-005).
+    api_json=""
+    if ! api_json="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
+                      --paginate --slurp)"; then
+      echo "::error::Failed to fetch PR comments from GitHub API"
+      exit 1
+    fi
+
+    # Extract the latest review-bot body containing the kind marker.
+    # --slurp + --paginate yields [[page1...],[page2...]] hence .[][] to flatten.
+    # --arg passes the marker to jq; never shell-interpolate REVIEW_KIND into a
+    # jq filter string (quoting/injection hazard).
+    if ! body="$(printf '%s\n' "$api_json" | jq -r --arg marker "**${REVIEW_KIND}:**" \
+                                                --arg login "$VERDICT_BOT_LOGIN" '
+      [ .[][] | select(.user.login == $login
+                       and (.body | contains($marker))) ]
+      | sort_by(.created_at) | last | .body // ""
+    ')"; then
+      echo "::error::Failed to parse PR comments with jq"
+      exit 1
+    fi
+
+    # Head-sha binding: when HEAD_SHA is set, the selected marker comment is
+    # acceptable only if it carries <!-- claude-head-sha: <HEAD_SHA> -->.
+    if [ -n "$body" ] && [ -n "$HEAD_SHA" ]; then
+      # grep -iE with hardcoded regex is safe here (not built from user data).
+      # || true guards against the bash 3.2 (macOS runner) set -e subshell
+      # abort on no-match, same as the tier 2 pipeline below.
+      sha_line="$(printf '%s\n' "$body" \
+        | grep -iE '<!--[[:space:]]*claude-head-sha:[[:space:]]*[0-9a-f]+[[:space:]]*-->' \
+        | tail -1 || true)"
+      if [ -z "$sha_line" ]; then
+        echo "marker comment has no claude-head-sha, treating as absent"
+        body=""
+      else
+        # Lowercase before extracting so the hex compare is case-insensitive
+        # (BSD sed has no /I flag, so fold case with tr instead).
+        comment_sha="$(printf '%s\n' "$sha_line" \
+          | tr '[:upper:]' '[:lower:]' \
+          | sed -E 's/.*claude-head-sha:[[:space:]]*([0-9a-f]+)[[:space:]]*-->.*/\1/')"
+        head_sha_lower="$(printf '%s\n' "$HEAD_SHA" | tr '[:upper:]' '[:lower:]')"
+        if [ "$comment_sha" != "$head_sha_lower" ]; then
+          echo "stale comment from sha ${comment_sha}, current HEAD_SHA ${HEAD_SHA}"
+          body=""
+        fi
+      fi
+    fi
+
+    if [ -n "$body" ]; then
+      break
+    fi
+    if [ "$attempt" -ge "$POLL_ATTEMPTS" ]; then
+      break
+    fi
+    echo "no current-head ${VERDICT_BOT_LOGIN} comment with marker '**${REVIEW_KIND}:**' yet (attempt ${attempt}/${POLL_ATTEMPTS}); retrying in ${POLL_INTERVAL_SECONDS}s"
+    sleep "$POLL_INTERVAL_SECONDS"
+    attempt=$((attempt + 1))
+  done
 
   if [ -z "$body" ]; then
-    echo "::error::No ${VERDICT_BOT_LOGIN} comment with marker '**${REVIEW_KIND}:**' found"
-    exit 1
+    if [ "$detect_mode" -eq 0 ]; then
+      echo "::error::Claude ${REVIEW_KIND} agent produced no verdict file and no current-head summary comment from ${VERDICT_BOT_LOGIN} with marker '**${REVIEW_KIND}:**'. Re-run the job."
+      exit 1
+    fi
+    echo "no current-head ${VERDICT_BOT_LOGIN} comment with marker '**${REVIEW_KIND}:**' found"
   fi
 
   # CR-strip once; share across tier 2 and tier 3.
@@ -165,19 +254,32 @@ if [ -z "$verdict" ]; then
   fi
 fi
 
-# --- Tier 4: fail-closed ---
+# --- Tier 4: no tier produced a verdict ---
 if [ -z "$verdict" ]; then
-  if [ -z "${body:-}" ]; then
-    echo "::error::No ${VERDICT_BOT_LOGIN} comment with marker '**${REVIEW_KIND}:**' found"
-  elif [ -n "${unclassified_line:-}" ]; then
-    echo "::error::Marker line did not yield a known verdict: ${unclassified_line}"
-  else
-    echo "::error::No line starting with marker '**${REVIEW_KIND}:**' in ${VERDICT_BOT_LOGIN} comment"
+  # Enforce mode only; detect mode reports verdict=none in the final block.
+  if [ "$detect_mode" -eq 0 ]; then
+    if [ -n "${unclassified_line:-}" ]; then
+      echo "::error::Marker line did not yield a known verdict: ${unclassified_line}"
+    else
+      echo "::error::No line starting with marker '**${REVIEW_KIND}:**' in ${VERDICT_BOT_LOGIN} comment"
+    fi
+    exit 1
   fi
-  exit 1
 fi
 
 # --- Final verdict ---
+if [ "$detect_mode" -eq 1 ]; then
+  # Exactly one verdict line for the caller. An empty verdict means no tier
+  # produced one (none); any non-pass Tier 1 content maps to fail because
+  # enforce mode would fail on it too.
+  case "$verdict" in
+    pass) echo "verdict=pass" >> "$GITHUB_OUTPUT" ;;
+    "")   echo "verdict=none" >> "$GITHUB_OUTPUT" ;;
+    *)    echo "verdict=fail" >> "$GITHUB_OUTPUT" ;;
+  esac
+  exit 0
+fi
+
 if [ "$verdict" = "pass" ]; then
   exit 0
 fi
