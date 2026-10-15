@@ -85,7 +85,7 @@ func trimReleaseBody(body string) string {
 // (current, target], newest first, capped at maxChangelogEntries. An empty
 // body entry is skipped and does not consume a cap slot. elided is set true
 // when the cap truncates the list or when current is not found in releases
-// (stale binary more than 30 releases behind).
+// (stale binary whose version is absent from the metadata document).
 func changelogForRange(releases []Release, current, target string) (entries []releaseNotesEntry, elided bool) {
 	// A downgrade yields an empty range by construction — no special branch.
 	if semver.Compare(target, current) <= 0 {

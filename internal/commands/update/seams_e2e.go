@@ -16,9 +16,9 @@
 //
 // Env vars honored on init (only when -tags e2e_seams):
 //
-//   - NEO4J_CLI_UPDATE_E2E_API_URL    → overrides apiBaseURL
-//   - NEO4J_CLI_UPDATE_E2E_DL_URL     → overrides dlBaseURL
-//   - NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP → if non-empty, drops requireHTTPS and
+//   - NEO4J_CLI_UPDATE_E2E_METADATA_URL → overrides metadataBaseURL
+//   - NEO4J_CLI_UPDATE_E2E_DL_URL       → overrides dlBaseURL
+//   - NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP   → if non-empty, drops requireHTTPS and
 //     allows 127.0.0.1 / localhost to be the download host. The fixture
 //     server uses an httptest.Server (HTTP only), so plain-HTTP loopback is
 //     a hard requirement for the e2e harness.
@@ -31,8 +31,8 @@ package update
 import "os"
 
 func init() {
-	if v := os.Getenv("NEO4J_CLI_UPDATE_E2E_API_URL"); v != "" {
-		apiBaseURL = v
+	if v := os.Getenv("NEO4J_CLI_UPDATE_E2E_METADATA_URL"); v != "" {
+		metadataBaseURL = v
 	}
 	if v := os.Getenv("NEO4J_CLI_UPDATE_E2E_DL_URL"); v != "" {
 		dlBaseURL = v

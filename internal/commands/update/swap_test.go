@@ -566,7 +566,7 @@ func TestAssertAllowedHost_RejectsForeignHost(t *testing.T) {
 func TestAssertAllowedHost_AcceptsGitHub(t *testing.T) {
 	assert.NoError(t, assertAllowedHost("https://github.com/neo4j-labs/neo4j-cli/releases/download/v0.1.0/foo.tar.gz"))
 	assert.NoError(t, assertAllowedHost("https://objects.githubusercontent.com/foo"))
-	assert.NoError(t, assertAllowedHost("https://api.github.com/repos/foo"))
+	assert.NoError(t, assertAllowedHost("https://neo4j.sh/releases.json"))
 }
 
 func TestDownloadCapped_BodyExceedsCap(t *testing.T) {
