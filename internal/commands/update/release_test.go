@@ -25,11 +25,13 @@ import (
 
 // withMetadataBaseURL swaps the package-level metadataBaseURL seam for the
 // test's duration, restoring it via t.Cleanup. It also flips requireHTTPS off
-// and adds the URL's host to allowedDownloadHosts so the REQ-S-001 final-URL
-// host pin in fetchReleases lets the loopback request through. The dedicated
+// and adds the URL's host to allowedDownloadHosts so the REQ-S-001 host pins
+// in downloadCapped (pre-flight AND final-URL, both now on the fetchReleases
+// path) let the loopback request through. The dedicated
 // TestFetchReleases_RejectsRedirectAwayFromAllowlist test asserts the gate
 // still fires when a redirect goes off-allowlist (it sets requireHTTPS back
-// to true via withRequireHTTPS).
+// to true via withRequireHTTPS), and TestFetchReleases_PreFlightHostCheck
+// asserts the pre-flight gate rejects a bad metadataBaseURL before any HTTP.
 func withMetadataBaseURL(t *testing.T, v string) {
 	t.Helper()
 	prev := metadataBaseURL
@@ -198,8 +200,10 @@ func TestFetchReleases_SortsSemverDescending(t *testing.T) {
 // TestFetchReleases_NonOKStatus pins the post-CLI-244 failure mode: ANY
 // non-200 (including the old 403/429 rate-limit pair and a 404 for a missing
 // releases.json) errors clearly with the status and NO credential hint —
-// there is no token to configure any more. The exact-match assertion proves
-// nothing (hint, header, body) is appended to the status line.
+// there is no token to configure any more. The error text is downloadCapped's
+// unified "status <n> for <redacted url>" convention (the metadata endpoint
+// URL is static and public, so echoing it is safe); the exact-match assertion
+// proves nothing (hint, header, body) is appended beyond that.
 func TestFetchReleases_NonOKStatus(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -217,9 +221,44 @@ func TestFetchReleases_NonOKStatus(t *testing.T) {
 
 			_, err := Latest(context.Background(), true)
 			require.Error(t, err)
-			assert.Equal(t, fmt.Sprintf("releases metadata fetch returned status %d", tc.status), err.Error(),
-				"non-200 errors must carry the status only — no credential hint, no echoed body")
+			assert.Equal(t, fmt.Sprintf("status %d for %s/releases.json", tc.status, srv.URL), err.Error(),
+				"non-200 errors must carry the status + redacted URL only — no credential hint, no echoed body")
 			// A fetch failure must NEVER surface as ErrNoStableRelease.
+			assert.False(t, errors.Is(err, ErrNoStableRelease))
+		})
+	}
+}
+
+// TestFetchReleases_PreFlightHostCheck proves the metadata fetch goes through
+// the SAME REQ-S-001 pre-flight gate as the asset downloads: a metadataBaseURL
+// whose scheme is non-HTTPS or whose host is not on the download allowlist is
+// rejected BEFORE any HTTP request is dispatched (httpDoFn must not fire).
+// Uses the raw metadataBaseURL seam rather than withMetadataBaseURL, which
+// would add the host to the allowlist and disable requireHTTPS.
+func TestFetchReleases_PreFlightHostCheck(t *testing.T) {
+	cases := []struct {
+		name    string
+		baseURL string
+		wantSub string
+	}{
+		{"foreign host", "https://evil.example.com", "allowlist"},
+		{"non-https", "http://neo4j.sh", "non-https"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			prev := metadataBaseURL
+			metadataBaseURL = tc.baseURL
+			t.Cleanup(func() { metadataBaseURL = prev })
+
+			withHttpDo(t, func(req *http.Request) (*http.Response, error) {
+				t.Fatal("httpDoFn must not fire when the pre-flight host check rejects the URL")
+				return nil, nil
+			})
+
+			_, err := fetchReleases(context.Background())
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantSub)
+			// A pre-flight rejection must NEVER surface as ErrNoStableRelease.
 			assert.False(t, errors.Is(err, ErrNoStableRelease))
 		})
 	}
@@ -239,6 +278,8 @@ func TestFetchReleases_NoAuthorizationHeader(t *testing.T) {
 		assert.Equal(t, "", captured.Get("Authorization"),
 			"discovery must be anonymous — no Authorization header, ever")
 		assert.Equal(t, "neo4j-cli-update", captured.Get("User-Agent"))
+		assert.Equal(t, "application/json", captured.Get("Accept"),
+			"the metadata request keeps its Accept header (set unconditionally inside downloadCapped)")
 	})
 
 	t.Run("error path echoes no auth material", func(t *testing.T) {

@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"runtime"
 	"sort"
@@ -176,50 +175,20 @@ func filterReleases(releases []Release, preReleases bool) []Release {
 // fetchReleases downloads the static releases.json metadata document and
 // decodes it. No authentication is sent or read from the environment — the
 // document is public and anonymous by design (CLI-244).
+//
+// The download goes through downloadCapped (swap.go) so the REQ-S-001
+// pipeline — pre-flight AND post-redirect host pin, HTTPS-only, drain on
+// non-200, cap+1 oversize reader, httpDoFn timeout — is single-sourced with
+// the archive and checksum fetches: the metadata path is never weaker than
+// the asset path. A non-200 (including a 404 for a missing releases.json)
+// surfaces as downloadCapped's plain status error — no credential hint
+// (there is no token to configure) and never ErrNoStableRelease /
+// ErrTagNotFound, so the runUpdate caller routes it to the look-up-release
+// upstream error (exit 8).
 func fetchReleases(ctx context.Context) ([]Release, error) {
-	url := metadataBaseURL + "/releases.json"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	body, err := downloadCapped(ctx, metadataBaseURL+"/releases.json", maxMetadataBytes)
 	if err != nil {
-		return nil, fmt.Errorf("build releases request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "neo4j-cli-update")
-
-	resp, err := httpDoFn(req)
-	if err != nil {
-		// req.URL is the public metadata endpoint; no secret leakage risk
-		// because no credentials are attached to the request at all.
-		return nil, fmt.Errorf("fetch releases: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// REQ-S-001 / defense-in-depth against a hijacked metadata host: validate
-	// the FINAL URL host after net/http transparently followed any redirects.
-	// Pinning the response host means we never read or decode a JSON payload
-	// from an unexpected origin. Reuses the swap.go allowedDownloadHosts
-	// allowlist (which includes neo4j.sh); tests that point metadataBaseURL
-	// at httptest.NewServer add the loopback host via withAllowedHost as they
-	// do for the swap path.
-	if resp.Request != nil && resp.Request.URL != nil {
-		if err := assertAllowedHostURL(resp.Request.URL); err != nil {
-			return nil, fmt.Errorf("fetch releases: %w", err)
-		}
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		// Drain a small amount of body for diagnostic context. No token hint
-		// here — there is no credential to configure; a non-200 (including a
-		// 404 for a missing releases.json) is a plain upstream failure.
-		_, _ = io.CopyN(io.Discard, resp.Body, 1<<10)
-		return nil, fmt.Errorf("releases metadata fetch returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxMetadataBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("read releases response: %w", err)
-	}
-	if int64(len(body)) > maxMetadataBytes {
-		return nil, fmt.Errorf("releases metadata exceeds cap of %d bytes", maxMetadataBytes)
+		return nil, err
 	}
 
 	var meta releasesMetadata
