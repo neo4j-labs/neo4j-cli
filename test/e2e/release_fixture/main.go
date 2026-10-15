@@ -2,19 +2,23 @@
 // Neo4j Sweden AB [http://neo4j.com]
 
 // Command release_fixture is the CI-only fixture server for the tier-1 e2e
-// test of `neo4j-cli update check`. It impersonates the GitHub releases API
-// against a single localhost port, driven by the e2e_seams build of
-// neo4j-cli (see internal/commands/update/seams_e2e.go).
+// test of `neo4j-cli update check`. It impersonates the static releases.json
+// metadata document served at https://neo4j.sh/releases.json against a
+// single localhost port, driven by the e2e_seams build of neo4j-cli (see
+// internal/commands/update/seams_e2e.go — the harness points the binary at
+// this fixture via NEO4J_CLI_UPDATE_E2E_METADATA_URL).
 //
-// Layout: pure stdlib, no module deps. Two canned release lists are embedded
-// at compile time from testdata/ and selected via --scenario. Unlike its
-// sibling update_fixture, this fixture serves ONLY the releases-list endpoint
-// — the tier-1 test exercises `update check`, which never downloads archives.
+// Layout: pure stdlib, no module deps. Two canned releases.json documents
+// are embedded at compile time from testdata/ and selected via --scenario.
+// Unlike its sibling update_fixture, this fixture serves ONLY the metadata
+// endpoint — the tier-1 test exercises `update check`, which never
+// downloads archives.
 //
 // Endpoints:
 //
-//   - GET /repos/neo4j-labs/neo4j-cli/releases
-//     Returns the canned release list for the selected scenario.
+//   - GET /releases.json
+//     Returns the canned releases.json document (schema_version 1) for the
+//     selected scenario.
 //
 // Lifecycle:
 //
@@ -28,12 +32,14 @@
 //
 //	--scenario  one of "stable-head" | "pre-release-head" (required)
 //
-// Channel invariant by scenario (under `update check --pre-releases`):
+// Channel invariant by scenario (under `update check --pre-releases`). The
+// CLI semver-sorts the releases array descending itself (file order is
+// never trusted), so "at head" below means "wins the semver compare":
 //
-//   - stable-head      → stable v9.9.0 at list head; Latest() returns it →
+//   - stable-head      → stable v9.9.0 at head; Latest() returns it →
 //     channel "stable" (even with --pre-releases since the stable is the
 //     newer release in the list AND outranks its sibling by semver).
-//   - pre-release-head → prerelease v9.9.1-alpha.1 at list head; Latest()
+//   - pre-release-head → prerelease v9.9.1-alpha.1 at head; Latest()
 //     with --pre-releases returns it → channel "pre-release".
 package main
 
@@ -75,7 +81,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/repos/neo4j-labs/neo4j-cli/releases", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/releases.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(body)
 	})
