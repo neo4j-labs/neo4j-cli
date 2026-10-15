@@ -29,9 +29,10 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli aura agent list|get|create|update|replace|delete|invoke` — manage Aura Agents (LLM assistants bound to a database); `--tools` accepts a JSON array of `{type, name, description, config}` with camelCase types (`text2cypher`, `cypherTemplate`, `similaritySearch`)
 - `neo4j-cli docker create|list|get|start|stop|delete` — run a local Neo4j container by shelling out to `docker` (or `podman` aliased to `docker`); persistent flow stores a `dbms` credential, ephemeral flow emits an env-file consumable by `query --env`; `create --plugin <name>` (repeatable) installs plugins such as `apoc` / `graph-data-science` via `NEO4J_PLUGINS`; `delete --remove-volume` also removes the `neo4j-cli-<name>-data` volume a `docker load` container leaves behind
 - `neo4j-cli desktop install|list|doctor` — manage a local Neo4j Desktop 2 install: install the app, list managed DBMSes + saved connections, run a structured health check
-- `neo4j-cli desktop dbms list|create|start|stop|delete` — lifecycle local DBMSes under Neo4j Desktop 2 (enterprise-only; one DBMS runs at a time on port 7687); `--wait` blocks until `status=started`
+- `neo4j-cli desktop dbms list|create|update|start|stop|delete` — lifecycle local DBMSes under Neo4j Desktop 2 (enterprise-only; one DBMS runs at a time on port 7687); `--wait` blocks until `status=started`; `update` renames, edits the description, or replaces project/tag assignments
 - `neo4j-cli desktop dbms plugin available|list|install|uninstall` — manage plugins on a Desktop DBMS
 - `neo4j-cli desktop connection list|create|update|delete` — register saved remote DB connection profiles with Desktop; consume via `query --credential desktop-connection:<uuid>`
+- `neo4j-cli desktop project list|create|update|delete` and `neo4j-cli desktop tag list|create|update|delete` — manage Desktop's project and tag catalogs (`tag create/update --color` takes a palette index 1..12); `dbms update` / `connection update` accept `--project` / `--tags` (names or UUIDs, repeatable/comma-separated, replace semantics, empty value clears). In `desktop` JSON output DBMS and connection objects carry `projects` as an array
 - `neo4j-cli query --credential desktop` — query the currently-running Desktop DBMS without restating URI / username / password (credential is read from Desktop's safeStorage on demand and never written to `~/.neo4j/cli/credentials.json`)
 - `neo4j-cli query <cypher>` — run Cypher against any Neo4j via the Bolt protocol
 - `neo4j-cli query :schema` — introspect node labels, rel types, properties
@@ -44,7 +45,7 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli skill print` — preview a skill's SKILL.md before installing
 - `neo4j-cli skill remove` — remove a skill by name (`--agent <name>` to scope, `--all` for every catalog skill; self-skill preserved; idempotent)
 - `neo4j-cli skill refresh` — force a fresh download of the curated skill catalog
-- `neo4j-cli agent-context` — emit the full CLI command tree as a stable JSON envelope (commands, flags, exit codes, output formats) for AI-agent discovery; `--format` toon/table/json supported
+- `neo4j-cli agent-context` — emit a stable JSON envelope (schema_version 2) for AI-agent discovery: by default a compact flat index of every command (path + short) plus exit codes and output formats; pass a command path (e.g. `agent-context aura instance list`) for that command's flags and examples, or `--full` for the complete recursive tree; `--format` toon/table/json supported
 - `neo4j-cli update` — self-update the binary to the latest GitHub release (`update check` subcommand to report availability without downloading, `--pre-releases` for alpha/beta/rc, `--version <tag>` to pin)
 
 ## Connection
@@ -75,7 +76,7 @@ Installed skill bundles are auto-refreshed in the background whenever the binary
 
 `--rw` is required for any command that mutates state (Aura API, local config, credentials, skills, write Cypher) when running under an agent harness or non-interactive script. In an interactive terminal `--rw` is auto-applied — humans typing at a prompt don't need the flag. Read-only commands (`skill list`, `skill check`, `skill print`, `query <read>`, `aura instance list`) never need it.
 
-Destructive leaves (any `… delete` / `… remove` — Aura instance/agent/CMK/data-api/graph-analytics/auth-provider/CORS allowed-origin, `docker delete`, `desktop dbms/connection delete`, `credential aura-client/dbms/embed remove`) gate on both `--yes` and `--force` in addition to `--rw`. On a TTY either missing flag prompts y/N; in non-TTY contexts both must be passed or the command exits 2.
+Destructive leaves (any `… delete` / `… remove` — Aura instance/agent/CMK/data-api/graph-analytics/auth-provider/CORS allowed-origin, `docker delete`, `desktop dbms/connection/project/tag delete`, `credential aura-client/dbms/embed remove`) gate on both `--yes` and `--force` in addition to `--rw`. On a TTY either missing flag prompts y/N; in non-TTY contexts both must be passed or the command exits 2.
 
 Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-skills
 

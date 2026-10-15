@@ -1070,7 +1070,7 @@
 <section class="hero">
   <div class="container inner">
     <div class="pill">
-      <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill-tag" style="text-transform:none">v1.16.0</a>
+      <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill-tag" style="text-transform:none">v1.17.0</a>
       <span><a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">open source</a> · <a href="https://neo4j.com/labs/" target="_blank" rel="noopener">neo4j-labs</a></span>
     </div>
 
@@ -1127,7 +1127,7 @@
         </button>
       </div>
       <div class="cmd-hint">
-        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.16.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
+        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.17.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
       </div>
     </div>
   </div>
@@ -1935,7 +1935,7 @@
           <span class="desc">Desktop (local)</span>
         </div>
         <div class="ref-body">
-          <p>Manage a local Neo4j Desktop 2 install — install the app, lifecycle local DBMSes, install plugins, and register saved remote connections. All commands except <code>install</code> talk to Desktop's local relate API on <code>http://localhost:&lt;port&gt;/fastify/api</code>, so Desktop must be running. <code>--port</code> pins the API port instead of probing <code>44222..44232</code>.</p>
+          <p>Manage a local Neo4j Desktop 2 install — install the app, lifecycle local DBMSes, install plugins, register saved remote connections, and organise them with projects and tags. All commands except <code>install</code> talk to Desktop's local relate API on <code>http://localhost:&lt;port&gt;/fastify/api</code>, so Desktop must be running. <code>--port</code> pins the API port instead of probing <code>44222..44232</code>.</p>
           <pre><span class="prompt">$</span> neo4j-cli desktop install <span class="flag">--rw</span>                       <span class="comment"># install Desktop 2 (DMG / AppImage / NSIS .exe)</span>
 <span class="prompt">$</span> neo4j-cli desktop install <span class="flag">--dry-run</span> <span class="flag">--rw</span>             <span class="comment"># resolve manifest + URL only, no download</span>
 <span class="prompt">$</span> neo4j-cli desktop list <span class="flag">--format</span> table                <span class="comment"># composed view: DBMSes + saved connections</span>
@@ -1946,6 +1946,7 @@
 <span class="prompt">$</span> neo4j-cli desktop dbms create <span class="flag">--name</span> dev <span class="flag">--version</span> 2026.04.0 <span class="flag">--wait</span> <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms start &lt;id&gt; <span class="flag">--wait</span> <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms stop &lt;id&gt; <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms update &lt;id&gt; <span class="flag">--name</span> dev2 <span class="flag">--tags</span> prod,eu <span class="flag">--rw</span>   <span class="comment"># rename / describe / replace project+tag sets</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms upgrade &lt;id&gt; <span class="flag">--rw</span>          <span class="comment"># upgrade to latest stable; --version pins, --backup snapshots first</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms delete &lt;id&gt; <span class="flag">--rw</span></pre>
           <p class="ref-sub"><span class="keyword">dbms plugin</span> — manage plugins on a Desktop DBMS.</p>
@@ -1958,7 +1959,16 @@
 <span class="prompt">$</span> neo4j-cli desktop connection create <span class="flag">--name</span> aura-prod \
     <span class="flag">--uri</span> neo4j+s://abc123.databases.neo4j.io <span class="flag">--username</span> neo4j <span class="flag">--rw</span>      <span class="comment"># prompts for password on TTY</span>
 <span class="prompt">$</span> neo4j-cli desktop connection update &lt;id&gt; <span class="flag">--description</span> <span class="string">"dev tier"</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop connection update &lt;id&gt; <span class="flag">--project</span> Prod <span class="flag">--tags</span> backend,oncall <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli desktop connection delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span></pre>
+          <p class="ref-sub"><span class="keyword">project</span> / <span class="keyword">tag</span> — manage Desktop's project and tag catalogs. <code>--project</code> / <code>--tags</code> on <code>dbms update</code> and <code>connection update</code> take names or UUIDs (comma-separated or repeated), replace the existing set, and clear it when empty. Older Desktop 2 builds without these endpoints fail with an upgrade message.</p>
+          <pre><span class="prompt">$</span> neo4j-cli desktop project list
+<span class="prompt">$</span> neo4j-cli desktop project create <span class="string">"Customer 360"</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop project update <span class="string">"Customer 360"</span> <span class="flag">--name</span> c360 <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop project delete c360 <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop tag create staging <span class="flag">--color</span> 5 <span class="flag">--rw</span>      <span class="comment"># palette index 1..12, not hex</span>
+<span class="prompt">$</span> neo4j-cli desktop tag update staging <span class="flag">--name</span> pre-prod <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop tag delete pre-prod <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span></pre>
           <p>Query against the currently-running Desktop DBMS or a saved connection without restating credentials:</p>
           <pre><span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop <span class="string">'MATCH (n) RETURN count(n)'</span>
 <span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop-connection:&lt;uuid&gt; <span class="string">'MATCH (n) RETURN count(n)'</span></pre>
@@ -2018,7 +2028,7 @@
           <p class="ref-sub"><span class="keyword">--force</span> — skip safety checks that would otherwise abort a command due to a conflicting resource. Required alongside <code>--yes</code> for all destructive leaves in non-TTY contexts.</p>
           <pre><span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>      <span class="comment"># delete even if running</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms start &lt;id&gt; <span class="flag">--force</span> <span class="flag">--rw</span>       <span class="comment"># stop conflicting DBMS first</span></pre>
-          <p class="ref-sub"><span class="keyword">--yes</span> — suppress interactive confirmation prompts in destructive operations. In non-TTY contexts (agents, CI, scripts) destructive leaves (<code>… delete</code> / <code>… remove</code> — Aura instance/agent/CMK/graph-analytics session, <code>docker delete</code>, <code>desktop dbms/connection delete</code>, <code>credential … remove</code>) require <strong>both</strong> <code>--yes</code> and <code>--force</code>; missing either exits with code 2.</p>
+          <p class="ref-sub"><span class="keyword">--yes</span> — suppress interactive confirmation prompts in destructive operations. In non-TTY contexts (agents, CI, scripts) destructive leaves (<code>… delete</code> / <code>… remove</code> — Aura instance/agent/CMK/graph-analytics session, <code>docker delete</code>, <code>desktop dbms/connection/project/tag delete</code>, <code>credential … remove</code>) require <strong>both</strong> <code>--yes</code> and <code>--force</code>; missing either exits with code 2.</p>
           <pre><span class="prompt">$</span> neo4j-cli desktop connection delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli aura instance delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span></pre>
           <p>Disable telemetry without writing config: <code>DO_NOT_TRACK=1 neo4j-cli …</code></p>
@@ -2075,8 +2085,10 @@
 <span class="prompt">$</span> neo4j-cli skill remove neo4j-cypher-skill <span class="flag">--rw</span>      <span class="comment"># remove a catalog skill</span>
 <span class="prompt">$</span> neo4j-cli skill remove self <span class="flag">--agent</span> windsurf <span class="flag">--rw</span>   <span class="comment"># remove self-skill from one agent</span></pre>
           <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie, Kiro. Self-skill bundles refresh automatically on binary version change; opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>.</p>
-          <p class="ref-sub"><span class="keyword">agent-context</span> — emit the full command tree (commands, flags, exit codes, output formats) as a stable JSON envelope for agent discovery:</p>
-          <pre><span class="prompt">$</span> neo4j-cli agent-context <span class="flag">--format</span> json | jq <span class="string">'.commands | keys'</span></pre>
+          <p class="ref-sub"><span class="keyword">agent-context</span> — emit a stable JSON envelope describing the command surface for agent discovery. Default is a compact flat index (path + short); pass a command path for one command's flags and examples, or <code>--full</code> for the complete tree:</p>
+          <pre><span class="prompt">$</span> neo4j-cli agent-context <span class="flag">--format</span> json | jq <span class="string">'.commands[].path'</span>   <span class="comment"># compact index</span>
+<span class="prompt">$</span> neo4j-cli agent-context aura instance list <span class="flag">--format</span> json      <span class="comment"># one command's details</span>
+<span class="prompt">$</span> neo4j-cli agent-context <span class="flag">--full</span> <span class="flag">--format</span> json                <span class="comment"># complete recursive tree (large)</span></pre>
         </div>
       </div>
       <!-- END:docs:skills -->
@@ -2091,7 +2103,7 @@
 <footer>
   <div class="container inner">
     <div class="meta">
-      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.16.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
+      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.17.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
     </div>
     <div class="links">
       <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">GitHub</a>
