@@ -117,9 +117,11 @@ jobs:
               run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./internal/commands/query/...
 
             # Tier-1 e2e: drive the freshly-built binary against a LOCAL
-            # fixture server that serves canned `/releases` payloads. Catches
+            # fixture server that serves a canned `/releases.json` metadata
+            # document (the same schema_version-1 shape
+            # https://neo4j.sh/releases.json serves in production). Catches
             # regressions that pure unit mocks miss — filter drift between
-            # release.go's Latest() and a realistic ordered release list,
+            # release.go's Latest() and a realistic release list,
             # JSON-shape changes, cobra-flag wiring breaks, channel/install_method
             # rendering. Runs on every matrix OS so a Windows-only path bug
             # in update can't slip through.
@@ -140,14 +142,14 @@ jobs:
             # (REQ-F-002). The e2e binary uses v0.0.0-e2e so any real
             # release wins the semver compare and the `check` subcommand
             # reports a newer version. The e2e_seams tag wires the
-            # NEO4J_CLI_UPDATE_E2E_API_URL / NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP
+            # NEO4J_CLI_UPDATE_E2E_METADATA_URL / NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP
             # env vars so the binary talks to the local fixture (see
             # internal/commands/update/seams_e2e.go).
             #
-            # Live GitHub-API coverage moved to the schema-only live smoke
-            # step below: it runs the SAME binary against real
-            # api.github.com without the seam env vars and asserts shape +
-            # enum membership only — no value coupling.
+            # Live releases.json coverage moved to the schema-only live smoke
+            # step below: it runs the SAME binary against the real
+            # https://neo4j.sh/releases.json without the seam env vars and
+            # asserts shape + enum membership only — no value coupling.
             - name: Build e2e binary (low semver, e2e_seams)
               shell: bash
               run: go build -tags e2e_seams -ldflags='-X github.com/neo4j/cli/internal/cli.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e ./cmd/neo4j-cli
@@ -233,7 +235,7 @@ jobs:
                     # exit-code change can't fail the step before the
                     # helper sees the JSON.
                     set +e
-                    out="$(NEO4J_CLI_UPDATE_E2E_API_URL="${base}" \
+                    out="$(NEO4J_CLI_UPDATE_E2E_METADATA_URL="${base}" \
                            NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1 \
                            "${cli_bin}" update check --pre-releases --format json)"
                     set -e
@@ -255,24 +257,22 @@ jobs:
                   echo "tier-1 hermetic e2e: OK"
 
             # Schema-only live smoke: reuse the Tier-1 e2e binary against
-            # the real api.github.com (no NEO4J_CLI_UPDATE_E2E_API_URL set,
-            # so the e2e_seams shim falls through to the production base
-            # URL). We assert shape + enum membership only via
+            # the real https://neo4j.sh/releases.json (no
+            # NEO4J_CLI_UPDATE_E2E_METADATA_URL set, so the e2e_seams shim
+            # falls through to the production metadata base URL). This step
+            # is the releases.json contract canary: it catches drift between
+            # the published document and the CLI's decoder (schema_version
+            # bump, missing/releases-key rename, undecodable JSON, a new
+            # install_method enum value, semver-invalid `latest`) BEFORE
+            # users do. We assert shape + enum membership only via
             # `check_json --schema-only` — no `--expect-channel`, no
-            # `--cross-check` — so this step is calendar-immune. Its job
-            # is to catch GitHub API contract drift (renamed/removed JSON
-            # fields, new install_method enum value, semver-invalid
-            # `latest`) WITHOUT coupling CI green to whichever tag is at
-            # the head of the release feed on a given day. The hermetic
-            # block above covers value assertions for both channels.
+            # `--cross-check` — so this step is calendar-immune and never
+            # couples CI green to whichever tag is at the head of the
+            # release feed on a given day. The hermetic block above covers
+            # value assertions for both channels. releases.json is public
+            # and anonymous by design (CLI-244), so no token is needed.
             - name: Update e2e (schema-only live smoke)
               shell: bash
-              # Authenticate api.github.com to dodge the 60 req/h unauth limit
-              # shared across the runner pool's egress IPs (a flake source on
-              # macOS in particular). Step-scoped so the token never leaks
-              # into other build steps.
-              env:
-                GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   set -euo pipefail
 
@@ -299,9 +299,10 @@ jobs:
 
             # Tier-2 e2e: real download + atomic-swap against a local fixture
             # server. Tier-1 (above) covers the `check` subcommand read path
-            # against real GitHub; this exercises the WRITE path — archive download,
-            # SHA256 verification, extraction, and the same-dir atomic
-            # rename — without publishing throwaway tags upstream.
+            # against a canned releases.json; this exercises the WRITE path —
+            # archive download, SHA256 verification, extraction, and the
+            # same-dir atomic rename — without publishing throwaway tags
+            # upstream.
             #
             # The e2e_seams build tag (see seams_e2e.go) lets the binary
             # honor NEO4J_CLI_UPDATE_E2E_* env vars to point at the fixture
@@ -383,7 +384,7 @@ jobs:
                   # Drive the swap. Stable tag is v9.9.0, prerelease is
                   # v9.9.1-alpha.1; --pre-releases picks the prerelease.
                   set +e
-                  NEO4J_CLI_UPDATE_E2E_API_URL="${base}" \
+                  NEO4J_CLI_UPDATE_E2E_METADATA_URL="${base}" \
                   NEO4J_CLI_UPDATE_E2E_DL_URL="${base}" \
                   NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1 \
                       "${stage}/${target_name}" update --pre-releases > "${stage}/swap.out" 2> "${stage}/swap.err"

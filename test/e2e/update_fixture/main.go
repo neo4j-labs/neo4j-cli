@@ -2,20 +2,23 @@
 // Neo4j Sweden AB [http://neo4j.com]
 
 // Command update_fixture is the CI-only fixture server for the tier-2 e2e
-// test of `neo4j-cli update`. It impersonates the GitHub releases API and
-// the GoReleaser archive-download URLs against a single localhost port,
-// driven by the e2e_seams build of neo4j-cli (see
-// internal/commands/update/seams_e2e.go).
+// test of `neo4j-cli update`. It impersonates the static releases.json
+// metadata document served at https://neo4j.sh/releases.json and the
+// GoReleaser archive-download URLs against a single localhost port, driven
+// by the e2e_seams build of neo4j-cli (see
+// internal/commands/update/seams_e2e.go — the harness points the binary at
+// this fixture via NEO4J_CLI_UPDATE_E2E_METADATA_URL and
+// NEO4J_CLI_UPDATE_E2E_DL_URL; the same port serves both logical bases).
 //
-// Layout: pure stdlib + golang.org/x/mod/semver, no new module deps. The
-// fake binary inside each archive is compiled on the fly (via `go build`)
-// from test/e2e/update_fixture/fakebin so the swapped binary actually runs
-// on the runner's OS/arch.
+// Layout: pure stdlib, no module deps. The fake binary inside each archive
+// is compiled on the fly (via `go build`) from test/e2e/update_fixture/fakebin
+// so the swapped binary actually runs on the runner's OS/arch.
 //
 // Endpoints:
 //
-//   - GET /repos/neo4j-labs/neo4j-cli/releases?per_page=30
-//     Returns a synthetic release list with one stable + one prerelease tag.
+//   - GET /releases.json
+//     Returns a synthetic releases.json document (schema_version 1) with
+//     one stable + one prerelease tag.
 //
 //   - GET /neo4j-labs/neo4j-cli/releases/download/<TAG>/neo4j-cli_<VER>_<OS>_<ARCH>.<ext>
 //     Returns a tar.gz (linux/darwin) or zip (windows) containing the
@@ -64,12 +67,24 @@ import (
 	"time"
 )
 
-// release mirrors the slim subset of the GitHub release JSON neo4j-cli's
-// release.go decodes. Extra fields are ignored on the client side.
-type release struct {
-	TagName    string `json:"tag_name"`
-	Draft      bool   `json:"draft"`
-	Prerelease bool   `json:"prerelease"`
+// releaseEntry is one element of the releases.json `releases` array
+// (schema_version 1) — the same shape tools/releases-json emits and
+// internal/commands/update/release.go decodes. The schema carries no draft
+// key: drafts never reach the published file.
+type releaseEntry struct {
+	Tag         string `json:"tag"`
+	Name        string `json:"name"`
+	Prerelease  bool   `json:"prerelease"`
+	PublishedAt string `json:"published_at"`
+	Body        string `json:"body"`
+}
+
+// document is the top-level releases.json shape (schema_version 1).
+type document struct {
+	SchemaVersion int            `json:"schema_version"`
+	GeneratedAt   string         `json:"generated_at"`
+	Repository    string         `json:"repository"`
+	Releases      []releaseEntry `json:"releases"`
 }
 
 func main() {
@@ -88,15 +103,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	releases := []release{
-		{TagName: *prereleaseTag, Draft: false, Prerelease: true},
-		{TagName: *stableTag, Draft: false, Prerelease: false},
+	doc := document{
+		SchemaVersion: 1,
+		GeneratedAt:   "2026-10-01T00:00:00Z",
+		Repository:    "neo4j-labs/neo4j-cli",
+		Releases: []releaseEntry{
+			{Tag: *prereleaseTag, Name: *prereleaseTag, Prerelease: true, PublishedAt: "2026-10-08T00:00:00Z", Body: "Alpha release body"},
+			{Tag: *stableTag, Name: *stableTag, Prerelease: false, PublishedAt: "2026-10-01T00:00:00Z", Body: "Stable release body"},
+		},
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/repos/neo4j-labs/neo4j-cli/releases", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/releases.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(releases)
+		_ = json.NewEncoder(w).Encode(doc)
 	})
 	mux.HandleFunc("/neo4j-labs/neo4j-cli/releases/download/", func(w http.ResponseWriter, r *http.Request) {
 		// URL shape: /neo4j-labs/neo4j-cli/releases/download/<TAG>/<FILENAME>
