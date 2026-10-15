@@ -73,7 +73,7 @@ jobs:
           #     this is temporary scaffolding and not the default.
           # Uncomment BOTH this and the VERDICT_BOT_LOGIN line below, together.
           #
-          # github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
           additional_permissions: |
             actions: read
@@ -89,6 +89,7 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
+            HEAD SHA: ${{ github.event.pull_request.head.sha }}
 
             ${{ env.PROMPT }}
 
@@ -105,6 +106,91 @@ jobs:
             --allowed-tools
             "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
 
+      - name: Upload Claude execution log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: claude-execution-security
+          path: ${{ runner.temp }}/claude-execution-output.json
+          if-no-files-found: ignore
+
+      - name: Detect verdict
+        id: detect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_KIND: "Security review"
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MODE: detect
+          VERDICT_BOT_LOGIN: "github-actions[bot]"
+        run: .github/scripts/enforce-claude-verdict.sh
+
+      - name: Retry Claude Code (security review)
+        id: claude_retry
+        if: steps.detect.outputs.verdict == 'none'
+        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
+        # Keep this with: block identical to the first Claude step above
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # WORKFLOW-CHANGE ESCAPE HATCH — keep commented out on main.
+          #
+          # claude-code-action mints a GitHub App token, and that exchange 401s
+          # ("Workflow validation failed ... identical content to the version on
+          # the repository's default branch") whenever a PR edits this file. The
+          # action then exits 1, so a PR that touches these review workflows can
+          # never satisfy its own required check. It clears on merge.
+          #
+          # Supplying github_token skips the App-token exchange entirely, letting
+          # the review actually run on such a PR. Two coupled consequences:
+          #   - comments post as github-actions[bot], NOT claude[bot], so the
+          #     verdict step below must set VERDICT_BOT_LOGIN to match or the
+          #     gate fail-closes on a review that really ran;
+          #   - a wider trusted author is a weaker forgery guard, which is why
+          #     this is temporary scaffolding and not the default.
+          # Uncomment BOTH this and the VERDICT_BOT_LOGIN line below, together.
+          #
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+          additional_permissions: |
+            actions: read
+
+          # Install the vendored golang-security skill from the in-repo
+          # marketplace at .claude-plugin/marketplace.json. Pin is enforced
+          # there (ref + sha) so the action sees a reproducible plugin source.
+          plugin_marketplaces: |
+            ./
+          plugins: |
+            cc-skills-golang@neo4j-cli-review
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            HEAD SHA: ${{ github.event.pull_request.head.sha }}
+
+            ${{ env.PROMPT }}
+
+          # Narrow tool allowlist (PRD REQ-F-007). `Bash(tee:*)` is the narrowest
+          # form that lets Claude write the one-word verdict to /tmp/claude-verdict.txt
+          # (`echo pass | tee /tmp/claude-verdict.txt`). `Skill` enables invoking
+          # the vendored golang-security plugin; `Bash(govulncheck:*)` lets that
+          # skill shell out to govulncheck. `Bash(gh api:*)` lets the summary step
+          # look up + PATCH an existing claude[bot] comment so each push updates
+          # one comment instead of appending a new one. No general `Bash`, no
+          # `Write`/`Edit` on repo files, no `curl`/`wget`.
+          claude_args: >-
+            --model sonnet
+            --allowed-tools
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
+
+      - name: Upload retry execution log
+        if: always() && steps.detect.outputs.verdict == 'none'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: claude-execution-security-retry
+          path: ${{ runner.temp }}/claude-execution-output.json
+          if-no-files-found: ignore
+
       - name: Enforce verdict
         # Four-tier verdict gate; see script header.
         env:
@@ -112,5 +198,5 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_KIND: "Security review"
           # Paired with the github_token escape hatch above — uncomment both or neither.
-          # VERDICT_BOT_LOGIN: "github-actions[bot]"
+          VERDICT_BOT_LOGIN: "github-actions[bot]"
         run: .github/scripts/enforce-claude-verdict.sh
