@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: On Windows, `skill install`, `skill list`, `skill remove` and `skill check` now detect installed agents when the `HOME` environment variable is unset (home is resolved from `%USERPROFILE%`), so `skill install --all` works for Codex users (bundled with ChatGPT Desktop on Windows).
-time: 2026-10-14T16:57:44.014384+02:00
