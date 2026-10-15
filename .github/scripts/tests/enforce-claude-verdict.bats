@@ -124,7 +124,57 @@ write_dual_comment_response() {
 EOF
 }
 
+# Replace the gh stub with a sequencing one for polling tests: each invocation
+# bumps ${TEST_TMP}/gh_call_count and emits the response file for that
+# invocation number (1-based); calls beyond the last file repeat the last one.
+# Args: response_file [response_file ...]
+write_sequencing_gh_stub() {
+  local n=1 f
+  for f in "$@"; do
+    cp "$f" "${TEST_TMP}/gh_seq_${n}.json"
+    n=$((n + 1))
+  done
+  local last=$((n - 1))
+  cat >"${STUBS_DIR}/gh" <<STUB
+#!/usr/bin/env bash
+# Same call-pattern validation as the default stub.
+found=0
+for arg in "\$@"; do
+  if [[ "\$arg" == *"repos/"*"/issues/"*"/comments"* ]]; then
+    found=1
+    break
+  fi
+done
+if [[ "\$found" -eq 0 ]]; then
+  echo "Unexpected gh call: \$*" >&2
+  exit 1
+fi
+count_file="${TEST_TMP}/gh_call_count"
+n=0
+if [[ -f "\$count_file" ]]; then
+  n=\$(cat "\$count_file")
+fi
+n=\$((n + 1))
+echo "\$n" >"\$count_file"
+seq_file="${TEST_TMP}/gh_seq_\${n}.json"
+if [[ ! -f "\$seq_file" ]]; then
+  seq_file="${TEST_TMP}/gh_seq_${last}.json"
+fi
+cat "\$seq_file"
+exit 0
+STUB
+  chmod +x "${STUBS_DIR}/gh"
+}
+
+# Number of gh invocations recorded by the sequencing stub.
+gh_call_count() {
+  cat "${TEST_TMP}/gh_call_count"
+}
+
 # Run the verdict script with standard env vars.
+# POLL_ATTEMPTS/POLL_INTERVAL_SECONDS default to a single immediate fetch so
+# pre-existing fail-closed cases don't sit through the poll loop; polling
+# cases override both explicitly.
 run_verdict() {
   PATH="${STUBS_DIR}:${PATH}" \
     REVIEW_KIND="${REVIEW_KIND:-Security review}" \
@@ -132,6 +182,8 @@ run_verdict() {
     GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-neo4j-labs/neo4j-cli}" \
     GH_TOKEN="${GH_TOKEN:-fake-token}" \
     VERDICT_FILE="${VERDICT_FILE:-${TEST_TMP}/verdict.txt}" \
+    POLL_ATTEMPTS="${POLL_ATTEMPTS:-1}" \
+    POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-0}" \
     bash "${SCRIPT}" 2>&1
 }
 
@@ -325,6 +377,124 @@ run_verdict() {
   fixture_body="$(cat "${FIXTURES_DIR}/pr239-summary-no-checkmark.md")"
   write_gh_response "$fixture_body"
   GH_STUB_RESPONSE_FILE="${TEST_TMP}/gh_response.json" run run_verdict
+  echo "$output"
+  [ "$status" -eq 0 ]
+}
+
+# case 19: MODE=detect with no comments writes verdict=none to GITHUB_OUTPUT and exits 0
+@test "case 19: detect mode empty comments writes verdict=none" {
+  MODE=detect \
+    GITHUB_OUTPUT="${TEST_TMP}/github_output" \
+    POLL_ATTEMPTS=1 POLL_INTERVAL_SECONDS=0 \
+    run run_verdict
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(cat "${TEST_TMP}/github_output")" = "verdict=none" ]
+}
+
+# case 20: MODE=detect with a pass verdict file writes verdict=pass and exits 0
+@test "case 20: detect mode pass verdict file writes verdict=pass" {
+  echo "pass" > "${TEST_TMP}/verdict.txt"
+  MODE=detect \
+    GITHUB_OUTPUT="${TEST_TMP}/github_output" \
+    run run_verdict
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(cat "${TEST_TMP}/github_output")" = "verdict=pass" ]
+}
+
+# case 21: MODE=detect with a fail verdict file writes verdict=fail and exits 0
+@test "case 21: detect mode fail verdict file writes verdict=fail" {
+  echo "fail" > "${TEST_TMP}/verdict.txt"
+  MODE=detect \
+    GITHUB_OUTPUT="${TEST_TMP}/github_output" \
+    run run_verdict
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(cat "${TEST_TMP}/github_output")" = "verdict=fail" ]
+}
+
+# case 22: poll finds the marker comment on the third fetch
+@test "case 22: poll picks up comment appearing on third fetch" {
+  printf '[]\n' > "${TEST_TMP}/seq_empty.json"
+  write_gh_response "**Security review:** ✅ no issues found"
+  write_sequencing_gh_stub \
+    "${TEST_TMP}/seq_empty.json" \
+    "${TEST_TMP}/seq_empty.json" \
+    "${TEST_TMP}/gh_response.json"
+  POLL_ATTEMPTS=5 POLL_INTERVAL_SECONDS=0 run run_verdict
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(gh_call_count)" -eq 3 ]
+}
+
+# case 23: poll exhaustion in enforce mode fails with the nothing-found message
+@test "case 23: poll exhaustion fails closed with re-run remedy" {
+  printf '[]\n' > "${TEST_TMP}/seq_empty.json"
+  write_sequencing_gh_stub "${TEST_TMP}/seq_empty.json"
+  POLL_ATTEMPTS=3 POLL_INTERVAL_SECONDS=0 run run_verdict
+  echo "$output"
+  [ "$status" -eq 1 ]
+  grep -qF "produced no verdict file and no current-head summary comment" <<< "$output"
+  grep -qF "Re-run the job." <<< "$output"
+  [ "$(gh_call_count)" -eq 3 ]
+}
+
+# case 24: poll exhaustion in detect mode writes verdict=none and exits 0
+@test "case 24: poll exhaustion in detect mode writes verdict=none" {
+  printf '[]\n' > "${TEST_TMP}/seq_empty.json"
+  write_sequencing_gh_stub "${TEST_TMP}/seq_empty.json"
+  MODE=detect \
+    GITHUB_OUTPUT="${TEST_TMP}/github_output" \
+    POLL_ATTEMPTS=3 POLL_INTERVAL_SECONDS=0 \
+    run run_verdict
+  echo "$output"
+  [ "$status" -eq 0 ]
+  [ "$(cat "${TEST_TMP}/github_output")" = "verdict=none" ]
+  [ "$(gh_call_count)" -eq 3 ]
+}
+
+# case 25: comment carrying the matching claude-head-sha marker is accepted
+@test "case 25: head-sha match accepts the comment" {
+  write_gh_response "$(printf '**Security review:** ✅ no issues found\n<!-- claude-head-sha: abc123 -->')"
+  HEAD_SHA="abc123" \
+    GH_STUB_RESPONSE_FILE="${TEST_TMP}/gh_response.json" \
+    POLL_ATTEMPTS=1 POLL_INTERVAL_SECONDS=0 \
+    run run_verdict
+  echo "$output"
+  [ "$status" -eq 0 ]
+}
+
+# case 26: comment carrying a different claude-head-sha is treated as absent (stale)
+@test "case 26: head-sha mismatch treats the comment as stale" {
+  write_gh_response "$(printf '**Security review:** ✅ no issues found\n<!-- claude-head-sha: deadbeef -->')"
+  HEAD_SHA="abc123" \
+    GH_STUB_RESPONSE_FILE="${TEST_TMP}/gh_response.json" \
+    POLL_ATTEMPTS=1 POLL_INTERVAL_SECONDS=0 \
+    run run_verdict
+  echo "$output"
+  [ "$status" -eq 1 ]
+  grep -qF "stale comment from sha deadbeef" <<< "$output"
+}
+
+# case 27: HEAD_SHA set but the marker comment carries no claude-head-sha line
+@test "case 27: missing head-sha marker treats the comment as absent" {
+  write_gh_response "**Security review:** ✅ no issues found"
+  HEAD_SHA="abc123" \
+    GH_STUB_RESPONSE_FILE="${TEST_TMP}/gh_response.json" \
+    POLL_ATTEMPTS=1 POLL_INTERVAL_SECONDS=0 \
+    run run_verdict
+  echo "$output"
+  [ "$status" -eq 1 ]
+  grep -qF "no claude-head-sha, treating as absent" <<< "$output"
+}
+
+# case 28: HEAD_SHA unset keeps legacy acceptance of a marker comment without a sha line
+@test "case 28: unset head-sha keeps legacy acceptance" {
+  write_gh_response "**Security review:** ✅ no issues found"
+  GH_STUB_RESPONSE_FILE="${TEST_TMP}/gh_response.json" \
+    POLL_ATTEMPTS=1 POLL_INTERVAL_SECONDS=0 \
+    run run_verdict
   echo "$output"
   [ "$status" -eq 0 ]
 }
