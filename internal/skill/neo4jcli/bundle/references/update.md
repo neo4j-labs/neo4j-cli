@@ -38,7 +38,7 @@ neo4j-cli update --no-changelog
 
 Report whether a newer neo4j-cli release is available without swapping
 
-Compares the running binary's version against the latest GitHub release at neo4j-labs/neo4j-cli and reports the result without downloading or swapping. By default only stable semver tags are considered; pass `--pre-releases` to opt into alpha/beta/rc tags. Exits 0 whether or not a newer version exists; scripts that want to branch on drift compare `current != latest` in the JSON output.
+Compares the running binary's version against the latest release listed in the releases.json metadata at neo4j.sh and reports the result without downloading or swapping. By default only stable semver tags are considered; pass `--pre-releases` to opt into alpha/beta/rc tags. Exits 0 whether or not a newer version exists; scripts that want to branch on drift compare `current != latest` in the JSON output.
 
 Usage: `neo4j-cli update check [flags]`
 
