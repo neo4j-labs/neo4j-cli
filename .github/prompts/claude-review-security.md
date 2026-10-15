@@ -1,4 +1,4 @@
-You are performing an automated security review of a pull request in this Go repository. Be concise, concrete, and avoid noise — only flag findings you can name a specific risk for.
+You are performing an automated security review of a pull request in this Go repository. Be concise, concrete, and avoid noise — only flag findings you can name a specific risk for. The workflow supplies the PR head SHA in the prompt header line `HEAD SHA: <sha>` (injected as `HEAD SHA: ${{ github.event.pull_request.head.sha }}` next to the existing `REPO:` / `PR NUMBER:` header lines) — you must echo it into the summary comment as mandated below.
 
 ## Step 1 — Invoke the `golang-security` skill (review mode)
 
@@ -18,6 +18,7 @@ Before invoking the skill, run `gh pr diff` and inspect the file list. If the di
    ```
    **Security review:** no security-relevant changes (no Go files modified). ✅
    <!-- claude-verdict: pass -->
+   <!-- claude-head-sha: <the HEAD SHA from the prompt header> -->
    ```
 3. Stop. Do not invoke the skill.
 
@@ -56,9 +57,10 @@ Compose the top-level summary body with this shape:
 
 **Security review:** ✅ no issues found
 <!-- claude-verdict: pass -->
+<!-- claude-head-sha: <the HEAD SHA from the prompt header> -->
 ```
 
-The line immediately after `**Security review:**` must be the machine-readable HTML comment: `<!-- claude-verdict: pass -->` (zero issues) or `<!-- claude-verdict: fail -->` (one or more issues). This comment renders invisibly on GitHub. CI reads it as the primary verdict signal.
+The line immediately after `**Security review:**` must be the machine-readable HTML comment: `<!-- claude-verdict: pass -->` (zero issues) or `<!-- claude-verdict: fail -->` (one or more issues), and the line immediately after that must be `<!-- claude-head-sha: <the HEAD SHA from the prompt header> -->`. These comments render invisibly on GitHub. CI reads them: the verdict as the primary verdict signal, the head SHA to bind the verdict to the push it belongs to.
 
 When the HTML marker is absent (fallback), CI parses the `**Security review:**` line's wording:
 - `no issues found` and `flagged inline` are the load-bearing phrases.
@@ -97,7 +99,7 @@ Write the summary body to a temp file first (e.g. `/tmp/claude-summary.md`) via 
 If the `golang-security` skill cannot be invoked or errors out mid-run — examples: the `Skill` tool reports it is not installed, the skill's `SKILL.md` cannot be located, `govulncheck` is not on `PATH`, or the skill exits with an error you cannot work around — do the following and stop:
 
 1. Write `fail` to `/tmp/claude-verdict.txt`.
-2. Post-or-update the summary comment (using the "Posting the summary" discover-then-edit pattern above) naming the failure mode, e.g. `**Security review:** ⚠️ golang-security skill unavailable — pin may be broken. Details: <short description of what failed>.`
+2. Post-or-update the summary comment (using the "Posting the summary" discover-then-edit pattern above) naming the failure mode, e.g. `**Security review:** ⚠️ golang-security skill unavailable — pin may be broken. Details: <short description of what failed>.` End that body with the same `<!-- claude-head-sha: <the HEAD SHA from the prompt header> -->` marker line.
 3. Do **NOT** fall back to hand-rolled security checks. The whole point of pinning the skill is that pin breakage must be loudly visible — silently degrading to ad-hoc heuristics would mask a broken pin indefinitely.
 
 ## Constraints
