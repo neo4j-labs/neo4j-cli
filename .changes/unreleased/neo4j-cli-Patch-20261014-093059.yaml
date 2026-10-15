@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Fixed `desktop list` and `desktop connection list` failing against Neo4j Desktop 2.3, which reports a connection''s `createdAt` as a numeric timestamp instead of a string.'
-time: 2026-10-14T09:30:59+00:00
