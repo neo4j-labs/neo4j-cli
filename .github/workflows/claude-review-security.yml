@@ -93,18 +93,22 @@ jobs:
 
             ${{ env.PROMPT }}
 
-          # Narrow tool allowlist (PRD REQ-F-007). `Bash(tee:*)` is the narrowest
-          # form that lets Claude write the one-word verdict to /tmp/claude-verdict.txt
-          # (`echo pass | tee /tmp/claude-verdict.txt`). `Skill` enables invoking
-          # the vendored golang-security plugin; `Bash(govulncheck:*)` lets that
-          # skill shell out to govulncheck. `Bash(gh api:*)` lets the summary step
-          # look up + PATCH an existing claude[bot] comment so each push updates
-          # one comment instead of appending a new one. No general `Bash`, no
-          # `Write`/`Edit` on repo files, no `curl`/`wget`.
+          # Narrow tool allowlist (PRD REQ-F-007). `Bash(tee:*)` lets Claude write
+          # the verdict/summary files; `Bash(echo:*)` and `Bash(printf:*)` are
+          # required alongside it because the prompt-mandated writes
+          # (`echo pass | tee /tmp/claude-verdict.txt`,
+          # `printf ... | tee /tmp/claude-summary.md`) are pipelines, and the
+          # permission checker requires every pipeline segment to be allowlisted.
+          # `Skill` enables invoking the vendored golang-security plugin;
+          # `Bash(govulncheck:*)` lets that skill shell out to govulncheck.
+          # `Bash(gh api:*)` lets the summary step look up + PATCH an existing
+          # claude[bot] comment so each push updates one comment instead of
+          # appending a new one. No general `Bash`, no `Write`/`Edit` on repo
+          # files, no `curl`/`wget`.
           claude_args: >-
             --model sonnet
             --allowed-tools
-            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(echo:*),Bash(printf:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
 
       - name: Upload Claude execution log
         if: always()
@@ -170,18 +174,22 @@ jobs:
 
             ${{ env.PROMPT }}
 
-          # Narrow tool allowlist (PRD REQ-F-007). `Bash(tee:*)` is the narrowest
-          # form that lets Claude write the one-word verdict to /tmp/claude-verdict.txt
-          # (`echo pass | tee /tmp/claude-verdict.txt`). `Skill` enables invoking
-          # the vendored golang-security plugin; `Bash(govulncheck:*)` lets that
-          # skill shell out to govulncheck. `Bash(gh api:*)` lets the summary step
-          # look up + PATCH an existing claude[bot] comment so each push updates
-          # one comment instead of appending a new one. No general `Bash`, no
-          # `Write`/`Edit` on repo files, no `curl`/`wget`.
+          # Narrow tool allowlist (PRD REQ-F-007). `Bash(tee:*)` lets Claude write
+          # the verdict/summary files; `Bash(echo:*)` and `Bash(printf:*)` are
+          # required alongside it because the prompt-mandated writes
+          # (`echo pass | tee /tmp/claude-verdict.txt`,
+          # `printf ... | tee /tmp/claude-summary.md`) are pipelines, and the
+          # permission checker requires every pipeline segment to be allowlisted.
+          # `Skill` enables invoking the vendored golang-security plugin;
+          # `Bash(govulncheck:*)` lets that skill shell out to govulncheck.
+          # `Bash(gh api:*)` lets the summary step look up + PATCH an existing
+          # claude[bot] comment so each push updates one comment instead of
+          # appending a new one. No general `Bash`, no `Write`/`Edit` on repo
+          # files, no `curl`/`wget`.
           claude_args: >-
             --model sonnet
             --allowed-tools
-            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(echo:*),Bash(printf:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
 
       - name: Upload retry execution log
         if: always() && steps.detect.outputs.verdict == 'none'
