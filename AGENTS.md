@@ -27,6 +27,7 @@ Strict one-file-per-leaf layout under `internal/commands/aura/<resource>/` and `
 - Colocated `<action>_test.go`; shared helpers in `<resource>_helpers_test.go`.
 - New leaf = `<action>.go` + `<action>_test.go` + one `AddCommand` line.
 - Documented exception: `admin privilege` grant/deny/revoke generate their 7 category leaves (property/entity/graph/label/load/database/dbms) from a single `categoryMeta` table via `newCategoryCmd` in `privilege/helpers.go` — no per-leaf file.
+- Documented exception: `desktop project`/`desktop tag` generate their 4 catalog leaves (list/create/update/delete) from a `Spec` via `catalogcmd.Mount` (`internal/commands/desktop/internal/catalogcmd/`) — no per-leaf files; each package's spec data lives in `spec.go`.
 
 ## Build System
 
