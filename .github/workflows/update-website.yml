@@ -61,6 +61,17 @@ jobs:
           [ -n "$ANTHROPIC_API_KEY" ] || { echo "ANTHROPIC_API_KEY secret not set"; exit 1; }
           echo "API key present (${#ANTHROPIC_API_KEY} chars)"
 
+      - name: Generate releases.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Regenerate gh-pages/releases.json from the GitHub Releases API
+          # (CLI-244: the CLI's `update` command discovers releases from
+          # https://neo4j.sh/releases.json, not the API). The generator is
+          # idempotent — unchanged release data yields a byte-identical file,
+          # so the commit step below stays a no-op when nothing changed.
+          go run ./tools/releases-json --out gh-pages/releases.json
+
       - name: Run website update
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -98,17 +109,6 @@ jobs:
                 end
               ' \
             | stdbuf -oL tee /tmp/update-summary.txt
-
-      - name: Generate releases.json
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Regenerate gh-pages/releases.json from the GitHub Releases API
-          # (CLI-244: the CLI's `update` command discovers releases from
-          # https://neo4j.sh/releases.json, not the API). The generator is
-          # idempotent — unchanged release data yields a byte-identical file,
-          # so the commit step below stays a no-op when nothing changed.
-          go run ./tools/releases-json --out gh-pages/releases.json
 
       - name: Commit and push
         run: |
