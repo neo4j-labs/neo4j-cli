@@ -73,7 +73,7 @@ jobs:
           #     this is temporary scaffolding and not the default.
           # Uncomment BOTH this and the VERDICT_BOT_LOGIN line below, together.
           #
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # github_token: ${{ secrets.GITHUB_TOKEN }}
 
           additional_permissions: |
             actions: read
@@ -126,7 +126,7 @@ jobs:
           REVIEW_KIND: "Security review"
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           MODE: detect
-          VERDICT_BOT_LOGIN: "github-actions[bot]"
+          # VERDICT_BOT_LOGIN: "github-actions[bot]"
         run: .github/scripts/enforce-claude-verdict.sh
 
       - name: Retry Claude Code (security review)
@@ -154,7 +154,7 @@ jobs:
           #     this is temporary scaffolding and not the default.
           # Uncomment BOTH this and the VERDICT_BOT_LOGIN line below, together.
           #
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # github_token: ${{ secrets.GITHUB_TOKEN }}
 
           additional_permissions: |
             actions: read
@@ -207,5 +207,5 @@ jobs:
           REVIEW_KIND: "Security review"
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           # Paired with the github_token escape hatch above — uncomment both or neither.
-          VERDICT_BOT_LOGIN: "github-actions[bot]"
+          # VERDICT_BOT_LOGIN: "github-actions[bot]"
         run: .github/scripts/enforce-claude-verdict.sh
