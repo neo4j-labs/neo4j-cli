@@ -11,7 +11,7 @@ export LC_ALL=C.UTF-8
 # denial cannot silently pass.
 #
 # Fallback tiers (most exact to most tolerant):
-#   1. VERDICT_FILE (default /tmp/claude-verdict.txt)
+#   1. VERDICT_FILE (default claude-verdict.txt, workspace-relative)
 #   2. HTML comment <!-- claude-verdict: pass|fail -->
 #   3. Marker-line phrase match (single-line only)
 #   4. Fail-closed (::error:: + exit 1)
@@ -59,7 +59,12 @@ export LC_ALL=C.UTF-8
 # Env var (optional):  POLL_INTERVAL_SECONDS (default 15) —
 #                      sleep between fetches.
 # Env var (optional):  VERDICT_FILE
-#                      (default /tmp/claude-verdict.txt)
+#                      (default claude-verdict.txt, relative
+#                      to the workspace root). Workspace-relative
+#                      on purpose: the review agent's sandbox
+#                      auto-approves writes only inside the
+#                      session working directory — /tmp is
+#                      outside it and gets denied.
 # Env var (optional):  VERDICT_BOT_LOGIN
 #                      (default claude[bot]) — must match the
 #                      identity the review step posts as
@@ -90,7 +95,7 @@ if [ "${MODE:-}" = "detect" ]; then
   : "${GITHUB_OUTPUT:=/dev/stdout}"
 fi
 
-: "${VERDICT_FILE:=/tmp/claude-verdict.txt}"
+: "${VERDICT_FILE:=claude-verdict.txt}"
 
 # Author whose comment carries the verdict. Defaults to the Claude GitHub App.
 # Only override when the review step authenticates with a different identity

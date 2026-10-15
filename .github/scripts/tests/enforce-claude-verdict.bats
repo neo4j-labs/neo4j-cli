@@ -372,6 +372,24 @@ run_verdict() {
   [[ "$output" == *"claude[bot]"* ]]
 }
 
+# case: default VERDICT_FILE is workspace-relative (claude-verdict.txt in cwd) —
+# the review agent's sandbox denies writes outside the session working directory,
+# so the default must not point at /tmp (PR #256 failure class).
+@test "default verdict file is workspace-relative claude-verdict.txt" {
+  echo "pass" > "${TEST_TMP}/claude-verdict.txt"
+  cd "${TEST_TMP}"
+  run env -u VERDICT_FILE \
+    PATH="${STUBS_DIR}:${PATH}" \
+    REVIEW_KIND="Security review" \
+    PR_NUMBER="123" \
+    GITHUB_REPOSITORY="neo4j-labs/neo4j-cli" \
+    GH_TOKEN="fake-token" \
+    bash "${SCRIPT}" 2>&1
+  echo "$output"
+  [ "$status" -eq 0 ]
+  grep -qF "Tier 1 (verdict file)" <<< "$output"
+}
+
 # fixture replay: pr239-summary-no-checkmark.md verbatim through the gate
 @test "fixture: pr239 summary without checkmark passes" {
   fixture_body="$(cat "${FIXTURES_DIR}/pr239-summary-no-checkmark.md")"
