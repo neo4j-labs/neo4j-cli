@@ -1,4 +1,4 @@
-You are performing an automated repo-conventions review of a pull request in this Go repository. Be concise, concrete, and avoid noise — only flag findings that violate a named rule from `AGENTS.md`.
+You are performing an automated repo-conventions review of a pull request in this Go repository. Be concise, concrete, and avoid noise — only flag findings that violate a named rule from `AGENTS.md`. The workflow supplies the PR head SHA in the prompt header line `HEAD SHA: <sha>` (injected as `HEAD SHA: ${{ github.event.pull_request.head.sha }}` next to the existing `REPO:` / `PR NUMBER:` header lines) — you must echo it into the summary comment as mandated below.
 
 ## Source of truth
 
@@ -33,6 +33,7 @@ Out of scope for this review (do **not** post inline comments for these):
    ```
    **Conventions review:** no convention-relevant changes.
    <!-- claude-verdict: pass -->
+   <!-- claude-head-sha: <the HEAD SHA from the prompt header> -->
    ```
 
    Stop. Do not continue further.
@@ -59,9 +60,10 @@ Out of scope for this review (do **not** post inline comments for these):
 
    **Conventions review:** ✅ no issues found
    <!-- claude-verdict: pass -->
+   <!-- claude-head-sha: <the HEAD SHA from the prompt header> -->
    ```
 
-   The final line of the body (immediately after `**Conventions review:**`) must be `<!-- claude-verdict: pass -->` or `<!-- claude-verdict: fail -->`. This HTML comment renders invisibly on GitHub but CI reads it as the authoritative verdict. When the HTML comment is absent, CI falls back to parsing the `**Conventions review:**` line's wording: `no issues found` and `no convention-relevant changes` signal pass, `flagged inline` signals fail — the emoji (`✅`/`⚠️`) is cosmetic only.
+   The two final lines of the body (immediately after `**Conventions review:**`) must be `<!-- claude-verdict: pass -->` or `<!-- claude-verdict: fail -->`, followed by `<!-- claude-head-sha: <the HEAD SHA from the prompt header> -->`. These HTML comments render invisibly on GitHub but CI reads them: the verdict as the authoritative outcome, the head SHA to bind the verdict to the push it belongs to. When the verdict HTML comment is absent, CI falls back to parsing the `**Conventions review:**` line's wording: `no issues found` and `no convention-relevant changes` signal pass, `flagged inline` signals fail — the emoji (`✅`/`⚠️`) is cosmetic only.
 7. Post-or-update that summary using the discover-then-edit pattern so the PR ends up with exactly one Conventions-review comment, not one per push:
 
    1. Look up any prior summary written by this workflow:
