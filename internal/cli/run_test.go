@@ -469,6 +469,26 @@ func TestRun_UsageErrorsAreCompact(t *testing.T) {
 	}
 }
 
+// A failing `feedback submit` prints the report back in its outcome JSON, so
+// nothing from it may be saved to the tee dir.
+func TestHandleFailure_FeedbackSubmitIsNeverTeed(t *testing.T) {
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test")
+	cfg.Flags.SetForTest("flag.feedback-command", true)
+	cmd := NewCmd(cfg)
+
+	captured := []byte(`{"outcome":"failed","payload":{"expected":"ada@example.com"}}`)
+	ce := handleFailure(cfg, cmd, []string{"feedback", "submit", "--expected", "x"}, captured, errors.New("feedback failed: unreachable"))
+
+	require.NotNil(t, ce)
+	assert.Empty(t, ce.TeePath, "no tee path for feedback submit")
+	entries, err := afero.ReadDir(fs, tee.Dir())
+	if err == nil {
+		assert.Empty(t, entries, "no tee file may be written")
+	}
+}
+
 // The crash diagnostic echoes the arguments; report text must not reach it.
 func TestRecoverPanic_MasksFeedbackSubmitText(t *testing.T) {
 	var buf bytes.Buffer

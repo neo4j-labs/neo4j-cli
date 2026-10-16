@@ -50,6 +50,14 @@ var Registry = map[string]Flag{
 		IntroducedIn:     "1.12.0",
 		RemovalCondition: "GA of `neo4j-cli mcp`: this entry and the gated branch in app.go are deleted in the same PR. Never flipped to default true.",
 	},
+	"flag.feedback-command": {
+		Name:             "flag.feedback-command",
+		Default:          false,
+		Owner:            "neo4j-cli-workinggroup",
+		Gates:            "the neo4j-cli feedback command group (agent feedback reports, early-access trial)",
+		IntroducedIn:     "1.18.0",
+		RemovalCondition: "GA of agent feedback after the early-access trial: this entry, the gated branch in app.go, the flag passed in the Codex registration and the installers' `config set flag.feedback-command` are deleted in the same PR.",
+	},
 }
 
 // FlagSet wraps the runtime override surface (env vars + config file via viper)

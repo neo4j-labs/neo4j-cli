@@ -49,12 +49,15 @@ type Gates struct {
 // command-path prefixes: `update` swaps the running binary out from under the
 // server, `mcp` would spawn a server inside a server, `completion` emits shell
 // code for a shell the model does not have, and `history clear` destroys the
-// audit trail of what the model did.
+// audit trail of what the model did. `feedback` has its own MCP server
+// (`feedback serve`) with its own consent; it must not be reachable here,
+// where a tool call could run `feedback enable --accept` for the person.
 var deniedPaths = [][]string{
 	{"update"},
 	{"mcp"},
 	{"completion"},
 	{"history", "clear"},
+	{"feedback"},
 }
 
 // deniedArgs deny a single leaf only when a specific token appears among its

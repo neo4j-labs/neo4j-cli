@@ -26,6 +26,7 @@ import (
 	"github.com/neo4j/cli/internal/commands/dataset"
 	"github.com/neo4j/cli/internal/commands/desktop"
 	"github.com/neo4j/cli/internal/commands/docker"
+	"github.com/neo4j/cli/internal/commands/feedback"
 	"github.com/neo4j/cli/internal/commands/history"
 	"github.com/neo4j/cli/internal/commands/mcp"
 	"github.com/neo4j/cli/internal/commands/query"
@@ -118,6 +119,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		// NewCmd is handed back to the group as its root factory: mcp builds a
 		// fresh tree per tool call and cannot import this package to do it.
 		cmd.AddCommand(mcp.NewCmd(cfg, NewCmd))
+	}
+	if cfg.Flags.Enabled("flag.feedback-command") {
+		cmd.AddCommand(feedback.NewCmd(cfg))
 	}
 
 	cobra.EnableTraverseRunHooks = true

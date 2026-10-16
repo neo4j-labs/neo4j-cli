@@ -4,6 +4,8 @@
 package clicfg
 
 import (
+	"errors"
+	"io/fs"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
 
@@ -133,6 +136,45 @@ func (config *GlobalConfig) Set(key string, value string) error {
 	// IsSet or GetString in the same process reflect the written value immediately.
 	config.viper.Set(key, value)
 	return nil
+}
+
+// SetValues writes the key/value pairs to the config file in one atomic write
+// and syncs them into the in-memory store. Unlike Set it neither validates keys
+// nor panics: a read or write failure is returned, for callers that must fail
+// cleanly when the config file is not writable.
+func (config *GlobalConfig) SetValues(kv ...[2]string) error {
+	data, err := afero.ReadFile(config.fs, config.configPath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	updated := string(data)
+	for _, p := range kv {
+		if updated, err = sjson.Set(updated, p[0], p[1]); err != nil {
+			return err
+		}
+	}
+	if err := fileutils.WriteFileErr(config.fs, config.configPath, []byte(updated)); err != nil {
+		return err
+	}
+	for _, p := range kv {
+		config.viper.Set(p[0], p[1])
+	}
+	return nil
+}
+
+// ReadFresh returns key's value as currently stored in the config file, read
+// from disk rather than from the in-memory store loaded at startup, so a
+// long-running process sees changes made since by other processes. It returns
+// "" when the key is unset and an error when the file cannot be read.
+func (config *GlobalConfig) ReadFresh(key string) (string, error) {
+	data, err := afero.ReadFile(config.fs, config.configPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return gjson.GetBytes(data, key).String(), nil
 }
 
 func (config *GlobalConfig) Format() string {
