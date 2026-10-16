@@ -167,7 +167,11 @@ func (s evaluationRunService) Create(ctx context.Context, scope Scope, spec Eval
 	if err != nil {
 		return nil, err
 	}
-	run := newEvaluationRun(rows[0])
+	rec, err := single(rows, "creating evaluation run")
+	if err != nil {
+		return nil, err
+	}
+	run := newEvaluationRun(rec)
 	return &run, nil
 }
 
@@ -198,7 +202,11 @@ func (s evaluationRunService) Cancel(ctx context.Context, scope Scope, id string
 	if err != nil {
 		return nil, err
 	}
-	run := newEvaluationRun(rows[0])
+	rec, err := single(rows, "cancelling evaluation run")
+	if err != nil {
+		return nil, err
+	}
+	run := newEvaluationRun(rec)
 	return &run, nil
 }
 
