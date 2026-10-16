@@ -31,6 +31,7 @@ The script is controlled via environment variables:
 |----------|---------|-------------|
 | `VERSION` | _(latest)_ | Pin a specific release, e.g. `v0.1.0-alpha.6` |
 | `INSTALL_DIR` | `/usr/local/bin` | Directory to install the binary into |
+| `NEO4J_CLI_SKIP_FEEDBACK_PROMPT` | _(unset)_ | Set to `1` to skip the agent feedback question and registration (see [Agent feedback](#agent-feedback-opt-in-both-scripts)) |
 
 
 > Note: You will need to set `VERSION` for pre-release versions 
@@ -88,6 +89,8 @@ A PowerShell 5.1+ script that uses only built-in Windows cmdlets — no third-pa
 | `-Version` | _(latest)_ | Pin a specific release, e.g. `v0.1.0-alpha.6` |
 | `-InstallDir` | `%LOCALAPPDATA%\neo4j-cli` | Directory to install the binary into |
 
+Set `$Env:NEO4J_CLI_SKIP_FEEDBACK_PROMPT = "1"` to skip the agent feedback question and registration (see [Agent feedback](#agent-feedback-opt-in-both-scripts)).
+
 ### Examples
 
 ```powershell
@@ -119,6 +122,17 @@ A PowerShell 5.1+ script that uses only built-in Windows cmdlets — no third-pa
 - The default install location (`%LOCALAPPDATA%\neo4j-cli`) does **not** require administrator rights.
 - PATH changes take effect in new terminal sessions. To use the binary immediately in the current session, run `$Env:PATH += ";$InstallDir"`.
 - For a system-wide install visible to all users, run the script in an **elevated** (Administrator) PowerShell terminal and pass `-InstallDir "C:\Program Files\neo4j-cli"`.
+
+## Agent feedback (opt-in, both scripts)
+
+Builds that include `neo4j-cli feedback` let coding agents send short reports about `neo4j-cli` to the Neo4j team. Both scripts handle it the same way, after the skill question:
+
+- **A person at a terminal:** the script shows what a report contains and asks `[y/N]` (default No). Only a typed yes enables feedback.
+- **No terminal (CI), or a coding agent running the script:** nothing is asked and nothing is enabled. The script registers the feedback tool with Claude Code and Codex, whichever are installed (`neo4j-cli feedback register`); it appears in that agent's next session, not the one that ran the script. The tool sends nothing on its own: the first time an agent reports a problem with `neo4j-cli`, the person is asked to accept or decline. Undo it with `neo4j-cli feedback disable`.
+- **Feedback switched off:** with `NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1`, `DO_NOT_TRACK=1`, or telemetry turned off in `neo4j-cli`'s settings, the script neither asks nor registers anything.
+- No variable can enable feedback without a person answering.
+- A failure in this step never fails the install.
+- Before deleting `neo4j-cli`, run `neo4j-cli feedback disable`; it removes the registration. Otherwise the agent keeps an entry for a program that no longer exists (remove it with `claude mcp remove -s user neo4j-feedback` or `codex mcp remove neo4j-feedback`).
 
 ---
 

@@ -22,6 +22,10 @@ neo4j-cli aura instance list --format table
 
 `pnpm add -g @neo4j-labs/cli` and `yarn global add @neo4j-labs/cli` work the same way.
 
+## Agent feedback (builds that include `neo4j-cli feedback`)
+
+Coding agents can send short feedback reports about `neo4j-cli` to the Neo4j team. It is off by default; run `neo4j-cli feedback enable` to see exactly what would be sent and to turn it on. **Before you run `npm rm -g @neo4j-labs/cli`, run `neo4j-cli feedback disable`**: it removes the tool registration. If you uninstall first, your agent keeps a registration for a binary that no longer exists; remove it with `claude mcp remove -s user neo4j-feedback` (Claude Code) or `codex mcp remove neo4j-feedback` (Codex). Setting `DO_NOT_TRACK=1`, or turning telemetry off (`neo4j-cli config set telemetry false --rw`), switches feedback off.
+
 ## Supported platforms
 
 | OS        | CPU     |

@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'The install scripts (`install-neo4j-cli.sh`, `install-neo4j-cli.ps1`) offer agent feedback when the installed build has the `neo4j-cli feedback` command: at a terminal they show what a report contains and ask `[y/N]` (default No); with no terminal, or when a coding agent runs them, they ask nothing and register the feedback tool with Claude Code and Codex without enabling anything. `NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1`, `DO_NOT_TRACK=1` or telemetry turned off skips both, and a failure in this step never fails the install.'
+time: 2026-10-15T19:46:57-04:00
