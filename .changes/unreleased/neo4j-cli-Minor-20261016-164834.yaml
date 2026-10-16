@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Adds `aura agent evaluation-dataset` and `aura agent evaluation-run` commands for managing Aura agent evaluation datasets and runs
+time: 2026-10-16T16:48:34.255752+02:00

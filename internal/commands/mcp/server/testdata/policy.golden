@@ -53,6 +53,18 @@ aura	allow
 aura agent	gated:allow-aura
 aura agent create	gated:allow-aura
 aura agent delete	gated:allow-aura
+aura agent evaluation-dataset	gated:allow-aura
+aura agent evaluation-dataset create	gated:allow-aura
+aura agent evaluation-dataset delete	gated:allow-aura
+aura agent evaluation-dataset get	gated:allow-aura
+aura agent evaluation-dataset list	gated:allow-aura
+aura agent evaluation-dataset update	gated:allow-aura
+aura agent evaluation-run	gated:allow-aura
+aura agent evaluation-run cancel	gated:allow-aura
+aura agent evaluation-run create	gated:allow-aura
+aura agent evaluation-run delete	gated:allow-aura
+aura agent evaluation-run get	gated:allow-aura
+aura agent evaluation-run list	gated:allow-aura
 aura agent get	gated:allow-aura
 aura agent invoke	gated:allow-aura
 aura agent list	gated:allow-aura
