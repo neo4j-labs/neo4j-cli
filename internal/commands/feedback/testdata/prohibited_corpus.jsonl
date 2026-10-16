@@ -1,0 +1,38 @@
+{"id": "p01", "field": "observed", "text": "The error mentioned z.okonkwo@canary-example.test as the account owner.", "expect": "reject", "detector": "email"}
+{"id": "p02", "field": "observed", "text": "It tried to connect to bolt://db.internal.example:7687 and timed out.", "expect": "reject", "detector": "url"}
+{"id": "p03", "field": "observed", "text": "Connection to neo4j+s://abcd1234.databases.neo4j.io failed.", "expect": "reject", "detector": "url"}
+{"id": "p04", "field": "expected", "text": "It should have used localhost:7687 by default.", "expect": "reject", "detector": "host_port"}
+{"id": "p05", "field": "observed", "text": "The server at 10.20.30.40 refused the connection.", "expect": "reject", "detector": "ip_address"}
+{"id": "p06", "field": "observed", "text": "It could not read /home/alice/projects/acme/import/people.csv at all.", "expect": "reject", "detector": "file_path"}
+{"id": "p07", "field": "observed", "text": "The config under ~/work/secrets was ignored.", "expect": "reject", "detector": "file_path"}
+{"id": "p08", "field": "observed", "text": "It failed reading C:\\Users\\bob\\data while loading.", "expect": "reject", "detector": "file_path"}
+{"id": "p09", "field": "observed", "text": "The export to customers_2026.csv produced no rows.", "expect": "reject", "detector": "data_filename"}
+{"id": "p10", "field": "observed", "text": "It failed on the seed script load_people.cypher during import.", "expect": "reject", "detector": "data_filename"}
+{"id": "p11", "field": "observed", "text": "Authentication failed even though password=Hunter2Hunter2 was set.", "expect": "reject", "detector": "secret"}
+{"id": "p12", "field": "observed", "text": "I passed the key sk-ABCDEF1234567890abcdef and it was rejected.", "expect": "reject", "detector": "secret"}
+{"id": "p13", "field": "observed", "text": "The token ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345 was not accepted.", "expect": "reject", "detector": "secret"}
+{"id": "p14", "field": "observed", "text": "The header carried Zx9Lq2Vb7Nm4Rt8Yp3Wk6Hj1Gf5Ds0Aa and failed.", "expect": "reject", "detector": "secret"}
+{"id": "p15", "field": "observed", "text": "Instance 1f3a9c7e did not respond to the request.", "expect": "reject", "detector": "identifier"}
+{"id": "p16", "field": "observed", "text": "Database 3fa85f64-5717-4562-b3fc-2c963f66afa6 was not found.", "expect": "reject", "detector": "identifier"}
+{"id": "p17", "field": "observed", "text": "Running MATCH (p:Person) RETURN p.name returned nothing useful.", "expect": "reject", "detector": "cypher"}
+{"id": "p18", "field": "observed", "text": "The pattern (c:Customer)-[:BOUGHT]->(x) was rejected.", "expect": "reject", "detector": "cypher"}
+{"id": "p19", "field": "observed", "text": "MERGE on the node then SET the flag failed with a lock error.", "expect": "reject", "detector": "cypher"}
+{"id": "p20", "field": "observed", "text": "Using $customerId in the query did not bind correctly.", "expect": "reject", "detector": "cypher"}
+{"id": "p21", "field": "observed", "text": "A map like {name: 'x'} was treated as a string.", "expect": "reject", "detector": "cypher"}
+{"id": "p22", "field": "observed", "text": "Passing --param sku=10042 matched no rows.", "expect": "reject", "detector": "parameter"}
+{"id": "p23", "field": "observed", "text": "With --param=limit=5 the flag was ignored.", "expect": "reject", "detector": "parameter"}
+{"id": "p24", "field": "observed", "text": "The output was {\"name\":\"Ada\",\"email\":\"x\"} which looked wrong.", "expect": "reject", "detector": "pasted_output"}
+{"id": "p25", "field": "observed", "text": "It printed [{\"id\":1}] instead of a table.", "expect": "reject", "detector": "pasted_output"}
+{"id": "p26", "field": "observed", "text": "The table showed | name | email | row | with empty cells.", "expect": "reject", "detector": "pasted_output"}
+{"id": "p27", "field": "observed", "text": "It printed Error: password is required (exit 2) and stopped.", "expect": "reject", "detector": "pasted_output"}
+{"id": "p28", "field": "observed", "text": "Bad char here:\u0007 in output.", "expect": "reject", "detector": "control_chars"}
+{"id": "p29", "field": "observed", "text": "   ", "expect": "reject", "detector": "invalid_input"}
+{"id": "p30", "field": "observed", "text": "See https://internal.acme.example/wiki/neo4j for details.", "expect": "reject", "detector": "url"}
+{"id": "p31", "field": "observed", "text": "See https://neo4j.com/docs/AKIAABCDEFGHIJKLMNOP1234/x for the behavior.", "expect": "reject", "detector": "secret"}
+{"id": "p32", "field": "observed", "text": "Docs at https://neo4j.com/docs/x/home/alice/sales.csv?db=acme-prod explain it.", "expect": "reject", "detector": "url"}
+{"id": "p33", "field": "observed", "text": "Compare with https://github.com/neo4j-labs/neo4j-cli-evil/x where it works.", "expect": "reject", "detector": "url"}
+{"id": "p34", "field": "observed", "text": "The error named ｕｓｅｒ＠ｅｘａｍｐｌｅ．ｃｏｍ as the owner.", "expect": "reject", "detector": "email"}
+{"id": "p35", "field": "observed", "text": "Running match (p) where p.name = 'Alice Smith' return p gave nothing.", "expect": "reject", "detector": "cypher"}
+{"id": "p36", "field": "observed", "text": "It could not reach acme-prod：7687 at all.", "expect": "reject", "detector": "host_port"}
+{"id": "p37", "field": "observed", "text": "Logging in with password: Hunter2 failed without a reason.", "expect": "reject", "detector": "secret"}
+{"id": "p38", "field": "observed", "text": "The token Zx9Lq2Vb7Nm4Rt8Yp3Wk6H was rejected.", "expect": "reject", "detector": "secret"}

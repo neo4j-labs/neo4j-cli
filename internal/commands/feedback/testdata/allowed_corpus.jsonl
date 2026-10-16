@@ -1,0 +1,29 @@
+{"id": "a01", "field": "observed", "text": "There is no CSV output format; --format only accepts default, json, table and toon, so exporting to a spreadsheet needed a separate conversion step.", "expect": "accept", "detector": ""}
+{"id": "a02", "field": "expected", "text": "A numeric-looking string passed as a query parameter should stay a string, or the help should warn that it will be converted to an integer.", "expect": "accept", "detector": ""}
+{"id": "a03", "field": "observed", "text": "A numeric-looking string parameter was silently converted to an integer, so a lookup on a string property returned no rows and no warning.", "expect": "accept", "detector": ""}
+{"id": "a04", "field": "observed", "text": "Credential environment variables were present but ignored until accept-env-vars was enabled; the hint explained it, but the default was surprising.", "expect": "accept", "detector": ""}
+{"id": "a05", "field": "expected", "text": "LOAD CSV guidance should explain where local files must be placed.", "expect": "accept", "detector": ""}
+{"id": "a06", "field": "observed", "text": "The query command failed with a usage error that did not say which flag was invalid.", "expect": "accept", "detector": ""}
+{"id": "a07", "field": "observed", "text": "See https://neo4j.com/docs/operations-manual/current/ for the documented behavior that differs from the CLI.", "expect": "accept", "detector": ""}
+{"id": "a08", "field": "observed", "text": "Setting accept-env-vars in config.json had no effect until the CLI was restarted.", "expect": "accept", "detector": ""}
+{"id": "a09", "field": "observed", "text": "The error returned Neo.ClientError.Security.Unauthorized without saying which credential source was used.", "expect": "accept", "detector": ""}
+{"id": "a10", "field": "expected", "text": "The help for --max-rows should mention the default of 100 more prominently.", "expect": "accept", "detector": ""}
+{"id": "a11", "field": "observed", "text": "The command took several seconds to start on every invocation, even for help output.", "expect": "accept", "detector": "", "category": "other_friction"}
+{"id": "a12", "field": "observed", "text": "NEO4J_PASSWORD was set, but the CLI still asked for --password in a non-interactive shell.", "expect": "accept", "detector": ""}
+{"id": "a13", "field": "observed", "text": "The --format flag help says (default: false) for a string option, which is confusing.", "expect": "accept", "detector": ""}
+{"id": "a14", "field": "observed", "text": "A note in the help (note: experimental) did not say what would change.", "expect": "accept", "detector": ""}
+{"id": "a15", "field": "observed", "text": "The command printed Error on auth: unauthorized without naming the credential source.", "expect": "accept", "detector": ""}
+{"id": "a16", "field": "observed", "text": "When the token: expired case happens, the message should say how to log in again.", "expect": "accept", "detector": ""}
+{"id": "a17", "field": "observed", "text": "The release asset for x86_64-unknown-linux-gnu was missing from the list.", "expect": "accept", "detector": ""}
+{"id": "a18", "field": "observed", "text": "The skill refers to neo4j-cli-aura-instance-create-v2, which no longer exists.", "expect": "accept", "detector": ""}
+{"id": "a19", "field": "observed", "text": "The --param flag syntax is not explained for lists.", "expect": "accept", "detector": ""}
+{"id": "a20", "field": "observed", "text": "The SKILL.md and README.md disagree about the install.sh options.", "expect": "accept", "detector": ""}
+{"id": "a21", "field": "observed", "text": "Settings in neo4j.conf were not reflected in the CLI output.", "expect": "accept", "detector": ""}
+{"id": "a22", "field": "observed", "text": "It suggested a Next.js example that does not use the driver.", "expect": "accept", "detector": ""}
+{"id": "a23", "field": "observed", "text": "The $NEO4J_URI variable was ignored when --uri was absent.", "expect": "accept", "detector": ""}
+{"id": "a24", "field": "observed", "text": "The help should explain CALL IN TRANSACTIONS with LOAD CSV for large imports.", "expect": "accept", "detector": ""}
+{"id": "a25", "field": "observed", "text": "Typing the /mcp command in the agent did not list the CLI.", "expect": "accept", "detector": ""}
+{"id": "a26", "field": "observed", "text": "The docs compare it to std::string handling, which was unclear.", "expect": "accept", "detector": ""}
+{"id": "a27", "field": "observed", "text": "It used retry:10 in the message but did not retry.", "expect": "accept", "detector": ""}
+{"id": "a28", "field": "observed", "text": "The help\ttext used a tab where a space was expected.", "expect": "accept", "detector": ""}
+{"id": "a29", "field": "observed", "text": "See https://github.com/neo4j-labs/neo4j-cli/issues for the existing report on this.", "expect": "accept", "detector": ""}
