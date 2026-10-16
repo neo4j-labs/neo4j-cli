@@ -38,8 +38,9 @@ type PagedResult struct {
 	// Items is every element gathered across the pages that were walked.
 	Items []map[string]any
 	// LimitReached reports that traversal stopped because the caller's limit was
-	// reached while the API still had more to give. Only ListAllPages takes a
-	// limit, so ListAllOffsetPages never sets this.
+	// reached while the API still had more to give. Only the cursor walkers
+	// (ListAllPages/ListAllPagesWithQuery) take a limit, so ListAllOffsetPages
+	// never sets this.
 	LimitReached bool
 	// PageCapReached reports that traversal stopped at MaxListPages rather than
 	// at the end of the collection.
@@ -48,7 +49,7 @@ type PagedResult struct {
 
 // ListAllPages walks a cursor-paginated v2beta1 collection from the first page
 // to the last, following each response's links.next, and returns the merged
-// items.
+// items. It is ListAllPagesWithQuery without extra query parameters.
 //
 // Following by default is deliberate: the API caps a single response well below
 // the size of a large collection, so a single request would quietly return a
@@ -58,6 +59,15 @@ type PagedResult struct {
 // A limit of zero or less means "no limit". A positive limit stops the walk
 // once that many items are gathered and trims the final page to match.
 func ListAllPages(ctx context.Context, cfg *clicfg.Config, path string, version AuraApiVersion, limit int) (*PagedResult, error) {
+	return ListAllPagesWithQuery(ctx, cfg, path, version, limit, nil)
+}
+
+// ListAllPagesWithQuery is ListAllPages with caller-supplied query parameters
+// (e.g. a resource filter) sent on every page of the walk. As in
+// ListAllOffsetPages, the walker's own page_limit/page_token keys win any
+// collision, so a caller filter can never pin the walk to one page or inject
+// its own cursor.
+func ListAllPagesWithQuery(ctx context.Context, cfg *clicfg.Config, path string, version AuraApiVersion, limit int, extraQuery map[string]string) (*PagedResult, error) {
 	result := &PagedResult{Items: []map[string]any{}}
 
 	pageToken := ""
@@ -67,9 +77,17 @@ func ListAllPages(ctx context.Context, cfg *clicfg.Config, path string, version 
 	followed := map[string]struct{}{}
 
 	for page := 0; page < MaxListPages; page++ {
-		queryParams := map[string]string{"page_limit": strconv.Itoa(ListPageSize)}
+		queryParams := map[string]string{}
+		for k, v := range extraQuery {
+			queryParams[k] = v
+		}
+		// Applied after extraQuery so a caller-supplied page_limit/page_token
+		// key can never pin the walk or corrupt its cursor.
+		queryParams["page_limit"] = strconv.Itoa(ListPageSize)
 		if pageToken != "" {
 			queryParams["page_token"] = pageToken
+		} else {
+			delete(queryParams, "page_token")
 		}
 
 		resBody, statusCode, err := MakeRequest(ctx, cfg, path, &RequestConfig{

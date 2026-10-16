@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/neo4j/cli/internal/auraclient/transport"
@@ -124,15 +123,13 @@ func (s evaluationRunService) List(ctx context.Context, scope Scope, agentID str
 		return nil, clierr.NewUsageError("--limit must be zero or greater; zero returns every evaluation run")
 	}
 
-	var res *transport.PagedResult
-	if agentID == "" {
-		res, err = transport.ListAllPages(ctx, s.cfg, p, transport.AuraApiVersion2, limit)
-	} else {
-		// The agent filter must ride on every page's query.
-		// transport.ListAllPages takes no extra query parameters, so the
-		// filtered walk is local and mirrors its page/limit semantics.
-		res, err = listEvaluationRunsFiltered(ctx, s.cfg, p, agentID, limit)
+	// The agent filter must ride on every page of the walk; an empty filter
+	// sends no agent_id parameter at all.
+	var extraQuery map[string]string
+	if agentID != "" {
+		extraQuery = map[string]string{"agent_id": agentID}
 	}
+	res, err := transport.ListAllPagesWithQuery(ctx, s.cfg, p, transport.AuraApiVersion2, limit, extraQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -229,68 +226,4 @@ func (spec EvaluationRunSpec) body() map[string]any {
 		"dataset_id": spec.DatasetID,
 		"metrics":    spec.Metrics,
 	}
-}
-
-// listEvaluationRunsFiltered walks the cursor-paginated collection with the
-// agent_id filter on every request. It mirrors transport.ListAllPages, which
-// cannot carry a filter: the same page_limit, the same links.next cursor
-// following, the same limit and stop-reason rules, and the same
-// repeated-cursor guard.
-func listEvaluationRunsFiltered(ctx context.Context, cfg *clicfg.Config, path, agentID string, limit int) (*transport.PagedResult, error) {
-	result := &transport.PagedResult{Items: []map[string]any{}}
-
-	pageToken := ""
-	// The cursor is opaque to the CLI, so a server-side bug could hand back a
-	// token that does not advance. Tracking the tokens already followed turns
-	// that into a clean error instead of an infinite loop.
-	followed := map[string]struct{}{}
-
-	for page := 0; page < MaxListPages; page++ {
-		queryParams := map[string]string{
-			"agent_id":   agentID,
-			"page_limit": strconv.Itoa(ListPageSize),
-		}
-		if pageToken != "" {
-			queryParams["page_token"] = pageToken
-		}
-
-		resBody, statusCode, err := transport.MakeRequest(ctx, cfg, path, &transport.RequestConfig{
-			Method:      http.MethodGet,
-			Version:     transport.AuraApiVersion2,
-			QueryParams: queryParams,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if statusCode != http.StatusOK {
-			return result, nil
-		}
-
-		items, err := decodeRows(resBody)
-		if err != nil {
-			return nil, err
-		}
-		result.Items = append(result.Items, items...)
-		next := transport.NextPageToken(resBody)
-
-		if limit > 0 && len(result.Items) >= limit {
-			// More remains if this page overshot the limit, or the API says
-			// there is another page after it.
-			result.LimitReached = len(result.Items) > limit || next != ""
-			result.Items = result.Items[:limit]
-			return result, nil
-		}
-
-		if next == "" {
-			return result, nil
-		}
-		if _, repeat := followed[next]; repeat {
-			return nil, clierr.NewUpstreamError("pagination stopped: the API returned a page cursor it had already returned, so following it would loop")
-		}
-		followed[next] = struct{}{}
-		pageToken = next
-	}
-
-	result.PageCapReached = true
-	return result, nil
 }

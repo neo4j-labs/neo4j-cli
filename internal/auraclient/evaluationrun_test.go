@@ -261,22 +261,53 @@ func TestEvaluationRunList_Paginates(t *testing.T) {
 		assert.Len(t, m.recorded(), 1, "the walk stops once the limit is reached")
 	})
 
-	t.Run("a never-ending cursor reports the page cap", func(t *testing.T) {
+	t.Run("the agent filter rides on a limit-truncated walk", func(t *testing.T) {
 		m := newEvalRunMock(t)
-		var pages atomic.Int32
 		m.respond = func(w http.ResponseWriter, _ *http.Request) {
-			n := pages.Add(1)
-			next := fmt.Sprintf("%s%s?page_token=tok-%d", m.srv.URL, evalRunCollectionPath, n)
-			m.writeJSON(w, http.StatusOK, fmt.Sprintf(`{"data":[{"id":"run-%d","status":"running"}],"links":{"next":%q}}`, n, next))
+			m.writeJSON(w, http.StatusOK, pageOne(m, "agent-1"))
 		}
 		c, _ := m.client(t)
 
-		page, err := c.EvaluationRuns().List(context.Background(), evalRunScope, "agent-1", 0)
+		page, err := c.EvaluationRuns().List(context.Background(), evalRunScope, "agent-1", 1)
 
 		require.NoError(t, err)
-		assert.True(t, page.PageCapReached, "an endless cursor must stop at the page cap")
-		assert.Len(t, page.Items, MaxListPages)
-		assert.Len(t, m.recorded(), MaxListPages)
+		require.Len(t, page.Items, 1)
+		assert.True(t, page.LimitReached)
+		reqs := m.recorded()
+		require.Len(t, reqs, 1, "the walk stops once the limit is reached")
+		assert.Equal(t, "agent-1", reqs[0].query.Get("agent_id"), "the filter must ride the truncated walk's page")
+	})
+
+	t.Run("a never-ending cursor reports the page cap", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			agentID string
+		}{
+			{name: "unfiltered", agentID: ""},
+			{name: "agent-filtered", agentID: "agent-1"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				m := newEvalRunMock(t)
+				var pages atomic.Int32
+				m.respond = func(w http.ResponseWriter, _ *http.Request) {
+					n := pages.Add(1)
+					next := fmt.Sprintf("%s%s?page_token=tok-%d", m.srv.URL, evalRunCollectionPath, n)
+					m.writeJSON(w, http.StatusOK, fmt.Sprintf(`{"data":[{"id":"run-%d","status":"running"}],"links":{"next":%q}}`, n, next))
+				}
+				c, _ := m.client(t)
+
+				page, err := c.EvaluationRuns().List(context.Background(), evalRunScope, tc.agentID, 0)
+
+				require.NoError(t, err)
+				assert.True(t, page.PageCapReached, "an endless cursor must stop at the page cap")
+				assert.Len(t, page.Items, MaxListPages)
+				reqs := m.recorded()
+				require.Len(t, reqs, MaxListPages)
+				for i, req := range reqs {
+					assert.Equal(t, tc.agentID, req.query.Get("agent_id"), "page %d", i+1)
+				}
+			})
+		}
 	})
 }
 
