@@ -52,6 +52,7 @@ type Client interface {
 	Organizations() OrganizationService
 	Projects() ProjectService
 	CustomerManagedKeys() CustomerManagedKeyService
+	EvaluationRuns() EvaluationRunService
 	Snapshots() SnapshotService
 }
 
@@ -154,6 +155,10 @@ func (c *httpClient) CustomerManagedKeys() CustomerManagedKeyService {
 	return cmkService{cfg: c.cfg}
 }
 
+func (c *httpClient) EvaluationRuns() EvaluationRunService {
+	return evaluationRunService{cfg: c.cfg}
+}
+
 func (c *httpClient) Snapshots() SnapshotService {
 	return snapshotService{cfg: c.cfg}
 }
@@ -165,4 +170,5 @@ var (
 	_ EvaluationDatasetService = evaluationDatasetService{}
 	_ GraphQLService           = graphqlService{}
 	_ AuthProviderService      = authProviderService{}
+	_ EvaluationRunService     = evaluationRunService{}
 )
