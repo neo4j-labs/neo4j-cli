@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'neo4j-cli update and neo4j-cli update check no longer fail with the GitHub API rate-limit error (HTTP 403 advising to set GH_TOKEN or GITHUB_TOKEN, exit code 8): release metadata is now fetched from a static document on neo4j.sh instead of the GitHub API, so no token is needed or read. Commands, flags, output, and exit codes are otherwise unchanged.'
-time: 2026-10-15T14:45:47.187457+02:00
