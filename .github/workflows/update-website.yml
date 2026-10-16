@@ -5,6 +5,14 @@ on:
     types: [published]
   workflow_dispatch:
 
+# Serialize runs: two overlapping runs check out the same gh-pages tip and
+# race each other's push (push-gh-pages.sh then rebases the loser, but not
+# starting twice is cheaper). Manual prompt-flow pushes to gh-pages can still
+# race a run — the push helper covers those.
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -121,4 +129,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "chore(website): sync with ${{ github.ref_name }}"
-          git push origin gh-pages
+          # Rebase-and-retry push: a manual prompt-flow push (AGENTS.md
+          # "Website (neo4j.sh)") can advance gh-pages between this run's
+          # checkout and this push. Never force-pushes; fails on conflict.
+          bash "$GITHUB_WORKSPACE/.github/scripts/push-gh-pages.sh" .
