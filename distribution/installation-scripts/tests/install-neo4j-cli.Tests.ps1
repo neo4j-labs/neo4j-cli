@@ -224,3 +224,191 @@ Describe "install-neo4j-cli.ps1 auto-skill-install guard" {
         $result.Calls | Should -Match "skill install --rw"
     }
 }
+
+# Agent feedback. The installer's own run (above) cannot reach the feedback
+# step with a working binary: the archive stub installs an empty placeholder
+# file. So the end-to-end case below checks only that a binary that cannot
+# start never fails the install, and the logic of Invoke-FeedbackSetup is
+# driven directly, pulled out of the installer with the PowerShell parser, with
+# a stub CLI passed as -Cli.
+Describe "install-neo4j-cli.ps1 agent feedback: failure isolation" {
+
+    It "a binary that cannot start skips feedback setup and the install still succeeds" {
+        $result = Invoke-Installer
+
+        $result.ExitCode | Should -Be 0
+        $result.Output | Should -Match "Skipped agent feedback setup"
+        $result.Output | Should -Match "Questions or found a bug"
+    }
+}
+
+Describe "Invoke-FeedbackSetup" {
+
+    BeforeAll {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($Script:InstallerPath, [ref]$null, [ref]$null)
+        foreach ($name in "Write-Step", "Write-Ok", "Write-Warn", "Invoke-FeedbackSetup") {
+            $fn = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name }, $true) |
+                Select-Object -First 1
+            $fn | Should -Not -BeNullOrEmpty -Because "function $name must exist in the installer"
+            . ([scriptblock]::Create($fn.Extent.Text))
+        }
+
+        # The answer a "person" types; Read-Host is replaced so no console is needed.
+        function Read-Host { param($Prompt) return $global:FeedbackTestAnswer }
+
+        $Script:FbDir   = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
+        $Script:FbCalls = Join-Path $Script:FbDir "calls.txt"
+        $null = New-Item -ItemType Directory -Path $Script:FbDir -Force
+
+        # A stub CLI that records its arguments: `feedback enable --help` lists
+        # --accept unless STUB_SUPPORTED=0, `feedback enable` prints a
+        # disclosure and exits 2 (or, with STUB_ENABLE_REFUSE set, prints
+        # nothing and exits with it: 4 = agent detected, 2 = switched off),
+        # `feedback enable --accept` exits STUB_ENABLE_EXIT, `feedback
+        # register` prints STUB_REGISTER_OUT.
+        if ($IsWindows -or $env:OS -eq "Windows_NT") {
+            $Script:FbStub = Join-Path $Script:FbDir "neo4j-cli.cmd"
+            $stub = @'
+@echo off
+pwsh -NoProfile -NonInteractive -Command "Add-Content -Path '%STUB_CALLS%' -Value ('%*')"
+if "%1 %2 %3"=="feedback enable --help" (
+  if not "%STUB_SUPPORTED%"=="0" echo       --accept   Accept the disclosure
+  exit 0
+)
+if "%1 %2 %3"=="feedback enable --accept" exit %STUB_ENABLE_EXIT%
+if "%1 %2"=="feedback enable" if not "%STUB_ENABLE_REFUSE%"=="" exit %STUB_ENABLE_REFUSE%
+if "%1 %2"=="feedback enable" (
+  echo Enabling neo4j-cli feedback. Reports contain only: category, expected, observed.
+  exit 2
+)
+if "%1 %2"=="feedback register" echo %STUB_REGISTER_OUT%
+exit 0
+'@
+            Set-Content -Path $Script:FbStub -Value $stub -Encoding ASCII
+        } else {
+            $Script:FbStub = Join-Path $Script:FbDir "neo4j-cli"
+            $stub = @'
+#!/bin/sh
+echo "$*" >> "$STUB_CALLS"
+case "$1 $2 $3" in
+  "feedback enable --help") [ "$STUB_SUPPORTED" = "0" ] || echo "      --accept   Accept the disclosure"; exit 0 ;;
+  "feedback enable --accept") exit "$STUB_ENABLE_EXIT" ;;
+esac
+case "$1 $2" in
+  "feedback enable") [ -n "$STUB_ENABLE_REFUSE" ] && exit "$STUB_ENABLE_REFUSE"; echo "Enabling neo4j-cli feedback. Reports contain only: category, expected, observed."; exit 2 ;;
+  "feedback register") printf '%s\n' "$STUB_REGISTER_OUT"; exit 0 ;;
+esac
+exit 0
+'@
+            # This file has CRLF line endings; a shell script must not.
+            Set-Content -Path $Script:FbStub -Value ($stub -replace "`r`n", "`n") -NoNewline
+            chmod +x $Script:FbStub
+        }
+
+        function Invoke-Feedback {
+            param(
+                [bool]      $Interactive,
+                [hashtable] $Env = @{},
+                [string]    $Answer = ""
+            )
+            foreach ($k in "NEO4J_CLI_SKIP_FEEDBACK_PROMPT", "DO_NOT_TRACK", "NEO4J_CLI_AUTO_ENABLE_FEEDBACK", "STUB_SUPPORTED", "STUB_ENABLE_REFUSE") {
+                Remove-Item "Env:$k" -ErrorAction SilentlyContinue
+            }
+            $env:STUB_CALLS = $Script:FbCalls
+            $env:STUB_ENABLE_EXIT = "0"
+            $env:STUB_REGISTER_OUT = '{"registered_agents": ["claude-code"]}'
+            foreach ($k in $Env.Keys) { Set-Item "Env:$k" $Env[$k] }
+            Set-Content -Path $Script:FbCalls -Value ""
+            $global:FeedbackTestAnswer = $Answer
+            $out = Invoke-FeedbackSetup -Cli $Script:FbStub -Interactive $Interactive *>&1 | Out-String
+            return @{ Output = $out; Calls = (Get-Content $Script:FbCalls -Raw) }
+        }
+    }
+
+    AfterAll {
+        Remove-Item -Recurse -Force $Script:FbDir -ErrorAction SilentlyContinue
+        Remove-Item Env:STUB_CALLS, Env:STUB_ENABLE_EXIT, Env:STUB_REGISTER_OUT, Env:STUB_SUPPORTED, Env:STUB_ENABLE_REFUSE -ErrorAction SilentlyContinue
+    }
+
+    It "no terminal: registers the inert tool and enables nothing" {
+        $r = Invoke-Feedback -Interactive $false
+        $r.Calls | Should -Match "feedback register"
+        $r.Calls | Should -Not -Match "enable --accept"
+        $r.Output | Should -Match "Registered the feedback tool"
+    }
+
+    It "no terminal and no supported agent found: says so" {
+        $r = Invoke-Feedback -Interactive $false -Env @{ STUB_REGISTER_OUT = '{"registered_agents": []}' }
+        $r.Output | Should -Match "no supported coding agent was found"
+        $r.Calls | Should -Not -Match "enable --accept"
+    }
+
+    It "no terminal and registration failed: says so" {
+        $r = Invoke-Feedback -Interactive $false -Env @{ STUB_REGISTER_OUT = '{"notes": ["Claude Code registration failed (x)"]}' }
+        $r.Output | Should -Match "registering the feedback tool failed"
+    }
+
+    It "build without the feedback command: no registration, no hint" {
+        $r = Invoke-Feedback -Interactive $false -Env @{ STUB_SUPPORTED = "0" }
+        $r.Calls | Should -Not -Match "feedback register"
+        $r.Output | Should -Not -Match "Agent feedback is off"
+    }
+
+    It "NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1: feedback is never touched" {
+        $r = Invoke-Feedback -Interactive $true -Answer "y" -Env @{ NEO4J_CLI_SKIP_FEEDBACK_PROMPT = "1" }
+        $r.Calls.Trim() | Should -BeNullOrEmpty
+    }
+
+    It "DO_NOT_TRACK=1 with a terminal: never asked, never touched" {
+        $r = Invoke-Feedback -Interactive $true -Answer "y" -Env @{ DO_NOT_TRACK = "1" }
+        $r.Calls.Trim() | Should -BeNullOrEmpty
+    }
+
+    It "no environment variable can enable it" {
+        $r = Invoke-Feedback -Interactive $false -Env @{ NEO4J_CLI_AUTO_ENABLE_FEEDBACK = "1" }
+        $r.Calls | Should -Not -Match "enable --accept"
+    }
+
+    It "terminal, empty answer is No" {
+        $r = Invoke-Feedback -Interactive $true -Answer ""
+        $r.Output | Should -Match "Enabling neo4j-cli feedback"
+        $r.Calls | Should -Not -Match "enable --accept"
+    }
+
+    It "terminal, answer n: nothing enabled" {
+        $r = Invoke-Feedback -Interactive $true -Answer "n"
+        $r.Calls | Should -Not -Match "enable --accept"
+    }
+
+    It "terminal, answer y: enabled" {
+        $r = Invoke-Feedback -Interactive $true -Answer "y"
+        $r.Calls | Should -Match "feedback enable --accept"
+        $r.Output | Should -Match "Agent feedback enabled"
+    }
+
+    It "terminal, answer y but enable fails: warns and keeps going" {
+        $r = Invoke-Feedback -Interactive $true -Answer "y" -Env @{ STUB_ENABLE_EXIT = "1" }
+        $r.Output | Should -Match "Could not enable agent feedback"
+    }
+
+    It "terminal, but a coding agent is detected: not asked, registers the inert tool" {
+        $r = Invoke-Feedback -Interactive $true -Answer "y" -Env @{ STUB_ENABLE_REFUSE = "4" }
+        $r.Output | Should -Not -Match "Enabling neo4j-cli feedback"
+        $r.Calls | Should -Match "feedback register"
+        $r.Calls | Should -Not -Match "enable --accept"
+    }
+
+    It "switched off by the person's settings (telemetry off): does nothing, with or without a terminal" {
+        foreach ($interactive in $true, $false) {
+            $r = Invoke-Feedback -Interactive $interactive -Answer "y" -Env @{ STUB_ENABLE_REFUSE = "2" }
+            $r.Calls | Should -Not -Match "feedback register"
+            $r.Calls | Should -Not -Match "enable --accept"
+        }
+    }
+
+    It "a CLI that cannot start: warns instead of failing" {
+        $env:STUB_CALLS = $Script:FbCalls
+        $out = Invoke-FeedbackSetup -Cli (Join-Path $Script:FbDir "missing-neo4j-cli") -Interactive $false *>&1 | Out-String
+        $out | Should -Match "Skipped agent feedback setup"
+    }
+}

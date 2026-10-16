@@ -122,6 +122,21 @@ fi
 if [[ "$1" == "skill" ]]; then
   exit "${NEO4J_CLI_STUB_EXIT:-0}"
 fi
+# STUB_FEEDBACK=1 makes this a build that ships the feedback command. The
+# probe `feedback enable --rw` prints a disclosure and exits 2, or, with
+# STUB_ENABLE_REFUSE set, prints nothing and exits with that code (4: an agent
+# was detected; 2: feedback is switched off by the person's settings).
+if [[ "${STUB_FEEDBACK:-}" == "1" && "$1" == "feedback" ]]; then
+  case "$2 $3" in
+    "enable --help") echo "      --accept   Accept the disclosure"; exit 0 ;;
+    "enable --accept") exit "${STUB_ENABLE_EXIT:-0}" ;;
+    "enable --rw")
+      if [[ -n "${STUB_ENABLE_REFUSE:-}" ]]; then exit "${STUB_ENABLE_REFUSE}"; fi
+      echo "Enabling neo4j-cli feedback. Reports contain only: category, expected, observed."
+      exit 2 ;;
+  esac
+  if [[ "$2" == "register" ]]; then echo "${STUB_REGISTER_OUT:-}"; fi
+fi
 exit 0
 NEOSTUB
   chmod +x "${target_dir}/neo4j-cli"
@@ -160,6 +175,21 @@ fi
 if [[ "$1" == "skill" ]]; then
   exit "${NEO4J_CLI_STUB_EXIT:-0}"
 fi
+# STUB_FEEDBACK=1 makes this a build that ships the feedback command. The
+# probe `feedback enable --rw` prints a disclosure and exits 2, or, with
+# STUB_ENABLE_REFUSE set, prints nothing and exits with that code (4: an agent
+# was detected; 2: feedback is switched off by the person's settings).
+if [[ "${STUB_FEEDBACK:-}" == "1" && "$1" == "feedback" ]]; then
+  case "$2 $3" in
+    "enable --help") echo "      --accept   Accept the disclosure"; exit 0 ;;
+    "enable --accept") exit "${STUB_ENABLE_EXIT:-0}" ;;
+    "enable --rw")
+      if [[ -n "${STUB_ENABLE_REFUSE:-}" ]]; then exit "${STUB_ENABLE_REFUSE}"; fi
+      echo "Enabling neo4j-cli feedback. Reports contain only: category, expected, observed."
+      exit 2 ;;
+  esac
+  if [[ "$2" == "register" ]]; then echo "${STUB_REGISTER_OUT:-}"; fi
+fi
 exit 0
 STUB
   chmod +x "${INSTALL_DIR}/neo4j-cli"
@@ -186,7 +216,32 @@ run_installer() {
     INSTALL_DIR="${INSTALL_DIR}" \
     STUB_CALLS="${STUB_CALLS}" \
     NEO4J_CLI_STUB_EXIT="${NEO4J_CLI_STUB_EXIT:-0}" \
+    STUB_FEEDBACK="${STUB_FEEDBACK:-}" \
+    STUB_REGISTER_OUT="${STUB_REGISTER_OUT:-}" \
+    STUB_ENABLE_REFUSE="${STUB_ENABLE_REFUSE:-}" \
+    STUB_ENABLE_EXIT="${STUB_ENABLE_EXIT:-0}" \
     bash "${SCRIPT}" 2>&1
+}
+
+# run_installer_tty ANSWER runs the installer in a pseudo-terminal (a fake
+# terminal, via util-linux `script`) and types ANSWER at the feedback question.
+# The skill question is switched off so ANSWER reaches the feedback question.
+# Skipped where util-linux `script` is missing (macOS has a different one).
+run_installer_tty() {
+  if ! script --version 2>/dev/null | grep -q util-linux; then
+    skip "needs util-linux script for a pseudo-terminal"
+  fi
+  local stub_path="${STUBS_DIR}:${INSTALL_DIR}:${PATH}"
+  printf '%s\n' "$1" | PATH="${stub_path}" \
+    VERSION="v9.9.9" \
+    INSTALL_DIR="${INSTALL_DIR}" \
+    STUB_CALLS="${STUB_CALLS}" \
+    NEO4J_CLI_AUTO_INSTALL_SKILL=0 \
+    STUB_FEEDBACK=1 \
+    STUB_REGISTER_OUT="${STUB_REGISTER_OUT:-}" \
+    STUB_ENABLE_REFUSE="${STUB_ENABLE_REFUSE:-}" \
+    STUB_ENABLE_EXIT="${STUB_ENABLE_EXIT:-0}" \
+    script -qec "bash '${SCRIPT}'" /dev/null 2>&1
 }
 
 # ---------------------------------------------------------------------------
@@ -252,4 +307,148 @@ run_installer() {
   # skill install was attempted
   run grep -F "skill install --rw" "${STUB_CALLS}"
   [ "$status" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------
+# Agent feedback prompt. It needs a terminal (/dev/tty) to ask, and bats has
+# none, so these tests cover the paths that must NOT enable anything. The
+# interactive "y" path is exercised by hand in a pseudo-terminal.
+# ---------------------------------------------------------------------------
+
+@test "agent feedback: no terminal means no prompt and nothing enabled" {
+  run run_installer
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"feedback reports"* ]]
+  # The support check may call `feedback enable --help`; only --accept enables.
+  # (`run` resets $output, so check the installer's output first.)
+  run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback: NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1 never touches feedback" {
+  NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1 run run_installer
+  [ "$status" -eq 0 ]
+  run ! grep -q "feedback" "${STUB_CALLS}"
+}
+
+@test "agent feedback: DO_NOT_TRACK=1 never touches feedback" {
+  DO_NOT_TRACK=1 run run_installer
+  [ "$status" -eq 0 ]
+  run ! grep -q "feedback" "${STUB_CALLS}"
+}
+
+@test "agent feedback: no environment variable can enable it" {
+  NEO4J_CLI_AUTO_ENABLE_FEEDBACK=1 NEO4J_CLI_AUTO_INSTALL_FEEDBACK=1 run run_installer
+  [ "$status" -eq 0 ]
+  run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback: no terminal and no feedback command prints no hint" {
+  run run_installer
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Agent feedback is off"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# Agent feedback on a build that ships the feedback command (STUB_FEEDBACK=1).
+# There is still no terminal, so the script must never ask or enable; it only
+# registers the inert tool and says so.
+# ---------------------------------------------------------------------------
+
+@test "agent feedback (feedback build): no terminal registers the inert tool and enables nothing" {
+  STUB_FEEDBACK=1 STUB_REGISTER_OUT='{"registered_agents": ["claude-code"]}' run run_installer
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Registered the feedback tool"* ]]
+  grep -q "feedback register" "${STUB_CALLS}"
+  run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback (feedback build): no supported agent found says so" {
+  STUB_FEEDBACK=1 STUB_REGISTER_OUT='{"registered_agents": []}' run run_installer
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no supported coding agent was found"* ]]
+  run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback (feedback build): registration failure is reported" {
+  STUB_FEEDBACK=1 STUB_REGISTER_OUT='{"notes": ["Claude Code registration failed (x)"]}' run run_installer
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"registering the feedback tool failed"* ]]
+}
+
+@test "agent feedback (feedback build): the skip variable never touches feedback" {
+  STUB_FEEDBACK=1 NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1 run run_installer
+  [ "$status" -eq 0 ]
+  run ! grep -q "feedback" "${STUB_CALLS}"
+}
+
+@test "agent feedback (feedback build): DO_NOT_TRACK=1 never touches feedback" {
+  STUB_FEEDBACK=1 DO_NOT_TRACK=1 run run_installer
+  [ "$status" -eq 0 ]
+  run ! grep -q "feedback" "${STUB_CALLS}"
+}
+
+@test "agent feedback (feedback build): no environment variable can enable it" {
+  STUB_FEEDBACK=1 STUB_REGISTER_OUT='{"registered_agents": ["codex"]}' \
+    NEO4J_CLI_AUTO_ENABLE_FEEDBACK=1 NEO4J_CLI_AUTO_INSTALL_FEEDBACK=1 run run_installer
+  [ "$status" -eq 0 ]
+  run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+# ---------------------------------------------------------------------------
+# Agent feedback with a terminal (pseudo-terminal), on a feedback build.
+# ---------------------------------------------------------------------------
+
+@test "agent feedback (terminal): Enter is No, nothing enabled" {
+  run run_installer_tty ""
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Let coding agents send short feedback reports"* ]]
+  run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback (terminal): n enables nothing" {
+  run run_installer_tty "n"
+  [ "$status" -eq 0 ]
+  run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback (terminal): y enables" {
+  run run_installer_tty "y"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Agent feedback enabled"* ]]
+  grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback (terminal): y but enable fails warns and the install succeeds" {
+  STUB_ENABLE_EXIT=1 run run_installer_tty "y"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Could not enable agent feedback"* ]]
+}
+
+@test "agent feedback (terminal): a detected agent is not asked and gets the inert registration" {
+  STUB_ENABLE_REFUSE=4 STUB_REGISTER_OUT='{"registered_agents": ["claude-code"]}' run run_installer_tty "y"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Let coding agents send short feedback reports"* ]]
+  [[ "$output" == *"Registered the feedback tool"* ]]
+  grep -q "feedback register" "${STUB_CALLS}"
+  run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback (terminal): switched off by the person's settings does nothing" {
+  STUB_ENABLE_REFUSE=2 run run_installer_tty "y"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Let coding agents send short feedback reports"* ]]
+  run ! grep -q -e "feedback register" -e "feedback enable --accept" "${STUB_CALLS}"
+}
+
+@test "agent feedback (terminal): DO_NOT_TRACK=1 is never asked" {
+  DO_NOT_TRACK=1 run run_installer_tty "y"
+  [ "$status" -eq 0 ]
+  run ! grep -q "feedback" "${STUB_CALLS}"
+}
+
+@test "agent feedback (feedback build): no terminal and switched off does nothing" {
+  STUB_FEEDBACK=1 STUB_ENABLE_REFUSE=2 run run_installer
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Agent feedback is off"* ]]
+  run ! grep -q "feedback register" "${STUB_CALLS}"
 }

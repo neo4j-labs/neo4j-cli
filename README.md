@@ -21,6 +21,16 @@ Verify with `neo4j-cli --help`.
 - **PyPI**: `pip install neo4j-cli`, `pipx install neo4j-cli`, or `uv tool install neo4j-cli`. One-shot: `uvx -i neo4j-cli <commands>`. Pin a prerelease with `==`, e.g. `pipx install neo4j-cli==0.1.0a6`.
 - **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest), place the binary on your `PATH`, then run `neo4j-cli skill install --rw`.
 
+### Agent feedback (opt-in)
+
+Builds that include `neo4j-cli feedback` let coding agents send short reports to the Neo4j team when `neo4j-cli` gets in their way. It is off by default: nothing is sent until a person agrees.
+
+- **Install scripts** (`install-neo4j-cli.sh`, `install-neo4j-cli.ps1`): in a terminal, the script shows what a report contains and asks `[y/N]`; the default is No. When there is no terminal, or a coding agent is running the script, it asks nothing and instead registers the feedback tool with Claude Code and Codex, whichever are installed. The tool sends nothing on its own: the first time an agent reports a problem, you are asked to accept or decline. Set `NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1` to skip both.
+- **Homebrew, npm, PyPI and prebuilt archives** don't ask. Run `neo4j-cli feedback enable` to see exactly what would be sent and to turn it on.
+- Each report is checked on your machine before it is sent and rejected if it looks like it contains queries, file paths, connection details, credentials or similar data. The check can't catch everything (people's names, for example), so read what you are asked to approve. Every report sent is recorded on your machine; `neo4j-cli feedback status` shows where.
+- Turn it off any time with `neo4j-cli feedback disable`. Setting `DO_NOT_TRACK=1`, or turning telemetry off (`neo4j-cli config set telemetry false --rw`), also switches it off.
+- **Before you uninstall `neo4j-cli`**, run `neo4j-cli feedback disable` to remove the registration. If you uninstalled first, your agent keeps an entry for a program that no longer exists and reports that it fails to start; remove it with `claude mcp remove -s user neo4j-feedback` (Claude Code) or `codex mcp remove neo4j-feedback` (Codex).
+
 ### Self-update
 
 `neo4j-cli update` swaps the running binary with the latest GitHub release. By default only stable semver tags are considered.
