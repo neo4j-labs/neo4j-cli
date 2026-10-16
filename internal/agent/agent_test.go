@@ -158,3 +158,30 @@ func TestInvoker(t *testing.T) {
 		})
 	}
 }
+
+func TestHarness(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  map[string]string
+		want string
+	}{
+		{"none", map[string]string{}, ""},
+		{"claude via CLAUDECODE", map[string]string{"CLAUDECODE": "1"}, "claude-code"},
+		{"claude via CLAUDE_CODE", map[string]string{"CLAUDE_CODE": "1"}, "claude-code"},
+		{"codex via CODEX_SANDBOX", map[string]string{"CODEX_SANDBOX": "1"}, "codex"},
+		{"codex via CODEX_THREAD_ID", map[string]string{"CODEX_THREAD_ID": "t"}, "codex"},
+		{"gemini", map[string]string{"GEMINI_CLI": "1"}, "gemini-cli"},
+		{"cursor", map[string]string{"CURSOR_AGENT": "1"}, "cursor"},
+		{"opencode", map[string]string{"OPENCODE": "1"}, "opencode"},
+		{"detected but unlabelled harness (Replit)", map[string]string{"REPL_ID": "x"}, ""},
+		{"empty value is not a match", map[string]string{"CLAUDECODE": ""}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			orig := getenv
+			getenv = func(key string) string { return tc.env[key] }
+			t.Cleanup(func() { getenv = orig })
+
+			assert.Equal(t, tc.want, Harness())
+		})
+	}
+}

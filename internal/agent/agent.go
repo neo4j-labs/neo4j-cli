@@ -25,18 +25,22 @@ var stdinIsTerminal = func() bool {
 }
 
 // presenceVars enumerates env vars whose mere presence (non-empty) marks a
-// known agent harness.
-var presenceVars = []string{
-	"CLAUDECODE",      // Claude Code
-	"CLAUDE_CODE",     // Claude Code (alt)
-	"REPL_ID",         // Replit
-	"GEMINI_CLI",      // Gemini CLI
-	"CODEX_SANDBOX",   // Codex
-	"CODEX_THREAD_ID", // Codex (alt)
-	"OPENCODE",        // OpenCode
-	"AUGMENT_AGENT",   // Auggie
-	"GOOSE_PROVIDER",  // Goose
-	"CURSOR_AGENT",    // Cursor
+// known agent harness. label is the public harness name Harness reports, or
+// "" for harnesses it does not name.
+var presenceVars = []struct {
+	name  string
+	label string
+}{
+	{"CLAUDECODE", "claude-code"},  // Claude Code
+	{"CLAUDE_CODE", "claude-code"}, // Claude Code (alt)
+	{"REPL_ID", ""},                // Replit
+	{"GEMINI_CLI", "gemini-cli"},   // Gemini CLI
+	{"CODEX_SANDBOX", "codex"},     // Codex
+	{"CODEX_THREAD_ID", "codex"},   // Codex (alt)
+	{"OPENCODE", "opencode"},       // OpenCode
+	{"AUGMENT_AGENT", ""},          // Auggie
+	{"GOOSE_PROVIDER", ""},         // Goose
+	{"CURSOR_AGENT", "cursor"},     // Cursor
 }
 
 // substringRule matches an agent by case-insensitive substring of an env var
@@ -54,8 +58,8 @@ var substringRules = []substringRule{
 
 // Detect returns true if any known agent-harness env var is set.
 func Detect() bool {
-	for _, name := range presenceVars {
-		if getenv(name) != "" {
+	for _, v := range presenceVars {
+		if getenv(v.name) != "" {
 			return true
 		}
 	}
@@ -69,6 +73,18 @@ func Detect() bool {
 		}
 	}
 	return false
+}
+
+// Harness returns the public label of the detected agent harness
+// (claude-code, codex, gemini-cli, cursor, opencode), or "" when none of
+// those is detected.
+func Harness() string {
+	for _, v := range presenceVars {
+		if v.label != "" && getenv(v.name) != "" {
+			return v.label
+		}
+	}
+	return ""
 }
 
 // Invoker is the single source of truth for caller classification across the
