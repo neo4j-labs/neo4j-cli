@@ -4,8 +4,6 @@
 package evaluationdataset
 
 import (
-	"fmt"
-
 	"github.com/neo4j/cli/internal/auraclient"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -53,14 +51,7 @@ neo4j-cli aura agent evaluation-dataset list --format json`,
 			for i, dataset := range page.Items {
 				rows[i] = dataset.Record
 			}
-			output.PrintRecords(cmd, cfg, rows, []string{"id", "dataset_name", "description", "question_count", "created_at", "updated_at"})
-
-			if page.LimitReached {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Showing the first %d evaluation datasets; more are available. Raise or omit --limit to see them all.\n", limit) //nolint:errcheck // narration to stderr; write errors are not actionable
-			}
-			if page.PageCapReached {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Stopped after %d pages, so this list may be incomplete.\n", auraclient.MaxListPages) //nolint:errcheck // narration to stderr; write errors are not actionable
-			}
+			output.PrintPagedRecords(cmd, cfg, rows, []string{"id", "dataset_name", "description", "question_count", "created_at", "updated_at"}, "evaluation datasets", limit, page.LimitReached, page.PageCapReached)
 
 			return nil
 		},
