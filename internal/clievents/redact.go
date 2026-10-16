@@ -38,6 +38,90 @@ var secretFlags = []string{
 	"H",
 }
 
+// `neo4j-cli feedback submit` carries a report that is checked and consented
+// to only inside the command, so its arguments are masked by allow-list rather
+// than by name: after `submit`, only the flags below stay readable. The report
+// flags keep their names and lose their values; anything else (an unknown or
+// misspelled flag, a positional word, everything after `--`) becomes ***.
+var (
+	// feedbackSubmitVisibleFlags take a short fixed-shape value that may be
+	// shown: a category from a fixed list, a request id, the output format.
+	feedbackSubmitVisibleFlags = []string{"category", "request-id", "format"}
+	// feedbackSubmitTextFlags carry the report text.
+	feedbackSubmitTextFlags = []string{"expected", "observed", "command", "error-code", "agent-model"}
+	// feedbackSubmitBoolFlags take no value.
+	feedbackSubmitBoolFlags = []string{"help", "h"}
+	// feedbackVisibleValue is the shape a visible flag's value must have to be
+	// shown; anything longer or with spaces is masked like report text.
+	feedbackVisibleValue = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+)
+
+// feedbackSubmitIndex returns the index of `submit` when args invoke
+// `feedback submit`, or -1. Global flags may come before `feedback` or between
+// the two words, so it fails closed: any `submit` after a `feedback` counts.
+func feedbackSubmitIndex(args []string) int {
+	seenFeedback := false
+	for i, arg := range args {
+		switch {
+		case arg == "feedback":
+			seenFeedback = true
+		case seenFeedback && arg == "submit":
+			return i
+		}
+	}
+	return -1
+}
+
+// redactFeedbackSubmitArgs masks the arguments that follow `feedback submit`.
+func redactFeedbackSubmitArgs(args []string) []string {
+	visible := func(v string) string {
+		if feedbackVisibleValue.MatchString(v) {
+			return v
+		}
+		return redactedPlaceholder
+	}
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if name, value, ok := splitFlagEq(arg); ok {
+			switch {
+			case slices.Contains(feedbackSubmitVisibleFlags, name):
+				out = append(out, dashPrefix(arg)+name+"="+visible(value))
+			case slices.Contains(feedbackSubmitTextFlags, name):
+				out = append(out, dashPrefix(arg)+name+"="+redactedPlaceholder)
+			default:
+				out = append(out, redactedPlaceholder)
+			}
+			continue
+		}
+		name, isFlag := flagName(arg)
+		switch {
+		case arg == "--":
+			for range args[i:] {
+				out = append(out, redactedPlaceholder)
+			}
+			return out
+		case isFlag && slices.Contains(feedbackSubmitBoolFlags, name):
+			out = append(out, arg)
+		case isFlag && slices.Contains(feedbackSubmitVisibleFlags, name):
+			out = append(out, arg)
+			if i+1 < len(args) {
+				out = append(out, visible(args[i+1]))
+				i++
+			}
+		case isFlag && slices.Contains(feedbackSubmitTextFlags, name):
+			out = append(out, arg)
+			if i+1 < len(args) {
+				out = append(out, redactedPlaceholder)
+				i++
+			}
+		default:
+			out = append(out, redactedPlaceholder)
+		}
+	}
+	return out
+}
+
 // keyValueFlags are the flags whose values are `key=value` pairs, scrubbed
 // selectively by redactParamValue: only the value is replaced, and only when
 // the key looks secret-bearing, so non-secret pairs stay readable in history.
@@ -127,6 +211,9 @@ func quotedAlternation(words []string) string {
 // secret stored under an innocuous key name (e.g. `--param x=sk-live-...`) is
 // NOT caught.
 //
+// The arguments of `feedback submit` are masked by allow-list instead (see
+// redactFeedbackSubmitArgs): they carry a report, not just the odd secret.
+//
 // This helper is the single source of truth for "what flag is sensitive" in
 // the CLI; telemetry, panic templates, and error formatting all funnel
 // through it.
@@ -134,7 +221,15 @@ func RedactArgs(args []string) string {
 	if len(args) == 0 {
 		return ""
 	}
+	if j := feedbackSubmitIndex(args); j >= 0 {
+		head := redactArgs(args[:j+1])
+		return strings.Join(append(head, redactFeedbackSubmitArgs(args[j+1:])...), " ")
+	}
+	return strings.Join(redactArgs(args), " ")
+}
 
+// redactArgs applies the per-flag rules of RedactArgs to each token.
+func redactArgs(args []string) []string {
 	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -179,7 +274,7 @@ func RedactArgs(args []string) string {
 
 		out = append(out, arg)
 	}
-	return strings.Join(out, " ")
+	return out
 }
 
 // knownSecrets holds literal secret VALUES (not flag names) registered at

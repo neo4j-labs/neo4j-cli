@@ -534,3 +534,59 @@ func TestRedactText_RegisteredSecretValue(t *testing.T) {
 		}
 	})
 }
+
+func TestRedactArgs_FeedbackSubmitMasksReportText(t *testing.T) {
+	const text = "ada@example.com sees MATCH (n) RETURN n"
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"space form", []string{"feedback", "submit", "--category", "unclear_error", "--expected", text, "--observed", text, "--command", "query", "--error-code", "usage_error", "--agent-model", "m"},
+			"feedback submit --category unclear_error --expected *** --observed *** --command *** --error-code *** --agent-model ***"},
+		{"equals form", []string{"feedback", "submit", "--expected=" + text, "--observed=" + text},
+			"feedback submit --expected=*** --observed=***"},
+		{"global flags first", []string{"--format", "json", "feedback", "submit", "--observed", text},
+			"--format json feedback submit --observed ***"},
+		{"request id and category stay", []string{"feedback", "submit", "--category", "other_friction", "--request-id", "abc"},
+			"feedback submit --category other_friction --request-id abc"},
+		{"global flag between the command words", []string{"feedback", "--format", "json", "submit", "--observed", text},
+			"feedback --format json submit --observed ***"},
+		{"global flag equals form between the words", []string{"feedback", "--format=json", "submit", "--observed=" + text},
+			"feedback --format=json submit --observed=***"},
+		{"unquoted words after a value", []string{"feedback", "submit", "--observed", "ada@example.com", "words", "unquoted"},
+			"feedback submit --observed *** *** ***"},
+		{"misspelled flag", []string{"feedback", "submit", "--observd", "ada@example.com"},
+			"feedback submit *** ***"},
+		{"misspelled flag equals form", []string{"feedback", "submit", "--observd=ada@example.com"},
+			"feedback submit ***"},
+		{"repeated flag", []string{"feedback", "submit", "--expected", "a", "--expected", "ada@example.com"},
+			"feedback submit --expected *** --expected ***"},
+		{"value that looks like a flag", []string{"feedback", "submit", "--expected", "--observed", "ada@example.com"},
+			"feedback submit --expected *** ***"},
+		{"everything after --", []string{"feedback", "submit", "--", "ada@example.com", "--category", "x"},
+			"feedback submit *** *** *** ***"},
+		{"report text in a visible flag", []string{"feedback", "submit", "--category", text, "--request-id=" + text},
+			"feedback submit --category *** --request-id=***"},
+		{"help stays readable", []string{"feedback", "submit", "--help"},
+			"feedback submit --help"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := RedactArgs(tc.args)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+			if strings.Contains(got, "ada@example.com") {
+				t.Errorf("report text leaked: %q", got)
+			}
+		})
+	}
+}
+
+func TestRedactArgs_FeedbackFlagNamesElsewhereAreUntouched(t *testing.T) {
+	for _, args := range [][]string{{"docker", "exec", "--command", "ls"}, {"feedback", "status", "--command", "x"}} {
+		if got, want := RedactArgs(args), strings.Join(args, " "); got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	}
+}

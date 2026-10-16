@@ -201,3 +201,17 @@ func TestClear_EmptiesFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, entries)
 }
+
+func TestRecord_FeedbackSubmitKeepsReportTextOut(t *testing.T) {
+	cfg := newTestConfig(t, `{"format":"json"}`, "{}")
+	withArgs(t, []string{"neo4j-cli", "feedback", "submit", "--category", "unclear_error",
+		"--expected", "ada@example.com expected a clear error", "--observed", "it said only failed"})
+	withInvoker(t, false)
+
+	Record(cfg)
+
+	entries, err := Load(cfg)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "neo4j-cli feedback submit --category unclear_error --expected *** --observed ***", entries[0].Command)
+}
