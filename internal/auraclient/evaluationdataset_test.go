@@ -48,13 +48,11 @@ func newEvaluationDatasetClient(t *testing.T, handler http.HandlerFunc) Client {
 }
 
 func TestEvaluationDatasetPath(t *testing.T) {
-	s := evaluationDatasetService{}
-
-	p, err := s.path(evaluationDatasetScope, "")
+	p, err := scopedResourcePath(evaluationDatasetScope, "agents/evaluation-datasets", "evaluation-dataset", "")
 	require.NoError(t, err)
 	assert.Equal(t, evaluationDatasetsPath, p)
 
-	p, err = s.path(evaluationDatasetScope, "ds-1")
+	p, err = scopedResourcePath(evaluationDatasetScope, "agents/evaluation-datasets", "evaluation-dataset", "ds-1")
 	require.NoError(t, err)
 	assert.Equal(t, evaluationDatasetsPath+"/ds-1", p)
 }

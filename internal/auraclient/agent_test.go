@@ -15,7 +15,6 @@ import (
 )
 
 func TestAgentPath(t *testing.T) {
-	s := agentService{}
 	good := Scope{OrgID: "org-1", ProjectID: "proj-1"}
 
 	tests := []struct {
@@ -37,7 +36,7 @@ func TestAgentPath(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := s.path(tc.scope, tc.id, tc.suffix...)
+			got, err := scopedResourcePath(tc.scope, "agents", "agent", tc.id, tc.suffix...)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				var ce *clierr.CLIError
