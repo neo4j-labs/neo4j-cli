@@ -468,3 +468,11 @@ func TestRun_UsageErrorsAreCompact(t *testing.T) {
 		})
 	}
 }
+
+// The crash diagnostic echoes the arguments; report text must not reach it.
+func TestRecoverPanic_MasksFeedbackSubmitText(t *testing.T) {
+	var buf bytes.Buffer
+	recoverPanic(&buf, []string{"feedback", "--format", "json", "submit", "--observed", "ada@example.com"}, "boom")
+	assert.NotContains(t, buf.String(), "ada@example.com")
+	assert.Contains(t, buf.String(), "feedback --format json submit --observed ***")
+}
