@@ -232,7 +232,10 @@ run_installer_tty() {
     skip "needs util-linux script for a pseudo-terminal"
   fi
   local stub_path="${STUBS_DIR}:${INSTALL_DIR}:${PATH}"
-  printf '%s\n' "$1" | PATH="${stub_path}" \
+  # Keep the input open for a moment after the answer: when it closes at once,
+  # `script` on macOS sends end-of-input into the session before the installer
+  # reads the answer (seen on macos-latest: the typed "y" never arrived).
+  { printf '%s\n' "$1"; sleep 2; } | PATH="${stub_path}" \
     VERSION="v9.9.9" \
     INSTALL_DIR="${INSTALL_DIR}" \
     STUB_CALLS="${STUB_CALLS}" \
