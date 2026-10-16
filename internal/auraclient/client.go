@@ -45,6 +45,7 @@ type Scope struct {
 type Client interface {
 	Instances() InstanceService
 	Agents() AgentService
+	EvaluationDatasets() EvaluationDatasetService
 	GraphQL() GraphQLService
 	VirtualGraphs() VirtualGraphService
 	Sessions() SessionService
@@ -125,6 +126,10 @@ func (c *httpClient) Agents() AgentService {
 	return agentService{cfg: c.cfg}
 }
 
+func (c *httpClient) EvaluationDatasets() EvaluationDatasetService {
+	return evaluationDatasetService{cfg: c.cfg}
+}
+
 func (c *httpClient) GraphQL() GraphQLService {
 	return graphqlService{cfg: c.cfg}
 }
@@ -154,9 +159,10 @@ func (c *httpClient) Snapshots() SnapshotService {
 }
 
 var (
-	_ Client              = (*httpClient)(nil)
-	_ InstanceService     = instanceService{}
-	_ AgentService        = agentService{}
-	_ GraphQLService      = graphqlService{}
-	_ AuthProviderService = authProviderService{}
+	_ Client                   = (*httpClient)(nil)
+	_ InstanceService          = instanceService{}
+	_ AgentService             = agentService{}
+	_ EvaluationDatasetService = evaluationDatasetService{}
+	_ GraphQLService           = graphqlService{}
+	_ AuthProviderService      = authProviderService{}
 )
