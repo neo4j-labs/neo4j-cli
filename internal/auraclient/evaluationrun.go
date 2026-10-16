@@ -87,30 +87,8 @@ func newEvaluationRun(rec map[string]any) EvaluationRun {
 	}
 }
 
-// path builds the v2beta1 scoped path for the evaluation-runs collection, a
-// single run, or a run sub-resource (e.g. cancel).
-func (s evaluationRunService) path(scope Scope, id string, suffix ...string) (string, error) {
-	if err := ValidateResourceID("organization", scope.OrgID); err != nil {
-		return "", err
-	}
-	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
-		return "", err
-	}
-	p := fmt.Sprintf("/organizations/%s/projects/%s/agents/evaluation-runs", scope.OrgID, scope.ProjectID)
-	if id != "" {
-		if err := ValidateResourceID("evaluation-run", id); err != nil {
-			return "", err
-		}
-		p += "/" + id
-	}
-	for _, sfx := range suffix {
-		p += "/" + sfx
-	}
-	return p, nil
-}
-
 func (s evaluationRunService) List(ctx context.Context, scope Scope, agentID string, limit int) (*EvaluationRunPage, error) {
-	p, err := s.path(scope, "")
+	p, err := scopedResourcePath(scope, "agents/evaluation-runs", "evaluation-run", "")
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +120,7 @@ func (s evaluationRunService) List(ctx context.Context, scope Scope, agentID str
 }
 
 func (s evaluationRunService) Get(ctx context.Context, scope Scope, id string) (*EvaluationRun, error) {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents/evaluation-runs", "evaluation-run", id)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +137,7 @@ func (s evaluationRunService) Get(ctx context.Context, scope Scope, id string) (
 }
 
 func (s evaluationRunService) Create(ctx context.Context, scope Scope, spec EvaluationRunSpec) (*EvaluationRun, error) {
-	p, err := s.path(scope, "")
+	p, err := scopedResourcePath(scope, "agents/evaluation-runs", "evaluation-run", "")
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +150,7 @@ func (s evaluationRunService) Create(ctx context.Context, scope Scope, spec Eval
 }
 
 func (s evaluationRunService) Delete(ctx context.Context, scope Scope, id string) error {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents/evaluation-runs", "evaluation-run", id)
 	if err != nil {
 		return err
 	}
@@ -190,7 +168,7 @@ func (s evaluationRunService) Delete(ctx context.Context, scope Scope, id string
 }
 
 func (s evaluationRunService) Cancel(ctx context.Context, scope Scope, id string) (*EvaluationRun, error) {
-	p, err := s.path(scope, id, "cancel")
+	p, err := scopedResourcePath(scope, "agents/evaluation-runs", "evaluation-run", id, "cancel")
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +181,7 @@ func (s evaluationRunService) Cancel(ctx context.Context, scope Scope, id string
 }
 
 func (s evaluationRunService) WaitWhileRunning(ctx context.Context, scope Scope, id string) (string, error) {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents/evaluation-runs", "evaluation-run", id)
 	if err != nil {
 		return "", err
 	}

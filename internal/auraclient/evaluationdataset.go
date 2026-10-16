@@ -111,23 +111,6 @@ func newEvaluationDataset(rec map[string]any) EvaluationDataset {
 	return d
 }
 
-func (s evaluationDatasetService) path(scope Scope, id string) (string, error) {
-	if err := ValidateResourceID("organization", scope.OrgID); err != nil {
-		return "", err
-	}
-	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
-		return "", err
-	}
-	p := fmt.Sprintf("/organizations/%s/projects/%s/agents/evaluation-datasets", scope.OrgID, scope.ProjectID)
-	if id != "" {
-		if err := ValidateResourceID("evaluation-dataset", id); err != nil {
-			return "", err
-		}
-		p += "/" + id
-	}
-	return p, nil
-}
-
 // one sends a request whose response carries one dataset record in the
 // {"data": ...} envelope, and must come back with status 200.
 func (s evaluationDatasetService) one(ctx context.Context, method, path string, body map[string]any, doing string) (*EvaluationDataset, error) {
@@ -148,7 +131,7 @@ func (s evaluationDatasetService) one(ctx context.Context, method, path string, 
 // caps one response well below the size of a large collection, so a single GET
 // would silently return a prefix.
 func (s evaluationDatasetService) List(ctx context.Context, scope Scope, limit int) (*EvaluationDatasetPage, error) {
-	p, err := s.path(scope, "")
+	p, err := scopedResourcePath(scope, "agents/evaluation-datasets", "evaluation-dataset", "")
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +150,7 @@ func (s evaluationDatasetService) List(ctx context.Context, scope Scope, limit i
 }
 
 func (s evaluationDatasetService) Get(ctx context.Context, scope Scope, id string) (*EvaluationDataset, error) {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents/evaluation-datasets", "evaluation-dataset", id)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +158,7 @@ func (s evaluationDatasetService) Get(ctx context.Context, scope Scope, id strin
 }
 
 func (s evaluationDatasetService) Create(ctx context.Context, scope Scope, spec EvaluationDatasetSpec) (*EvaluationDataset, error) {
-	p, err := s.path(scope, "")
+	p, err := scopedResourcePath(scope, "agents/evaluation-datasets", "evaluation-dataset", "")
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +166,7 @@ func (s evaluationDatasetService) Create(ctx context.Context, scope Scope, spec 
 }
 
 func (s evaluationDatasetService) Update(ctx context.Context, scope Scope, id string, patch EvaluationDatasetPatch) (*EvaluationDataset, error) {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents/evaluation-datasets", "evaluation-dataset", id)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +178,7 @@ func (s evaluationDatasetService) Update(ctx context.Context, scope Scope, id st
 }
 
 func (s evaluationDatasetService) Delete(ctx context.Context, scope Scope, id string) error {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents/evaluation-datasets", "evaluation-dataset", id)
 	if err != nil {
 		return err
 	}
