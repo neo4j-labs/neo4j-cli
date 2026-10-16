@@ -5,6 +5,18 @@
 - [neo4j-cli aura agent](#neo4j-cli-aura-agent)
 - [neo4j-cli aura agent create](#neo4j-cli-aura-agent-create)
 - [neo4j-cli aura agent delete](#neo4j-cli-aura-agent-delete)
+- [neo4j-cli aura agent evaluation-dataset](#neo4j-cli-aura-agent-evaluation-dataset)
+- [neo4j-cli aura agent evaluation-dataset create](#neo4j-cli-aura-agent-evaluation-dataset-create)
+- [neo4j-cli aura agent evaluation-dataset delete](#neo4j-cli-aura-agent-evaluation-dataset-delete)
+- [neo4j-cli aura agent evaluation-dataset get](#neo4j-cli-aura-agent-evaluation-dataset-get)
+- [neo4j-cli aura agent evaluation-dataset list](#neo4j-cli-aura-agent-evaluation-dataset-list)
+- [neo4j-cli aura agent evaluation-dataset update](#neo4j-cli-aura-agent-evaluation-dataset-update)
+- [neo4j-cli aura agent evaluation-run](#neo4j-cli-aura-agent-evaluation-run)
+- [neo4j-cli aura agent evaluation-run cancel](#neo4j-cli-aura-agent-evaluation-run-cancel)
+- [neo4j-cli aura agent evaluation-run create](#neo4j-cli-aura-agent-evaluation-run-create)
+- [neo4j-cli aura agent evaluation-run delete](#neo4j-cli-aura-agent-evaluation-run-delete)
+- [neo4j-cli aura agent evaluation-run get](#neo4j-cli-aura-agent-evaluation-run-get)
+- [neo4j-cli aura agent evaluation-run list](#neo4j-cli-aura-agent-evaluation-run-list)
 - [neo4j-cli aura agent get](#neo4j-cli-aura-agent-get)
 - [neo4j-cli aura agent invoke](#neo4j-cli-aura-agent-invoke)
 - [neo4j-cli aura agent list](#neo4j-cli-aura-agent-list)
@@ -161,6 +173,300 @@ neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --organization-
 
 # Delete an agent and emit the response as JSON
 neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --force --format json
+```
+
+### neo4j-cli aura agent evaluation-dataset
+
+Relates to Aura Agent evaluation datasets
+
+Usage: `neo4j-cli aura agent evaluation-dataset`
+
+#### neo4j-cli aura agent evaluation-dataset create
+
+Creates a new evaluation dataset
+
+Creates a new evaluation dataset for the specified project from a JSON questions file holding 1-50 questions.
+
+Usage: `neo4j-cli aura agent evaluation-dataset create [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--description` | string | - | Optional evaluation dataset description |
+| `--name` | string | - | (required) Evaluation dataset name |
+| `--questions-file` | string | - | (required) Path to a JSON file with 1-50 questions, each with query_number, query_text and expected_answer |
+
+Examples:
+
+```
+# Create an evaluation dataset from a questions file
+neo4j-cli aura agent evaluation-dataset create --name "Product Q&A" --questions-file ./questions.json --rw
+
+# Create an evaluation dataset with a description in a specific organization and project
+neo4j-cli aura agent evaluation-dataset create --name "Product Q&A" --description "Smoke tests" --questions-file ./questions.json --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Create an evaluation dataset and emit the response as JSON
+neo4j-cli aura agent evaluation-dataset create --name "Product Q&A" --questions-file ./questions.json --rw --format json
+```
+
+#### neo4j-cli aura agent evaluation-dataset delete
+
+Deletes an evaluation dataset
+
+Deletes an evaluation dataset by its ID.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura agent evaluation-dataset delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete an evaluation dataset by ID
+neo4j-cli aura agent evaluation-dataset delete 00000000-0000-0000-0000-000000000000 --rw --yes --force
+
+# Delete an evaluation dataset in a specific organization and project
+neo4j-cli aura agent evaluation-dataset delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw --yes --force
+
+# Delete an evaluation dataset and emit the response as JSON
+neo4j-cli aura agent evaluation-dataset delete 00000000-0000-0000-0000-000000000000 --rw --yes --force --format json
+```
+
+#### neo4j-cli aura agent evaluation-dataset get
+
+Returns evaluation dataset details
+
+Returns the details of a specific evaluation dataset, including its questions.
+
+Usage: `neo4j-cli aura agent evaluation-dataset get <id>`
+
+Examples:
+
+```
+# Get details for an evaluation dataset
+neo4j-cli aura agent evaluation-dataset get 00000000-0000-0000-0000-000000000000
+
+# Get an evaluation dataset in a specific organization and project
+neo4j-cli aura agent evaluation-dataset get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000
+
+# Get evaluation dataset details as JSON for scripting
+neo4j-cli aura agent evaluation-dataset get 00000000-0000-0000-0000-000000000000 --format json
+```
+
+#### neo4j-cli aura agent evaluation-dataset list
+
+Returns a list of evaluation datasets
+
+Returns a list containing a summary of each evaluation dataset in the specified project.
+
+The API returns results a page at a time; this subcommand follows every page so the output is the complete list. Use --limit to stop early, in which case a note is written to stderr saying more results exist.
+
+Use --organization-id and --project-id to specify which project's evaluation datasets to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.
+
+Usage: `neo4j-cli aura agent evaluation-dataset list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--limit` | int | 0 | The maximum number of evaluation datasets to return. Omit to return all of them. |
+
+Examples:
+
+```
+# List every evaluation dataset in the default project
+neo4j-cli aura agent evaluation-dataset list
+
+# List at most 10 evaluation datasets in a specific organization and project
+neo4j-cli aura agent evaluation-dataset list --limit 10 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000
+
+# List evaluation datasets as JSON for scripting
+neo4j-cli aura agent evaluation-dataset list --format json
+```
+
+#### neo4j-cli aura agent evaluation-dataset update
+
+Partially updates an existing evaluation dataset
+
+Partially updates an existing evaluation dataset. Only provided fields are updated (PATCH semantics).
+
+Usage: `neo4j-cli aura agent evaluation-dataset update <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--description` | string | - | Evaluation dataset description |
+| `--name` | string | - | Evaluation dataset name |
+| `--questions-file` | string | - | Path to a JSON file with 1-50 questions, each with query_number, query_text and expected_answer |
+
+Examples:
+
+```
+# Rename an evaluation dataset
+neo4j-cli aura agent evaluation-dataset update 00000000-0000-0000-0000-000000000000 --name "Renamed dataset" --rw
+
+# Replace an evaluation dataset's questions from a file
+neo4j-cli aura agent evaluation-dataset update 00000000-0000-0000-0000-000000000000 --questions-file ./questions.json --rw
+
+# Update an evaluation dataset and emit the response as JSON
+neo4j-cli aura agent evaluation-dataset update 00000000-0000-0000-0000-000000000000 --description "Updated" --rw --format json
+```
+
+### neo4j-cli aura agent evaluation-run
+
+Relates to Aura Agent evaluation runs
+
+Usage: `neo4j-cli aura agent evaluation-run`
+
+#### neo4j-cli aura agent evaluation-run cancel
+
+Cancels an evaluation run
+
+Cancels a queued or running evaluation run by its ID.
+
+The run's status becomes cancelled once the cancellation is processed.
+
+Usage: `neo4j-cli aura agent evaluation-run cancel <id>`
+
+Examples:
+
+```
+# Cancel a running evaluation run
+neo4j-cli aura agent evaluation-run cancel 00000000-0000-0000-0000-000000000000 --rw
+
+# Cancel an evaluation run in a specific organization and project
+neo4j-cli aura agent evaluation-run cancel 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Cancel an evaluation run and emit the response as JSON for scripting
+neo4j-cli aura agent evaluation-run cancel 00000000-0000-0000-0000-000000000000 --rw --format json
+```
+
+#### neo4j-cli aura agent evaluation-run create
+
+Creates a new evaluation run
+
+Starts an evaluation run of an agent against an evaluation dataset.
+
+At least one --metric is required; repeat the flag to evaluate several metrics. Valid metrics are accuracy, tool_trajectory, groundedness and relevance.
+
+Creating an evaluation run is an asynchronous operation that can be waited for with --wait: without it the command returns immediately with the accepted run (status queued or running), while with it the command blocks until the run reaches a terminal status and prints the finished run.
+
+Usage: `neo4j-cli aura agent evaluation-run create [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--agent-id` | string | - | (required) The ID of the agent to evaluate |
+| `--dataset-id` | string | - | (required) The ID of the evaluation dataset to evaluate the agent against |
+| `--metric` | stringArray | [] | (required) The metric to evaluate; repeat the flag to evaluate several. Valid metrics: accuracy, tool_trajectory, groundedness, relevance |
+| `--wait` | bool | false | Waits until the evaluation run reaches a terminal status and prints the finished run. |
+
+Examples:
+
+```
+# Start a run evaluating accuracy of an agent against a dataset
+neo4j-cli aura agent evaluation-run create --agent-id 00000000-0000-0000-0000-000000000000 --dataset-id 11111111-1111-1111-1111-111111111111 --metric accuracy --rw
+
+# Start a run with several metrics and wait until it finishes
+neo4j-cli aura agent evaluation-run create --agent-id 00000000-0000-0000-0000-000000000000 --dataset-id 11111111-1111-1111-1111-111111111111 --metric accuracy --metric groundedness --wait --rw
+
+# Start a run and emit the accepted record as JSON for scripting
+neo4j-cli aura agent evaluation-run create --agent-id 00000000-0000-0000-0000-000000000000 --dataset-id 11111111-1111-1111-1111-111111111111 --metric relevance --rw --format json
+```
+
+#### neo4j-cli aura agent evaluation-run delete
+
+Deletes an evaluation run
+
+Deletes an evaluation run by its ID.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura agent evaluation-run delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete an evaluation run by ID
+neo4j-cli aura agent evaluation-run delete 00000000-0000-0000-0000-000000000000 --rw --yes --force
+
+# Delete an evaluation run in a specific organization and project
+neo4j-cli aura agent evaluation-run delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+
+# Delete an evaluation run and emit the response as JSON
+neo4j-cli aura agent evaluation-run delete 00000000-0000-0000-0000-000000000000 --rw --yes --force --format json
+```
+
+#### neo4j-cli aura agent evaluation-run get
+
+Returns evaluation run details
+
+Returns the details of a specific evaluation run.
+
+Once the run has finished, JSON output also carries the per-question results in the questions field.
+
+Usage: `neo4j-cli aura agent evaluation-run get <id>`
+
+Examples:
+
+```
+# Get details for an evaluation run
+neo4j-cli aura agent evaluation-run get 00000000-0000-0000-0000-000000000000
+
+# Get an evaluation run in a specific organization and project
+neo4j-cli aura agent evaluation-run get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Get the full record, including per-question results, as JSON for scripting
+neo4j-cli aura agent evaluation-run get 00000000-0000-0000-0000-000000000000 --format json
+```
+
+#### neo4j-cli aura agent evaluation-run list
+
+Returns a list of evaluation runs
+
+This subcommand returns a list of Aura Agent evaluation runs in the specified project, newest first. Each run evaluates one agent against one evaluation dataset; pass --agent-id to return only that agent's runs.
+
+The API returns results a page at a time; this subcommand follows every page so the output is the complete list. Use --limit to stop early, in which case a note is written to stderr saying more results exist.
+
+Use --organization-id and --project-id to specify which project's evaluation runs to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.
+
+Usage: `neo4j-cli aura agent evaluation-run list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--agent-id` | string | - | Only return evaluation runs of this agent. Omit to return the project's runs for every agent. |
+| `--limit` | int | 0 | The maximum number of evaluation runs to return. Omit to return all of them. |
+
+Examples:
+
+```
+# List every evaluation run in the default project
+neo4j-cli aura agent evaluation-run list
+
+# List the evaluation runs of a specific agent
+neo4j-cli aura agent evaluation-run list --agent-id 00000000-0000-0000-0000-000000000000
+
+# Return at most 10 and emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura agent evaluation-run list --limit 10 --format json
 ```
 
 ### neo4j-cli aura agent get
