@@ -62,7 +62,7 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0
 	github.com/tidwall/sjson v1.2.5
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/text v0.42.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

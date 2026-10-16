@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/clievents"
+	"github.com/neo4j/cli/internal/commands/feedback"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/neo4j/cli/internal/tee"
 	"github.com/spf13/afero"
@@ -112,6 +113,10 @@ func commandSlug(cmd *cobra.Command, args []string) string {
 	return strings.ReplaceAll(path, " ", "-")
 }
 
+// feedbackSubmitSlug is the commandSlug of `feedback submit`, whose output
+// carries the report text and so is neither teed nor rendered as JSON.
+const feedbackSubmitSlug = "feedback-submit"
+
 // teeContent builds the bytes persisted by tee.Save from the captured
 // stdout+stderr stream plus the failing error. The root command sets
 // SilenceErrors, so the failure message is rendered by clierr.Render (after
@@ -206,6 +211,10 @@ func run(ctx context.Context, cfg *clicfg.Config, args []string, stdio IO) int {
 	cmd.SetArgs(args)
 	cmd.SetIn(stdio.In)
 
+	// Runs last, after any error is rendered, so the one-time hint can never
+	// change the exit code or the error output.
+	defer feedback.MaybeRegisterHint(cfg, args, stdio.Err)
+
 	// Capture emitted output into a shared bounded buffer while passing it
 	// through to the real streams, so a failing command can be teed to disk.
 	buf := &tee.LimitedBuffer{}
@@ -238,6 +247,11 @@ func run(ctx context.Context, cfg *clicfg.Config, args []string, stdio IO) int {
 	ce := handleFailure(cfg, cmd, args, buf.Bytes(), err)
 
 	format := resolveFormatForRender(args, cfg.Global.Format())
+	if commandSlug(cmd, args) == feedbackSubmitSlug {
+		// submit prints one JSON outcome document on stdout; keep the error
+		// line plain so stdout stays a single document.
+		format = "default"
+	}
 	clierr.Render(ce, stdio.Out, stdio.Err, format)
 	return exitCodeFor(ce)
 }
@@ -249,7 +263,12 @@ func run(ctx context.Context, cfg *clicfg.Config, args []string, stdio IO) int {
 // (falling back to a fatal error), and attaches the tee path when one was
 // written. Rendering and the exit code stay in Run so this helper is testable.
 func handleFailure(cfg *clicfg.Config, cmd *cobra.Command, args []string, captured []byte, err error) *clierr.CLIError {
-	path, _ := tee.Save(cfg, commandSlug(cmd, args), teeContent(captured, err))
+	slug := commandSlug(cmd, args)
+	var path string
+	// `feedback submit` prints the report back in its outcome; never save it.
+	if slug != feedbackSubmitSlug {
+		path, _ = tee.Save(cfg, slug, teeContent(captured, err))
+	}
 
 	var ce *clierr.CLIError
 	if !errors.As(err, &ce) {
