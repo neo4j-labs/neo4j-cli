@@ -5,6 +5,7 @@ package agent
 
 import (
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/commands/aura/agent/evaluationdataset"
 	auraflags "github.com/neo4j/cli/internal/commands/aura/flags"
 	"github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
@@ -29,6 +30,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(newReplaceCmd(cfg))
 	cmd.AddCommand(newDeleteCmd(cfg))
 	cmd.AddCommand(newInvokeCmd(cfg))
+	cmd.AddCommand(evaluationdataset.NewCmd(cfg))
 
 	cmd.PersistentFlags().String("auth-url", "", "")
 	cmd.PersistentFlags().String("base-url", "", "")
