@@ -223,18 +223,33 @@ run_installer() {
     bash "${SCRIPT}" 2>&1
 }
 
-# run_installer_tty ANSWER runs the installer in a pseudo-terminal (a fake
-# terminal, via util-linux `script`) and types ANSWER at the feedback question.
-# The skill question is switched off so ANSWER reaches the feedback question.
-# Skipped where util-linux `script` is missing (macOS has a different one).
-run_installer_tty() {
-  if ! script --version 2>/dev/null | grep -q util-linux; then
-    skip "needs util-linux script for a pseudo-terminal"
+# require_tty_script skips the calling test when no `script` command can give
+# the installer a pseudo-terminal (a fake terminal). It must be called in the
+# test itself: `skip` inside `run` only ends a subshell.
+require_tty_script() {
+  if script --version 2>/dev/null | grep -q util-linux; then
+    TTY_SCRIPT=util-linux
+  elif [[ "$(uname -s)" == "Darwin" ]]; then
+    TTY_SCRIPT=bsd
+  else
+    skip "needs util-linux or BSD script for a pseudo-terminal"
   fi
+}
+
+# run_installer_tty ANSWER runs the installer in a pseudo-terminal and types
+# ANSWER at the feedback question. The skill question is switched off so ANSWER
+# reaches the feedback question. Call require_tty_script first.
+run_installer_tty() {
   local stub_path="${STUBS_DIR}:${INSTALL_DIR}:${PATH}"
+  local -a tty_cmd
+  if [[ "${TTY_SCRIPT}" == "bsd" ]]; then
+    tty_cmd=(script -q /dev/null bash "${SCRIPT}")
+  else
+    tty_cmd=(script -qec "bash '${SCRIPT}'" /dev/null)
+  fi
   # Keep the input open for a moment after the answer: when it closes at once,
   # `script` on macOS sends end-of-input into the session before the installer
-  # reads the answer (seen on macos-latest: the typed "y" never arrived).
+  # reads the answer.
   { printf '%s\n' "$1"; sleep 2; } | PATH="${stub_path}" \
     VERSION="v9.9.9" \
     INSTALL_DIR="${INSTALL_DIR}" \
@@ -244,7 +259,7 @@ run_installer_tty() {
     STUB_REGISTER_OUT="${STUB_REGISTER_OUT:-}" \
     STUB_ENABLE_REFUSE="${STUB_ENABLE_REFUSE:-}" \
     STUB_ENABLE_EXIT="${STUB_ENABLE_EXIT:-0}" \
-    script -qec "bash '${SCRIPT}'" /dev/null 2>&1
+    "${tty_cmd[@]}" 2>&1
 }
 
 # ---------------------------------------------------------------------------
@@ -321,7 +336,7 @@ run_installer_tty() {
 @test "agent feedback: no terminal means no prompt and nothing enabled" {
   run run_installer
   [ "$status" -eq 0 ]
-  [[ "$output" != *"feedback reports"* ]]
+  [[ "$output" != *"feedback reports"* ]] || false
   # The support check may call `feedback enable --help`; only --accept enables.
   # (`run` resets $output, so check the installer's output first.)
   run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
@@ -348,7 +363,7 @@ run_installer_tty() {
 @test "agent feedback: no terminal and no feedback command prints no hint" {
   run run_installer
   [ "$status" -eq 0 ]
-  [[ "$output" != *"Agent feedback is off"* ]]
+  [[ "$output" != *"Agent feedback is off"* ]] || false
 }
 
 # ---------------------------------------------------------------------------
@@ -360,7 +375,7 @@ run_installer_tty() {
 @test "agent feedback (feedback build): no terminal registers the inert tool and enables nothing" {
   STUB_FEEDBACK=1 STUB_REGISTER_OUT='{"registered_agents": ["claude-code"]}' run run_installer
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Registered the feedback tool"* ]]
+  [[ "$output" == *"Registered the feedback tool"* ]] || false
   grep -q "feedback register" "${STUB_CALLS}"
   run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
 }
@@ -368,14 +383,14 @@ run_installer_tty() {
 @test "agent feedback (feedback build): no supported agent found says so" {
   STUB_FEEDBACK=1 STUB_REGISTER_OUT='{"registered_agents": []}' run run_installer
   [ "$status" -eq 0 ]
-  [[ "$output" == *"no supported coding agent was found"* ]]
+  [[ "$output" == *"no supported coding agent was found"* ]] || false
   run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
 }
 
 @test "agent feedback (feedback build): registration failure is reported" {
   STUB_FEEDBACK=1 STUB_REGISTER_OUT='{"notes": ["Claude Code registration failed (x)"]}' run run_installer
   [ "$status" -eq 0 ]
-  [[ "$output" == *"registering the feedback tool failed"* ]]
+  [[ "$output" == *"registering the feedback tool failed"* ]] || false
 }
 
 @test "agent feedback (feedback build): the skip variable never touches feedback" {
@@ -402,48 +417,55 @@ run_installer_tty() {
 # ---------------------------------------------------------------------------
 
 @test "agent feedback (terminal): Enter is No, nothing enabled" {
+  require_tty_script
   run run_installer_tty ""
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Let coding agents send short feedback reports"* ]]
+  [[ "$output" == *"Let coding agents send short feedback reports"* ]] || false
   run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
 }
 
 @test "agent feedback (terminal): n enables nothing" {
+  require_tty_script
   run run_installer_tty "n"
   [ "$status" -eq 0 ]
   run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
 }
 
 @test "agent feedback (terminal): y enables" {
+  require_tty_script
   run run_installer_tty "y"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Agent feedback enabled"* ]]
+  [[ "$output" == *"Agent feedback enabled"* ]] || false
   grep -q "feedback enable --accept" "${STUB_CALLS}"
 }
 
 @test "agent feedback (terminal): y but enable fails warns and the install succeeds" {
+  require_tty_script
   STUB_ENABLE_EXIT=1 run run_installer_tty "y"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Could not enable agent feedback"* ]]
+  [[ "$output" == *"Could not enable agent feedback"* ]] || false
 }
 
 @test "agent feedback (terminal): a detected agent is not asked and gets the inert registration" {
+  require_tty_script
   STUB_ENABLE_REFUSE=4 STUB_REGISTER_OUT='{"registered_agents": ["claude-code"]}' run run_installer_tty "y"
   [ "$status" -eq 0 ]
-  [[ "$output" != *"Let coding agents send short feedback reports"* ]]
-  [[ "$output" == *"Registered the feedback tool"* ]]
+  [[ "$output" != *"Let coding agents send short feedback reports"* ]] || false
+  [[ "$output" == *"Registered the feedback tool"* ]] || false
   grep -q "feedback register" "${STUB_CALLS}"
   run ! grep -q "feedback enable --accept" "${STUB_CALLS}"
 }
 
 @test "agent feedback (terminal): switched off by the person's settings does nothing" {
+  require_tty_script
   STUB_ENABLE_REFUSE=2 run run_installer_tty "y"
   [ "$status" -eq 0 ]
-  [[ "$output" != *"Let coding agents send short feedback reports"* ]]
+  [[ "$output" != *"Let coding agents send short feedback reports"* ]] || false
   run ! grep -q -e "feedback register" -e "feedback enable --accept" "${STUB_CALLS}"
 }
 
 @test "agent feedback (terminal): DO_NOT_TRACK=1 is never asked" {
+  require_tty_script
   DO_NOT_TRACK=1 run run_installer_tty "y"
   [ "$status" -eq 0 ]
   run ! grep -q "feedback" "${STUB_CALLS}"
@@ -452,6 +474,6 @@ run_installer_tty() {
 @test "agent feedback (feedback build): no terminal and switched off does nothing" {
   STUB_FEEDBACK=1 STUB_ENABLE_REFUSE=2 run run_installer
   [ "$status" -eq 0 ]
-  [[ "$output" != *"Agent feedback is off"* ]]
+  [[ "$output" != *"Agent feedback is off"* ]] || false
   run ! grep -q "feedback register" "${STUB_CALLS}"
 }
