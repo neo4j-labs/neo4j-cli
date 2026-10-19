@@ -1070,7 +1070,7 @@
 <section class="hero">
   <div class="container inner">
     <div class="pill">
-      <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill-tag" style="text-transform:none">v1.17.0</a>
+      <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill-tag" style="text-transform:none">v1.18.0</a>
       <span><a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">open source</a> · <a href="https://neo4j.com/labs/" target="_blank" rel="noopener">neo4j-labs</a></span>
     </div>
 
@@ -1127,7 +1127,7 @@
         </button>
       </div>
       <div class="cmd-hint">
-        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.17.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
+        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.18.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
       </div>
     </div>
   </div>
@@ -1883,7 +1883,7 @@
 <span class="prompt">$</span> neo4j-cli aura cmk get &lt;cmk-id&gt;
 <span class="prompt">$</span> neo4j-cli aura cmk create <span class="flag">--name</span> my-key <span class="flag">--type</span> enterprise-db <span class="flag">--cloud-provider</span> aws <span class="flag">--region</span> us-east-1 <span class="flag">--key-id</span> arn:aws:kms:… <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli aura cmk delete &lt;cmk-id&gt; <span class="flag">--rw</span></pre>
-          <p class="ref-sub"><span class="keyword">aura agent</span> — LLM-backed assistants bound to an instance. Seven leaves: <code>list</code>, <code>get</code>, <code>create</code>, <code>update</code>, <code>replace</code>, <code>delete</code>, <code>invoke</code>. Every leaf except <code>list</code> takes the agent id as a <strong>positional argument</strong>:</p>
+          <p class="ref-sub"><span class="keyword">aura agent</span> — LLM-backed assistants bound to an instance. Seven agent leaves: <code>list</code>, <code>get</code>, <code>create</code>, <code>update</code>, <code>replace</code>, <code>delete</code>, <code>invoke</code>. Every leaf except <code>list</code> takes the agent id as a <strong>positional argument</strong>:</p>
           <pre><span class="prompt">$</span> neo4j-cli aura agent list <span class="flag">--format</span> json
 <span class="prompt">$</span> neo4j-cli aura agent get &lt;agent-id&gt;
 <span class="prompt">$</span> neo4j-cli aura agent create <span class="flag">--name</span> docs-bot <span class="flag">--description</span> "Docs assistant" <span class="flag">--dbid</span> &lt;dbid&gt; \
@@ -1898,6 +1898,15 @@
           <p><code>create</code> and <code>replace</code> both require <code>--name</code>, <code>--description</code>, <code>--dbid</code> (the Aura instance the agent queries), and <code>--tools</code>; <code>update</code> requires none of them and patches only what you supply. Optional on all three: <code>--system-prompt</code>, <code>--is-private</code>, <code>--is-mcp-enabled</code> (exposes the agent over MCP), <code>--enabled</code>.</p>
           <p><code>--tools</code> takes a JSON array of <code>{type, name, description, config}</code> objects — the <code>type</code> discriminator is <strong>camelCase</strong>: <code>text2cypher</code>, <code>cypherTemplate</code>, <code>similaritySearch</code>. Per-type <code>config</code> shapes are in the <a href="https://neo4j.com/docs/aura/platform/api/specification/?urls.primaryName=Aura%20v2beta1#/agents" target="_blank" rel="noopener">Aura v2beta1 spec</a>.</p>
           <p><code>invoke</code> under <code>--format json</code> returns the full server response (<code>content</code> blocks, <code>status</code>, <code>end_reason</code>, <code>usage</code>); the default table output prints the joined text followed by a stats line — Status / End reason / Tool calls / Tokens.</p>
+          <p class="ref-sub"><span class="keyword">aura agent evaluation-dataset</span> / <span class="keyword">evaluation-run</span> — score an agent against a fixed question set:</p>
+          <pre><span class="prompt">$</span> neo4j-cli aura agent evaluation-dataset create <span class="flag">--name</span> <span class="string">"Product Q&amp;A"</span> <span class="flag">--questions-file</span> ./questions.json <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura agent evaluation-dataset list
+<span class="prompt">$</span> neo4j-cli aura agent evaluation-run create <span class="flag">--agent-id</span> &lt;agent-id&gt; <span class="flag">--dataset-id</span> &lt;dataset-id&gt; \
+    <span class="flag">--metric</span> accuracy <span class="flag">--metric</span> groundedness <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura agent evaluation-run list <span class="flag">--agent-id</span> &lt;agent-id&gt;
+<span class="prompt">$</span> neo4j-cli aura agent evaluation-run get &lt;run-id&gt; <span class="flag">--format</span> json   <span class="comment"># per-question results once finished</span>
+<span class="prompt">$</span> neo4j-cli aura agent evaluation-run cancel &lt;run-id&gt; <span class="flag">--rw</span></pre>
+          <p>The questions file is a JSON array of 1–50 <code>{query_number, query_text, expected_answer}</code> objects. <code>--metric</code> is repeatable: <code>accuracy</code>, <code>tool_trajectory</code>, <code>groundedness</code>, <code>relevance</code>. Datasets also support <code>get</code>, <code>update</code>, <code>delete</code>; runs support <code>delete</code> (deletes need <code>--yes --force</code>).</p>
         </div>
       </div>
       <!-- END:docs:aura -->
@@ -2060,7 +2069,7 @@
           <p class="ref-sub"><span class="keyword">--max-rows / --truncate-arrays-over</span> — limit result size to avoid flooding stdout.</p>
           <pre><span class="prompt">$</span> neo4j-cli query … <span class="flag">--max-rows</span> 100
 <span class="prompt">$</span> neo4j-cli query … <span class="flag">--max-rows</span> 500 <span class="flag">--truncate-arrays-over</span> 10   <span class="comment"># cap arrays at 10 elements</span>
-<span class="prompt">$</span> neo4j-cli query … <span class="flag">--truncate-arrays-over</span> 0                  <span class="comment"># suppress all arrays</span></pre>
+<span class="prompt">$</span> neo4j-cli query … <span class="flag">--truncate-arrays-over</span> 0                  <span class="comment"># disable array truncation</span></pre>
           <p>Diagnostic output always goes to <strong>stderr</strong> (<code>--debug</code>, warnings, error messages) so it never pollutes pipelines that consume stdout.</p>
         </div>
       </div>
@@ -2103,7 +2112,7 @@
 <footer>
   <div class="container inner">
     <div class="meta">
-      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.17.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
+      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.18.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
     </div>
     <div class="links">
       <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">GitHub</a>

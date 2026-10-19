@@ -27,6 +27,7 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli aura instance create` — provision a new Aura instance (`--name` optional; auto-generates `InstanceNN` if omitted)
 - `neo4j-cli aura instance get <id>` — get instance details
 - `neo4j-cli aura agent list|get|create|update|replace|delete|invoke` — manage Aura Agents (LLM assistants bound to a database); `--tools` accepts a JSON array of `{type, name, description, config}` with camelCase types (`text2cypher`, `cypherTemplate`, `similaritySearch`)
+- `neo4j-cli aura agent evaluation-dataset list|get|create|update|delete` / `aura agent evaluation-run list|get|create|cancel|delete` — evaluate an Aura Agent against a dataset of 1-50 questions (`--questions-file` JSON of `{query_number, query_text, expected_answer}`); `evaluation-run create --agent-id <id> --dataset-id <id> --metric accuracy|tool_trajectory|groundedness|relevance` (repeatable `--metric`, `--wait` blocks until a terminal status)
 - `neo4j-cli docker create|list|get|start|stop|delete` — run a local Neo4j container by shelling out to `docker` (or `podman` aliased to `docker`); persistent flow stores a `dbms` credential, ephemeral flow emits an env-file consumable by `query --env`; `create --plugin <name>` (repeatable) installs plugins such as `apoc` / `graph-data-science` via `NEO4J_PLUGINS`; `delete --remove-volume` also removes the `neo4j-cli-<name>-data` volume a `docker load` container leaves behind
 - `neo4j-cli desktop install|list|doctor` — manage a local Neo4j Desktop 2 install: install the app, list managed DBMSes + saved connections, run a structured health check
 - `neo4j-cli desktop dbms list|create|update|start|stop|delete` — lifecycle local DBMSes under Neo4j Desktop 2 (enterprise-only; one DBMS runs at a time on port 7687); `--wait` blocks until `status=started`; `update` renames, edits the description, or replaces project/tag assignments
@@ -76,7 +77,7 @@ Installed skill bundles are auto-refreshed in the background whenever the binary
 
 `--rw` is required for any command that mutates state (Aura API, local config, credentials, skills, write Cypher) when running under an agent harness or non-interactive script. In an interactive terminal `--rw` is auto-applied — humans typing at a prompt don't need the flag. Read-only commands (`skill list`, `skill check`, `skill print`, `query <read>`, `aura instance list`) never need it.
 
-Destructive leaves (any `… delete` / `… remove` — Aura instance/agent/CMK/data-api/graph-analytics/auth-provider/CORS allowed-origin, `docker delete`, `desktop dbms/connection/project/tag delete`, `credential aura-client/dbms/embed remove`) gate on both `--yes` and `--force` in addition to `--rw`. On a TTY either missing flag prompts y/N; in non-TTY contexts both must be passed or the command exits 2.
+Destructive leaves (any `… delete` / `… remove` — Aura instance/agent/agent evaluation-dataset/evaluation-run/CMK/data-api/graph-analytics/auth-provider/CORS allowed-origin, `docker delete`, `desktop dbms/connection/project/tag delete`, `credential aura-client/dbms/embed remove`) gate on both `--yes` and `--force` in addition to `--rw`. On a TTY either missing flag prompts y/N; in non-TTY contexts both must be passed or the command exits 2.
 
 Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-skills
 
