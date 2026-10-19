@@ -7,9 +7,10 @@ set -euo pipefail
 # Pushes the commits a CI job made in its `gh-pages` checkout,
 # rebasing them onto whatever else pushed in the meantime.
 #
-# update-website.yml is the only automated gh-pages writer, but
-# its run takes minutes (the website-update step) between the
-# gh-pages checkout and the push, and the site is also updated
+# update-website.yml and update-releases-json.yml are the
+# automated gh-pages writers. Both trigger on the same release,
+# the website run takes minutes (the website-update step) between
+# the gh-pages checkout and the push, and the site is also updated
 # by hand through the prompt flow (AGENTS.md "Website
 # (neo4j.sh)": worktree + commit + push on gh-pages). A plain
 # `git push` from a checkout the branch has since left behind is

@@ -1,8 +1,9 @@
 # Behavioral tests for push-gh-pages.sh
 #
-# Covers the push policy for gh-pages writes (update-website.yml's
-# automated run, plus the manual prompt-flow pushes from AGENTS.md
-# "Website (neo4j.sh)"). A push rejected because the branch advanced
+# Covers the push policy for gh-pages writes (the update-website.yml
+# and update-releases-json.yml automated runs, plus the manual
+# prompt-flow pushes from AGENTS.md "Website (neo4j.sh)"). A push
+# rejected because the branch advanced
 # since checkout rebases ONLY this job's commits onto the new tip and
 # retries, at most 5 pushes. A conflicting rebase is aborted and fails
 # without pushing, and the script never force-pushes. The "raced push"

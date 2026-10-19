@@ -6,9 +6,9 @@
 // Releases API. It is the producer half of CLI-244: the CLI's `update`
 // command discovers releases from that file instead of the GitHub API.
 //
-// CI invocation (.github/workflows/update-website.yml, on `release:
-// published` and `workflow_dispatch`, with the gh-pages branch checked out
-// into gh-pages/):
+// CI invocation (.github/workflows/update-releases-json.yml, on `release:
+// published`, after post-release-notes.yml completes, and on
+// `workflow_dispatch`, with the gh-pages branch checked out into gh-pages/):
 //
 //	GH_TOKEN=${{ secrets.GITHUB_TOKEN }} go run ./tools/releases-json --out gh-pages/releases.json
 //
