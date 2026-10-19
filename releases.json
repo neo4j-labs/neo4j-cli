@@ -1,8 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-15T12:38:16Z",
+  "generated_at": "2026-10-19T07:29:16Z",
   "repository": "neo4j-labs/neo4j-cli",
   "releases": [
+    {
+      "tag": "v1.18.0",
+      "name": "v1.18.0",
+      "prerelease": false,
+      "published_at": "2026-10-19T07:28:59Z",
+      "body": "## Versions\n\n- neo4j-cli: v1.18.0\n\n## Changes\n\n### neo4j-cli\n\n### Minor\n* Adds `aura agent evaluation-dataset` and `aura agent evaluation-run` commands for managing Aura agent evaluation datasets and runs\n### Patch\n* neo4j-cli update and neo4j-cli update check no longer fail with the GitHub API rate-limit error (HTTP 403 advising to set GH_TOKEN or GITHUB_TOKEN, exit code 8): release metadata is now fetched from a static document on neo4j.sh instead of the GitHub API, so no token is needed or read. Commands, flags, output, and exit codes are otherwise unchanged.\n\n\n"
+    },
     {
       "tag": "v1.17.0",
       "name": "v1.17.0",
