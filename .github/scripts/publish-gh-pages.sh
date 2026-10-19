@@ -17,8 +17,9 @@ set -euo pipefail
 #
 # Policy:
 #   - Stage everything in the checkout and commit it as the CI
-#     bot. A caller that must not publish a file restores it
-#     before calling. With nothing to commit, exit 0 unpushed.
+#     bot (set in the checkout's git config). A caller that must
+#     not publish a file restores it before calling. With nothing
+#     to commit, exit 0 unpushed.
 #   - Push HEAD to origin's gh-pages. On a rejection, fetch the
 #     current remote tip and rebase ONLY this job's commits (those
 #     after the tip the checkout started from) onto it, then push
@@ -85,9 +86,12 @@ if git diff --cached --quiet; then
   echo "[publish-gh-pages] nothing changed in ${CHECKOUT_DIR}; nothing to publish"
   exit 0
 fi
-git -c user.name="github-actions[bot]" \
-  -c user.email="github-actions[bot]@users.noreply.github.com" \
-  commit -q -m "$MESSAGE"
+# In the checkout's config, not `git -c` on the commit: the rebase below
+# rewrites the commit and needs a committer too, and the runner's account
+# has no name for git to fall back on.
+git config user.name "github-actions[bot]"
+git config user.email "github-actions[bot]@users.noreply.github.com"
+git commit -q -m "$MESSAGE"
 
 attempt=1
 while true; do

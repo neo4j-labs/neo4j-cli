@@ -34,16 +34,19 @@ setup() {
   TEST_TMP="$(mktemp -d)"
   ORIGIN="${TEST_TMP}/origin.git"
 
-  # Ignore the developer's git config (signing, pull.rebase, hooks, ...).
+  # Ignore the developer's git config (signing, pull.rebase, hooks, ...),
+  # and never guess an identity: the CI runner's account has no name, so
+  # any commit or rebase the script makes without configuring one fails
+  # there, and must fail here too. The test's own writers commit with an
+  # explicit identity (as_other).
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-  export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com
-  export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true
 
   git init -q --bare -b gh-pages "${ORIGIN}"
   git init -q -b gh-pages "${TEST_TMP}/seed"
   printf '<html>v1</html>\n' > "${TEST_TMP}/seed/index.html"
   git -C "${TEST_TMP}/seed" add index.html
-  git -C "${TEST_TMP}/seed" commit -q -m "seed"
+  as_other git -C "${TEST_TMP}/seed" commit -q -m "seed"
   git -C "${TEST_TMP}/seed" push -q "${ORIGIN}" gh-pages
 
   export TEST_TMP ORIGIN
@@ -71,13 +74,19 @@ write_file() {
   printf '%s\n' "$3" > "$1/$2"
 }
 
+# Run a git command as a writer other than the script. Args: git ARGS...
+as_other() {
+  GIT_AUTHOR_NAME=other GIT_AUTHOR_EMAIL=other@example.com \
+    GIT_COMMITTER_NAME=other GIT_COMMITTER_EMAIL=other@example.com "$@"
+}
+
 # Another writer pushing straight to the remote. Args: NAME FILE CONTENT
 concurrent_push() {
   local dir
   dir="$(checkout "$1")"
   write_file "${dir}" "$2" "$3"
   git -C "${dir}" add "$2"
-  git -C "${dir}" commit -q -m "$1: $2"
+  as_other git -C "${dir}" commit -q -m "$1: $2"
   git -C "${dir}" push -q origin gh-pages
 }
 
@@ -98,6 +107,13 @@ remote_file() {
 
 remote_subject() {
   git --git-dir="${ORIGIN}" log -1 --format=%s gh-pages
+}
+
+BOT='github-actions[bot] <github-actions[bot]@users.noreply.github.com>'
+
+# Author and committer of the remote tip.
+remote_idents() {
+  git --git-dir="${ORIGIN}" log -1 --format='%an <%ae>|%cn <%ce>' gh-pages
 }
 
 # Install a pre-receive hook that rejects the first N pushes (all of
@@ -131,6 +147,7 @@ HOOK
   [[ "$output" != *"rebasing"* ]]
   [ "$(remote_tip)" = "$(git -C "${dir}" rev-parse HEAD)" ]
   [ "$(remote_subject)" = "publish llms.txt" ]
+  [ "$(remote_idents)" = "${BOT}|${BOT}" ]
   [ "$(remote_file llms.txt)" = 'v1' ]
 }
 
@@ -161,9 +178,11 @@ HOOK
   grep -qF "push rejected (attempt 1/5)" <<< "$output"
   grep -qF "(attempt 2/5)" <<< "$output"
 
-  # Linear history: this job's commit sits on top of the other writer's.
+  # Linear history: this job's commit sits on top of the other writer's,
+  # rewritten by the rebase with the bot as committer too.
   [ "$(git --git-dir="${ORIGIN}" rev-parse gh-pages^)" = "${website_tip}" ]
   [ "$(remote_subject)" = "publish releases.json" ]
+  [ "$(remote_idents)" = "${BOT}|${BOT}" ]
   [ -z "$(git --git-dir="${ORIGIN}" rev-list --merges gh-pages)" ]
 
   # Both writers' files are live.
