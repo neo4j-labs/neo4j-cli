@@ -1,14 +1,13 @@
-# Behavioral tests for push-gh-pages.sh
+# Behavioral tests for publish-gh-pages.sh
 #
-# Covers the push policy for gh-pages writes (the update-website.yml
-# and update-releases-json.yml automated runs, plus the manual
-# prompt-flow pushes from AGENTS.md "Website (neo4j.sh)"). A push
-# rejected because the branch advanced
-# since checkout rebases ONLY this job's commits onto the new tip and
-# retries, at most 5 pushes. A conflicting rebase is aborted and fails
-# without pushing, and the script never force-pushes. The "raced push"
-# case is a manual website update landing between a workflow run's
-# gh-pages checkout and its push.
+# Covers the publish policy for CI writes to gh-pages. Everything a
+# job changed in its checkout is committed in one commit; nothing
+# changed means nothing is pushed. A push rejected because the
+# branch advanced since checkout (another workflow, or a manual
+# website update from AGENTS.md "Website (neo4j.sh)") rebases ONLY
+# this job's commit onto the new tip and retries, at most 5 pushes.
+# A failed rebase is aborted and fails without pushing, and the
+# script never force-pushes.
 #
 # Hermetic: a local bare repository stands in for GitHub and each
 # writer is a `--depth 1` clone of its gh-pages branch, the shape
@@ -17,7 +16,7 @@
 # rejections. The user's git config is ignored.
 #
 # Local run:
-#   bats .github/scripts/tests/push-gh-pages.bats
+#   bats .github/scripts/tests/publish-gh-pages.bats
 #
 # Requirements:
 #   bats-core >= 1.5.0  (brew install bats-core)
@@ -25,7 +24,7 @@
 
 bats_require_minimum_version 1.5.0
 
-SCRIPT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)/push-gh-pages.sh"
+SCRIPT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)/publish-gh-pages.sh"
 
 # ---------------------------------------------------------------------------
 # setup / teardown
@@ -66,26 +65,27 @@ checkout() {
   printf '%s\n' "${dir}"
 }
 
-# Commit one file in a checkout. Args: DIR FILE CONTENT MESSAGE
-commit_file() {
+# Change one file in a checkout, as a CI job does before publishing.
+# Args: DIR FILE CONTENT
+write_file() {
   printf '%s\n' "$3" > "$1/$2"
-  git -C "$1" add "$2"
-  git -C "$1" commit -q -m "$4"
 }
 
 # Another writer pushing straight to the remote. Args: NAME FILE CONTENT
 concurrent_push() {
   local dir
   dir="$(checkout "$1")"
-  commit_file "${dir}" "$2" "$3" "$1: $2"
+  write_file "${dir}" "$2" "$3"
+  git -C "${dir}" add "$2"
+  git -C "${dir}" commit -q -m "$1: $2"
   git -C "${dir}" push -q origin gh-pages
 }
 
-# Run the helper with no back-off. Args: DIR [NAME=VALUE ...]
-run_push() {
-  local dir="$1"
-  shift
-  env PUSH_GH_PAGES_BACKOFF_SECONDS=0 "$@" bash "${SCRIPT}" "${dir}" 2>&1
+# Run the helper with no back-off. Args: DIR MESSAGE [NAME=VALUE ...]
+run_publish() {
+  local dir="$1" message="$2"
+  shift 2
+  env PUBLISH_GH_PAGES_BACKOFF_SECONDS=0 "$@" bash "${SCRIPT}" "${dir}" "${message}" 2>&1
 }
 
 remote_tip() {
@@ -94,6 +94,10 @@ remote_tip() {
 
 remote_file() {
   git --git-dir="${ORIGIN}" show "gh-pages:$1"
+}
+
+remote_subject() {
+  git --git-dir="${ORIGIN}" log -1 --format=%s gh-pages
 }
 
 # Install a pre-receive hook that rejects the first N pushes (all of
@@ -113,31 +117,45 @@ HOOK
 }
 
 # ---------------------------------------------------------------------------
-# Tests: pushes that land
+# Tests: publishes that land
 # ---------------------------------------------------------------------------
 
-@test "an unraced push lands on the first attempt" {
+@test "an unraced publish commits the change and lands on the first attempt" {
   dir="$(checkout writer)"
-  commit_file "${dir}" llms.txt 'v1' "publish llms.txt"
+  write_file "${dir}" llms.txt 'v1'
 
-  run run_push "${dir}"
+  run run_publish "${dir}" "publish llms.txt"
   echo "$output"
   [ "$status" -eq 0 ]
   grep -qF "(attempt 1/5)" <<< "$output"
   [[ "$output" != *"rebasing"* ]]
   [ "$(remote_tip)" = "$(git -C "${dir}" rev-parse HEAD)" ]
+  [ "$(remote_subject)" = "publish llms.txt" ]
+  [ "$(remote_file llms.txt)" = 'v1' ]
 }
 
-@test "a push raced by another writer rebases onto it and lands" {
-  # A manual website push lands between the workflow's checkout and its
-  # push: this writer's plain push is rejected.
+@test "a checkout with nothing changed publishes nothing" {
+  dir="$(checkout writer)"
+  seed_tip="$(remote_tip)"
+
+  run run_publish "${dir}" "publish nothing"
+  echo "$output"
+  [ "$status" -eq 0 ]
+  grep -qF "nothing to publish" <<< "$output"
+  [ "$(remote_tip)" = "${seed_tip}" ]
+  [ "$(git -C "${dir}" rev-parse HEAD)" = "${seed_tip}" ]
+}
+
+@test "a publish raced by another writer rebases onto it and lands" {
+  # Another writer lands between this job's checkout and its push: the
+  # plain push is rejected.
   dir="$(checkout releases-json)"
   [ "$(git -C "${dir}" rev-parse --is-shallow-repository)" = true ]
   concurrent_push website index.html '<html>v2</html>'
   website_tip="$(remote_tip)"
-  commit_file "${dir}" releases.json '{"schema_version":1}' "publish releases.json"
+  write_file "${dir}" releases.json '{"schema_version":1}'
 
-  run run_push "${dir}"
+  run run_publish "${dir}" "publish releases.json"
   echo "$output"
   [ "$status" -eq 0 ]
   grep -qF "push rejected (attempt 1/5)" <<< "$output"
@@ -145,7 +163,7 @@ HOOK
 
   # Linear history: this job's commit sits on top of the other writer's.
   [ "$(git --git-dir="${ORIGIN}" rev-parse gh-pages^)" = "${website_tip}" ]
-  [ "$(git --git-dir="${ORIGIN}" log -1 --format=%s gh-pages)" = "publish releases.json" ]
+  [ "$(remote_subject)" = "publish releases.json" ]
   [ -z "$(git --git-dir="${ORIGIN}" rev-list --merges gh-pages)" ]
 
   # Both writers' files are live.
@@ -157,12 +175,12 @@ HOOK
   install_dir="$(checkout install)"
   releases_dir="$(checkout releases)"
   website_dir="$(checkout website)"
-  commit_file "${install_dir}" install.sh '#!/bin/sh' "publish install.sh"
-  commit_file "${releases_dir}" releases.json '{}' "publish releases.json"
-  commit_file "${website_dir}" index.html '<html>v2</html>' "sync with main"
+  write_file "${install_dir}" install.sh '#!/bin/sh'
+  write_file "${releases_dir}" releases.json '{}'
+  write_file "${website_dir}" index.html '<html>v2</html>'
 
   for dir in "${install_dir}" "${releases_dir}" "${website_dir}"; do
-    run run_push "${dir}"
+    run run_publish "${dir}" "publish $(basename "${dir}")"
     echo "$output"
     [ "$status" -eq 0 ]
   done
@@ -177,16 +195,18 @@ HOOK
 
 @test "a transient rejection is retried without changing the commit" {
   dir="$(checkout writer)"
-  commit_file "${dir}" llms.txt 'v1' "publish llms.txt"
-  head="$(git -C "${dir}" rev-parse HEAD)"
+  seed_tip="$(remote_tip)"
+  write_file "${dir}" llms.txt 'v1'
   reject_pushes 1
 
-  run run_push "${dir}"
+  run run_publish "${dir}" "publish llms.txt"
   echo "$output"
   [ "$status" -eq 0 ]
   grep -qF "(attempt 2/5)" <<< "$output"
-  # Nothing moved upstream, so the rebase replayed nothing.
-  [ "$(remote_tip)" = "${head}" ]
+  # Nothing moved upstream, so the rebase replayed nothing: the pushed
+  # commit is the one made on top of the seed.
+  [ "$(remote_tip)" = "$(git -C "${dir}" rev-parse HEAD)" ]
+  [ "$(git --git-dir="${ORIGIN}" rev-parse gh-pages^)" = "${seed_tip}" ]
 }
 
 # ---------------------------------------------------------------------------
@@ -195,32 +215,50 @@ HOOK
 
 @test "a conflicting concurrent edit aborts the rebase and pushes nothing" {
   dir="$(checkout writer)"
+  seed_tip="$(remote_tip)"
   concurrent_push other index.html '<html>theirs</html>'
   their_tip="$(remote_tip)"
-  commit_file "${dir}" index.html '<html>ours</html>' "edit index.html"
-  our_head="$(git -C "${dir}" rev-parse HEAD)"
+  write_file "${dir}" index.html '<html>ours</html>'
 
-  run run_push "${dir}"
+  run run_publish "${dir}" "edit index.html"
   echo "$output"
   [ "$status" -eq 1 ]
-  grep -qF "::error::" <<< "$output"
-  grep -qF "conflicts" <<< "$output"
+  grep -qF "::error::Rebasing onto the current origin/gh-pages failed" <<< "$output"
 
   # The remote keeps the other writer's commit, and the checkout is back
   # on its own commit with no rebase in progress.
   [ "$(remote_tip)" = "${their_tip}" ]
-  [ "$(git -C "${dir}" rev-parse HEAD)" = "${our_head}" ]
+  [ "$(git -C "${dir}" log -1 --format=%s)" = "edit index.html" ]
+  [ "$(git -C "${dir}" rev-parse HEAD^)" = "${seed_tip}" ]
+  [ ! -d "${dir}/.git/rebase-merge" ]
+  [ ! -d "${dir}/.git/rebase-apply" ]
+}
+
+@test "a rebase that fails without a conflict still fails with an ::error::" {
+  # A rebase refused before it starts leaves nothing to abort.
+  dir="$(checkout writer)"
+  concurrent_push other llms.txt 'theirs'
+  their_tip="$(remote_tip)"
+  write_file "${dir}" index.html '<html>ours</html>'
+  printf '#!/usr/bin/env bash\nexit 1\n' > "${dir}/.git/hooks/pre-rebase"
+  chmod +x "${dir}/.git/hooks/pre-rebase"
+
+  run run_publish "${dir}" "edit index.html"
+  echo "$output"
+  [ "$status" -eq 1 ]
+  grep -qF "::error::Rebasing onto the current origin/gh-pages failed" <<< "$output"
+  [ "$(remote_tip)" = "${their_tip}" ]
   [ ! -d "${dir}/.git/rebase-merge" ]
   [ ! -d "${dir}/.git/rebase-apply" ]
 }
 
 @test "a push the remote keeps rejecting gives up after 5 attempts" {
   dir="$(checkout writer)"
-  commit_file "${dir}" llms.txt 'v1' "publish llms.txt"
+  write_file "${dir}" llms.txt 'v1'
   seed_tip="$(remote_tip)"
   reject_pushes all
 
-  run run_push "${dir}"
+  run run_publish "${dir}" "publish llms.txt"
   echo "$output"
   [ "$status" -eq 1 ]
   grep -qF "::error::Push to gh-pages still rejected after 5 attempts" <<< "$output"
@@ -229,15 +267,22 @@ HOOK
   [ "$(remote_tip)" = "${seed_tip}" ]
 }
 
-@test "a missing CHECKOUT_DIR argument is refused" {
+@test "a missing CHECKOUT_DIR or MESSAGE argument is refused" {
+  dir="$(checkout writer)"
+
   run bash "${SCRIPT}"
   echo "$output"
   [ "$status" -eq 1 ]
-  grep -qF "::error::Usage: push-gh-pages.sh CHECKOUT_DIR" <<< "$output"
+  grep -qF "::error::Usage: publish-gh-pages.sh CHECKOUT_DIR MESSAGE" <<< "$output"
+
+  run bash "${SCRIPT}" "${dir}"
+  echo "$output"
+  [ "$status" -eq 1 ]
+  grep -qF "::error::Usage: publish-gh-pages.sh CHECKOUT_DIR MESSAGE" <<< "$output"
 }
 
 @test "a directory that does not exist is refused" {
-  run run_push "${TEST_TMP}/missing"
+  run run_publish "${TEST_TMP}/missing" "publish"
   echo "$output"
   [ "$status" -eq 1 ]
   grep -qF "::error::" <<< "$output"
@@ -247,7 +292,7 @@ HOOK
 @test "a directory that is not a gh-pages checkout is refused" {
   mkdir "${TEST_TMP}/plain"
 
-  run run_push "${TEST_TMP}/plain"
+  run run_publish "${TEST_TMP}/plain" "publish"
   echo "$output"
   [ "$status" -eq 1 ]
   grep -qF "::error::" <<< "$output"
@@ -257,8 +302,8 @@ HOOK
 @test "a non-numeric back-off is refused" {
   dir="$(checkout writer)"
 
-  run run_push "${dir}" PUSH_GH_PAGES_BACKOFF_SECONDS=soon
+  run run_publish "${dir}" "publish" PUBLISH_GH_PAGES_BACKOFF_SECONDS=soon
   echo "$output"
   [ "$status" -eq 1 ]
-  grep -qF "::error::PUSH_GH_PAGES_BACKOFF_SECONDS 'soon'" <<< "$output"
+  grep -qF "::error::PUBLISH_GH_PAGES_BACKOFF_SECONDS 'soon'" <<< "$output"
 }

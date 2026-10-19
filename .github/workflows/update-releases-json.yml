@@ -21,7 +21,7 @@ on:
 # Serialize feed runs. Deliberately not update-website.yml's `gh-pages`
 # group: a pending run in a shared group is cancelled by the next one, which
 # could drop a website run. The two workflows write disjoint files and
-# push-gh-pages.sh rebases whichever push loses the race.
+# publish-gh-pages.sh rebases whichever push loses the race.
 concurrency:
   group: releases-json
   cancel-in-progress: false
@@ -36,12 +36,12 @@ jobs:
 
     steps:
       - name: Checkout main
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: main
 
       - name: Checkout gh-pages into subdirectory
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: gh-pages
           path: gh-pages
@@ -51,25 +51,18 @@ jobs:
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
+          # Keep it off: the generator is stdlib-only, so a module cache buys
+          # nothing, and a contents:write job reachable via workflow_run must
+          # not restore a cache another run could have poisoned.
           cache: false
 
       - name: Generate releases.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Idempotent: unchanged release data yields a byte-identical file,
-          # so the commit step below stays a no-op when nothing changed.
-          go run ./tools/releases-json --out gh-pages/releases.json
+        # Idempotent: unchanged release data yields a byte-identical file, so
+        # the publish step below has nothing to commit.
+        run: go run ./tools/releases-json --out gh-pages/releases.json
 
-      - name: Commit and push
+      - name: Publish
         run: |
-          cd gh-pages
-          git add releases.json
-          git diff --cached --quiet && {
-            echo "releases.json is already up to date."
-            exit 0
-          }
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore(website): sync releases.json"
-          bash "$GITHUB_WORKSPACE/.github/scripts/push-gh-pages.sh" .
+          bash .github/scripts/publish-gh-pages.sh gh-pages "chore(website): sync releases.json"
