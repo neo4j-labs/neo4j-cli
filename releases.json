@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-21T16:01:43Z",
+  "generated_at": "2026-10-21T16:02:43Z",
   "repository": "neo4j-labs/neo4j-cli",
   "releases": [
     {
@@ -8,7 +8,7 @@
       "name": "v1.18.1",
       "prerelease": false,
       "published_at": "2026-10-21T16:01:18Z",
-      "body": "## Versions\n\n- neo4j-cli: v1.18.1\n\n## Changes\n\n### neo4j-cli\n\n### Patch\n* Aura API requests now identify the caller in the User-Agent header as `Neo4jCLI/\u003cversion\u003e (agent|script|human)`, so Aura can tell agent-driven, scripted and interactive use apart.\n\n\n"
+      "body": "## Release notes\n\n### Highlights\n\n- **Aura now knows who's knocking** — Aura API and token requests send a `User-Agent` of `Neo4jCLI/\u003cversion\u003e (agent|script|human)`, so Aura can tell agent-driven, scripted and interactive use apart. Your commands don't change; Aura just gets a slightly better-mannered introduction. Example:\n  ```\n  neo4j-cli aura instance list --format json\n  ```\n\n\n---\n\n## Versions\n\n- neo4j-cli: v1.18.1\n\n## Changes\n\n### neo4j-cli\n\n### Patch\n* Aura API requests now identify the caller in the User-Agent header as `Neo4jCLI/\u003cversion\u003e (agent|script|human)`, so Aura can tell agent-driven, scripted and interactive use apart.\n"
     },
     {
       "tag": "v1.18.0",
