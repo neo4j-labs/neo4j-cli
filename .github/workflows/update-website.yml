@@ -5,6 +5,15 @@ on:
     types: [published]
   workflow_dispatch:
 
+# Serialize runs: two overlapping runs check out the same gh-pages tip and
+# race each other's push (publish-gh-pages.sh then rebases the loser, but not
+# starting twice is cheaper). Other gh-pages writers still race a run, chiefly
+# update-releases-json.yml on the same release, plus manual prompt-flow
+# pushes; the publish helper rebases over those.
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -61,17 +70,6 @@ jobs:
           [ -n "$ANTHROPIC_API_KEY" ] || { echo "ANTHROPIC_API_KEY secret not set"; exit 1; }
           echo "API key present (${#ANTHROPIC_API_KEY} chars)"
 
-      - name: Generate releases.json
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Regenerate gh-pages/releases.json from the GitHub Releases API
-          # (CLI-244: the CLI's `update` command discovers releases from
-          # https://neo4j.sh/releases.json, not the API). The generator is
-          # idempotent — unchanged release data yields a byte-identical file,
-          # so the commit step below stays a no-op when nothing changed.
-          go run ./tools/releases-json --out gh-pages/releases.json
-
       - name: Run website update
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -110,15 +108,19 @@ jobs:
               ' \
             | stdbuf -oL tee /tmp/update-summary.txt
 
-      - name: Commit and push
+      - name: Publish
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          cd gh-pages
-          git add -A
-          git diff --cached --quiet && {
-            echo "No website updates needed for ${{ github.ref_name }}."
-            exit 0
-          }
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore(website): sync with ${{ github.ref_name }}"
-          git push origin gh-pages
+          # releases.json belongs to update-releases-json.yml and the helper
+          # publishes the whole checkout, so drop any change the website step
+          # made to it. Restore it rather than leave it unstaged: a dirty tree
+          # stops the helper's rebase.
+          if ! git -C gh-pages diff --quiet HEAD -- releases.json; then
+            echo "::warning::The website update modified releases.json; discarding it (owned by update-releases-json.yml)"
+            git -C gh-pages restore --staged --worktree -- releases.json
+          fi
+          # update-releases-json.yml fires on the same release and pushes
+          # minutes before this step, so this push usually goes through the
+          # helper's rebase-and-retry. Never force-pushes; fails on conflict.
+          bash .github/scripts/publish-gh-pages.sh gh-pages "chore(website): sync with ${REF_NAME}"

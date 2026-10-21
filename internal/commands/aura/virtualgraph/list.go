@@ -4,7 +4,6 @@
 package virtualgraph
 
 import (
-	"fmt"
 	"github.com/neo4j/cli/internal/auraclient"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -50,14 +49,7 @@ neo4j-cli aura virtual-graph list --limit 10 --format json`,
 			for i, vg := range page.Items {
 				rows[i] = vg.Record
 			}
-			output.PrintRecords(cmd, cfg, rows, summaryFields)
-
-			if page.LimitReached {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Showing the first %d virtual graphs; more are available. Raise or omit --limit to see them all.\n", limit) //nolint:errcheck // narration to stderr; write errors are not actionable
-			}
-			if page.PageCapReached {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Stopped after %d pages, so this list may be incomplete.\n", auraclient.MaxListPages) //nolint:errcheck // narration to stderr; write errors are not actionable
-			}
+			output.PrintPagedRecords(cmd, cfg, rows, summaryFields, "virtual graphs", limit, page.LimitReached, page.PageCapReached)
 
 			return nil
 		},

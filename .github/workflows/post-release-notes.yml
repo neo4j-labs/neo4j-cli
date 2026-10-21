@@ -1,3 +1,4 @@
+# update-releases-json.yml's workflow_run trigger matches this name: rename both together.
 name: Post release notes
 
 # Generates richer release notes via Claude Code after a neo4j-cli release.

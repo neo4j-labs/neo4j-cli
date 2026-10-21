@@ -101,26 +101,6 @@ func newAgent(rec map[string]any) Agent {
 	return Agent{ID: str(rec, "id"), Name: str(rec, "name"), Description: str(rec, "description"), Record: rec}
 }
 
-func (s agentService) path(scope Scope, id string, suffix ...string) (string, error) {
-	if err := ValidateResourceID("organization", scope.OrgID); err != nil {
-		return "", err
-	}
-	if err := ValidateResourceID("project", scope.ProjectID); err != nil {
-		return "", err
-	}
-	p := fmt.Sprintf("/organizations/%s/projects/%s/agents", scope.OrgID, scope.ProjectID)
-	if id != "" {
-		if err := ValidateResourceID("agent", id); err != nil {
-			return "", err
-		}
-		p += "/" + id
-	}
-	for _, sfx := range suffix {
-		p += "/" + sfx
-	}
-	return p, nil
-}
-
 func (s agentService) do(ctx context.Context, method, path string, body map[string]any, doing string) ([]byte, error) {
 	resBody, status, err := transport.MakeRequest(ctx, s.cfg, path, &transport.RequestConfig{
 		Method:   method,
@@ -153,7 +133,7 @@ func (s agentService) one(ctx context.Context, method, path string, body map[str
 // parameters for this endpoint (GET /organizations/{o}/projects/{p}/agents);
 // one GET returns the full collection.
 func (s agentService) List(ctx context.Context, scope Scope) ([]Agent, error) {
-	p, err := s.path(scope, "")
+	p, err := scopedResourcePath(scope, "agents", "agent", "")
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +153,7 @@ func (s agentService) List(ctx context.Context, scope Scope) ([]Agent, error) {
 }
 
 func (s agentService) Get(ctx context.Context, scope Scope, id string) (*Agent, error) {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents", "agent", id)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +161,7 @@ func (s agentService) Get(ctx context.Context, scope Scope, id string) (*Agent, 
 }
 
 func (s agentService) Create(ctx context.Context, scope Scope, spec AgentSpec) (*Agent, error) {
-	p, err := s.path(scope, "")
+	p, err := scopedResourcePath(scope, "agents", "agent", "")
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +169,7 @@ func (s agentService) Create(ctx context.Context, scope Scope, spec AgentSpec) (
 }
 
 func (s agentService) Replace(ctx context.Context, scope Scope, id string, spec AgentSpec) (*Agent, error) {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents", "agent", id)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +177,7 @@ func (s agentService) Replace(ctx context.Context, scope Scope, id string, spec 
 }
 
 func (s agentService) Update(ctx context.Context, scope Scope, id string, patch AgentPatch) (*Agent, error) {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents", "agent", id)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +185,7 @@ func (s agentService) Update(ctx context.Context, scope Scope, id string, patch 
 }
 
 func (s agentService) Delete(ctx context.Context, scope Scope, id string) error {
-	p, err := s.path(scope, id)
+	p, err := scopedResourcePath(scope, "agents", "agent", id)
 	if err != nil {
 		return err
 	}
@@ -214,7 +194,7 @@ func (s agentService) Delete(ctx context.Context, scope Scope, id string) error 
 }
 
 func (s agentService) Invoke(ctx context.Context, scope Scope, id, input string) (*AgentInvocation, error) {
-	p, err := s.path(scope, id, "invoke")
+	p, err := scopedResourcePath(scope, "agents", "agent", id, "invoke")
 	if err != nil {
 		return nil, err
 	}

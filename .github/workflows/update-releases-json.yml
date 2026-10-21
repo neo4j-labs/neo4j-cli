@@ -1,0 +1,68 @@
+name: Update releases.json
+
+# Publishes https://neo4j.sh/releases.json (gh-pages branch root), the feed
+# `neo4j-cli update` discovers releases from instead of the rate-limited
+# GitHub API (CLI-244).
+#
+# Kept apart from update-website.yml so the feed never waits on, or fails
+# with, the paid Claude website step. It also re-runs once
+# post-release-notes.yml has rewritten the new release's body: that edit is
+# made with GITHUB_TOKEN, which never fires a `release: edited` run, hence
+# the workflow_run trigger. No workflow_run event data is used — main and
+# gh-pages are checked out by name.
+on:
+  release:
+    types: [published]
+  workflow_run:
+    workflows: ["Post release notes"]
+    types: [completed]
+  workflow_dispatch:
+
+# Serialize feed runs. Deliberately not update-website.yml's `gh-pages`
+# group: a pending run in a shared group is cancelled by the next one, which
+# could drop a website run. The two workflows write disjoint files and
+# publish-gh-pages.sh rebases whichever push loses the race.
+concurrency:
+  group: releases-json
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  releases-json:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: main
+
+      - name: Checkout gh-pages into subdirectory
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: gh-pages
+          path: gh-pages
+          fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version-file: go.mod
+          # Keep it off: the generator is stdlib-only, so a module cache buys
+          # nothing, and a contents:write job reachable via workflow_run must
+          # not restore a cache another run could have poisoned.
+          cache: false
+
+      - name: Generate releases.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Idempotent: unchanged release data yields a byte-identical file, so
+        # the publish step below has nothing to commit.
+        run: go run ./tools/releases-json --out gh-pages/releases.json
+
+      - name: Publish
+        run: |
+          bash .github/scripts/publish-gh-pages.sh gh-pages "chore(website): sync releases.json"

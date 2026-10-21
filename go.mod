@@ -2,7 +2,7 @@ module github.com/neo4j/cli
 
 go 1.26.0
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	github.com/denisbrodbeck/machineid v1.0.1
