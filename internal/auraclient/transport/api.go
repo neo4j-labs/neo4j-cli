@@ -14,13 +14,20 @@ import (
 	"os"
 	"time"
 
+	"github.com/neo4j/cli/internal/agent"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clicfg/credentials"
 	"github.com/neo4j/cli/internal/clicfg/urlcheck"
 	"github.com/neo4j/cli/internal/clierr"
 )
 
-const userAgent = "Neo4jCLI/%s"
+// userAgentFormat renders the User-Agent as `Neo4jCLI/<version> (<invoker>)`;
+// invoker is agent|script|human from agent.Invoker.
+const userAgentFormat = "Neo4jCLI/%s (%s)"
+
+func userAgent(version string) string {
+	return fmt.Sprintf(userAgentFormat, version, agent.Invoker())
+}
 
 // httpClientTimeout caps every Aura HTTP request so a slow/silent server cannot
 // stall the CLI indefinitely. Variable rather than const to let tests dial it

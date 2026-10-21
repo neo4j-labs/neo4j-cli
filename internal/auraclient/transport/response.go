@@ -295,7 +295,7 @@ func getHeaders(ctx context.Context, credential *credentials.AuraCredential, cfg
 	return http.Header{
 		"Content-Type":  {"application/json"},
 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
-		"User-Agent":    {fmt.Sprintf(userAgent, version)},
+		"User-Agent":    {userAgent(version)},
 	}, nil
 }
 

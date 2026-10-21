@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Aura API requests now identify the caller in the User-Agent header as `Neo4jCLI/<version> (agent|script|human)`, so Aura can tell agent-driven, scripted and interactive use apart.
+time: 2026-10-21T16:30:04.206646+01:00

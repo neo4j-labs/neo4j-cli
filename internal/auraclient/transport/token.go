@@ -101,7 +101,7 @@ func mintTokenHTTP(ctx context.Context, credential *credentials.AuraCredential, 
 
 	req.Header = http.Header{
 		"Content-Type": {"application/x-www-form-urlencoded"},
-		"User-Agent":   {fmt.Sprintf(userAgent, cfg.Version)},
+		"User-Agent":   {userAgent(cfg.Version)},
 	}
 	req.SetBasicAuth(credential.ClientId, credential.ClientSecret)
 
