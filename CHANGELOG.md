@@ -11,6 +11,7 @@ The historical [CHANGELOG-aura.md](CHANGELOG-aura.md) covers the now-discontinue
 ## v1.18.1 - 2026-10-21
 ### Patch
 * Aura API requests now identify the caller in the User-Agent header as `Neo4jCLI/<version> (agent|script|human)`, so Aura can tell agent-driven, scripted and interactive use apart.
+* Picks up the crypto/x509 fix that distrusts compromised intermediate certificates.
 
 ## v1.18.0 - 2026-10-19
 ### Minor
