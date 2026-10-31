@@ -28,10 +28,16 @@ import (
 // Duplicate object keys (which json.Marshal never produces) are kept as
 // duplicate fields rather than last-wins; callers only feed it documents
 // produced by encoding/json.
+//
+// Nesting depth is capped at maxOrderedJSONDepth, mirroring the 10,000-level
+// limit encoding/json enforces: the decoder recurses, so an unbounded
+// document from an untrusted source (the passthrough-toon path feeds it raw
+// API response bodies) could otherwise exhaust the stack — a fatal, uncaught
+// process crash rather than a recoverable error.
 func decodeOrderedJSON(data []byte) (any, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
-	v, err := decodeOrderedValue(dec)
+	v, err := decodeOrderedValue(dec, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -41,9 +47,20 @@ func decodeOrderedJSON(data []byte) (any, error) {
 	return v, nil
 }
 
+// maxOrderedJSONDepth matches the nesting limit encoding/json applies to both
+// encoding and decoding, so decodeOrderedJSON accepts exactly the documents
+// json.Unmarshal would and rejects the rest with an error instead of
+// unbounded recursion.
+const maxOrderedJSONDepth = 10000
+
 // decodeOrderedValue reads the next value from dec, recursing into objects
-// and arrays so nested key order is preserved at every depth.
-func decodeOrderedValue(dec *json.Decoder) (any, error) {
+// and arrays so nested key order is preserved at every depth. depth counts
+// the open containers enclosing this value and rejects documents nested
+// deeper than maxOrderedJSONDepth.
+func decodeOrderedValue(dec *json.Decoder, depth int) (any, error) {
+	if depth > maxOrderedJSONDepth {
+		return nil, fmt.Errorf("ordered json: exceeded max nesting depth %d", maxOrderedJSONDepth)
+	}
 	tok, err := dec.Token()
 	if err != nil {
 		return nil, err
@@ -52,9 +69,9 @@ func decodeOrderedValue(dec *json.Decoder) (any, error) {
 	case json.Delim:
 		switch t {
 		case '{':
-			return decodeOrderedObject(dec)
+			return decodeOrderedObject(dec, depth)
 		case '[':
-			return decodeOrderedArray(dec)
+			return decodeOrderedArray(dec, depth)
 		default:
 			return nil, fmt.Errorf("ordered json: unexpected delimiter %v", t)
 		}
@@ -72,7 +89,7 @@ func decodeOrderedValue(dec *json.Decoder) (any, error) {
 
 // decodeOrderedObject consumes an object body whose opening delimiter has
 // already been read, producing an order-preserving toon.Object.
-func decodeOrderedObject(dec *json.Decoder) (any, error) {
+func decodeOrderedObject(dec *json.Decoder, depth int) (any, error) {
 	var fields []toon.Field
 	for dec.More() {
 		keyTok, err := dec.Token()
@@ -83,7 +100,7 @@ func decodeOrderedObject(dec *json.Decoder) (any, error) {
 		if !ok {
 			return nil, fmt.Errorf("ordered json: object key is not a string")
 		}
-		value, err := decodeOrderedValue(dec)
+		value, err := decodeOrderedValue(dec, depth+1)
 		if err != nil {
 			return nil, err
 		}
@@ -98,10 +115,10 @@ func decodeOrderedObject(dec *json.Decoder) (any, error) {
 // decodeOrderedArray consumes an array body whose opening delimiter has
 // already been read. An empty array decodes to []any{} (not nil), matching
 // json.Unmarshal-into-any.
-func decodeOrderedArray(dec *json.Decoder) (any, error) {
+func decodeOrderedArray(dec *json.Decoder, depth int) (any, error) {
 	items := []any{}
 	for dec.More() {
-		item, err := decodeOrderedValue(dec)
+		item, err := decodeOrderedValue(dec, depth+1)
 		if err != nil {
 			return nil, err
 		}

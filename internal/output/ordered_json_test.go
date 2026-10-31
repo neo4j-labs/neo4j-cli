@@ -4,6 +4,7 @@
 package output
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -57,6 +58,27 @@ func TestDecodeOrderedJSON_ScalarShapesMatchUnmarshal(t *testing.T) {
 func TestDecodeOrderedJSON_RejectsTrailingData(t *testing.T) {
 	_, err := decodeOrderedJSON([]byte(`{} 1`))
 	assert.Error(t, err)
+}
+
+func TestDecodeOrderedJSON_RejectsExcessiveNestingDepth(t *testing.T) {
+	// One level over the encoding/json-equivalent cap: a wall of nested
+	// arrays must come back as an error, not unbounded recursion (the
+	// passthrough-toon path feeds the decoder raw API response bodies, and a
+	// stack overflow is a fatal crash rather than a recoverable error).
+	deep := bytes.Repeat([]byte("["), maxOrderedJSONDepth+1)
+	_, err := decodeOrderedJSON(deep)
+	// Either this package's depth guard or encoding/json's own scanner cap
+	// (same limit) rejects the document; which one fires first is an
+	// implementation detail.
+	require.Error(t, err)
+
+	// Exactly at the cap still decodes (matching json.Unmarshal's boundary).
+	ok := bytes.Repeat([]byte("["), maxOrderedJSONDepth)
+	for _, b := range bytes.Repeat([]byte("]"), maxOrderedJSONDepth) {
+		ok = append(ok, b)
+	}
+	_, err = decodeOrderedJSON(ok)
+	assert.NoError(t, err)
 }
 
 func TestWalkStrings_ToonObjectTransformsKeysAndValuesInPlace(t *testing.T) {
