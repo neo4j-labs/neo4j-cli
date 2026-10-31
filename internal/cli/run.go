@@ -10,6 +10,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/neo4j/cli/internal/analytics"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/clievents"
@@ -225,7 +226,11 @@ func run(ctx context.Context, cfg *clicfg.Config, args []string, stdio IO) int {
 	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
 	err := cmd.ExecuteContext(ctx)
 	clievents.Emit(cfg.Events, args, err == nil)
-	cfg.Events.Flush() // Send out any remaining events
+	// Bounded: an unbounded flush waits out the per-event HTTP timeout against
+	// a slow/unreachable analytics endpoint, adding up to 10s per queued event
+	// to this invocation's exit path. Unsent events at the deadline are
+	// dropped — the process is exiting anyway.
+	cfg.Events.FlushTimeout(analytics.DefaultShutdownFlushTimeout) // Send out any remaining events
 
 	if err == nil {
 		return 0

@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: The CLI no longer waits out the telemetry endpoint's HTTP timeout (up to 10s per queued event) before exiting; the shutdown wait is capped at 500ms and events still in flight at the deadline are dropped. Tool responses from the MCP server get the same bound.
+time: 2026-10-31T21:22:23.716673+01:00
