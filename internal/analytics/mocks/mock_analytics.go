@@ -12,6 +12,7 @@ package analytics_mocks
 import (
 	http "net/http"
 	reflect "reflect"
+	time "time"
 
 	analytics "github.com/neo4j/cli/internal/analytics"
 	gomock "go.uber.org/mock/gomock"
@@ -145,6 +146,42 @@ func (c *MockServiceFlushCall) Do(f func()) *MockServiceFlushCall {
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockServiceFlushCall) DoAndReturn(f func()) *MockServiceFlushCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// FlushTimeout mocks base method.
+func (m *MockService) FlushTimeout(timeout time.Duration) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "FlushTimeout", timeout)
+}
+
+// FlushTimeout indicates an expected call of FlushTimeout.
+func (mr *MockServiceMockRecorder) FlushTimeout(timeout any) *MockServiceFlushTimeoutCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FlushTimeout", reflect.TypeOf((*MockService)(nil).FlushTimeout), timeout)
+	return &MockServiceFlushTimeoutCall{Call: call}
+}
+
+// MockServiceFlushTimeoutCall wrap *gomock.Call
+type MockServiceFlushTimeoutCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockServiceFlushTimeoutCall) Return() *MockServiceFlushTimeoutCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockServiceFlushTimeoutCall) Do(f func(time.Duration)) *MockServiceFlushTimeoutCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockServiceFlushTimeoutCall) DoAndReturn(f func(time.Duration)) *MockServiceFlushTimeoutCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

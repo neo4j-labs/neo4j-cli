@@ -176,6 +176,11 @@ func (a *Analytics) EmitEvent(eventSuffix string, event TrackEvent) {
 // started) has sent every queued event. Call it once during application
 // shutdown. After Flush returns, EmitEvent is a safe no-op. Flushing a service
 // that never emitted returns immediately.
+//
+// Each queued event is one synchronous HTTP POST with a 10s timeout, so
+// against a slow or unreachable analytics endpoint an unbounded Flush can add
+// tens of seconds to the exit path. Short-lived processes should prefer
+// FlushTimeout with DefaultShutdownFlushTimeout.
 func (a *Analytics) Flush() {
 	a.mu.Lock()
 	// Mark as closed before closing the channel so EmitEvent's guard fires
@@ -185,6 +190,40 @@ func (a *Analytics) Flush() {
 	}
 	a.mu.Unlock()
 	a.wg.Wait()
+}
+
+// DefaultShutdownFlushTimeout bounds the exit-path wait for queued telemetry
+// events. It is sized to cover a healthy-network POST with margin while
+// keeping a blackholed endpoint from visibly slowing every invocation; events
+// still in flight when it elapses are dropped (the process is about to exit).
+const DefaultShutdownFlushTimeout = 500 * time.Millisecond
+
+// FlushTimeout closes the event channel exactly like Flush, then waits at
+// most timeout for the worker to drain the queued events. If the timeout
+// elapses first it returns immediately — the worker keeps draining in the
+// background (until the process exits, which reaps it) and whatever remains
+// unsent is dropped. A timeout <= 0 behaves like Flush. Use this on a CLI
+// exit path instead of Flush so a slow analytics endpoint cannot add its HTTP
+// timeout per queued event to every invocation.
+func (a *Analytics) FlushTimeout(timeout time.Duration) {
+	a.mu.Lock()
+	if a.closed.CompareAndSwap(false, true) {
+		close(a.eventCh)
+	}
+	a.mu.Unlock()
+	if timeout <= 0 {
+		a.wg.Wait()
+		return
+	}
+	done := make(chan struct{})
+	go func() {
+		a.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(timeout):
+	}
 }
 
 // worker is the single goroutine that drains eventCh and forwards events to
