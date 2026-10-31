@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Query output now emits row object keys in the server-declared column order (matching the columns array and table headers) in --format json and toon output; previously they were alphabetically sorted, so values could be misread against the declared column order. TOON output in general now preserves the key order of its JSON equivalent.
-time: 2026-10-31T20:28:44.357987+01:00
