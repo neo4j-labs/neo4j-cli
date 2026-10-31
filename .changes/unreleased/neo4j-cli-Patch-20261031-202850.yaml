@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Single read-only query statements, including the write-guard EXPLAIN preflight, now run in auto-commit mode instead of a managed transaction, removing two Bolt round trips per statement; single-statement read invocations complete measurably faster against remote instances.
+time: 2026-10-31T20:28:50.070714+01:00
