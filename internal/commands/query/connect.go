@@ -386,12 +386,24 @@ func runStatementsResponse(ctx context.Context, c *conn, statements []string, pa
 }
 
 // runStatementsResponseImpl is the real Bolt-backed batch implementation. Opens
-// ONE session targeted at c.Database and runs ONE managed transaction
-// (ExecuteRead when readOnly is true, ExecuteWrite otherwise) whose work
-// callback loops tx.Run → Collect → Consume per statement, appending a
-// *queryResponse each (reusing coerceDriverValue). Any error returned from the callback aborts the
-// transaction, so the driver rolls it back automatically. The session is closed
-// via defer; the driver retains pooling.
+// ONE session targeted at c.Database. A single read-only statement runs in
+// auto-commit mode (session.Run); everything else — multi-statement batches
+// and the write path — runs ONE managed transaction (ExecuteRead when
+// readOnly is true, ExecuteWrite otherwise) whose work callback loops
+// tx.Run → Collect → Consume per statement, appending a *queryResponse each
+// (reusing coerceDriverValue). Any error returned from the callback aborts the
+// transaction, so the driver rolls it back automatically. The session is
+// closed via defer; the driver retains pooling.
+//
+// The auto-commit fast path exists because the default execution mode is
+// "each statement in its own transaction", which is exactly auto-commit
+// semantics — the managed transaction's BEGIN/COMMIT pair adds two Bolt round
+// trips per statement for no behavioral gain. It also covers the EXPLAIN
+// write-guard preflight, which funnels through here as a read-only
+// batch-of-one, so a plain read invocation saves the overhead twice. Writes
+// and --atomic keep the managed transaction: a single transaction across
+// statements is required for --atomic, and ExecuteWrite's transient-error
+// retry (cluster switchover, deadlock) matters on the write path.
 func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string, params map[string]any, readOnly bool) ([]*queryResponse, error) {
 	if c == nil {
 		return nil, errors.New("query: nil connection")
@@ -405,48 +417,27 @@ func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.Database})
 	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
 
+	if len(statements) == 1 && readOnly {
+		runner := func(ctx context.Context, cypher string, params map[string]any) (neo4j.Result, error) {
+			return session.Run(ctx, cypher, params)
+		}
+		resp, err := runOneQueryResponse(ctx, runner, statements[0], params)
+		if err != nil {
+			return nil, fmt.Errorf("query: %w", err)
+		}
+		return []*queryResponse{resp}, nil
+	}
+
 	work := func(tx neo4j.ManagedTransaction) (any, error) {
 		responses := make([]*queryResponse, 0, len(statements))
 		for _, statement := range statements {
-			result, err := tx.Run(ctx, statement, params)
+			runner := func(ctx context.Context, cypher string, params map[string]any) (neo4j.Result, error) {
+				return tx.Run(ctx, cypher, params)
+			}
+			resp, err := runOneQueryResponse(ctx, runner, statement, params)
 			if err != nil {
 				return nil, err
 			}
-
-			records, err := result.Collect(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			summary, err := result.Consume(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			resp := &queryResponse{}
-			if len(records) > 0 {
-				resp.Data.Fields = append([]string(nil), records[0].Keys...)
-				resp.Data.Values = make([][]any, 0, len(records))
-				for _, rec := range records {
-					row := make([]any, len(rec.Values))
-					for i, v := range rec.Values {
-						row[i] = coerceDriverValue(v)
-					}
-					resp.Data.Values = append(resp.Data.Values, row)
-				}
-			} else {
-				keys, _ := result.Keys()
-				resp.Data.Fields = append([]string(nil), keys...)
-				resp.Data.Values = [][]any{}
-			}
-
-			if summary != nil {
-				resp.QueryType = summary.QueryType()
-				resp.Counters = summary.Counters()
-				resp.Plan = summary.Plan()
-				resp.Profile = summary.Profile()
-			}
-
 			responses = append(responses, resp)
 		}
 		return responses, nil
@@ -470,6 +461,64 @@ func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string
 		return nil, errors.New("query: unexpected nil response from managed transaction")
 	}
 	return resps, nil
+}
+
+// statementRunner runs one Cypher statement and returns its result stream. It
+// abstracts the Run method shared by auto-commit execution (neo4j.Session) and
+// managed-transaction execution (neo4j.ManagedTransaction) so
+// runOneQueryResponse serves both modes; the two Run signatures differ only in
+// the session's optional per-call transaction configurers, which the CLI never
+// passes.
+type statementRunner func(ctx context.Context, cypher string, params map[string]any) (neo4j.Result, error)
+
+// runOneQueryResponse executes a single statement through runner and collects
+// it into a *queryResponse: records are coerced positionally into rows
+// (coerceDriverValue), the column list comes from the first record (or the
+// result's Keys when there are none), and the summary contributes query type,
+// counters, and the EXPLAIN/PROFILE plan. It is the per-statement body shared
+// by the auto-commit fast path and the managed-transaction work callback in
+// runStatementsResponseImpl.
+func runOneQueryResponse(ctx context.Context, runner statementRunner, statement string, params map[string]any) (*queryResponse, error) {
+	result, err := runner(ctx, statement, params)
+	if err != nil {
+		return nil, err
+	}
+
+	records, err := result.Collect(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	summary, err := result.Consume(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &queryResponse{}
+	if len(records) > 0 {
+		resp.Data.Fields = append([]string(nil), records[0].Keys...)
+		resp.Data.Values = make([][]any, 0, len(records))
+		for _, rec := range records {
+			row := make([]any, len(rec.Values))
+			for i, v := range rec.Values {
+				row[i] = coerceDriverValue(v)
+			}
+			resp.Data.Values = append(resp.Data.Values, row)
+		}
+	} else {
+		keys, _ := result.Keys()
+		resp.Data.Fields = append([]string(nil), keys...)
+		resp.Data.Values = [][]any{}
+	}
+
+	if summary != nil {
+		resp.QueryType = summary.QueryType()
+		resp.Counters = summary.Counters()
+		resp.Plan = summary.Plan()
+		resp.Profile = summary.Profile()
+	}
+
+	return resp, nil
 }
 
 // runStatementsWithMode executes a batch of statements in a single managed
