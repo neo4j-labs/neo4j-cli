@@ -194,8 +194,8 @@ func writeUnrenderable(cmd *cobra.Command, body []byte) {
 }
 
 func printPassthroughToon(cmd *cobra.Command, body []byte) {
-	var v any
-	if err := json.Unmarshal(body, &v); err != nil {
+	v, err := decodeOrderedJSON(body)
+	if err != nil {
 		writeUnrenderable(cmd, body)
 		return
 	}
@@ -326,14 +326,16 @@ func printToon(cmd *cobra.Command, values ResponseData) {
 
 // printToonValue renders an arbitrary value as a TOON document. It first
 // marshals to canonical JSON (honouring any MarshalJSON implementations),
-// unmarshals to any to obtain a plain Go value, then encodes with toon.Marshal.
+// then decodes it order-preservingly (decodeOrderedJSON) so objects keep the
+// key order the JSON document declared — a map round-trip would alphabetize
+// them — and encodes with toon.Marshal.
 func printToonValue(cmd *cobra.Command, values any) {
 	jsonBytes, err := json.Marshal(values)
 	if err != nil {
 		panic(err)
 	}
-	var v any
-	if err := json.Unmarshal(jsonBytes, &v); err != nil {
+	v, err := decodeOrderedJSON(jsonBytes)
+	if err != nil {
 		panic(err)
 	}
 	// toon.Marshal rejects C0 control bytes (e.g. ESC, BEL) in strings — the
@@ -353,8 +355,9 @@ func printToonValue(cmd *cobra.Command, values any) {
 
 // WalkStrings returns a copy of v with f applied to every string leaf and
 // every map key. It handles the shapes encoding/json unmarshals into any
-// (string, map[string]any, []any, []string) and returns non-string scalars
-// unchanged. It never mutates the caller's input.
+// (string, map[string]any, []any, []string), the ordered toon.Object trees
+// decodeOrderedJSON produces, and returns non-string scalars unchanged. It
+// never mutates the caller's input.
 func WalkStrings(v any, f func(string) string) any {
 	switch val := v.(type) {
 	case string:
@@ -365,6 +368,14 @@ func WalkStrings(v any, f func(string) string) any {
 			out[f(k)] = WalkStrings(item, f)
 		}
 		return out
+	case toon.Object:
+		// Preserve field order: rebuild the Field slice in place rather than
+		// funelling it through a map, which would re-alphabetize the keys.
+		out := make([]toon.Field, len(val.Fields))
+		for i, field := range val.Fields {
+			out[i] = toon.Field{Key: f(field.Key), Value: WalkStrings(field.Value, f)}
+		}
+		return toon.NewObject(out...)
 	case []any:
 		out := make([]any, len(val))
 		for i, item := range val {

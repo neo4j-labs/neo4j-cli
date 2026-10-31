@@ -4,8 +4,10 @@
 package query
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -66,12 +68,16 @@ func (r renderResult) AsArray() []map[string]any {
 //
 //	{columns, rows, truncated, arrays_truncated}
 //
-// Field order is fixed via struct field order so encoding/json preserves it.
-// The `stats`, `plan`, `profile`, and `error` keys are additive (omitempty): a
-// successful read stays byte-identical, an EXPLAIN/PROFILE run appends its
-// operator tree under `plan`/`profile` (mutually exclusive, so never both), and
-// an error-placeholder (--continue-on-error) keeps its positional slot and
-// surfaces the failure under `error`.
+// Field order is fixed via struct field order so encoding/json preserves it,
+// and each row object's keys are emitted in the server-declared column order
+// (see orderedRow) rather than the alphabetical order encoding/json would
+// impose on a map — an agent reading the output can zip row values against
+// the columns array positionally. The `stats`, `plan`, `profile`, and `error`
+// keys are additive (omitempty): a successful read stays byte-identical, an
+// EXPLAIN/PROFILE run appends its operator tree under `plan`/`profile`
+// (mutually exclusive, so never both), and an error-placeholder
+// (--continue-on-error) keeps its positional slot and surfaces the failure
+// under `error`.
 func (r renderResult) MarshalJSON() ([]byte, error) {
 	cols := r.columns
 	if cols == nil {
@@ -81,18 +87,22 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 	if rows == nil {
 		rows = []map[string]any{}
 	}
+	ordered := make([]orderedRow, len(rows))
+	for i, row := range rows {
+		ordered[i] = orderedRow{order: cols, row: row}
+	}
 	return json.Marshal(struct {
-		Columns         []string         `json:"columns"`
-		Rows            []map[string]any `json:"rows"`
-		Truncated       bool             `json:"truncated"`
-		ArraysTruncated int              `json:"arrays_truncated"`
-		Stats           *writeStats      `json:"stats,omitempty"`
-		Plan            *planNode        `json:"plan,omitempty"`
-		Profile         *planNode        `json:"profile,omitempty"`
-		Error           string           `json:"error,omitempty"`
+		Columns         []string     `json:"columns"`
+		Rows            []orderedRow `json:"rows"`
+		Truncated       bool         `json:"truncated"`
+		ArraysTruncated int          `json:"arrays_truncated"`
+		Stats           *writeStats  `json:"stats,omitempty"`
+		Plan            *planNode    `json:"plan,omitempty"`
+		Profile         *planNode    `json:"profile,omitempty"`
+		Error           string       `json:"error,omitempty"`
 	}{
 		Columns:         cols,
-		Rows:            rows,
+		Rows:            ordered,
 		Truncated:       r.truncated,
 		ArraysTruncated: r.arraysTruncated,
 		Stats:           r.stats,
@@ -100,6 +110,65 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 		Profile:         r.profile,
 		Error:           r.errMsg,
 	})
+}
+
+// orderedRow marshals one row of renderResult.rows with its keys in the
+// order the columns were declared on the wire, instead of the alphabetical
+// order encoding/json imposes on map[string]any. The row map itself stays
+// unordered; only the marshaled form is ordered. Keys not present in order
+// (which rowsFromValues never produces — every row is keyed by exactly the
+// columns slice — but a future constructor could drift) are appended sorted
+// so the output remains deterministic. A duplicated column name collapses in
+// the row map; the first position wins and later occurrences are skipped.
+type orderedRow struct {
+	order []string
+	row   map[string]any
+}
+
+func (r orderedRow) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	written := make(map[string]bool, len(r.row))
+	writeKey := func(key string) error {
+		value, err := json.Marshal(r.row[key])
+		if err != nil {
+			return err
+		}
+		keyJSON, err := json.Marshal(key)
+		if err != nil {
+			return err
+		}
+		if len(written) > 0 {
+			buf.WriteByte(',')
+		}
+		buf.Write(keyJSON)
+		buf.WriteByte(':')
+		buf.Write(value)
+		written[key] = true
+		return nil
+	}
+	for _, col := range r.order {
+		if written[col] {
+			continue
+		}
+		if err := writeKey(col); err != nil {
+			return nil, err
+		}
+	}
+	rest := make([]string, 0, len(r.row))
+	for k := range r.row {
+		if !written[k] {
+			rest = append(rest, k)
+		}
+	}
+	sort.Strings(rest)
+	for _, k := range rest {
+		if err := writeKey(k); err != nil {
+			return nil, err
+		}
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }
 
 // renderRows writes the query result to cmd's stdout via PrintBodyMap, which

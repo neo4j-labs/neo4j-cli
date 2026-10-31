@@ -229,6 +229,44 @@ func TestRenderRows_JSON_PreservesColumnOrder(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &raw))
 	assert.Equal(t, []string{"z", "a", "m"}, raw.Columns)
+
+	// And the row object's key order: the values must be keyed in the same
+	// server-declared column order, not re-alphabetized by the map round-trip.
+	// The `"key":` form (with colon) only occurs in row objects — the columns
+	// array renders keys without colons.
+	out := stdout.String()
+	assert.Less(t, strings.Index(out, `"z":`), strings.Index(out, `"a":`), "row keys must follow column order z,a,m, got: %s", out)
+	assert.Less(t, strings.Index(out, `"a":`), strings.Index(out, `"m":`), "row keys must follow column order z,a,m, got: %s", out)
+}
+
+func TestRenderRows_Toon_PreservesColumnOrder(t *testing.T) {
+	cmd, cfg, stdout := newRenderCmd(t, "toon")
+	renderRows(cmd, cfg, []string{"z", "a", "m"}, []map[string]any{
+		{"z": float64(1), "a": "first", "m": true},
+	}, false, 0)
+
+	// The tabular TOON row header and its value line must both follow the
+	// server-declared column order (z,a,m), matching the columns header —
+	// previously the map round-trip re-alphabetized them to a,m,z while the
+	// columns line kept server order, so a positional zip against columns
+	// assigned values to the wrong keys.
+	out := stdout.String()
+	assert.Contains(t, out, "columns[#3]: z,a,m")
+	assert.Contains(t, out, "rows[#1]{z,a,m}:")
+	assert.Contains(t, out, "\n  1,first,true\n")
+}
+
+func TestRenderResults_MultiStatement_KeepsPerResultColumnOrder(t *testing.T) {
+	cmd, cfg, stdout := newRenderCmd(t, "json")
+	renderResults(cmd, cfg, []renderResult{
+		{columns: []string{"z", "a"}, rows: []map[string]any{{"z": float64(1), "a": "x"}}},
+		{columns: []string{"n", "b", "c"}, rows: []map[string]any{{"n": float64(2), "b": "y", "c": true}}},
+	})
+
+	out := stdout.String()
+	assert.Less(t, strings.Index(out, `"z":`), strings.Index(out, `"a":`), "first result row keys must follow its own column order, got: %s", out)
+	assert.Less(t, strings.Index(out, `"n":`), strings.Index(out, `"b":`), "second result row keys must follow its own column order, got: %s", out)
+	assert.Less(t, strings.Index(out, `"b":`), strings.Index(out, `"c":`), "second result row keys must follow its own column order, got: %s", out)
 }
 
 func TestRenderRows_Table(t *testing.T) {
