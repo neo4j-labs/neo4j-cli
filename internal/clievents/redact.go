@@ -72,6 +72,30 @@ func feedbackSubmitIndex(args []string) int {
 	return -1
 }
 
+// maskFeedbackTextFlags masks the value of every report flag in args. Cobra
+// locates the subcommand by skipping flags (and their values) wherever they
+// sit, so `feedback --observed <text> submit` reaches `submit` with the report
+// text in front of the command words, outside the allow-list's reach.
+func maskFeedbackTextFlags(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if name, _, ok := splitFlagEq(arg); ok {
+			if slices.Contains(feedbackSubmitTextFlags, name) {
+				arg = dashPrefix(arg) + name + "=" + redactedPlaceholder
+			}
+			out = append(out, arg)
+			continue
+		}
+		out = append(out, arg)
+		if name, isFlag := flagName(arg); isFlag && slices.Contains(feedbackSubmitTextFlags, name) && i+1 < len(args) {
+			out = append(out, redactedPlaceholder)
+			i++
+		}
+	}
+	return out
+}
+
 // redactFeedbackSubmitArgs masks the arguments that follow `feedback submit`.
 func redactFeedbackSubmitArgs(args []string) []string {
 	visible := func(v string) string {
@@ -222,7 +246,7 @@ func RedactArgs(args []string) string {
 		return ""
 	}
 	if j := feedbackSubmitIndex(args); j >= 0 {
-		head := redactArgs(args[:j+1])
+		head := redactArgs(maskFeedbackTextFlags(args[:j+1]))
 		return strings.Join(append(head, redactFeedbackSubmitArgs(args[j+1:])...), " ")
 	}
 	return strings.Join(redactArgs(args), " ")
