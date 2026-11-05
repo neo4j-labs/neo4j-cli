@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"os"
 	"testing"
 	"time"
 
@@ -70,6 +71,18 @@ func fakeAgent(name, displayName string, installed bool) commonskill.AgentInstal
 		Detected:  true,
 		Installed: installed,
 	}
+}
+
+// TestMain pins stdoutIsTerminal to true for the whole package: the
+// pre-existing expectations describe the interactive path. Cases that exercise
+// the CLI-250 non-interactive gate override the seam locally and restore it
+// via t.Cleanup.
+func TestMain(m *testing.M) {
+	orig := stdoutIsTerminal
+	stdoutIsTerminal = func() bool { return true }
+	code := m.Run()
+	stdoutIsTerminal = orig
+	os.Exit(code)
 }
 
 // waitForCacheVersion polls the state file until it records the expected version
@@ -320,6 +333,39 @@ func TestMaybeRefresh_NilCfg(t *testing.T) {
 	cmd := makeCmd(stderr)
 	// Must not panic.
 	MaybeRefresh(context.Background(), cmd, nil, nil, "neo4j-cli")
+	assert.Empty(t, stderr.String())
+}
+
+// TestMaybeRefresh_NonInteractiveSkips verifies the CLI-250 gate: with stdout
+// not a terminal (agent harness, script, pipe), a version mismatch plus
+// auto-refresh enabled still triggers nothing — no install calls, no state
+// file write, no stderr output. The tool surface must not change mid-task.
+func TestMaybeRefresh_NonInteractiveSkips(t *testing.T) {
+	prev := stdoutIsTerminal
+	stdoutIsTerminal = func() bool { return false }
+	t.Cleanup(func() { stdoutIsTerminal = prev })
+
+	testFs, err := testfs.GetTestFs("{}", "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(testFs, "v1.1.0")
+
+	stderr := &bytes.Buffer{}
+	cmd := makeCmd(stderr)
+
+	installCalled := false
+	withListFn(t, func(afero.Fs, string) ([]commonskill.AgentInstall, error) {
+		return []commonskill.AgentInstall{fakeAgent("claude-code", "Claude Code", true)}, nil
+	})
+	withInstallFn(t, func(afero.Fs, fs.FS, string, string, string) ([]*commonskill.Agent, error) {
+		installCalled = true
+		return nil, nil
+	})
+
+	MaybeRefresh(context.Background(), cmd, cfg, nil, "neo4j-cli")
+
+	time.Sleep(100 * time.Millisecond)
+	assert.False(t, installCalled, "non-interactive runs must not reinstall skill bundles")
+	assert.Nil(t, readCache(testFs), "non-interactive runs must not write the refresh state file")
 	assert.Empty(t, stderr.String())
 }
 

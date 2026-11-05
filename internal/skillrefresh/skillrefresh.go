@@ -7,6 +7,14 @@
 // (skill-refresh.json), a goroutine reinstalls the skill bundle for every
 // agent that currently has the skill installed, then updates the state file.
 //
+// The probe only fires for an interactive terminal (CLI-250): a non-interactive
+// invocation — agent harness, script, pipe — never mutates the installed skill
+// bundles or prints refresh output mid-run, because a tool surface that
+// changes its own behaviour underneath a running task breaks reproducibility.
+// Non-interactive consumers refresh explicitly via `skill install` /
+// `skill refresh`, or after `update` (which refreshes installed bundles as
+// part of its own flow).
+//
 // MaybeRefresh is the only public entry point. It returns immediately and
 // does all work in the background goroutine. All errors are either silently
 // swallowed or emitted as single-line warnings to stderr — the foreground
@@ -19,6 +27,7 @@ import (
 	"io/fs"
 
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/output"
 	commonskill "github.com/neo4j/cli/internal/skill"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -38,6 +47,13 @@ var (
 // devVersion is the sentinel used when no ldflags tag has been baked in.
 // Refresh is skipped for dev builds — there is nothing meaningful to compare.
 const devVersion = "dev"
+
+// stdoutIsTerminal is the interactive-detection seam, mirroring the --rw
+// auto-apply rule: background mutation of installed skills happens only when
+// a human is at a terminal. Tests override it; production reads the real
+// os.Stdout file descriptor (output.StdoutIsTerminal) so wrapping the
+// command's writer cannot flip the decision.
+var stdoutIsTerminal = output.StdoutIsTerminal
 
 // autoRefreshEnabled reports whether skill-auto-refresh is enabled. The value
 // from viper can be a bool (default) or a string ("true"/"false") when the
@@ -59,9 +75,10 @@ func autoRefreshEnabled(cfg *clicfg.Config) bool {
 }
 
 // MaybeRefresh compares the last-refreshed version in the state file to the
-// running binary version. When they differ and skill-auto-refresh is enabled,
-// it spawns a background goroutine that reinstalls the skill bundle for every
-// agent that currently has the skill installed and updates the state file.
+// running binary version. When they differ, skill-auto-refresh is enabled, and
+// stdout is an interactive terminal, it spawns a background goroutine that
+// reinstalls the skill bundle for every agent that currently has the skill
+// installed and updates the state file.
 //
 // The function returns immediately — all I/O and install work happens in the
 // goroutine. ctx is forwarded so the goroutine can honour early cancellation.
@@ -72,6 +89,13 @@ func MaybeRefresh(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, b
 		return
 	}
 	if !autoRefreshEnabled(cfg) {
+		return
+	}
+	if !stdoutIsTerminal() {
+		// CLI-250: non-interactive runs (agent harness, script, pipe) never
+		// auto-refresh — the tool surface must not change mid-task. The state
+		// file is deliberately left untouched so an interactive run still
+		// refreshes when one happens.
 		return
 	}
 

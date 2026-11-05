@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Installed agent skill bundles are no longer auto-refreshed in the background during non-interactive runs (agent harnesses, scripts, piped output) when the CLI version changes - the refresh now happens only in an interactive terminal, so the CLI's behaviour cannot change mid-task under an agent. Refresh explicitly with 'skill install' or 'update'; disable background refresh entirely with 'config set skill-auto-refresh false'.
+time: 2026-10-31T21:27:08.042743+01:00

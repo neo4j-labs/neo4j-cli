@@ -69,6 +69,8 @@ neo4j-cli skill refresh                              # force a catalog fetch
 
 The catalog is cached under `os.UserCacheDir()/neo4j-cli/skill-catalog/` with a 24h TTL; `install` / `list` / `check` auto-refresh when stale, and fall back to the cached copy on network failure with a stderr warning.
 
+Installed skill bundles are refreshed in the background when the binary version changes — but only in an **interactive terminal**. Non-interactive runs (agent harnesses, scripts, pipes) never auto-refresh, so the tool surface an agent sees never changes mid-task; refresh explicitly with `skill install` or `update` (which refreshes installed bundles after a successful swap). Disable background refresh entirely with `neo4j-cli config set skill-auto-refresh false --rw`.
+
 Using a multi-agent orchestrator like [Conductor](https://www.conductor.build)? It reuses the underlying agents' skill directories (e.g. Claude Code, Codex), so `skill install` with no argument covers every detected agent in one go, and `skill check` surfaces any version drift between them.
 
 ## Credentials
