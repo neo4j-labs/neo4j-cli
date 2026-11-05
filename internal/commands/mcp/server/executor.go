@@ -10,6 +10,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/neo4j/cli/internal/analytics"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/clievents"
@@ -108,7 +109,7 @@ func (e *Executor) dispatch(ctx context.Context, args []string, stdout, stderr i
 	// Every clicfg.NewConfig starts an analytics worker goroutine that only
 	// exits once the channel is closed, so a per-call config that is never
 	// flushed leaks one goroutine per tool call for the life of the server.
-	defer cfg.Events.Flush()
+	defer cfg.Events.FlushTimeout(analytics.DefaultShutdownFlushTimeout)
 
 	root := e.newRoot(cfg)
 	root.SetArgs(args)

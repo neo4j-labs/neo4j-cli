@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/neo4j/cli/internal/analytics"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/spf13/afero"
 )
@@ -44,7 +45,7 @@ func EnsureToolDefinitions(srcCfg *clicfg.Config) {
 			storedFlagStates[name] = enabled
 		}
 		cfg := clicfg.NewConfig(afero.NewMemMapFs(), storedVersion)
-		defer cfg.Events.Flush()
+		defer cfg.Events.FlushTimeout(analytics.DefaultShutdownFlushTimeout)
 		for name, enabled := range storedFlagStates {
 			if enabled {
 				cfg.Flags.SetForTest(name, true)
