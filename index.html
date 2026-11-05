@@ -1070,7 +1070,7 @@
 <section class="hero">
   <div class="container inner">
     <div class="pill">
-      <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill-tag" style="text-transform:none">v1.18.1</a>
+      <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener" class="pill-tag" style="text-transform:none">v1.19.0</a>
       <span><a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">open source</a> · <a href="https://neo4j.com/labs/" target="_blank" rel="noopener">neo4j-labs</a></span>
     </div>
 
@@ -1127,7 +1127,7 @@
         </button>
       </div>
       <div class="cmd-hint">
-        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.18.1</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
+        latest release <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.19.0</a> · <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
       </div>
     </div>
   </div>
@@ -1743,7 +1743,7 @@
 <span class="prompt">$</span> neo4j-cli update check              <span class="comment"># report availability, exit 1 if newer version exists</span>
 <span class="prompt">$</span> neo4j-cli update <span class="flag">--version</span> v1.0.0   <span class="comment"># pin or downgrade to a specific version</span>
 <span class="prompt">$</span> neo4j-cli update <span class="flag">--pre-releases</span>     <span class="comment"># opt into alpha/beta/rc tags</span></pre>
-          <p>Installed skill bundles are refreshed automatically in the background whenever the binary version changes. Opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>.</p>
+          <p>Installed skill bundles are refreshed automatically in the background whenever the binary version changes, in an interactive terminal only (never under an agent or script). Opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>.</p>
           <p>Prefix any installer with <code>NEO4J_CLI_AUTO_INSTALL_SKILL=1</code> to auto-run <code>skill install --rw</code> after the binary is placed — supported on curl, PowerShell, Homebrew, and npm. Strictly opt-in.</p>
         </div>
       </div>
@@ -2093,7 +2093,7 @@
 <span class="prompt">$</span> neo4j-cli skill check                                <span class="comment"># version drift vs running binary</span>
 <span class="prompt">$</span> neo4j-cli skill remove neo4j-cypher-skill <span class="flag">--rw</span>      <span class="comment"># remove a catalog skill</span>
 <span class="prompt">$</span> neo4j-cli skill remove self <span class="flag">--agent</span> windsurf <span class="flag">--rw</span>   <span class="comment"># remove self-skill from one agent</span></pre>
-          <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie, Kiro. Self-skill bundles refresh automatically on binary version change; opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>.</p>
+          <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie, Kiro. Self-skill bundles refresh automatically on binary version change (interactive terminals only); opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>.</p>
           <p class="ref-sub"><span class="keyword">agent-context</span> — emit a stable JSON envelope describing the command surface for agent discovery. Default is a compact flat index (path + short); pass a command path for one command's flags and examples, or <code>--full</code> for the complete tree:</p>
           <pre><span class="prompt">$</span> neo4j-cli agent-context <span class="flag">--format</span> json | jq <span class="string">'.commands[].path'</span>   <span class="comment"># compact index</span>
 <span class="prompt">$</span> neo4j-cli agent-context aura instance list <span class="flag">--format</span> json      <span class="comment"># one command's details</span>
@@ -2112,7 +2112,7 @@
 <footer>
   <div class="container inner">
     <div class="meta">
-      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.18.1</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
+      neo4j-cli <a href="https://github.com/neo4j-labs/neo4j-cli/releases" target="_blank" rel="noopener">v1.19.0</a> · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
     </div>
     <div class="links">
       <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">GitHub</a>

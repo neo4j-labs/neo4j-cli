@@ -111,6 +111,94 @@ function Add-ToUserPath {
     Write-Warn "Restart your terminal (or run: `$Env:PATH += ';$Dir'`) to use it now."
 }
 
+# -- Agent feedback (opt-in) --------------------------------------------------
+# Mirrors the "Agent feedback" section of install-neo4j-cli.sh. Offered only
+# when this build ships `neo4j-cli feedback enable` (look for its --accept
+# flag). Enables nothing unless a person types y: no environment variable
+# answers for them (only NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1 suppresses the
+# question), there is no prompt without a terminal, and none under
+# DO_NOT_TRACK=1 or with telemetry off. The default answer is No. With no
+# terminal (CI), or when a coding agent runs this script even with a terminal,
+# it registers the inert tool instead, so the first report still gets a human
+# decision, and says how to turn feedback on.
+# $Cli is the installed binary; $Interactive says whether a person can answer.
+function Invoke-FeedbackSetup {
+    param(
+        [string] $Cli,
+        [bool]   $Interactive
+    )
+    if ($Env:NEO4J_CLI_SKIP_FEEDBACK_PROMPT -eq "1" -or $Env:DO_NOT_TRACK -eq "1") { return }
+
+    # Native commands that write to stderr must not stop the installer.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $help = (& $Cli feedback enable --help 2>$null) -join "`n"
+        if ($help -notmatch '--accept') { return }
+
+        # `feedback enable` without --accept is the probe: it prints the
+        # disclosure and exits 2 when a person could enable feedback, prints
+        # nothing when the person's settings switch feedback off (DO_NOT_TRACK=1,
+        # telemetry off) or the build has no destination, and exits 4 when it
+        # detects a coding agent, because only a person may enable feedback.
+        # --rw: enable and register are writes, which the CLI refuses without it
+        # when there is no terminal or an agent runs this script.
+        $disclosure = (& $Cli feedback enable --rw 2>$null) -join "`n"
+        $probeExit = $LASTEXITCODE
+        $mode = "none"
+        if ($disclosure) {
+            $mode = if ($Interactive) { "ask" } else { "register" }
+        } elseif ($probeExit -eq 4) {
+            $mode = "register"
+        }
+        if ($mode -eq "none") { return }
+
+        if ($mode -eq "ask") {
+            Write-Host ""
+            Write-Host $disclosure
+            Write-Host ""
+            $answer = Read-Host "Let coding agents send short feedback reports about neo4j-cli to Neo4j? [y/N]"
+            if ($answer -match '^(y|yes)$') {
+                & $Cli feedback enable --accept --rw | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    # Keep the command available while it is behind flag.feedback-command; delete with the flag.
+                    & $Cli config set flag.feedback-command true --rw *>$null
+                    Write-Ok "Agent feedback enabled. Turn it off any time with: neo4j-cli feedback disable"
+                } else {
+                    Write-Warn "Could not enable agent feedback. Run '$Cli feedback enable' to try again."
+                }
+            }
+            return
+        }
+
+        Write-Host ""
+        # `register` exits 0 even when no supported agent was found, so look at
+        # the agents it reports.
+        $registered = (& $Cli feedback register --rw --format json 2>$null) -join "`n"
+        if ($registered -match '"claude-code"|"codex"') {
+            Write-Host "Agent feedback is off. Registered the feedback tool for coding agents (it appears in your next Claude Code or Codex session): it sends nothing, and the first time an agent reports a problem with neo4j-cli you are asked to accept or decline. Remove it with: $Cli feedback disable"
+        } elseif ($registered -match 'registration failed') {
+            Write-Host "Agent feedback is off. A coding agent was found, but registering the feedback tool failed. Run '$Cli feedback register' to see why."
+            Write-Host "A person can turn feedback on with: $Cli feedback enable"
+        } else {
+            Write-Host "Agent feedback is off. The feedback tool was not registered: no supported coding agent was found (Claude Code and Codex are supported)."
+            Write-Host "A person can turn feedback on with: $Cli feedback enable"
+        }
+    } catch {
+        # A binary that cannot start (blocked, quarantined, wrong architecture)
+        # or a host that cannot prompt must never fail the install itself.
+        Write-Warn "Skipped agent feedback setup: $($_.Exception.Message)"
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
+# Test-NonInteractiveHost reports whether PowerShell was started with
+# -NonInteractive, where Read-Host throws even in a real console.
+function Test-NonInteractiveHost {
+    return [bool]([Environment]::GetCommandLineArgs() | Where-Object { $_ -match '^-noni' })
+}
+
 # -- Main ---------------------------------------------------------------------
 
 $Arch = Get-Arch
@@ -200,6 +288,10 @@ try {
             }
         }
     }
+
+    # -- Agent feedback -------------------------------------------------------
+    $CanAsk = [Environment]::UserInteractive -and -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected -and -not (Test-NonInteractiveHost)
+    Invoke-FeedbackSetup -Cli $Destination -Interactive $CanAsk
 
     Write-Host ""
     Write-Step "Questions or found a bug? https://github.com/neo4j-labs/neo4j-cli/issues"

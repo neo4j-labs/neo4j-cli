@@ -192,6 +192,77 @@ case "${NEO4J_CLI_AUTO_INSTALL_SKILL:-}" in
     ;;
 esac
 
+# ── Agent feedback (opt-in) ───────────────────
+# Offered only when this build ships `neo4j-cli feedback enable` (when the
+# command is absent, `neo4j-cli feedback --help` still exits 0 with the main
+# help, so look for enable's --accept flag). Enables nothing unless a person
+# types y at a terminal: there is no environment variable that answers for
+# them (only NEO4J_CLI_SKIP_FEEDBACK_PROMPT=1 to suppress the question), and
+# the default answer is No.
+#
+# `feedback enable` without --accept is the probe. It prints the disclosure and
+# exits 2 when a person could enable feedback; it prints nothing when the
+# person's settings switch feedback off (DO_NOT_TRACK=1, telemetry off) or the
+# build has no destination; and it exits 4 when it detects a coding agent,
+# because only a person may enable feedback. So:
+#   - disclosure and a terminal: ask the question;
+#   - disclosure and no terminal (CI, an agent without a terminal), or a
+#     detected agent even with a terminal: register the tool, which authorizes
+#     nothing, so the first report still gets a human decision;
+#   - otherwise: do nothing.
+if [ "${NEO4J_CLI_SKIP_FEEDBACK_PROMPT:-}" != "1" ] && [ "${DO_NOT_TRACK:-}" != "1" ] \
+   && "$INSTALLED_PATH" feedback enable --help 2>/dev/null | grep -q -e '--accept'; then
+  feedback_rc=0
+  # --rw: enable and register are writes, and without a terminal (or under an
+  # agent) the CLI refuses writes that lack it.
+  feedback_disclosure="$("$INSTALLED_PATH" feedback enable --rw 2>/dev/null)" || feedback_rc=$?
+  feedback_mode=none
+  if [ -n "$feedback_disclosure" ]; then
+    if [ -t 1 ] && [ -r /dev/tty ]; then feedback_mode=ask; else feedback_mode=register; fi
+  elif [ "$feedback_rc" -eq 4 ]; then
+    feedback_mode=register
+  fi
+
+  if [ "$feedback_mode" = ask ]; then
+    echo ""
+    printf "%s\n" "$feedback_disclosure"
+    echo ""
+    printf "%b" "${BOLD}Let coding agents send short feedback reports about neo4j-cli to Neo4j?${RESET} [y/N] "
+    read -r answer < /dev/tty || answer=""
+    case "${answer}" in
+      y|Y|yes|Yes|YES)
+        # --accept needs a person at a terminal, and stdin may be the curl pipe.
+        if "$INSTALLED_PATH" feedback enable --accept --rw </dev/tty >/dev/null; then
+          # Keep the command available after install while it is behind
+          # flag.feedback-command; delete this line with the flag.
+          "$INSTALLED_PATH" config set flag.feedback-command true --rw >/dev/null 2>&1 || true
+          success "Agent feedback enabled. Turn it off any time with: ${BOLD}neo4j-cli feedback disable${RESET}"
+        else
+          warn "Could not enable agent feedback. Run '${INSTALLED_PATH} feedback enable' to try again."
+        fi
+        ;;
+    esac
+  elif [ "$feedback_mode" = register ]; then
+    echo ""
+    # Say what actually happened: `register` exits 0 even when no supported
+    # agent was found, so look at the agents it reports.
+    reg_out="$("$INSTALLED_PATH" feedback register --rw --format json 2>/dev/null || true)"
+    if printf '%s' "$reg_out" | grep -q -e '"claude-code"' -e '"codex"'; then
+      # Registers the tool only. Nothing is sent until a person accepts the
+      # question the tool asks the first time an agent reports a problem.
+      info "Agent feedback is off. Registered the feedback tool for coding agents (it appears in your next Claude Code or Codex session): it sends nothing, and the first time an agent reports a problem with neo4j-cli you are asked to accept or decline. Remove it with: ${BOLD}${INSTALLED_PATH} feedback disable${RESET}"
+    elif printf '%s' "$reg_out" | grep -q 'registration failed'; then
+      # An agent was found but registering failed (for example a sandbox that
+      # cannot write the agent's config). Say so, and how to see the reason.
+      info "Agent feedback is off. A coding agent was found, but registering the feedback tool failed. Run '${INSTALLED_PATH} feedback register' to see why."
+      info "A person can turn feedback on with: ${BOLD}${INSTALLED_PATH} feedback enable${RESET}"
+    else
+      info "Agent feedback is off. The feedback tool was not registered: no supported coding agent was found (Claude Code and Codex are supported)."
+      info "A person can turn feedback on with: ${BOLD}${INSTALLED_PATH} feedback enable${RESET}"
+    fi
+  fi
+fi
+
 # ── PATH check ────────────────────────────────
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*)
