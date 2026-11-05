@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: The installed agent skill no longer refers to a nonexistent 'neo4j-cli query run' command when explaining the write-guard EXPLAIN preflight; the reference now names 'neo4j-cli query'.
+time: 2026-10-31T21:23:49.132959+01:00
