@@ -568,6 +568,12 @@ func TestRedactArgs_FeedbackSubmitMasksReportText(t *testing.T) {
 			"feedback submit *** *** *** ***"},
 		{"report text in a visible flag", []string{"feedback", "submit", "--category", text, "--request-id=" + text},
 			"feedback submit --category *** --request-id=***"},
+		{"report flag before the command words", []string{"feedback", "--observed", text, "submit", "--category", "other_friction"},
+			"feedback --observed *** submit --category other_friction"},
+		{"report flag equals form before feedback", []string{"--observed=" + text, "feedback", "submit"},
+			"--observed=*** feedback submit"},
+		{"report flag before feedback", []string{"--expected", text, "feedback", "--command", "x", "submit"},
+			"--expected *** feedback --command *** submit"},
 		{"help stays readable", []string{"feedback", "submit", "--help"},
 			"feedback submit --help"},
 	} {
