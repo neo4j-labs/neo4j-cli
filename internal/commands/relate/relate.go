@@ -48,6 +48,7 @@ neo4j-cli relate delete movies --yes --force`,
 	cmd.AddCommand(newDeleteCmd(cfg))
 	cmd.AddCommand(newInfoCmd(cfg))
 	cmd.AddCommand(newListCmd(cfg))
+	cmd.AddCommand(newPullCmd(cfg))
 
 	return cmd
 }
