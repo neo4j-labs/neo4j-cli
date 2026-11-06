@@ -267,7 +267,7 @@ Two behaviours worth knowing before you reach for them:
 
 ## Local Neo4j
 
-Two ways to run Neo4j locally from the CLI: drive a [Neo4j Desktop 2](https://neo4j.com/download/) install via its local relate API, or shell out to `docker`.
+Three ways to run Neo4j locally from the CLI: drive a [Neo4j Desktop 2](https://neo4j.com/download/) install via its local relate API, shell out to `docker`, or open a local embedded [Relate](#relate-embedded) store (no server at all).
 
 ### Neo4j Desktop
 
@@ -377,6 +377,46 @@ Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME`
 
 `--env-out-file` writes via a temp file in the target's directory and atomically renames it into place; a pre-existing symlink at the path is replaced by a regular file (the symlink is not followed). Use a non-symlink target if you rely on the path being a symlink.
 
+## Relate (embedded)
+
+`neo4j-cli relate` manages local [Relate](https://github.com/relatedb/relate) graph stores — the embedded openCypher engine (formerly CypherLite). A store is a directory holding one graph database: no server, no ports, no credentials. Stores are created under the CLI's managed directory when you pass a bare name, or at any path you give.
+
+> **Build note:** the embedded engine is compiled in behind the `relate` build tag (`go build -tags relate` with CGO_ENABLED=1, plus a Relate checkout with its FFI library — see [Developing and contributing](#developing-and-contributing)). In a stock build the engine-touching commands parse and fail with a typed "not compiled into this build" error; `relate list` and `relate delete` (pure filesystem work) work everywhere.
+
+```bash
+# Create a store, populate and query it via `query --relate` (writes need --rw)
+neo4j-cli relate create movies
+neo4j-cli query 'CREATE (:Movie {title: "The Matrix"}) RETURN 1' --relate movies --rw
+
+# List managed stores; inspect one (engine version, counts, labels)
+neo4j-cli relate list
+neo4j-cli relate info movies
+
+# Delete a store (destructive: --yes --force when scripted)
+neo4j-cli relate delete movies --yes --force
+```
+
+`query --relate <name-or-path>` switches the query command to the embedded backend — no Bolt connection is opened (`--uri`/`--username`/`--password`/`--database`/`--credential` are mutually exclusive with it). Everything else works as with a server: parameters, `--atomic`, `--continue-on-error`, `:schema`, output formats, and the `--rw` write guard. `--relate-namespace` selects the session namespace (`neo4j`, `system`, `system_ontologies`).
+
+### Pull a subgraph from a server
+
+`relate pull <name-or-path> --query '...'` streams a subgraph from a remote Neo4j over Bolt (same connection flags as `query`) and upserts it into the local store — created when missing. The query must return nodes, relationships or paths (e.g. `MATCH (a)-[r:ACTED_IN]->(m) RETURN a, r, m`); scalar-only results are refused. Entities are keyed by source identity, so a repeated pull updates in place instead of duplicating (a `pull-identity.json` sidecar beside the store carries the mapping per source). Relationships whose endpoints are not part of the pull are skipped and reported. The store is checkpointed after a successful pull.
+
+```bash
+neo4j-cli relate pull movies --credential local \
+  --query 'MATCH (a:Person)-[r:ACTED_IN]->(m:Movie) RETURN a, r, m'
+```
+
+### Push a subgraph to a server
+
+`relate push <name-or-path>` is the reverse direction: it upserts the local store's subgraph into a remote Neo4j. Nodes MERGE on their label's identity key — the remote's single-property uniqueness constraint, or an explicit `--merge-key Label.property` override. A label in scope without a key is refused (`--dry-run` reports it instead). Relationships MATCH endpoints by those keys and MERGE on the (start, type, end) pattern — pass `--rel-key property` when multiple relationships of one type can exist between the same pair. The push is additive: nothing is deleted. Scope with `--labels`/`--types`; `--batch-size` bounds rows per remote statement.
+
+```bash
+# Preview, then push the whole store
+neo4j-cli relate push movies --uri neo4j://localhost:7687 -u neo4j -p '<pw>' --dry-run
+neo4j-cli relate push movies --uri neo4j://localhost:7687 -u neo4j -p '<pw>'
+```
+
 ## Example datasets
 
 `neo4j-cli` can load published example Neo4j datasets into a local Docker container, a Neo4j Desktop 2 DBMS, or a new Aura instance. A dataset is any GitHub `<owner>/<repo>` carrying a `relate.project-install.json` manifest — the CLI resolves the manifest, downloads the matching `.dump`, and loads it.
@@ -455,6 +495,8 @@ Flags, env vars, and `.env` files are optional overrides — useful for one-offs
 | Database | `--database` | `NEO4J_DATABASE` | `neo4j`                   |
 
 `http://` and `https://` URIs are auto-rewritten to `neo4j://<host>:7687` and `neo4j+s://<host>:7687` respectively (path/query stripped). For self-signed certs use `neo4j+ssc://`.
+
+To query a local embedded Relate store instead of a server, pass `--relate <name-or-path>` (mutually exclusive with the connection flags above) — see [Relate (embedded)](#relate-embedded).
 
 Pass parameters with `--param key=value` (repeatable). Values that parse as JSON are typed; everything else is a string:
 
