@@ -7,6 +7,9 @@ import (
 	"bytes"
 	"context"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -80,6 +83,7 @@ type fakeStore struct {
 	statements      []string
 	checkpoints     int
 	closed          bool
+	created         int
 	respond         func(stmt string) (relate.StatementResult, error)
 }
 
@@ -88,7 +92,19 @@ func (f *fakeStore) Run(statements []string, params map[string]any, atomic bool)
 	results := make([]relate.StatementResult, 0, len(statements))
 	for _, stmt := range statements {
 		if f.respond == nil {
-			results = append(results, relate.StatementResult{})
+			// Default responder: identity-capturing statements (the pull
+			// materializer's CREATE ... RETURN elementId ...) get synthetic
+			// local ids extracted from the inlined src literals; everything
+			// else answers empty.
+			res := relate.StatementResult{Rows: [][]any{}}
+			if strings.Contains(stmt, "RETURN elementId") {
+				res.Columns = []string{"eid", "src"}
+				for _, m := range srcLiteralPattern.FindAllStringSubmatch(stmt, -1) {
+					f.created++
+					res.Rows = append(res.Rows, []any{"local-" + strconv.Itoa(f.created), m[1]})
+				}
+			}
+			results = append(results, res)
 			continue
 		}
 		res, err := f.respond(stmt)
@@ -99,6 +115,10 @@ func (f *fakeStore) Run(statements []string, params map[string]any, atomic bool)
 	}
 	return results, nil
 }
+
+// srcLiteralPattern extracts the inlined `src: '...'` identities from a
+// materializer statement.
+var srcLiteralPattern = regexp.MustCompile(`src: '([^']*)'`)
 
 func (f *fakeStore) Checkpoint() error {
 	f.checkpoints++
