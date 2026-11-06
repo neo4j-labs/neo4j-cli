@@ -66,4 +66,16 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+// Relate (embedded openCypher engine, formerly CypherLite) — imported only
+// behind the `relate` build tag (+ CGO_ENABLED=1); untagged builds never
+// import it, so the module graph of a default build is unchanged. The client
+// module has no tagged release yet, so tagged builds need the `replace` to a
+// local Relate checkout. The relative path expects the checkout as a sibling
+// directory named `cypherlite` (the pre-rename clone name); consuming the
+// published relate-ffi-<triple>.tar.gz (RELATE-INTEGRATION.md §4.5) removes
+// this machine-local dependency. Drop both lines once Relate tags a release.
+require github.com/relatedb/relate/clients/go v0.16.1
+
+replace github.com/relatedb/relate/clients/go => ../cypherlite/clients/go
+
 tool go.uber.org/mock/mockgen
