@@ -215,6 +215,13 @@ mcp tool	deny
 query	allow
 query :embed	allow
 query :schema	allow
+relate	allow
+relate create	write
+relate delete	write
+relate info	allow
+relate list	allow
+relate pull	write
+relate push	write
 skill	allow
 skill check	allow
 skill install	write

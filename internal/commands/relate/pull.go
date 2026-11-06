@@ -50,17 +50,18 @@ func newPullCmd(cfg *clicfg.Config) *cobra.Command {
 			"literals, so smaller batches mean smaller statements). The store is checkpointed after a " +
 			"successful pull. Requires a build with the Relate engine (-tags relate).",
 		Example: `# Pull the Person subgraph from a local Neo4j into a managed store
-neo4j-cli relate pull people --uri neo4j://localhost:7687 -u neo4j -p pw \\
+neo4j-cli relate pull people --rw --uri neo4j://localhost:7687 -u neo4j -p pw \\
   --query "MATCH (n:Person) RETURN n"
 
 # Pull a labeled neighborhood with relationships, using a stored credential
-neo4j-cli relate pull movies --credential local \\
+neo4j-cli relate pull movies --rw --credential local \\
   --query "MATCH (a:Person)-[r:ACTED_IN]->(m:Movie) RETURN a, r, m"
 
 # Pull with parameters and a smaller write batch
-neo4j-cli relate pull recent --uri neo4j://localhost:7687 -u neo4j -p pw \\
+neo4j-cli relate pull recent --rw --uri neo4j://localhost:7687 -u neo4j -p pw \\
   --query "MATCH (n:Event) WHERE n.date > $since RETURN n" --param since=\"2026-01-01\" --batch-size 100`,
-		Args: cobra.ExactArgs(1),
+		Annotations: map[string]string{"write": "true"},
+		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return runPull(cmd, cfg, args[0])

@@ -40,19 +40,20 @@ func newPushCmd(cfg *clicfg.Config) *cobra.Command {
 			"keys, counts, batches — without touching the remote. Requires a build with the Relate engine " +
 			"(-tags relate).",
 		Example: `# Push the whole store into a local Neo4j (nodes MERGE on remote unique constraints)
-neo4j-cli relate push movies --uri neo4j://localhost:7687 -u neo4j -p pw
+neo4j-cli relate push movies --rw --uri neo4j://localhost:7687 -u neo4j -p pw
 
 # Push one label with an explicit merge key
-neo4j-cli relate push movies --uri neo4j://localhost:7687 -u neo4j -p pw \\
+neo4j-cli relate push movies --rw --uri neo4j://localhost:7687 -u neo4j -p pw \\
   --labels Person --merge-key Person.email
 
 # Preview what a push would do
-neo4j-cli relate push movies --uri neo4j://localhost:7687 -u neo4j -p pw --dry-run
+neo4j-cli relate push movies --rw --uri neo4j://localhost:7687 -u neo4j -p pw --dry-run
 
 # Push only some labels and relationship types, keyed rels
-neo4j-cli relate push movies --credential local \\
+neo4j-cli relate push movies --rw --credential local \\
   --labels Person,Movie --types ACTED_IN --rel-key roles`,
-		Args: cobra.ExactArgs(1),
+		Annotations: map[string]string{"write": "true"},
+		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return runPush(cmd, cfg, args[0])
