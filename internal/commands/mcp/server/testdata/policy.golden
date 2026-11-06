@@ -204,6 +204,8 @@ feedback submit	deny
 history	allow
 history clear	deny
 history list	allow
+k8s	deny
+k8s doctor	deny
 mcp	deny
 mcp bundle	deny
 mcp check	deny

@@ -180,6 +180,7 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 
 ## Subsystem Notes
 
+- **k8s** (`internal/k8s` engine + `internal/commands/k8s` surface, behind `flag.k8s-commands`) — shells to host `kubectl`/`helm` exactly as the docker engine shells to `docker`; NO `k8s.io/*`, `sigs.k8s.io/*` or `helm.sh/*` import anywhere. Helm 4 dropped `helm version -o json` — the engine uses `version --short`.
 - **query** — Bolt driver, execution, creds, embedding providers: [`.agents/query.md`](.agents/query.md).
 - **dataset** (`internal/dataset/`) — no semver-range lib; `version.go` hand-rolls npm-style comparator-set matcher (`rangeMatches`/`canonicalVersion`); `rawBaseURL`/`httpDoFn` are httptest seams. Dumps come as REGULAR Git blob (raw serves bytes) OR Git-LFS (raw serves pointer, bytes on media host) — `download.go` fetches raw, sniffs `version https://git-lfs`, falls back to media; don't revert to media-only. **Resolver**: calver (2025.x/2026.x) continues the 5.x line — `Resolve` treats calver target OR `"latest"` as matching dumps with lower bound `>=5.0.0`; concrete targets keep exact matching; `canonicalVersion` strips leading zeros (calver months zero-padded).
 - **desktopclient mDNS** (`discovery_mdns.go`) — `mdns.QueryContext` honors caller's `params.Entries`; silence socket warnings via `params.Logger = log.New(io.Discard,...)`; keep all mDNS imports + macOS `dns-sd` exec isolated to this file.

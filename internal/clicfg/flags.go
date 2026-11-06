@@ -58,6 +58,14 @@ var Registry = map[string]Flag{
 		IntroducedIn:     "1.18.0",
 		RemovalCondition: "GA of agent feedback after the early-access trial: this entry, the gated branch in app.go, the flag passed in the Codex registration and the installers' `config set flag.feedback-command` are deleted in the same PR.",
 	},
+	"flag.k8s-commands": {
+		Name:             "flag.k8s-commands",
+		Default:          false,
+		Owner:            "neo4j-cli-workinggroup",
+		Gates:            "the neo4j-cli k8s command group — manage Neo4j on Kubernetes through the open-source Neo4j Kubernetes operator (milestone 1 preview: doctor, operator lifecycle, instance lifecycle, connect and credentials)",
+		IntroducedIn:     "1.20.0",
+		RemovalCondition: "GA of the k8s group: this entry and the gated branch in app.go are deleted in the same PR, after backup and restore land and the flag is promoted.",
+	},
 }
 
 // FlagSet wraps the runtime override surface (env vars + config file via viper)
