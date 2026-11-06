@@ -129,8 +129,9 @@ func convertError(err error) error {
 // convertResult snapshots one client Result into the driver-free
 // StatementResult: columns as-is, rows converted cell by cell into the CLI's
 // cell model (dbtype graph entities and containers; the query package's
-// coercion layer owns display formatting), the query type and bookmark, and
-// the plan tree when the statement carried one.
+// coercion layer owns display formatting), the query type and bookmark, the
+// mutation counters (zeros included on every result), and the plan tree when
+// the statement carried one.
 func convertResult(res *relateclient.Result) StatementResult {
 	out := StatementResult{
 		Columns:   res.Columns,
@@ -138,6 +139,19 @@ func convertResult(res *relateclient.Result) StatementResult {
 		QueryType: QueryType(res.QueryType),
 		Bookmark:  res.Bookmark,
 		Plan:      convertPlan(res.Plan),
+		Stats: StatementStats{
+			NodesCreated:         res.Stats.NodesCreated,
+			NodesDeleted:         res.Stats.NodesDeleted,
+			RelationshipsCreated: res.Stats.RelationshipsCreated,
+			RelationshipsDeleted: res.Stats.RelationshipsDeleted,
+			PropertiesSet:        res.Stats.PropertiesSet,
+			LabelsAdded:          res.Stats.LabelsAdded,
+			LabelsRemoved:        res.Stats.LabelsRemoved,
+			IndexesAdded:         res.Stats.IndexesAdded,
+			IndexesRemoved:       res.Stats.IndexesRemoved,
+			ConstraintsAdded:     res.Stats.ConstraintsAdded,
+			ConstraintsRemoved:   res.Stats.ConstraintsRemoved,
+		},
 	}
 	for i, row := range res.Rows {
 		r := make([]any, len(row))

@@ -88,6 +88,7 @@ func runRelateBatch(c *conn, statements []string, params map[string]any) ([]*que
 	for i, r := range results {
 		resp := &queryResponse{
 			QueryType: mapRelateQueryType(r.QueryType),
+			Counters:  relateCounters{stats: r.Stats},
 		}
 		resp.Data.Fields = r.Columns
 		resp.Data.Values = r.Rows
@@ -125,6 +126,42 @@ func isExplainPrefixed(stmt string) bool {
 	mode, _ := executionMode(stmt)
 	return mode == "EXPLAIN"
 }
+
+// relateCounters adapts the engine's mutation counters onto the driver's
+// Counters interface so statsFromCounters snapshots them exactly as it does a
+// Bolt summary — the embedded path then shares the whole stats surface (the
+// table-mode "N nodes created, …" lines and the JSON/TOON envelope's stats
+// object) with no backend-specific rendering. The engine reports the canonical
+// 11 counters with zeros included on every result; it has no system-database
+// updates, so the system counters stay zero. An all-zero result (a read, an
+// EXPLAIN, a no-op write) reports ContainsUpdates() == false, which
+// statsFromCounters turns into a nil writeStats so read output stays
+// byte-identical with the Bolt path.
+type relateCounters struct {
+	stats relate.StatementStats
+}
+
+func (c relateCounters) ContainsUpdates() bool {
+	return c.NodesCreated() > 0 || c.NodesDeleted() > 0 ||
+		c.RelationshipsCreated() > 0 || c.RelationshipsDeleted() > 0 ||
+		c.PropertiesSet() > 0 || c.LabelsAdded() > 0 || c.LabelsRemoved() > 0 ||
+		c.IndexesAdded() > 0 || c.IndexesRemoved() > 0 ||
+		c.ConstraintsAdded() > 0 || c.ConstraintsRemoved() > 0
+}
+func (c relateCounters) ContainsSystemUpdates() bool { return false }
+func (c relateCounters) SystemUpdates() int          { return 0 }
+
+func (c relateCounters) NodesCreated() int         { return int(c.stats.NodesCreated) }
+func (c relateCounters) NodesDeleted() int         { return int(c.stats.NodesDeleted) }
+func (c relateCounters) RelationshipsCreated() int { return int(c.stats.RelationshipsCreated) }
+func (c relateCounters) RelationshipsDeleted() int { return int(c.stats.RelationshipsDeleted) }
+func (c relateCounters) PropertiesSet() int        { return int(c.stats.PropertiesSet) }
+func (c relateCounters) LabelsAdded() int          { return int(c.stats.LabelsAdded) }
+func (c relateCounters) LabelsRemoved() int        { return int(c.stats.LabelsRemoved) }
+func (c relateCounters) IndexesAdded() int         { return int(c.stats.IndexesAdded) }
+func (c relateCounters) IndexesRemoved() int       { return int(c.stats.IndexesRemoved) }
+func (c relateCounters) ConstraintsAdded() int     { return int(c.stats.ConstraintsAdded) }
+func (c relateCounters) ConstraintsRemoved() int   { return int(c.stats.ConstraintsRemoved) }
 
 // mapRelateQueryType converts the engine's statement classification onto the
 // driver's QueryType vocabulary the --rw classifier compares against:

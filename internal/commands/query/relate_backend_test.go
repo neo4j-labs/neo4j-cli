@@ -327,3 +327,83 @@ func TestMapRelateQueryType(t *testing.T) {
 	assert.Equal(t, neo4j.QueryTypeReadWrite, mapRelateQueryType(relate.QueryTypeReadWrite))
 	assert.Equal(t, neo4j.QueryTypeSchemaWrite, mapRelateQueryType(relate.QueryTypeSchema))
 }
+
+func TestRelateCounters(t *testing.T) {
+	zero := relateCounters{stats: relate.StatementStats{}}
+	assert.False(t, zero.ContainsUpdates())
+	assert.Nil(t, statsFromCounters(zero), "all-zero counters must yield a nil writeStats")
+	assert.False(t, zero.ContainsSystemUpdates())
+	assert.Equal(t, 0, zero.SystemUpdates())
+
+	c := relateCounters{stats: relate.StatementStats{
+		NodesCreated:       2,
+		ConstraintsRemoved: 1,
+	}}
+	assert.True(t, c.ContainsUpdates())
+	got := statsFromCounters(c)
+	require.NotNil(t, got)
+	assert.Equal(t, &writeStats{NodesCreated: 2, ConstraintsRemoved: 1}, got)
+}
+
+func TestRunQueryRelate_WriteStatsRendered(t *testing.T) {
+	writeResult := func() relate.StatementResult {
+		return relate.StatementResult{
+			Columns:   []string{"n"},
+			Rows:      [][]any{{"node"}},
+			QueryType: relate.QueryTypeReadWrite,
+			Stats: relate.StatementStats{
+				NodesCreated:         2,
+				RelationshipsCreated: 1,
+				PropertiesSet:        3,
+				LabelsAdded:          2,
+			},
+		}
+	}
+
+	t.Run("json envelope carries the stats object", func(t *testing.T) {
+		f := &fakeRelateStore{respond: func(string) (relate.StatementResult, error) {
+			return writeResult(), nil
+		}}
+		installFakeStore(t, f)
+
+		h := newRunHarness(t, "json")
+		err := h.execute(t, "--rw", "--relate=/tmp/store", "CREATE (n)")
+		require.NoError(t, err)
+
+		var decoded struct {
+			Stats map[string]int `json:"stats"`
+		}
+		require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &decoded))
+		assert.Equal(t, map[string]int{
+			"nodes_created":         2,
+			"relationships_created": 1,
+			"properties_set":        3,
+			"labels_added":          2,
+		}, decoded.Stats)
+	})
+
+	t.Run("read envelope omits stats", func(t *testing.T) {
+		f := &fakeRelateStore{respond: func(string) (relate.StatementResult, error) {
+			return resultOf([]string{"name"}, [][]any{{"Ada"}}), nil
+		}}
+		installFakeStore(t, f)
+
+		h := newRunHarness(t, "json")
+		err := h.execute(t, "--relate=/tmp/store", "MATCH (n) RETURN n.name AS name")
+		require.NoError(t, err)
+		assert.NotContains(t, h.stdout.String(), "stats")
+	})
+
+	t.Run("table mode prints the stats line", func(t *testing.T) {
+		f := &fakeRelateStore{respond: func(string) (relate.StatementResult, error) {
+			return writeResult(), nil
+		}}
+		installFakeStore(t, f)
+
+		h := newRunHarness(t, "table")
+		err := h.execute(t, "--rw", "--relate=/tmp/store", "CREATE (n)")
+		require.NoError(t, err)
+		assert.Contains(t, h.stdout.String(),
+			"2 nodes created, 1 relationship created, 3 properties set, 2 labels added")
+	})
+}
