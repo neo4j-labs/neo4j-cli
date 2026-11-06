@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add `relate push <name-or-path>`: push a local embedded Relate store''s subgraph into a remote Neo4j over Bolt (same connection flags as `query`). Nodes MERGE on their label''s identity key — the remote''s single-property uniqueness constraint (SHOW CONSTRAINTS) or an explicit `--merge-key Label.property` override; a label in scope without a key is refused. Relationships MATCH endpoints by those keys and MERGE on the (start, type, end) pattern, or on `--rel-key property` for multiple rels of one type between the same pair. Additive: nothing is deleted; properties are replaced wholesale. Scope with --labels/--types; --batch-size bounds rows per remote statement (default 500); --dry-run prints the plan without writing. Relationship rows whose endpoints do not exist remotely are reported as unmatched'
+time: 2026-11-06T13:00:00+00:00
