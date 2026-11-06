@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add `relate pull <name-or-path>`: stream a subgraph from a remote Neo4j over Bolt (same connection flags as `query`: --uri/--username/--password/--database/--credential/--env) into a local embedded Relate store, created when missing. The --query must return nodes, relationships or paths; entities are upserted by source identity (a persisted pull-identity.json sidecar makes repeated pulls update in place instead of duplicating; properties replaced wholesale); relationships whose endpoints are not part of the pull are skipped and reported. Flags keep Relate’s names: --query (required), --param, --batch-size (default 500). The store is checkpointed after a successful pull'
+time: 2026-11-06T12:50:00+00:00
