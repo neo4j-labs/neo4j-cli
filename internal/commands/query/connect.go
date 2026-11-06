@@ -18,6 +18,7 @@ import (
 	"github.com/neo4j/cli/internal/dbconn"
 	commondebug "github.com/neo4j/cli/internal/debug"
 	commonoutput "github.com/neo4j/cli/internal/output"
+	"github.com/neo4j/cli/internal/relate"
 )
 
 // conn holds the resolved Neo4j connection details. The opened Bolt driver
@@ -25,9 +26,15 @@ import (
 // resolved or prompted. Callers MUST close the driver via defer once they are
 // done using the connection. TLS is selected exclusively by the URI scheme
 // (e.g. neo4j+s:// for verified TLS, neo4j+ssc:// for self-signed certs).
+//
+// When relateStore is non-nil (--relate) the connection targets a local
+// embedded Relate store instead of a server: no driver is opened, no
+// password is resolved, and execution routes through the embedded backend
+// (see relate_backend.go). The caller closes the store instead of a driver.
 type conn struct {
 	dbconn.Conn
-	driver neo4j.Driver
+	driver      neo4j.Driver
+	relateStore relate.Store
 }
 
 // queryResult is the parsed tabular payload of a successful Cypher run. The
@@ -269,7 +276,13 @@ var runStatementsResponseFn = runStatementsResponseImpl
 // NOT hold an open driver — callers should fill in the password (prompt if
 // needed) and then call c.openDriver(ctx) before issuing queries, and defer
 // c.driver.Close(ctx) for cleanup.
+//
+// When --relate selects the embedded backend, resolveRelateConn replaces
+// this resolution entirely (no server connection is consulted).
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
+	if relateTarget(cmd) {
+		return resolveRelateConn(cmd, cfg)
+	}
 	base, err := dbconn.ResolveConn(cmd, cfg, false)
 	if err != nil {
 		return nil, err
@@ -315,7 +328,7 @@ func (c *conn) openDriver() error {
 func runStatementResponse(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
 	resp, err := runStatementResponseFn(ctx, c, statement, params, readOnly)
 	if err != nil {
-		return nil, categorizeBoltError(err)
+		return nil, categorizeQueryError(c, err)
 	}
 	return resp, nil
 }
@@ -380,7 +393,7 @@ func runStatementWithMode(ctx context.Context, c *conn, statement string, params
 func runStatementsResponse(ctx context.Context, c *conn, statements []string, params map[string]any, readOnly bool) ([]*queryResponse, error) {
 	resps, err := runStatementsResponseFn(ctx, c, statements, params, readOnly)
 	if err != nil {
-		return nil, categorizeBoltError(err)
+		return nil, categorizeQueryError(c, err)
 	}
 	return resps, nil
 }
@@ -407,6 +420,12 @@ func runStatementsResponse(ctx context.Context, c *conn, statements []string, pa
 func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string, params map[string]any, readOnly bool) ([]*queryResponse, error) {
 	if c == nil {
 		return nil, errors.New("query: nil connection")
+	}
+	// The embedded backend (--relate) replaces the Bolt execution below; the
+	// readOnly flag is its no-op (the --rw guard is the EXPLAIN preflight,
+	// which flows through here as a read-only batch-of-one like any other).
+	if c.relateStore != nil {
+		return runRelateBatch(c, statements, params)
 	}
 	if c.driver == nil {
 		return nil, errors.New("query: connection driver not opened (call openDriver first)")

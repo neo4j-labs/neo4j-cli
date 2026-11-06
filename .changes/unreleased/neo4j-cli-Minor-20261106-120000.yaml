@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add `query --relate <path>` to run Cypher against a local embedded Relate graph store instead of a server (store created when missing; `--relate-namespace` selects the neo4j/system/system_ontologies session namespace; works with `query :schema`, `--param`, `--atomic` and `--continue-on-error`). Requires a build with the Relate engine (`-tags relate`); mutually exclusive with --uri/--username/--password/--database/--credential'
+time: 2026-11-06T12:00:00+00:00

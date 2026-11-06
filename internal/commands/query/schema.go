@@ -113,20 +113,25 @@ func runSchema(cmd *cobra.Command, cfg *clicfg.Config) error {
 		return err
 	}
 
-	if c.Password == "" {
-		pw, err := promptPassword(cmd, cfg)
-		if err != nil {
-			return err
-		}
-		c.Password = pw
-	}
-
 	ctx := cmd.Context()
 
-	if err := c.openDriver(); err != nil {
-		return err
+	if c.relateStore != nil {
+		// Embedded backend: no password, no driver; the store owns cleanup.
+		defer c.relateStore.Close()
+	} else {
+		if c.Password == "" {
+			pw, err := promptPassword(cmd, cfg)
+			if err != nil {
+				return err
+			}
+			c.Password = pw
+		}
+
+		if err := c.openDriver(); err != nil {
+			return err
+		}
+		defer c.driver.Close(ctx) //nolint:errcheck // driver close error not actionable in defer
 	}
-	defer c.driver.Close(ctx) //nolint:errcheck // driver close error not actionable in defer
 
 	nodes, err := fetchNodeProperties(ctx, c)
 	if err != nil {
