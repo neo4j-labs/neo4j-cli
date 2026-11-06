@@ -53,6 +53,9 @@ func resolveKubectl() (string, error) {
 	if err != nil {
 		return "", kubectlMissingErr()
 	}
+	if err := validateBinaryFn("kubectl", path); err != nil {
+		return "", err
+	}
 	return path, nil
 }
 
@@ -62,6 +65,9 @@ func resolveHelm() (string, error) {
 	path, err := helmLookPathFn("helm")
 	if err != nil {
 		return "", helmMissingErr()
+	}
+	if err := validateBinaryFn("helm", path); err != nil {
+		return "", err
 	}
 	return path, nil
 }

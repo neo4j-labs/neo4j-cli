@@ -39,6 +39,15 @@ func SetHelmLookPathForTest(t *testing.T, fn func(string) (string, error)) {
 	t.Cleanup(func() { helmLookPathFn = prev })
 }
 
+// SetValidateBinaryForTest replaces the binary-validation seam. Tests whose
+// lookPath stub returns a fake path use it to skip the real filesystem rules.
+func SetValidateBinaryForTest(t *testing.T, fn func(name, path string) error) {
+	t.Helper()
+	prev := validateBinaryFn
+	validateBinaryFn = fn
+	t.Cleanup(func() { validateBinaryFn = prev })
+}
+
 // SetRunFnForTest replaces the process-execution seam. Engine tests use it
 // to capture the argv the engine builds and return canned output without
 // spawning a process.

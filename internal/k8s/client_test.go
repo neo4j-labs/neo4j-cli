@@ -37,11 +37,13 @@ func captureRun(t *testing.T, results []runResult) *[]call {
 	return calls
 }
 
-// stubLookPath points both lookPath seams at a fake binary path.
+// stubLookPath points both lookPath seams at a fake binary path. The fake
+// path does not exist, so the validation seam accepts it unconditionally.
 func stubLookPath(t *testing.T) {
 	t.Helper()
 	SetKubectlLookPathForTest(t, func(string) (string, error) { return "/usr/local/bin/fake-kubectl", nil })
 	SetHelmLookPathForTest(t, func(string) (string, error) { return "/usr/local/bin/fake-helm", nil })
+	SetValidateBinaryForTest(t, func(string, string) error { return nil })
 }
 
 // missingLookPath makes both lookPath seams report a missing binary.
