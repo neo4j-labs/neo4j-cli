@@ -68,18 +68,23 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		return err
 	}
 
-	if c.Password == "" {
-		pw, err := promptPassword(cmd, cfg)
-		if err != nil {
+	if c.relateStore != nil {
+		// Embedded backend: no password, no driver; the store owns cleanup.
+		defer c.relateStore.Close()
+	} else {
+		if c.Password == "" {
+			pw, err := promptPassword(cmd, cfg)
+			if err != nil {
+				return err
+			}
+			c.Password = pw
+		}
+
+		if err := c.openDriver(); err != nil {
 			return err
 		}
-		c.Password = pw
+		defer c.driver.Close(cmd.Context()) //nolint:errcheck // driver close error not actionable in defer
 	}
-
-	if err := c.openDriver(); err != nil {
-		return err
-	}
-	defer c.driver.Close(cmd.Context()) //nolint:errcheck // driver close error not actionable in defer
 
 	statements := splitStatements(cypher)
 
