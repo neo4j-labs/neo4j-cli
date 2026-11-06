@@ -41,13 +41,32 @@ const (
 // entities and containers, ISO-formatted temporals are NOT applied here; the
 // query package's coercion layer owns display conversion), the classification
 // the --rw guard inspects, the bookmark when the statement committed
-// something, and the EXPLAIN/PROFILE plan tree when the statement carried one.
+// something, the EXPLAIN/PROFILE plan tree when the statement carried one,
+// and the statement's mutation counters.
 type StatementResult struct {
 	Columns   []string
 	Rows      [][]any
 	QueryType QueryType
 	Bookmark  string
 	Plan      *Plan
+	Stats     StatementStats
+}
+
+// StatementStats is a statement's mutation counters: the canonical 11, zeros
+// included — every counter is always present, so a read, an EXPLAIN (nothing
+// executes) or a no-op write reports all zeros, never a missing field.
+type StatementStats struct {
+	NodesCreated         int64
+	NodesDeleted         int64
+	RelationshipsCreated int64
+	RelationshipsDeleted int64
+	PropertiesSet        int64
+	LabelsAdded          int64
+	LabelsRemoved        int64
+	IndexesAdded         int64
+	IndexesRemoved       int64
+	ConstraintsAdded     int64
+	ConstraintsRemoved   int64
 }
 
 // Plan is the driver-free snapshot of a statement's EXPLAIN or PROFILE plan

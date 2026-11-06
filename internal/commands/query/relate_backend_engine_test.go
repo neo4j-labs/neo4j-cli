@@ -69,3 +69,38 @@ func TestRelateEngineEndToEnd_WriteReadSchema(t *testing.T) {
 	require.True(t, ok, "schema JSON must carry a nodes array")
 	require.NotEmpty(t, nodes)
 }
+
+func TestRelateEngineEndToEnd_WriteStats(t *testing.T) {
+	store := filepath.Join(t.TempDir(), "stats")
+
+	// Table mode: the write prints the cypher-shell style line after the table.
+	h := newRunHarness(t, "table")
+	err := h.execute(t, "--rw", "--relate="+store,
+		"CREATE (a:Person {name: 'Ada'})-[:KNOWS]->(b:Person {name: 'Bob'})")
+	require.NoError(t, err)
+	out := h.stdout.String()
+	assert.Contains(t, out, "2 nodes created")
+	assert.Contains(t, out, "1 relationship created")
+
+	// JSON mode: the envelope carries the stats object with the non-zero counters.
+	h2 := newRunHarness(t, "json")
+	err = h2.execute(t, "--rw", "--relate="+store,
+		"CREATE (c:Person {name: 'Cyd'})")
+	require.NoError(t, err)
+
+	var decoded struct {
+		Stats map[string]int `json:"stats"`
+	}
+	require.NoError(t, json.Unmarshal(h2.stdout.Bytes(), &decoded))
+	assert.Equal(t, map[string]int{
+		"nodes_created":  1,
+		"properties_set": 1,
+		"labels_added":   1,
+	}, decoded.Stats)
+
+	// A read emits no stats at all.
+	h3 := newRunHarness(t, "json")
+	err = h3.execute(t, "--relate="+store, "MATCH (p:Person) RETURN count(p) AS c")
+	require.NoError(t, err)
+	assert.NotContains(t, h3.stdout.String(), "stats")
+}

@@ -215,3 +215,22 @@ func mustWriteStore(t *testing.T) string {
 	s.Close()
 	return path
 }
+
+func TestEngineStats(t *testing.T) {
+	s := openTestStore(t)
+
+	res, err := s.Run([]string{"RETURN 1 AS one"}, nil, false)
+	require.NoError(t, err)
+	assert.Equal(t, StatementStats{}, res[0].Stats, "a read reports all-zero counters")
+
+	res, err = s.Run([]string{
+		"CREATE (a:Person {name: 'Ada'})-[:KNOWS]->(b:Person {name: 'Bob'})",
+	}, nil, false)
+	require.NoError(t, err)
+	assert.Equal(t, StatementStats{
+		NodesCreated:         2,
+		RelationshipsCreated: 1,
+		PropertiesSet:        2,
+		LabelsAdded:          2,
+	}, res[0].Stats)
+}
