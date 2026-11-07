@@ -47,6 +47,32 @@ type Client interface {
 	// for example "v4.1.1+g5caf004". Helm 4 removed the -o json flag, and
 	// --short works on every helm 3 and 4 release.
 	HelmVersion(ctx context.Context) (string, error)
+
+	// ApplyCRDs server-side applies the operator CRD manifest at source (the
+	// release asset URL or a local path) with the neo4j-cli field manager,
+	// and returns the CRD names kubectl reported.
+	ApplyCRDs(ctx context.Context, source string) ([]string, error)
+	// DeleteCRDs deletes the four operator CRDs by name and returns the ones
+	// kubectl reported deleting. Already-absent CRDs are not an error.
+	DeleteCRDs(ctx context.Context) ([]string, error)
+	// HelmUpgrade runs `helm upgrade` for the operator release.
+	HelmUpgrade(ctx context.Context, opts HelmUpgradeOptions) error
+	// HelmUninstall runs `helm uninstall` for the operator release.
+	HelmUninstall(ctx context.Context) error
+	// HelmReleases lists the operator's live Helm release in the client's
+	// namespace, whatever state it is in, but not one already uninstalled.
+	HelmReleases(ctx context.Context) ([]HelmRelease, error)
+	// CurrentContext returns the kube context the client's calls reach: the
+	// --context setting when one is set, otherwise kubeconfig's current one.
+	CurrentContext(ctx context.Context) (string, error)
+	// Deployment returns the status of one Deployment.
+	Deployment(ctx context.Context, name string) (DeploymentStatus, error)
+	// CRD returns one CustomResourceDefinition's versions.
+	CRD(ctx context.Context, name string) (CRDInfo, error)
+	// NamespaceExists reports whether a namespace exists. A missing
+	// namespace is not an error, so a caller can turn it into a clear local
+	// message instead of a raw helm failure.
+	NamespaceExists(ctx context.Context, name string) (bool, error)
 }
 
 // VersionInfo is the parsed output of `kubectl version -o json`. The
