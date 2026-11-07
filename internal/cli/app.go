@@ -28,6 +28,7 @@ import (
 	"github.com/neo4j/cli/internal/commands/docker"
 	"github.com/neo4j/cli/internal/commands/feedback"
 	"github.com/neo4j/cli/internal/commands/history"
+	"github.com/neo4j/cli/internal/commands/k8s"
 	"github.com/neo4j/cli/internal/commands/mcp"
 	"github.com/neo4j/cli/internal/commands/query"
 	"github.com/neo4j/cli/internal/commands/update"
@@ -122,6 +123,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 	if cfg.Flags.Enabled("flag.feedback-command") {
 		cmd.AddCommand(feedback.NewCmd(cfg))
+	}
+	if cfg.Flags.Enabled("flag.k8s-commands") {
+		cmd.AddCommand(k8s.NewCmd(cfg))
 	}
 
 	cobra.EnableTraverseRunHooks = true

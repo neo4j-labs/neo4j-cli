@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add the `neo4j-cli k8s operator` commands to the `flag.k8s-commands` preview: `install`, `status`, `upgrade` and `uninstall` install, inspect, upgrade and remove the open-source Neo4j Kubernetes operator by driving the host helm and kubectl. `upgrade` keeps the deployed values, never rolls back a newer deployed operator unless `--version` asks for it, and needs helm 3.14 or later. `uninstall` removes only the Helm release unless `--remove-crds` is passed, which also deletes every Neo4j, backup, restore and backup schedule in the cluster, needs a confirmation that names the kube context, and refuses to run unless the operator is installed and its controller is ready.'
+time: 2026-11-07T17:10:16+00:00

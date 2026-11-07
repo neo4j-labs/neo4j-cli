@@ -204,6 +204,13 @@ feedback submit	deny
 history	allow
 history clear	deny
 history list	allow
+k8s	deny
+k8s doctor	deny
+k8s operator	deny
+k8s operator install	deny
+k8s operator status	deny
+k8s operator uninstall	deny
+k8s operator upgrade	deny
 mcp	deny
 mcp bundle	deny
 mcp check	deny
