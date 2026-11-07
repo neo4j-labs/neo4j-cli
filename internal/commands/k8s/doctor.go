@@ -4,8 +4,9 @@
 package k8s
 
 import (
+	k8sflags "github.com/neo4j/cli/internal/commands/k8s/flags"
+
 	"github.com/neo4j/cli/internal/clicfg"
-	"github.com/neo4j/cli/internal/debug"
 	"github.com/spf13/cobra"
 )
 
@@ -108,7 +109,7 @@ neo4j-cli k8s doctor --kubeconfig ~/.kube/kind-config --context kind-kind --form
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cmd.SilenceUsage = true
-			settings, err := settingsFrom(cmd, cfg, debug.Resolve(cmd))
+			settings, err := k8sflags.SettingsFrom(cmd, cfg)
 			if err != nil {
 				return err
 			}
