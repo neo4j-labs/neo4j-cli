@@ -4,6 +4,7 @@
 package k8s
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -56,4 +57,49 @@ func MinorSkew(clientV, serverV string) (skew int, ok bool) {
 		return 0, false
 	}
 	return cMinor - sMinor, true
+}
+
+// releaseVersionPattern matches an operator release version: a semver
+// core with an optional pre-release suffix, and no build metadata.
+var releaseVersionPattern = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?$`)
+
+// NormaliseReleaseVersion returns an operator release version without a
+// leading "v", so "v1.0.0" and "1.0.0" both name the asset tag v1.0.0. The
+// second return value is false when v is not a release version at all.
+func NormaliseReleaseVersion(v string) (string, bool) {
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	return v, releaseVersionPattern.MatchString(v)
+}
+
+// CompareReleaseVersions compares two operator release versions and returns
+// -1, 0 or 1. A pre-release sorts before its release; two pre-releases of
+// the same core compare as text. The second return value is false when
+// either version is unparseable, so a caller can skip the comparison.
+func CompareReleaseVersions(a, b string) (int, bool) {
+	aParts := releaseVersionPattern.FindStringSubmatch(strings.TrimPrefix(a, "v"))
+	bParts := releaseVersionPattern.FindStringSubmatch(strings.TrimPrefix(b, "v"))
+	if aParts == nil || bParts == nil {
+		return 0, false
+	}
+	for i := 1; i <= 3; i++ {
+		x, _ := strconv.Atoi(aParts[i])
+		y, _ := strconv.Atoi(bParts[i])
+		if x != y {
+			if x < y {
+				return -1, true
+			}
+			return 1, true
+		}
+	}
+	aPre, bPre := aParts[4], bParts[4]
+	switch {
+	case aPre == bPre:
+		return 0, true
+	case aPre == "":
+		return 1, true
+	case bPre == "":
+		return -1, true
+	default:
+		return strings.Compare(aPre, bPre), true
+	}
 }

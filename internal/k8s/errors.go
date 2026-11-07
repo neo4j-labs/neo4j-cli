@@ -29,6 +29,17 @@ var (
 	markerUnauthorized  = "(Unauthorized)"
 )
 
+// Helm has no machine-readable not-found reason. `helm uninstall` of a
+// missing release prints `Error: uninstall: Release not loaded: <name>:
+// release: not found`, and `helm upgrade` of one prints `Error: UPGRADE
+// FAILED: "<name>" has no deployed releases`. Both were recorded against
+// helm 4.1.1 and are not a contract.
+var helmReleaseNotFoundMarkers = []string{
+	"release: not found",
+	"Release not loaded",
+	"has no deployed releases",
+}
+
 // connectionMarkers identify a child failure that means "the API server did
 // not answer". These become NewUpstreamError so the exit code and the
 // envelope say "upstream unavailable", not "CLI bug".
@@ -41,6 +52,13 @@ var connectionMarkers = []string{
 	"i/o timeout",
 	"unable to connect to the server",
 	"context deadline exceeded",
+}
+
+// IsNotFound reports whether err is the engine's not-found classification,
+// so a caller can tell "the object is absent" from a real failure.
+func IsNotFound(err error) bool {
+	var cliErr *clierr.CLIError
+	return errors.As(err, &cliErr) && cliErr.CodeName == "not_found"
 }
 
 // classifyRunError maps one child-process failure to a *clierr.CLIError. A
@@ -72,6 +90,11 @@ func classifyRunError(ctx context.Context, binary string, args []string, res run
 		return clierr.NewConflictError("%s: %s", binary, msg)
 	case strings.Contains(raw, markerForbidden), strings.Contains(raw, markerUnauthorized):
 		return clierr.NewAuthError("%s: %s", binary, msg)
+	}
+	for _, marker := range helmReleaseNotFoundMarkers {
+		if strings.Contains(raw, marker) {
+			return clierr.NewNotFoundError("%s: %s", binary, msg)
+		}
 	}
 	for _, marker := range connectionMarkers {
 		if strings.Contains(lower, strings.ToLower(marker)) {
