@@ -10,6 +10,7 @@ import (
 	engine "github.com/neo4j/cli/internal/k8s"
 
 	k8sflags "github.com/neo4j/cli/internal/commands/k8s/flags"
+	"github.com/neo4j/cli/internal/commands/k8s/operator"
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/spf13/cobra"
@@ -37,6 +38,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	k8sflags.RegisterPersistentFlags(cmd)
 
 	cmd.AddCommand(newDoctorCmd(cfg))
+	cmd.AddCommand(operator.NewCmd(cfg))
 
 	return cmd
 }
