@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'Release binaries are built with Go 1.26.11, which fixes a vulnerability in the standard library''s net/http package (GO-2026-6859).'
+time: 2026-11-13T22:57:35+00:00
