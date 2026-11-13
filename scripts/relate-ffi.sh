@@ -43,11 +43,16 @@ usage() {
     echo "  x86_64-unknown-linux-gnu" >&2
 }
 
+# Hashes stdin, not a named file: GNU coreutils prefixes a backslash to its
+# output line when the FILENAME needs escaping, and a Windows `$RUNNER_TEMP`
+# (D:\a\_temp) contains backslashes — `cut -d' ' -f1` then yields "\<hash>"
+# and every checksum on that platform mismatches. With no filename there is
+# nothing to escape.
 sha256_of() {
     if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | cut -d' ' -f1
+        sha256sum | cut -d' ' -f1
     elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$1" | cut -d' ' -f1
+        shasum -a 256 | cut -d' ' -f1
     else
         fail "neither sha256sum nor shasum is available to verify the archive"
     fi
@@ -87,7 +92,7 @@ if [[ ! -f "$archive" ]]; then
         fail "download failed: $url"
 fi
 
-got_sha="$(sha256_of "$archive")"
+got_sha="$(sha256_of < "$archive")"
 if [[ "$got_sha" != "$want_sha" ]]; then
     rm -f "$archive"
     fail "sha256 mismatch for $asset: got $got_sha, want $want_sha (removed the file; re-run to refetch)"
@@ -113,8 +118,10 @@ case "$triple" in
         ldflags="$dest/static/relate_ffi.lib"
         ;;
     *)
+        # -lm: the archive calls into libm (pow/exp/log/sin/…). macOS folds
+        # libm into libSystem, glibc does not, so this is linux-only.
         cp "$dest/librelate_ffi.a" "$dest/static/"
-        ldflags="-L$dest/static -lrelate_ffi"
+        ldflags="-L$dest/static -lrelate_ffi -lm"
         ;;
 esac
 
