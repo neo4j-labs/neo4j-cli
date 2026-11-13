@@ -1,0 +1,74 @@
+# Builds and tests the embedded-engine build: the `relate` build tag plus cgo,
+# linking the published Relate FFI library. The Test workflow builds every
+# platform with CGO_ENABLED=0 and never compiles this path, so a change that
+# only breaks the embedded backend would otherwise reach main unnoticed.
+#
+# The native library comes from the relatedb/relate release pinned in
+# scripts/relate-ffi.sh, which also verifies the asset's sha256 and sets up a
+# static link — the same script a developer runs locally (see README).
+
+name: Relate (embedded)
+
+on:
+    push:
+        branches: ["main"]
+    # No branch filter: the tagged path must be gated on every PR, including a
+    # stacked one whose base is not yet main.
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    relate:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      triple: x86_64-unknown-linux-gnu
+                    - os: macos-latest
+                      triple: aarch64-apple-darwin
+                    - os: windows-latest
+                      triple: x86_64-pc-windows-msvc
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+            - name: Set up Go
+              uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+              with:
+                  go-version-file: go.mod
+
+            - name: Fetch the Relate FFI library
+              shell: bash
+              # CGO_ENABLED goes to GITHUB_ENV, not a per-step `env:` — every
+              # later step that compiles (including `go run`) must see it, or
+              # cgo is silently off and the `relate` tag fails to build.
+              run: |
+                  eval "$(scripts/relate-ffi.sh ${{ matrix.triple }} "$RUNNER_TEMP/relate-ffi")"
+                  echo "CGO_ENABLED=1" >> "$GITHUB_ENV"
+                  echo "CGO_CFLAGS=$CGO_CFLAGS" >> "$GITHUB_ENV"
+                  echo "CGO_LDFLAGS=$CGO_LDFLAGS" >> "$GITHUB_ENV"
+
+            - name: Build with the embedded engine
+              shell: bash
+              run: go build -tags relate -o "$RUNNER_TEMP/neo4j-cli-relate" ./cmd/neo4j-cli
+
+            - name: Test with the embedded engine
+              shell: bash
+              run: go test -tags relate -count=1 ./...
+
+            - name: Smoke the embedded engine
+              shell: bash
+              # Runs the artifact that was just built, so the smoke covers the
+              # linked binary (and its static FFI) rather than a second build.
+              run: |
+                  bin="$RUNNER_TEMP/neo4j-cli-relate"
+                  [ -f "$bin.exe" ] && bin="$bin.exe"
+                  store="$RUNNER_TEMP/relate-smoke"
+                  "$bin" query --relate="$store" "RETURN 1 AS one"
+                  "$bin" query --rw --relate="$store" \
+                      "CREATE (a:Smoke {ok: true})-[:NEXT]->(b:Smoke {ok: true})" --format table
