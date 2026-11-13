@@ -30,6 +30,7 @@ import (
 	"github.com/neo4j/cli/internal/commands/history"
 	"github.com/neo4j/cli/internal/commands/mcp"
 	"github.com/neo4j/cli/internal/commands/query"
+	"github.com/neo4j/cli/internal/commands/relate"
 	"github.com/neo4j/cli/internal/commands/update"
 	"github.com/neo4j/cli/internal/flags"
 	"github.com/neo4j/cli/internal/quip"
@@ -111,6 +112,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(history.NewCmd(cfg))
 	cmd.AddCommand(desktop.NewCmd(cfg))
 	cmd.AddCommand(query.NewCmd(cfg))
+	cmd.AddCommand(relate.NewCmd(cfg))
 	cmd.AddCommand(docker.NewCmd(cfg))
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 	cmd.AddCommand(update.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))

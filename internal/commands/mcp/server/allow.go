@@ -127,6 +127,7 @@ var exposedPaths = [][]string{
 	{"docker"},
 	{"history"},
 	{"query"},
+	{"relate"},
 	{"skill"},
 }
 

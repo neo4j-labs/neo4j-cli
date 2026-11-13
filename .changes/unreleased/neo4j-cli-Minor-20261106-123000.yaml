@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add the `relate` command tree for local embedded Relate graph stores: `relate create <name-or-path>` (created empty under the CLI managed directory for bare names, refuse-if-exists unless --force), `relate list` (managed stores with kind/size/modified), `relate info <name-or-path>` (engine version, node/relationship counts, labels, relationship types, index/constraint counts, store size), and `relate delete <name-or-path>` (confirm-gated, stores only). `create`/`info` require a build with the Relate engine (-tags relate); `list`/`delete` work in every build'
+time: 2026-11-06T12:30:00+00:00
