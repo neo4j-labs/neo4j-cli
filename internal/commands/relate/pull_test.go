@@ -40,11 +40,6 @@ func installFakeStream(t *testing.T, records [][]any, streamErr error) *[]string
 	return &queries
 }
 
-// nodeRecord builds a one-node record.
-func nodeRecord(eid string, labels []string, props map[string]any) []any {
-	return []any{dbtype.Node{ElementId: eid, Labels: labels, Props: props}}
-}
-
 // tripleRecord builds an (a, rel, b) record.
 func tripleRecord(aEid, relEid, bEid string) []any {
 	return []any{

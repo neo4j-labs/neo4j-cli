@@ -14,6 +14,7 @@ require (
 	github.com/mixpanel/mixpanel-go v1.2.1
 	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/neo4j/neo4j-go-driver/v6 v6.0.0
+	github.com/relatedb/relate/clients/go v0.0.0-20261112130637-ef436ce10a54 // Relate client pinned to the v1.0.1 release commit — the repo's v1.0.x tags are release tags, not clients/go module tags, so the release state consumes as a pseudo-version (flip to plain v1.0.x once clients/go/v1.0.x is tagged). Imported only behind the `relate` build tag (+ CGO_ENABLED=1, native librelate_ffi from the release's relate-ffi-<triple>.tar.gz via CGO_CFLAGS/CGO_LDFLAGS).
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
@@ -65,17 +66,5 @@ require (
 	golang.org/x/text v0.42.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// Relate (embedded openCypher engine, formerly CypherLite) — imported only
-// behind the `relate` build tag (+ CGO_ENABLED=1); untagged builds never
-// import it, so the module graph of a default build is unchanged. The client
-// module has no tagged release yet, so tagged builds need the `replace` to a
-// local Relate checkout. The relative path expects the checkout as a sibling
-// directory named `cypherlite` (the pre-rename clone name); consuming the
-// published relate-ffi-<triple>.tar.gz (RELATE-INTEGRATION.md §4.5) removes
-// this machine-local dependency. Drop both lines once Relate tags a release.
-require github.com/relatedb/relate/clients/go v0.16.1
-
-replace github.com/relatedb/relate/clients/go => ../cypherlite/clients/go
 
 tool go.uber.org/mock/mockgen
