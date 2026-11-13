@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/neo4j/cli/internal/clicfg"
 )
 
 // Outcomes of a submit attempt.
@@ -41,12 +43,13 @@ const (
 // existing NEO4J-CLI_<NAME> convention (NEO4J-CLI_COMMAND, NEO4J-CLI_QUERY) and must match Lexicon exactly.
 const eventName = "NEO4J-CLI_AGENT_FEEDBACK"
 
-// Set at build time with -ldflags "-X .../feedback.mixpanelToken=<project token>"
-// (and mixpanelBase for another region). A build without a token has no
-// destination of its own and can only send to a loopback test endpoint.
+// Reports go to the same production Mixpanel project as the CLI's usage
+// analytics. Override at build time with -ldflags "-X .../feedback.mixpanelToken=<project token>"
+// (and mixpanelBase for another region). A build with the token set to ""
+// has no destination of its own and can only send to a loopback test endpoint.
 var (
-	mixpanelToken = ""
-	mixpanelBase  = "https://api.mixpanel.com"
+	mixpanelToken = clicfg.DefaultmixpanelToken
+	mixpanelBase  = clicfg.DefaultmixpanelEndpoint
 )
 
 // sendTimeout is the total deadline for one submission. A var so tests can

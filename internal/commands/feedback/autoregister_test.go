@@ -74,11 +74,6 @@ func TestRegisterHint_StaysQuiet(t *testing.T) {
 			cfg, _ := autoRig(t, "claude-code", false)
 			return cfg, []string{"feedback", "status"}
 		}},
-		{"flag off", func(t *testing.T) (*clicfg.Config, []string) {
-			cfg, _ := autoRig(t, "claude-code", false)
-			cfg.Flags.SetForTest("flag.feedback-command", false)
-			return cfg, []string{"query"}
-		}},
 		{"DO_NOT_TRACK=1", func(t *testing.T) (*clicfg.Config, []string) {
 			cfg, _ := autoRig(t, "claude-code", false)
 			lookupEnv = func(k string) string {
@@ -96,6 +91,7 @@ func TestRegisterHint_StaysQuiet(t *testing.T) {
 		}},
 		{"no endpoint known", func(t *testing.T) (*clicfg.Config, []string) {
 			cfg, _ := autoRig(t, "claude-code", false)
+			withToken(t, "") // a build without a destination of its own
 			lookupEnv = func(string) string { return "" }
 			return cfg, []string{"query"}
 		}},

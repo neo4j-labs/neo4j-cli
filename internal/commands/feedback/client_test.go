@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -313,4 +314,13 @@ func TestSend_CancelledMidRequestIsUnknownNotFailed(t *testing.T) {
 	res := Send(ctx, srv.URL+"/v1/feedback", testPayload())
 	assert.Equal(t, "unknown", res.Outcome)
 	assert.Equal(t, "cancelled", res.Reason)
+}
+
+// Release builds send to the CLI's production Mixpanel project unless a build
+// overrides the token: a build with no destination silently disables the
+// feedback tool for everyone who installs it (v1.19.0).
+func TestDefaultDestinationIsTheCLIAnalyticsProject(t *testing.T) {
+	assert.Equal(t, clicfg.DefaultmixpanelToken, mixpanelToken)
+	assert.Equal(t, clicfg.DefaultmixpanelEndpoint, defaultEndpoint())
+	assert.True(t, endpointAllowed(defaultEndpoint()))
 }

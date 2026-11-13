@@ -475,7 +475,6 @@ func TestHandleFailure_FeedbackSubmitIsNeverTeed(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test")
-	cfg.Flags.SetForTest("flag.feedback-command", true)
 	cmd := NewCmd(cfg)
 
 	captured := []byte(`{"outcome":"failed","payload":{"expected":"ada@example.com"}}`)

@@ -13,21 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func appWithFlag(t *testing.T, on bool) bool {
-	t.Helper()
+// The feedback group is always mounted: the installers and registered agent
+// tools call it without any flag.
+func TestFeedbackGroupIsAlwaysMounted(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test")
-	cfg.Flags.SetForTest("flag.feedback-command", on)
+	mounted := false
 	for _, c := range cli.NewCmd(cfg).Commands() {
 		if c.Name() == "feedback" {
-			return true
+			mounted = true
 		}
 	}
-	return false
-}
-
-func TestFeedbackGroupIsMountedOnlyWhenFlagIsOn(t *testing.T) {
-	assert.False(t, appWithFlag(t, false), "feedback must not be registered while the flag is off")
-	assert.True(t, appWithFlag(t, true), "feedback must be registered when the flag is on")
+	assert.True(t, mounted, "feedback must be registered on the root command")
 }

@@ -233,9 +233,6 @@ if [ "${NEO4J_CLI_SKIP_FEEDBACK_PROMPT:-}" != "1" ] && [ "${DO_NOT_TRACK:-}" != 
       y|Y|yes|Yes|YES)
         # --accept needs a person at a terminal, and stdin may be the curl pipe.
         if "$INSTALLED_PATH" feedback enable --accept --rw </dev/tty >/dev/null; then
-          # Keep the command available after install while it is behind
-          # flag.feedback-command; delete this line with the flag.
-          "$INSTALLED_PATH" config set flag.feedback-command true --rw >/dev/null 2>&1 || true
           success "Agent feedback enabled. Turn it off any time with: ${BOLD}neo4j-cli feedback disable${RESET}"
         else
           warn "Could not enable agent feedback. Run '${INSTALLED_PATH} feedback enable' to try again."

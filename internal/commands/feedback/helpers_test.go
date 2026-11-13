@@ -20,13 +20,12 @@ import (
 )
 
 // newTestConfig returns a Config over an in-memory filesystem with an empty
-// config.json and the feedback flag on.
+// config.json.
 func newTestConfig(t *testing.T) *clicfg.Config {
 	t.Helper()
 	fs, err := testfs.GetTestFs("{}", "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test-version")
-	cfg.Flags.SetForTest("flag.feedback-command", true)
 	t.Setenv("DO_NOT_TRACK", "") // a developer's own setting must not leak into tests
 	return cfg
 }

@@ -39,7 +39,7 @@ func registerFor(ctx context.Context, cfg *clicfg.Config, ep, instr string) (age
 // agent configuration (an
 // earlier version registered the tool here; Claude Code flagged that as an
 // unrequested side effect and reverted it). It prints at most once per machine,
-// and only when: the feature flag is on, the caller is Claude Code or Codex, DO_NOT_TRACK
+// and only when: the caller is Claude Code or Codex, DO_NOT_TRACK
 // is not 1, the command is not a `feedback` command, nobody ran `feedback
 // register`, `enable` or `disable`, and an allowed endpoint is known. It writes
 // one line to w (stderr) and never touches stdout, the error envelope or the exit code.
@@ -47,7 +47,7 @@ func MaybeRegisterHint(cfg *clicfg.Config, args []string, w io.Writer) {
 	if cfg == nil || cfg.Global == nil || cfg.Flags == nil || w == nil {
 		return
 	}
-	if !cfg.Flags.Enabled("flag.feedback-command") || optOut(cfg) != "" {
+	if optOut(cfg) != "" {
 		return
 	}
 	for _, a := range args {

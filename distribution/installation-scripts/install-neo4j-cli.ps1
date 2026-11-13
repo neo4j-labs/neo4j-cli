@@ -161,8 +161,6 @@ function Invoke-FeedbackSetup {
             if ($answer -match '^(y|yes)$') {
                 & $Cli feedback enable --accept --rw | Out-Null
                 if ($LASTEXITCODE -eq 0) {
-                    # Keep the command available while it is behind flag.feedback-command; delete with the flag.
-                    & $Cli config set flag.feedback-command true --rw *>$null
                     Write-Ok "Agent feedback enabled. Turn it off any time with: neo4j-cli feedback disable"
                 } else {
                     Write-Warn "Could not enable agent feedback. Run '$Cli feedback enable' to try again."
