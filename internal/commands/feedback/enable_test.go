@@ -31,6 +31,7 @@ func TestEnable_RefusalPaths(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			withSeams(t, tc.agent, "")
+			withToken(t, "") // a build without a destination of its own: only loopback is accepted
 			cfg := newTestConfig(t)
 			stdout, _, err := runCmd(t, newTestApp(cfg), tc.args...)
 			assert.Equal(t, tc.wantExit, exitCode(err))

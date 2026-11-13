@@ -75,6 +75,7 @@ func TestMCP_ListsExactlyOneToolWithSchemaAndDescription(t *testing.T) {
 
 func TestMCP_SubmitSentRejectedAndSkipped(t *testing.T) {
 	withSeams(t, false, "codex")
+	withToken(t, "") // a build without a destination of its own, so an unenabled tool skips without asking
 	var hits atomic.Int32
 	var last []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -198,6 +198,7 @@ func TestConsent_RejectedReportIsNotAskedAbout(t *testing.T) {
 
 func TestConsent_NoEndpointKnownSkipsWithoutAsking(t *testing.T) {
 	r := newConsentRig(t, true, "accept")
+	withToken(t, "") // a build without a destination of its own
 	lookupEnv = func(string) string { return "" }
 	out := r.report(t, csvExpected)
 	assert.Equal(t, "skipped", out["outcome"])

@@ -120,9 +120,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		// fresh tree per tool call and cannot import this package to do it.
 		cmd.AddCommand(mcp.NewCmd(cfg, NewCmd))
 	}
-	if cfg.Flags.Enabled("flag.feedback-command") {
-		cmd.AddCommand(feedback.NewCmd(cfg))
-	}
+	cmd.AddCommand(feedback.NewCmd(cfg))
 
 	cobra.EnableTraverseRunHooks = true
 

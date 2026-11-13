@@ -1,8 +1,8 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-// Package feedback implements the `neo4j-cli feedback` command group, behind
-// flag.feedback-command: coding agents and people send short, locally
+// Package feedback implements the `neo4j-cli feedback` command group: coding
+// agents and people send short, locally
 // validated reports of friction with neo4j-cli to the Neo4j team, only after a
 // person has agreed to it.
 package feedback

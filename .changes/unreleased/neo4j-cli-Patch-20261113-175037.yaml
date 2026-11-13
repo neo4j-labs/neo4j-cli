@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'Agent feedback now works in release builds and no longer needs a feature flag: the `neo4j-cli feedback` commands are always available, the install scripts register the feedback tool with Claude Code and Codex (or ask a person at a terminal) instead of silently skipping the step, and the first report an agent makes asks the person to accept. Reports go to the same Neo4j Mixpanel project as the CLI''s usage analytics. Nothing is sent without a person''s consent, and DO_NOT_TRACK=1 or telemetry off still switches feedback off. The installed agent skill now documents the feedback commands. `flag.feedback-command` is removed.'
+time: 2026-11-13T19:18:11+00:00
