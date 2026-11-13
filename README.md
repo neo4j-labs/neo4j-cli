@@ -381,7 +381,14 @@ Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME`
 
 `neo4j-cli relate` manages local [Relate](https://github.com/relatedb/relate) graph stores — the embedded openCypher engine (formerly CypherLite). A store is a directory holding one graph database: no server, no ports, no credentials. Stores are created under the CLI's managed directory when you pass a bare name, or at any path you give.
 
-> **Build note:** the embedded engine is compiled in behind the `relate` build tag (`go build -tags relate` with CGO_ENABLED=1, plus a Relate checkout with its FFI library — see [Developing and contributing](#developing-and-contributing)). In a stock build the engine-touching commands parse and fail with a typed "not compiled into this build" error; `relate list` and `relate delete` (pure filesystem work) work everywhere.
+> **Build note:** the embedded engine is compiled in behind the `relate` build tag. Tagged builds link the published Relate FFI library, which `scripts/relate-ffi.sh` downloads for your platform and verifies against the release's checksum:
+>
+> ```bash
+> eval "$(scripts/relate-ffi.sh aarch64-apple-darwin /tmp/relate-ffi)"   # or x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc, …
+> CGO_ENABLED=1 go build -tags relate ./cmd/neo4j-cli
+> ```
+>
+> The library is linked statically, so the resulting binary is self-contained — nothing to install beside it. In a stock build (`make build`) the engine-touching commands parse and fail with a typed "not compiled into this build" error; `relate list` and `relate delete` (pure filesystem work) work everywhere.
 
 ```bash
 # Create a store, populate and query it via `query --relate` (writes need --rw)
