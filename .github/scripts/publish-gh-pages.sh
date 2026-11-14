@@ -46,9 +46,6 @@ set -euo pipefail
 #
 # Exit status: 0 = published, or nothing to publish; 1 = refused
 # or gave up, with a `::error::` diagnostic.
-#
-# Adapted from neo4j-labs/cypherlite's push-gh-pages.sh (their
-# v0.12.4 release race, PR #320).
 # ============================================================
 
 BRANCH=gh-pages

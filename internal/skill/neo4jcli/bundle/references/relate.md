@@ -11,7 +11,7 @@
 
 Manage local embedded Relate graph stores
 
-Manage local Relate graph stores — the embedded openCypher engine (formerly CypherLite). A store is a directory (or .rl bundle) holding one graph database; no server, ports or credentials are involved. Stores are created under the CLI's managed directory when you pass a bare name, or at any path you give. Query a store with `neo4j-cli query "..." --relate <name-or-path>` (writes need --rw). `create` and `info` need the engine compiled in (build with -tags relate); `list` and `delete` work in every build.
+Manage local Relate graph stores — the embedded openCypher engine. A store is a directory (or .rl bundle) holding one graph database; no server, ports or credentials are involved. Stores are created under the CLI's managed directory when you pass a bare name, or at any path you give. Query a store with `neo4j-cli query "..." --relate <name-or-path>` (writes need --rw). `create` and `info` need the engine compiled in (build with -tags relate); `list` and `delete` work in every build.
 
 Usage: `neo4j-cli relate`
 
