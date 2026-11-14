@@ -61,7 +61,7 @@ func TestRegisterClaudeCode_AddsAtUserScopeReplacingAnyOldEntry(t *testing.T) {
 	assert.Empty(t, notes)
 	assert.Equal(t, []string{
 		"mcp remove -s user neo4j-feedback",
-		"mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -e NEO4J_CLI_FLAG_FEEDBACK_COMMAND=true -- /opt/neo4j-cli feedback serve",
+		"mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -- /opt/neo4j-cli feedback serve",
 	}, *calls)
 }
 
@@ -70,7 +70,7 @@ func TestRegisterClaudeCode_NoClaudeBinaryPrintsManualCommand(t *testing.T) {
 	assert.Empty(t, agents)
 	assert.NotNil(t, agents, "an empty list, not null, in the JSON")
 	require.Len(t, notes, 1)
-	assert.Contains(t, notes[0], "claude mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -e NEO4J_CLI_FLAG_FEEDBACK_COMMAND=true --")
+	assert.Contains(t, notes[0], "claude mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic --")
 	assert.Contains(t, notes[0], "feedback serve")
 }
 
@@ -106,7 +106,7 @@ func TestEnableDisableStatus_Registration(t *testing.T) {
 	stdout, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--endpoint", loopback)
 	require.NoError(t, err)
 	assert.Equal(t, []any{"claude-code"}, parseJSON(t, stdout)["registered_agents"])
-	assert.Contains(t, *calls, "mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -e NEO4J_CLI_FLAG_FEEDBACK_COMMAND=true -- /opt/neo4j-cli feedback serve")
+	assert.Contains(t, *calls, "mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -- /opt/neo4j-cli feedback serve")
 
 	stdout, _, err = runCmd(t, newTestApp(cfg), "feedback", "status")
 	require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestEnable_InstructionsVariant(t *testing.T) {
 	stdout, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--endpoint", loopback, "--instructions", "optin")
 	require.NoError(t, err)
 	assert.Equal(t, "optin", parseJSON(t, stdout)["instructions"])
-	assert.Contains(t, *calls, "mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=optin -e NEO4J_CLI_FLAG_FEEDBACK_COMMAND=true -- /opt/neo4j-cli feedback serve")
+	assert.Contains(t, *calls, "mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=optin -- /opt/neo4j-cli feedback serve")
 
 	_, _, err = runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--endpoint", loopback, "--instructions", "loud")
 	require.Error(t, err)
@@ -165,7 +165,7 @@ func TestEnable_DefaultsToBasicInstructions(t *testing.T) {
 	stdout, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--endpoint", loopback)
 	require.NoError(t, err)
 	assert.Equal(t, "basic", parseJSON(t, stdout)["instructions"])
-	assert.Contains(t, *calls, "mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -e NEO4J_CLI_FLAG_FEEDBACK_COMMAND=true -- /opt/neo4j-cli feedback serve")
+	assert.Contains(t, *calls, "mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -- /opt/neo4j-cli feedback serve")
 }
 
 func TestEnable_EndpointFromEnv(t *testing.T) {
@@ -226,7 +226,7 @@ func TestRegisterCodex_AddsWithExplicitEnvReplacingAnyOldEntry(t *testing.T) {
 	assert.Empty(t, notes)
 	assert.Equal(t, []string{
 		"mcp remove neo4j-feedback",
-		"mcp add neo4j-feedback --env NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic --env NEO4J_CLI_FLAG_FEEDBACK_COMMAND=true -- /opt/neo4j-cli feedback serve",
+		"mcp add neo4j-feedback --env NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -- /opt/neo4j-cli feedback serve",
 	}, *calls)
 }
 

@@ -29,6 +29,7 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 | [`dataset`](references/dataset.md) | Discover example Neo4j datasets |
 | [`desktop`](references/desktop.md) | Manage DBMSes under a local Neo4j Desktop 2 install |
 | [`docker`](references/docker.md) | Manage local Neo4j containers via Docker |
+| [`feedback`](references/feedback.md) | Send feedback about neo4j-cli to the Neo4j team |
 | [`history`](references/history.md) | View and manage the local command history log |
 | [`query`](references/query.md) | Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol |
 | [`skill`](references/skill.md) | Install agent skills for this CLI into supported AI agents |

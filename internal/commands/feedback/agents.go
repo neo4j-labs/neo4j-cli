@@ -52,7 +52,7 @@ func runAgentCLI(ctx context.Context, bin string, args ...string) error {
 // manualAddCommand is what an operator runs when automatic registration is not
 // possible.
 func manualAddCommand(bin, variant string) string {
-	return fmt.Sprintf("claude mcp add -s user %s -e %s=%s -e %s=true -- %s feedback serve", serverName, instructionsEnv, variant, flagEnv, bin)
+	return fmt.Sprintf("claude mcp add -s user %s -e %s=%s -- %s feedback serve", serverName, instructionsEnv, variant, bin)
 }
 
 // selfPath is the path the agents are told to run. It resolves symlinks to find
@@ -83,11 +83,6 @@ func claudeAvailable() bool {
 	return err == nil
 }
 
-// flagEnv turns on flag.feedback-command for the registered server, so the
-// server starts even when the flag was set only in the installer's
-// environment. It goes away with the flag.
-const flagEnv = "NEO4J_CLI_FLAG_FEEDBACK_COMMAND"
-
 // registerClaudeCode registers the feedback server with Claude Code at user
 // scope. It returns the agents now registered and notes for the operator.
 // The server instructions variant is set in the registration environment.
@@ -108,7 +103,7 @@ func registerClaudeCodeAt(ctx context.Context, bin, variant string) (agents, not
 	defer cancel()
 	removed := execClaude(ctx, "mcp", "remove", "-s", "user", serverName) == nil // absent is fine
 	if err := execClaude(ctx, "mcp", "add", "-s", "user", serverName,
-		"-e", instructionsEnv+"="+variant, "-e", flagEnv+"=true",
+		"-e", instructionsEnv+"="+variant,
 		"--", bin, "feedback", "serve"); err != nil {
 		note := "Claude Code registration failed (" + err.Error() + "). Run: " + manualAddCommand(bin, variant)
 		if removed {
@@ -164,7 +159,7 @@ func codexAvailable() bool {
 }
 
 func manualCodexAddCommand(bin, variant string) string {
-	return fmt.Sprintf("codex mcp add %s --env %s=%s --env %s=true -- %s feedback serve", serverName, instructionsEnv, variant, flagEnv, bin)
+	return fmt.Sprintf("codex mcp add %s --env %s=%s -- %s feedback serve", serverName, instructionsEnv, variant, bin)
 }
 
 // registerCodex registers the feedback server with Codex. Codex starts MCP
@@ -179,7 +174,7 @@ func registerCodexAt(ctx context.Context, bin, variant string) (agents, notes []
 	defer cancel()
 	removed := execCodex(ctx, "mcp", "remove", serverName) == nil // absent is fine
 	if err := execCodex(ctx, "mcp", "add", serverName,
-		"--env", instructionsEnv+"="+variant, "--env", flagEnv+"=true",
+		"--env", instructionsEnv+"="+variant,
 		"--", bin, "feedback", "serve"); err != nil {
 		note := "Codex registration failed (" + err.Error() + "). Run: " + manualCodexAddCommand(bin, variant)
 		if removed {
