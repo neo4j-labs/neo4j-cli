@@ -2,8 +2,8 @@
 // Neo4j Sweden AB [http://neo4j.com]
 
 // Package relate provides access to local Relate graph stores — Relate is the
-// embedded openCypher engine (formerly CypherLite) — for the `query --relate`
-// backend and the `relate` command tree.
+// embedded openCypher engine — for the `query --relate` backend and the
+// `relate` command tree.
 //
 // The engine itself is cgo: the typed C ABI (librelate_ffi, ABI v2) wrapped by
 // github.com/relatedb/relate/clients/go. Importing that client requires the

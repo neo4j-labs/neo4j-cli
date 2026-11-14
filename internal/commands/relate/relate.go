@@ -24,7 +24,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "relate",
 		Short: "Manage local embedded Relate graph stores",
-		Long: "Manage local Relate graph stores — the embedded openCypher engine (formerly CypherLite). " +
+		Long: "Manage local Relate graph stores — the embedded openCypher engine. " +
 			"A store is a directory (or .rl bundle) holding one graph database; no server, ports or credentials are involved. " +
 			"Stores are created under the CLI's managed directory when you pass a bare name, or at any path you give. " +
 			"Query a store with `neo4j-cli query \"...\" --relate <name-or-path>` (writes need --rw). " +

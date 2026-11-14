@@ -379,7 +379,7 @@ Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME`
 
 ## Relate (embedded)
 
-`neo4j-cli relate` manages local [Relate](https://github.com/relatedb/relate) graph stores — the embedded openCypher engine (formerly CypherLite). A store is a directory holding one graph database: no server, no ports, no credentials. Stores are created under the CLI's managed directory when you pass a bare name, or at any path you give.
+`neo4j-cli relate` manages local [Relate](https://github.com/relatedb/relate) graph stores — the embedded openCypher engine. A store is a directory holding one graph database: no server, no ports, no credentials. Stores are created under the CLI's managed directory when you pass a bare name, or at any path you give.
 
 > **Build note:** the embedded engine is compiled in behind the `relate` build tag. Tagged builds link the published Relate FFI library, which `scripts/relate-ffi.sh` downloads for your platform and verifies against the release's checksum:
 >
