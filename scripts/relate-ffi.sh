@@ -137,7 +137,18 @@ case "$triple" in
         # which also satisfies the Go client's own #cgo `-lrelate_ffi`
         # directives; the name is left exactly as the release ships it.
         cp "$dest/relate_ffi.lib" "$dest/static/"
-        ldflags="-L$dest_out/static"
+        # A Rust `staticlib` deliberately omits the platform's native system
+        # libraries — rustc expects the C consumer to supply them — and nothing
+        # in a Go build knows Rust's list, so they are named here. Without them
+        # lld-link stops at `undefined symbol: getpeername` / `WSASocketW` /
+        # `getaddrinfo` (ws2_32), `NtReadFile` (ntdll) and so on. These are
+        # import libraries for DLLs that ship with Windows itself, so the
+        # resulting binary is still self-contained.
+        ldflags="-L$dest_out/static \
+-ladvapi32 -lbcrypt -lcomdlg32 -lcrypt32 -ldbghelp -ldnsapi -lgdi32 \
+-liphlpapi -lkernel32 -lmsvcprt -lmswsock -lnetapi32 -lntdll -loldnames \
+-lole32 -loleaut32 -lpowrprof -lpsapi -lschannel -lsecur32 -lshell32 \
+-luser32 -luserenv -luuid -lwinmm -lwinspool -lws2_32 -lwsock32"
         ;;
     *)
         # -lm: the archive calls into libm (pow/exp/log/sin/…). macOS folds
