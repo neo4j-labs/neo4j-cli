@@ -389,6 +389,14 @@ Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME`
 > ```
 >
 > The library is linked statically, so the resulting binary is self-contained — nothing to install beside it. In a stock build (`make build`) the engine-touching commands parse and fail with a typed "not compiled into this build" error; `relate list` and `relate delete` (pure filesystem work) work everywhere.
+>
+> On Windows the library is MSVC-built, so it needs an MSVC-targeting toolchain rather than the usual mingw gcc — mingw's runtime has no equivalent for the MSVC C++ RTTI and Winsock/ntdll symbols it references. Point `CC` at clang, which finds the installed Visual Studio itself; `-fuse-ld=lld` is required, not preferred (Go otherwise passes a gcc linker script that `link.exe` cannot read):
+>
+> ```powershell
+> $env:CC = "clang -target x86_64-pc-windows-msvc -fuse-ld=lld"
+> $env:CGO_ENABLED = "1"
+> go build -tags relate ./cmd/neo4j-cli
+> ```
 
 ```bash
 # Create a store, populate and query it via `query --relate` (writes need --rw)
