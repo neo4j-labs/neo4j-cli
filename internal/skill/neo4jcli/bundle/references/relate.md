@@ -139,7 +139,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--batch-size` | int | 500 | Rows per write statement into the local store (property values are inlined as literals, so smaller batches mean smaller statements) |
+| `--batch-size` | int | 500 | Rows per write statement into the local store, 1-10000 (property values are inlined as literals, so smaller batches mean smaller statements) |
 | `-c, --credential` | string | - | Credential to use for the remote connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>', or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Remote database name; defaults to the connecting user's home database when unset |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
@@ -177,7 +177,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--batch-size` | int | 500 | Rows per remote write statement |
+| `--batch-size` | int | 500 | Rows per remote write statement, 1-10000 |
 | `-c, --credential` | string | - | Credential to use for the remote connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>', or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Remote database name; defaults to the connecting user's home database when unset |
 | `--dry-run` | bool | false | Print the push plan (labels, keys, counts, batches) without touching the remote |

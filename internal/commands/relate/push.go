@@ -73,7 +73,7 @@ neo4j-cli relate push movies --rw --credential local \\
 	cmd.Flags().StringArray("types", nil, "Comma-separated relationship types to push (default: every type in the store)")
 	cmd.Flags().StringArray("merge-key", nil, "Identity key override as Label.property (repeatable); default is the remote's uniqueness constraint per label")
 	cmd.Flags().String("rel-key", "", "Relationship property to key the remote MERGE on (for multiple rels of one type between the same pair)")
-	cmd.Flags().Int("batch-size", engine.DefaultPullBatchSize, "Rows per remote write statement")
+	cmd.Flags().Int("batch-size", engine.DefaultPullBatchSize, "Rows per remote write statement, 1-10000")
 	cmd.Flags().Bool("dry-run", false, "Print the push plan (labels, keys, counts, batches) without touching the remote")
 
 	return cmd
@@ -140,6 +140,11 @@ func runPush(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 		return engine.NotCompiledError("`relate push`")
 	}
 
+	batchSize, _ := cmd.Flags().GetInt("batch-size")
+	if err := validateBatchSize(batchSize); err != nil {
+		return err
+	}
+
 	storePath := engine.ResolveStorePath(storeArg)
 	if !engine.IsStore(cfg.Fs(), storePath) {
 		return unknownStoreError(storePath)
@@ -184,7 +189,6 @@ func runPush(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 		return err
 	}
 
-	batchSize, _ := cmd.Flags().GetInt("batch-size")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	relKey, _ := cmd.Flags().GetString("rel-key")
 

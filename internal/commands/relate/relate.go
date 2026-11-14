@@ -16,8 +16,22 @@ package relate
 
 import (
 	"github.com/neo4j/cli/internal/clicfg"
+	"github.com/neo4j/cli/internal/clierr"
+	engine "github.com/neo4j/cli/internal/relate"
 	"github.com/spf13/cobra"
 )
+
+// validateBatchSize is shared by `relate pull` and `relate push`: both inline a
+// batch's rows into ONE statement, so the value is bounded above as well as
+// below. The engine layer silently defaults non-positive sizes (it is a
+// programmatic API), but on the CLI a typo like `--batch-size 0` must not
+// quietly change behavior — it is a usage error.
+func validateBatchSize(n int) error {
+	if n < 1 || n > engine.MaxPullBatchSize {
+		return clierr.NewUsageError("--batch-size must be between 1 and %d, got %d", engine.MaxPullBatchSize, n)
+	}
+	return nil
+}
 
 // NewCmd returns the `relate` parent command with all leaves mounted.
 func NewCmd(cfg *clicfg.Config) *cobra.Command {

@@ -314,6 +314,13 @@ func Materialize(store Store, g *Subgraph, m *IdentityMap, source string, batchS
 // property payloads, so the CLI's default stays an order of magnitude lower.
 const DefaultPullBatchSize = 500
 
+// MaxPullBatchSize is the largest --batch-size the commands accept. A batch's
+// rows are inlined into ONE statement — on pull as Cypher literals, so the
+// statement string grows linearly with both row count and property payloads —
+// and an unbounded value turns a large pull into a single unbounded statement
+// the engine then has to parse. The bound is a guard, not a tuning target.
+const MaxPullBatchSize = 10000
+
 // batchRows is a single-row update (entities the source already
 // materialized).
 type batchRows struct {

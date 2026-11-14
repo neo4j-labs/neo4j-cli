@@ -5,6 +5,7 @@ package relate
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -255,4 +256,33 @@ func TestSplitCSV(t *testing.T) {
 	assert.Equal(t, []string{"A", "B"}, splitCSV([]string{"A,B"}))
 	assert.Equal(t, []string{"A", "B", "C"}, splitCSV([]string{"A, B", "C ", ""}))
 	assert.Nil(t, splitCSV(nil))
+}
+
+func TestRelatePush_BatchSizeBounds(t *testing.T) {
+	// Validation runs before any store or remote work; the fake exists merely
+	// to get past the not-compiled gate.
+	installFakeOpen(t, &fakeStore{})
+
+	for _, size := range []int{0, -1, relate.MaxPullBatchSize + 1} {
+		h := newHarness(t, "json")
+		err := h.execute(t, "push", "movies",
+			"--uri", "neo4j+s://remote:7687", "--username", "neo4j", "--password", "pw",
+			"--batch-size", strconv.Itoa(size),
+		)
+		require.Error(t, err, "batch size %d must be rejected", size)
+		var ce *clierr.CLIError
+		require.ErrorAs(t, err, &ce)
+		assert.Equal(t, 2, ce.Code)
+		assert.Contains(t, err.Error(), "--batch-size")
+	}
+
+	// The upper bound itself is accepted: the command proceeds to the next
+	// check — the missing store — which proves the bound did not reject it.
+	h := newHarness(t, "json")
+	err := h.execute(t, "push", "movies",
+		"--uri", "neo4j+s://remote:7687", "--username", "neo4j", "--password", "pw",
+		"--batch-size", strconv.Itoa(relate.MaxPullBatchSize),
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no Relate store at")
 }
