@@ -1,0 +1,111 @@
+# Builds and tests the embedded-engine build: the `relate` build tag plus cgo,
+# linking the published Relate FFI library. The Test workflow builds every
+# platform with CGO_ENABLED=0 and never compiles this path, so a change that
+# only breaks the embedded backend would otherwise reach main unnoticed.
+#
+# The native library comes from the relatedb/relate release pinned in
+# scripts/relate-ffi.sh, which also verifies the asset's sha256 and sets up a
+# static link — the same script a developer runs locally (see README).
+
+name: Relate (embedded)
+
+on:
+    push:
+        branches: ["main"]
+    # No branch filter: the tagged path must be gated on every PR, including a
+    # stacked one whose base is not yet main.
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    relate:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      triple: x86_64-unknown-linux-gnu
+                    - os: macos-latest
+                      triple: aarch64-apple-darwin
+                    - os: windows-latest
+                      triple: x86_64-pc-windows-msvc
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+            - name: Set up Go
+              uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+              with:
+                  go-version-file: go.mod
+
+            - name: Fetch the Relate FFI library
+              shell: bash
+              # CGO_ENABLED goes to GITHUB_ENV, not a per-step `env:` — every
+              # later step that compiles must see it, or cgo is silently off.
+              #
+              # The script output is captured before it is eval'd: `eval "$(…)"`
+              # discards the substitution's exit status, so a failing script
+              # would otherwise leave the vars empty and only surface much
+              # later as a confusing compile error. The assignment propagates
+              # the failure, and the explicit check covers a script that
+              # succeeds while printing nothing.
+              run: |
+                  out="$(scripts/relate-ffi.sh ${{ matrix.triple }} "$RUNNER_TEMP/relate-ffi")"
+                  eval "$out"
+                  [ -n "${CGO_CFLAGS:-}" ] && [ -n "${CGO_LDFLAGS:-}" ] ||
+                      { echo "relate-ffi.sh set no CGO_CFLAGS/CGO_LDFLAGS" >&2; exit 1; }
+                  echo "CGO_ENABLED=1" >> "$GITHUB_ENV"
+                  echo "CGO_CFLAGS=$CGO_CFLAGS" >> "$GITHUB_ENV"
+                  echo "CGO_LDFLAGS=$CGO_LDFLAGS" >> "$GITHUB_ENV"
+
+            # The Windows archive is MSVC-built: it references MSVC's C++ RTTI
+            # and Winsock/ntdll imports that mingw's runtime cannot satisfy, so
+            # the default mingw gcc cannot link it at all. clang in MSVC mode
+            # can, and auto-detects the installed Visual Studio for headers and
+            # libs. The target is stated explicitly so a clang defaulting to the
+            # mingw triple cannot silently reintroduce the unusable link.
+            #
+            # -fuse-ld=lld is load-bearing, not a preference. Go probes the
+            # external linker with `-Wl,--version` and, unless the answer
+            # contains "LLD ", assumes a GNU ld and passes a gcc linker script
+            # as `-Wl,-T,<script>` (a workaround for golang.org/issue/20183).
+            # link.exe reads that .ld as an input file and dies with
+            # "fatal error LNK1107: invalid or corrupt file". lld-link reports
+            # itself as LLD, so Go skips the script.
+            - name: Use clang targeting MSVC
+              if: matrix.os == 'windows-latest'
+              shell: bash
+              run: |
+                  clang --version
+                  clang -dumpmachine
+                  # The exact probe Go runs to decide whether to add the gcc
+                  # linker script; it must mention LLD.
+                  clang -target x86_64-pc-windows-msvc -fuse-ld=lld -Wl,--version
+                  {
+                      echo 'CC=clang -target x86_64-pc-windows-msvc -fuse-ld=lld'
+                      echo 'CXX=clang++ -target x86_64-pc-windows-msvc -fuse-ld=lld'
+                  } >> "$GITHUB_ENV"
+
+            - name: Build with the embedded engine
+              shell: bash
+              run: go build -tags relate -o "$RUNNER_TEMP/neo4j-cli-relate" ./cmd/neo4j-cli
+
+            - name: Test with the embedded engine
+              shell: bash
+              run: go test -tags relate -count=1 ./...
+
+            - name: Smoke the embedded engine
+              shell: bash
+              # Runs the artifact that was just built, so the smoke covers the
+              # linked binary (and its static FFI) rather than a second build.
+              run: |
+                  bin="$RUNNER_TEMP/neo4j-cli-relate"
+                  [ -f "$bin.exe" ] && bin="$bin.exe"
+                  store="$RUNNER_TEMP/relate-smoke"
+                  "$bin" query --relate="$store" "RETURN 1 AS one"
+                  "$bin" query --rw --relate="$store" \
+                      "CREATE (a:Smoke {ok: true})-[:NEXT]->(b:Smoke {ok: true})" --format table
