@@ -80,6 +80,9 @@ neo4j-cli query "MATCH (n) RETURN count(n)" --credential local --format json
 # Write Cypher requires --rw (opt-in)
 neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json
 
+# Run against a local embedded Relate store instead of a server (created when missing; still needs --rw to write)
+neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --relate ./mydb --rw --format json
+
 # Run multiple read statements in one call (split on ; at end of line); results render as a JSON array
 neo4j-cli query "MATCH (n:Person) RETURN count(n) AS people; MATCH (m:Movie) RETURN count(m) AS movies" --format json
 
@@ -99,6 +102,8 @@ neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bo
 	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password; prompted on TTY if unset")
 	cmd.PersistentFlags().StringP("database", "d", "", "Target database name; defaults to the connecting user's home database when unset - typically \"neo4j\", but can vary by deployment (e.g. the instance DBID on Aura Free). Also applies with --credential, overriding the credential-supplied database")
 	cmd.PersistentFlags().String("env", "", "Path to a .env file (auto-discovered by walking up from cwd if unset)")
+	cmd.PersistentFlags().String("relate", "", "Run against a local embedded Relate graph store instead of a server (no Bolt connection). PATH is a store directory or .rl bundle, created when missing; a bare name resolves under the CLI's managed store directory (see `neo4j-cli relate`). Mutually exclusive with --uri, --username, --password, --database and --credential; connection env vars and .env files are not consulted with --relate. Requires a build that includes the Relate engine (-tags relate)")
+	cmd.PersistentFlags().String("relate-namespace", "neo4j", "Relate session namespace to use with --relate: neo4j (the user database), system, or system_ontologies")
 	cmd.PersistentFlags().StringArray("param", nil, "Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string. Use `key:embed=<text>` to embed text via the configured provider and bind the resulting vector to $key (see `query :embed`).")
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
