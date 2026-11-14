@@ -79,7 +79,7 @@ neo4j-cli relate pull recent --rw --uri neo4j://localhost:7687 -u neo4j -p pw \\
 	// Pull flags — Relate's names verbatim.
 	cmd.Flags().String("query", "", "Remote Cypher to pull; must return nodes, relationships or paths (not scalars)")
 	cmd.Flags().StringArray("param", nil, "Remote query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise a string")
-	cmd.Flags().Int("batch-size", engine.DefaultPullBatchSize, "Rows per write statement into the local store (property values are inlined as literals, so smaller batches mean smaller statements)")
+	cmd.Flags().Int("batch-size", engine.DefaultPullBatchSize, "Rows per write statement into the local store, 1-10000 (property values are inlined as literals, so smaller batches mean smaller statements)")
 
 	if err := cmd.MarkFlagRequired("query"); err != nil {
 		panic(err) //nolint:errcheck // MarkFlagRequired on a registered flag cannot fail
@@ -143,6 +143,9 @@ func runPull(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 		return clierr.NewUsageError("--param :embed is not supported by `relate pull` (embed vectors cannot be pulled); drop the modifier")
 	}
 	batchSize, _ := cmd.Flags().GetInt("batch-size")
+	if err := validateBatchSize(batchSize); err != nil {
+		return err
+	}
 
 	// Local store: created when missing (the pull itself is the creation).
 	storePath := engine.ResolveStorePath(storeArg)

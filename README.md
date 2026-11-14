@@ -397,6 +397,8 @@ Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME`
 > $env:CGO_ENABLED = "1"
 > go build -tags relate ./cmd/neo4j-cli
 > ```
+>
+> **Supply chain:** the engine adds exactly two out-of-repo components, both reviewed and pinned. The Go client module (`github.com/relatedb/relate/clients/go`) is pinned to a specific upstream commit in `go.mod` and hash-pinned in `go.sum`. The native FFI archive is downloaded from one pinned `relatedb/relate` release and verified against the sha256 digests recorded in `scripts/relate-ffi.sh`; those digests were taken from GitHub's release API when the pin was made, so they guard against later asset substitution, not against a compromise of the release itself — the release is the trust root, as with any dependency. The import is isolated behind the `relate` build tag (an untagged build links none of it), and [`.github/workflows/relate.yml`](.github/workflows/relate.yml) builds and tests the tagged path on linux, macOS and Windows on every PR.
 
 ```bash
 # Create a store, populate and query it via `query --relate` (writes need --rw)

@@ -6,6 +6,7 @@ package relate
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
@@ -192,4 +193,37 @@ func TestIdentitySourceOf(t *testing.T) {
 
 	c2 := &dbconn.Conn{URI: "neo4j://other:7687", Database: ""}
 	assert.Equal(t, "neo4j://other:7687/neo4j", identitySourceOf(c2))
+}
+
+func TestRelatePull_BatchSizeBounds(t *testing.T) {
+	// Out-of-bounds values are usage errors before any store or remote work:
+	// only the not-compiled gate precedes the check, so the fake exists merely
+	// to get past it.
+	installFakeOpen(t, &fakeStore{})
+
+	for _, size := range []int{0, -1, relate.MaxPullBatchSize + 1} {
+		h := newHarness(t, "json")
+		err := h.execute(t, "pull", "movies",
+			"--uri", "neo4j://remote:7687", "--username", "neo4j", "--password", "pw",
+			"--query", "MATCH (n) RETURN n",
+			"--batch-size", strconv.Itoa(size),
+		)
+		require.Error(t, err, "batch size %d must be rejected", size)
+		var ce *clierr.CLIError
+		require.ErrorAs(t, err, &ce)
+		assert.Equal(t, 2, ce.Code)
+		assert.Contains(t, err.Error(), "--batch-size")
+	}
+
+	// The upper bound itself is accepted: an empty stream then succeeds, so
+	// the rejection above is the bound, not the stream.
+	installFakeStream(t, nil, nil)
+	h := newHarness(t, "json")
+	require.NoError(t, h.cfg.Fs().MkdirAll(relate.ResolveStorePath("movies"), 0o700))
+	err := h.execute(t, "pull", "movies",
+		"--uri", "neo4j://remote:7687", "--username", "neo4j", "--password", "pw",
+		"--query", "MATCH (n:Nothing) RETURN n",
+		"--batch-size", strconv.Itoa(relate.MaxPullBatchSize),
+	)
+	require.NoError(t, err)
 }
