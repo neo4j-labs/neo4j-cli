@@ -98,12 +98,24 @@ if [[ "$got_sha" != "$want_sha" ]]; then
     fail "sha256 mismatch for $asset: got $got_sha, want $want_sha (removed the file; re-run to refetch)"
 fi
 
+# Windows hands us a native path (D:\a\_temp). Bash and curl take it fine, but
+# MSYS2 tar treats the backslashes as ESCAPES and reports
+# "tar: D\:\a\\_temp/...: Cannot open: No such file or directory"; gcc would
+# mangle them the same way. cygpath -m gives the mixed form (D:/a/_temp/...),
+# which every Windows tool accepts and which has no backslashes to escape.
+# Absent on linux/macOS, where dest_out is just dest.
+if command -v cygpath >/dev/null 2>&1; then
+    dest_out="$(cygpath -m "$dest")"
+else
+    dest_out="$dest"
+fi
+
 # The archive goes in on stdin rather than as `-f <path>`: GNU tar reads a
 # leading `host:` in an archive argument as a REMOTE archive, and a Windows
 # `$RUNNER_TEMP` (D:\a\_temp) matches that — "tar (child): Cannot connect to
 # D: resolve failed". `--force-local` would fix it but bsdtar (macOS) has no
 # such option; stdin is portable.
-tar -xzf - -C "$dest" < "$archive"
+tar -xzf - -C "$dest_out" < "$archive"
 
 # Static linking needs the archive ALONE in a directory: with the shared
 # library next to it, the linker picks the shared one and the binary gains a
@@ -114,22 +126,22 @@ case "$triple" in
         # The Rust staticlib pulls iana_time_zone, which needs CoreFoundation;
         # the dylib carries it internally, the archive does not.
         cp "$dest/librelate_ffi.a" "$dest/static/"
-        ldflags="-L$dest/static -lrelate_ffi -framework CoreFoundation"
+        ldflags="-L$dest_out/static -lrelate_ffi -framework CoreFoundation"
         ;;
     *-pc-windows-msvc)
         # The MSVC staticlib keeps its MSVC name, which mingw's `-lrelate_ffi`
         # does not find (it searches lib*.a / lib*.dll.a), so name the file.
         cp "$dest/relate_ffi.lib" "$dest/static/"
-        ldflags="$dest/static/relate_ffi.lib"
+        ldflags="$dest_out/static/relate_ffi.lib"
         ;;
     *)
         # -lm: the archive calls into libm (pow/exp/log/sin/…). macOS folds
         # libm into libSystem, glibc does not, so this is linux-only.
         cp "$dest/librelate_ffi.a" "$dest/static/"
-        ldflags="-L$dest/static -lrelate_ffi -lm"
+        ldflags="-L$dest_out/static -lrelate_ffi -lm"
         ;;
 esac
 
 echo "relate-ffi: unpacked $asset into $dest (static link ready)" >&2
-printf 'export CGO_CFLAGS="-I%s/include"\n' "$dest"
+printf 'export CGO_CFLAGS="-I%s/include"\n' "$dest_out"
 printf 'export CGO_LDFLAGS="%s"\n' "$ldflags"
