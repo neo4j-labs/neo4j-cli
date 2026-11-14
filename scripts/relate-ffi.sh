@@ -129,18 +129,14 @@ case "$triple" in
         ldflags="-L$dest_out/static -lrelate_ffi -framework CoreFoundation"
         ;;
     *-pc-windows-msvc)
-        # The MSVC staticlib ships as `relate_ffi.lib`, but the Go client's own
-        # #cgo directives ask for `-lrelate_ffi`, and mingw's -l only searches
-        # `lib<name>.a` / `lib<name>.dll.a` — never a bare `*.lib`. Renaming the
-        # copy to `librelate_ffi.a` makes those directives resolve here instead
-        # of failing with "cannot find -lrelate_ffi". ld reads it by content,
-        # so the MSVC archive format is fine.
-        #
-        # Deliberately NOT also passed as an explicit path: that lists the
-        # archive twice on one command line and ld then pulls its members twice
-        # ("multiple definition of `.weak.__modti3.default'"). Going through -l
-        # keeps windows on the same single-reference route as linux.
-        cp "$dest/relate_ffi.lib" "$dest/static/librelate_ffi.a"
+        # Windows builds this with clang in MSVC mode, NOT mingw: the archive is
+        # MSVC-built and references MSVC's C++ RTTI (`??_7type_info@@6B@`) and
+        # Winsock/ntdll imports that mingw's runtime has no equivalent for, so a
+        # mingw link cannot succeed no matter which -l flags are added. clang
+        # resolves `-lrelate_ffi` to `relate_ffi.lib` (MSVC has no `lib` prefix),
+        # which also satisfies the Go client's own #cgo `-lrelate_ffi`
+        # directives; the name is left exactly as the release ships it.
+        cp "$dest/relate_ffi.lib" "$dest/static/"
         ldflags="-L$dest_out/static"
         ;;
     *)

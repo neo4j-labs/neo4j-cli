@@ -62,6 +62,23 @@ jobs:
                   echo "CGO_CFLAGS=$CGO_CFLAGS" >> "$GITHUB_ENV"
                   echo "CGO_LDFLAGS=$CGO_LDFLAGS" >> "$GITHUB_ENV"
 
+            # The Windows archive is MSVC-built: it references MSVC's C++ RTTI
+            # and Winsock/ntdll imports that mingw's runtime cannot satisfy, so
+            # the default mingw gcc cannot link it at all. clang in MSVC mode
+            # can, and auto-detects the installed Visual Studio for headers and
+            # libs. The target is stated explicitly so a clang defaulting to the
+            # mingw triple cannot silently reintroduce the unusable link.
+            - name: Use clang targeting MSVC
+              if: matrix.os == 'windows-latest'
+              shell: bash
+              run: |
+                  clang --version
+                  clang -dumpmachine
+                  {
+                      echo 'CC=clang -target x86_64-pc-windows-msvc'
+                      echo 'CXX=clang++ -target x86_64-pc-windows-msvc'
+                  } >> "$GITHUB_ENV"
+
             - name: Build with the embedded engine
               shell: bash
               run: go build -tags relate -o "$RUNNER_TEMP/neo4j-cli-relate" ./cmd/neo4j-cli
