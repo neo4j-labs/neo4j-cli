@@ -45,10 +45,19 @@ jobs:
             - name: Fetch the Relate FFI library
               shell: bash
               # CGO_ENABLED goes to GITHUB_ENV, not a per-step `env:` — every
-              # later step that compiles (including `go run`) must see it, or
-              # cgo is silently off and the `relate` tag fails to build.
+              # later step that compiles must see it, or cgo is silently off.
+              #
+              # The script output is captured before it is eval'd: `eval "$(…)"`
+              # discards the substitution's exit status, so a failing script
+              # would otherwise leave the vars empty and only surface much
+              # later as a confusing compile error. The assignment propagates
+              # the failure, and the explicit check covers a script that
+              # succeeds while printing nothing.
               run: |
-                  eval "$(scripts/relate-ffi.sh ${{ matrix.triple }} "$RUNNER_TEMP/relate-ffi")"
+                  out="$(scripts/relate-ffi.sh ${{ matrix.triple }} "$RUNNER_TEMP/relate-ffi")"
+                  eval "$out"
+                  [ -n "${CGO_CFLAGS:-}" ] && [ -n "${CGO_LDFLAGS:-}" ] ||
+                      { echo "relate-ffi.sh set no CGO_CFLAGS/CGO_LDFLAGS" >&2; exit 1; }
                   echo "CGO_ENABLED=1" >> "$GITHUB_ENV"
                   echo "CGO_CFLAGS=$CGO_CFLAGS" >> "$GITHUB_ENV"
                   echo "CGO_LDFLAGS=$CGO_LDFLAGS" >> "$GITHUB_ENV"
