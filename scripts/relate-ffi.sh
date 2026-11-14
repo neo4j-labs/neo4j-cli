@@ -18,6 +18,18 @@
 # asset, so a tampered or truncated archive fails closed instead of silently
 # linking into the binary.
 #
+# Windows needs a different toolchain, because the archive is MSVC-built: it
+# references MSVC's C++ RTTI and Winsock/ntdll imports that mingw's runtime has
+# no equivalent for, so the default mingw gcc cannot link it. Set
+#
+#   CC=clang -target x86_64-pc-windows-msvc -fuse-ld=lld
+#
+# (clang auto-detects the installed Visual Studio for headers and libraries;
+# -fuse-ld=lld is required, not preferred — Go probes the external linker and,
+# unless it answers LLD, passes a gcc linker script that link.exe cannot read.)
+# The emitted CGO_LDFLAGS name the Windows system libraries the Rust staticlib
+# leaves to its consumer; see the windows case below.
+#
 # Deliberately POSIX-ish bash 3.2 compatible (no associative arrays): macOS
 # ships bash 3.2 as /bin/bash, and that is what a `#!/usr/bin/env bash` script
 # gets on the macOS CI runners.
