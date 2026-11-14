@@ -68,15 +68,26 @@ jobs:
             # can, and auto-detects the installed Visual Studio for headers and
             # libs. The target is stated explicitly so a clang defaulting to the
             # mingw triple cannot silently reintroduce the unusable link.
+            #
+            # -fuse-ld=lld is load-bearing, not a preference. Go probes the
+            # external linker with `-Wl,--version` and, unless the answer
+            # contains "LLD ", assumes a GNU ld and passes a gcc linker script
+            # as `-Wl,-T,<script>` (a workaround for golang.org/issue/20183).
+            # link.exe reads that .ld as an input file and dies with
+            # "fatal error LNK1107: invalid or corrupt file". lld-link reports
+            # itself as LLD, so Go skips the script.
             - name: Use clang targeting MSVC
               if: matrix.os == 'windows-latest'
               shell: bash
               run: |
                   clang --version
                   clang -dumpmachine
+                  # The exact probe Go runs to decide whether to add the gcc
+                  # linker script; it must mention LLD.
+                  clang -target x86_64-pc-windows-msvc -fuse-ld=lld -Wl,--version
                   {
-                      echo 'CC=clang -target x86_64-pc-windows-msvc'
-                      echo 'CXX=clang++ -target x86_64-pc-windows-msvc'
+                      echo 'CC=clang -target x86_64-pc-windows-msvc -fuse-ld=lld'
+                      echo 'CXX=clang++ -target x86_64-pc-windows-msvc -fuse-ld=lld'
                   } >> "$GITHUB_ENV"
 
             - name: Build with the embedded engine
