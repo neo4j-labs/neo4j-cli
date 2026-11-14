@@ -98,7 +98,12 @@ if [[ "$got_sha" != "$want_sha" ]]; then
     fail "sha256 mismatch for $asset: got $got_sha, want $want_sha (removed the file; re-run to refetch)"
 fi
 
-tar -xzf "$archive" -C "$dest"
+# The archive goes in on stdin rather than as `-f <path>`: GNU tar reads a
+# leading `host:` in an archive argument as a REMOTE archive, and a Windows
+# `$RUNNER_TEMP` (D:\a\_temp) matches that — "tar (child): Cannot connect to
+# D: resolve failed". `--force-local` would fix it but bsdtar (macOS) has no
+# such option; stdin is portable.
+tar -xzf - -C "$dest" < "$archive"
 
 # Static linking needs the archive ALONE in a directory: with the shared
 # library next to it, the linker picks the shared one and the binary gains a
