@@ -267,6 +267,10 @@ Pilot work happens in the fork until it is proposed upstream. A checkout has two
 - **Check a re-reported finding against the tree before changing code.** Grep the symbol and count the claimed call sites. If the premise is stale, state the evidence on the PR and leave the code alone.
 - **Read comments newest first.** Only the latest review round is current.
 
+### Agent backlog
+
+`/agent-backlog-autopilot` (`.claude/skills/agent-backlog-autopilot/SKILL.md`) works one card from team `DEVSURF`, project `P-DEVSURF-2322`, state `Agent Backlog`. It runs to a merged PR or a handback in one run. The human flips ready. The agent may squash-merge, except diffs touching authentication, `go.mod`/`go.sum`, CI/tooling or agent rules, which go to a human. The skill holds the full contract.
+
 ### Larger features
 
 A feature that splits into several nodes or spans several PRs goes through the `gbuild` plugin (`oskarhane/oskars.ai`), not one hand-rolled branch. Small changes use a single branch directly.
