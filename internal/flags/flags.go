@@ -88,7 +88,7 @@ func BindFormatFromFlag(cmd *cobra.Command, cfg *clicfg.Config) error {
 			}
 		}
 		if !valid {
-			return clierr.NewUsageError("invalid format value specified: %s", formatValue)
+			return clierr.NewUsageError("invalid format value specified: %s (valid values: %s)", formatValue, strings.Join(clicfg.ValidFormatValues[:], ", "))
 		}
 	}
 
