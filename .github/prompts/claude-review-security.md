@@ -48,7 +48,7 @@ Single word, no other content. Issue the write as exactly this single Bash pipel
 echo pass | tee claude-verdict.txt
 ```
 
-Command-form rules (mandatory here and in "Posting the summary"): every Bash command must be a SINGLE invocation with LITERAL values interpolated — no shell variables (no `$...`/`${...}` forms of any kind; use the literal repo slug `neo4j-labs/neo4j-cli` and the literal PR number from the `PR NUMBER:` prompt header line), no `&&`/`;` chaining, no heredoc combined with any other command, and never the `Write` tool. Paths matter too: the two files you write live in the workspace root (`claude-verdict.txt`, `claude-summary.md`) because the sandbox auto-approves writes only inside the session working directory — `/tmp` is outside it and every write there is denied. The workflow's allowed-tools checker can only pre-approve single commands it can fully verify before they run, so it denies every other form — and then the verdict silently never lands.
+Command-form rules (mandatory here and in "Posting the summary"): every Bash command must be a SINGLE invocation with LITERAL values interpolated — no shell variables (no `$...`/`${...}` forms of any kind; use the literal repo slug from the `REPO:` prompt header line and the literal PR number from the `PR NUMBER:` prompt header line), no `&&`/`;` chaining, no heredoc combined with any other command, and never the `Write` tool. Paths matter too: the two files you write live in the workspace root (`claude-verdict.txt`, `claude-summary.md`) because the sandbox auto-approves writes only inside the session working directory — `/tmp` is outside it and every write there is denied. The workflow's allowed-tools checker can only pre-approve single commands it can fully verify before they run, so it denies every other form — and then the verdict silently never lands.
 
 ## Step 5 — Compose and post the summary
 
@@ -78,7 +78,7 @@ The final line of the summary must therefore include one of:
 
 ### Posting the summary
 
-Use the discover-then-edit pattern so the PR ends up with exactly one Security-review comment, not one per push. Every command below is a SINGLE Bash invocation with LITERAL values interpolated: the literal repo slug `neo4j-labs/neo4j-cli`, and wherever `<PR number>` appears substitute the literal digits from the `PR NUMBER:` prompt header line. The Step 4 command-form rules apply — no shell variables (`$...`/`${...}`), no `&&`/`;` chaining, no heredoc combined with another command, no `Write` tool — because the allowed-tools checker denies all of those and the verdict then silently never lands. **Resilience:** if a command is denied, rewrite it as a single literal allowlisted pipeline and retry; NEVER end your turn without writing `claude-verdict.txt` AND posting the summary comment.
+Use the discover-then-edit pattern so the PR ends up with exactly one Security-review comment, not one per push. Every command below is a SINGLE Bash invocation with LITERAL values interpolated: the literal repo slug from the `REPO:` prompt header line wherever `<REPO>` appears, and wherever `<PR number>` appears substitute the literal digits from the `PR NUMBER:` prompt header line. The Step 4 command-form rules apply — no shell variables (`$...`/`${...}`), no `&&`/`;` chaining, no heredoc combined with another command, no `Write` tool — because the allowed-tools checker denies all of those and the verdict then silently never lands. **Resilience:** if a command is denied, rewrite it as a single literal allowlisted pipeline and retry; NEVER end your turn without writing `claude-verdict.txt` AND posting the summary comment.
 
 1. Write the summary body to `claude-summary.md` with this lone heredoc command — nothing else attached (no `&&`, no second command):
    ```
@@ -88,7 +88,7 @@ Use the discover-then-edit pattern so the PR ends up with exactly one Security-r
    ```
 2. Look up any prior summary written by this workflow:
    ```
-   gh api "repos/neo4j-labs/neo4j-cli/issues/<PR number>/comments" \
+   gh api "repos/<REPO>/issues/<PR number>/comments" \
      --jq 'map(select(.user.login == "claude[bot]"
                        and (.body | contains("**Security review:**")))
                | sort_by(.created_at)
@@ -97,7 +97,7 @@ Use the discover-then-edit pattern so the PR ends up with exactly one Security-r
    ```
 3. If that returns a numeric id, **edit** the existing comment in place:
    ```
-   gh api -X PATCH "repos/neo4j-labs/neo4j-cli/issues/comments/<id>" -f body=@claude-summary.md
+   gh api -X PATCH "repos/<REPO>/issues/comments/<id>" -f body=@claude-summary.md
    ```
 4. Otherwise, **create** a fresh comment:
    ```
