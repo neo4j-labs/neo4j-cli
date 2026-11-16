@@ -20,6 +20,10 @@ permissions:
 jobs:
     cla-check:
         #if: github.event.pull_request.user.login != 'renovate[bot]'
+        # The token secret exists only upstream, so a fork's run would fail the
+        # checkout. Fork PRs to upstream still run: pull_request_target uses the
+        # base repo's context.
+        if: github.repository == 'neo4j-labs/neo4j-cli'
 
         runs-on: ubuntu-latest
 
