@@ -224,3 +224,46 @@ Served from `gh-pages` branch (NOT `main`): `index.html`, `llms.txt`, `install.s
 _This AGENTS.md was generated using agent-based project discovery._
 
 <!-- END GENERATED: AGENTS-MD -->
+
+## Agent workflow
+
+Hand-maintained. Lives outside the generated block above; regeneration must not touch it.
+
+### Branching and pull requests
+
+- **Work in a worktree on a fresh branch.** Every task starts with `git worktree add <dir> -b <branch> origin/main`. The main checkout stays on `main` and clean, for reading only. Stack dependent work (`main → b1 → b2`), each PR based on its predecessor.
+- **One concern per PR, one squashed commit.** Fix rounds go into that commit: `git commit --amend` while unpushed, otherwise re-squash onto fresh `origin/main`. After any re-squash, `git diff origin/main HEAD --name-only` must list exactly the intended files. A foreign file means a revert of `main`'s work: abort before pushing. A missing file means a dropped fix.
+- **Rebase, never merge.** Branches stay linear. `git merge <base>` into a branch breaks stacked PRs.
+- **Stage explicit paths.** `git add -A` in a worktree can pick up nested worktree gitlinks.
+- **Open every PR as a draft.** The conventions and security review workflows skip drafts and start on `ready_for_review`. A human marks the PR ready; agents never do.
+- **PR title** is a conventional-commit subject matching the squashed commit. **PR body** describes the final squashed diff, lists what verification actually ran, and is re-checked after every re-squash.
+
+### Before every push
+
+- `make test`, `make fmt-check`, `make lint` (the final gates above).
+- `make generate-check` when the command tree, `Long`/`Example` text, or `ValidFormatValues` changed.
+- `changie new` for user-facing changes only.
+
+### Review loop
+
+- **Fix before merge:** blocker, critical, high and medium findings from either review workflow.
+- **Defer low findings and nits.** Note them in the PR description and merge without them. Never hold a security or feature PR for polish.
+- **Bound the loop.** A round that only repeats a finding already fixed or already deferred ends the loop. Land the PR; target hours, not days.
+- **Check a re-reported finding against the tree before changing code.** Grep the symbol and count the claimed call sites. If the premise is stale, state the evidence on the PR and leave the code alone.
+- **Read comments newest first.** Only the latest review round is current.
+
+### Larger features
+
+A feature that splits into several nodes or spans several PRs goes through the `gbuild` plugin (`oskarhane/oskars.ai`), not one hand-rolled branch. Small changes use a single branch directly.
+
+- Needs `relate` 1.0.1 or newer on `PATH`. The plan store is local to the machine: `<git-common-dir>/gbuild/<feature>/db`.
+- Loop: `/gbuild:design` (optional) → `/gbuild:plan` → `/gbuild:run` → `/gbuild:review` → `/gbuild:pr` → `/gbuild:cleanup`.
+- Every node carries concrete acceptance criteria. A fresh reviewer, never the implementer, gates each node before it merges into the feature branch.
+
+### Cleanup at merge
+
+Remove everything the PR used: worktrees (`git worktree remove`), branches (local and remote), gbuild stores, scratch clones. Then `git worktree prune` and `git fetch --prune`. A workspace with uncommitted changes is never deleted by another session.
+
+### Permission blocks
+
+A tool call denied by a classifier, hook or permission guard ends that line of work. Report the block to the human. Never reroute the same action through another mechanism.
