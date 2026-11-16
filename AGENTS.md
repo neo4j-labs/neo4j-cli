@@ -229,13 +229,28 @@ _This AGENTS.md was generated using agent-based project discovery._
 
 Hand-maintained. Lives outside the generated block above; regeneration must not touch it.
 
+### Remotes (pilot in the fork)
+
+Pilot work happens in the fork until it is proposed upstream. A checkout has two remotes:
+
+| Remote | Repo | Use |
+| --- | --- | --- |
+| `origin` | `neo4j-labs/neo4j-cli` | Upstream. Read-only. Never a branch base, push target or PR target for pilot work. |
+| `fork` | `acke/neo4j-cli` | Branch base, push target and PR target. |
+
+- **Branch base:** `fork/main`. Run `git fetch fork` first. `origin/main` lacks the fork-only contract (this section), so a branch cut from it silently drops the rules.
+- **Push:** `git push fork <branch>`. Never `git push origin`. Set `git config remote.pushDefault fork` so a bare `git push` also goes to the fork.
+- **PR:** `gh pr create --repo acke/neo4j-cli --base main --head <branch> --draft`. Always pass `--repo` and `--base`: `gh` defaults to the upstream repo.
+- **Before pushing,** `git remote -v` must show `fork` as `acke/neo4j-cli`. If it does not, stop and report it.
+- **Upstream** gets a PR only when a human asks for one.
+
 ### Branching and pull requests
 
-- **Work in a worktree on a fresh branch.** Every task starts with `git worktree add <dir> -b <branch> origin/main`. The main checkout stays on `main` and clean, for reading only. Stack dependent work (`main → b1 → b2`), each PR based on its predecessor.
-- **One concern per PR, one squashed commit.** Fix rounds go into that commit: `git commit --amend` while unpushed, otherwise re-squash onto fresh `origin/main`. After any re-squash, `git diff origin/main HEAD --name-only` must list exactly the intended files. A foreign file means a revert of `main`'s work: abort before pushing. A missing file means a dropped fix.
+- **Work in a worktree on a fresh branch.** Every task starts with `git worktree add <dir> -b <branch> fork/main`. The main checkout stays on `main` and clean, for reading only. Stack dependent work (`main → b1 → b2`), each PR based on its predecessor.
+- **One concern per PR, one squashed commit.** Fix rounds go into that commit: `git commit --amend` while unpushed, otherwise re-squash onto fresh `fork/main`. After any re-squash, `git diff fork/main HEAD --name-only` must list exactly the intended files. A foreign file means a revert of `main`'s work: abort before pushing. A missing file means a dropped fix.
 - **Rebase, never merge.** Branches stay linear. `git merge <base>` into a branch breaks stacked PRs.
 - **Stage explicit paths.** `git add -A` in a worktree can pick up nested worktree gitlinks.
-- **Open every PR as a draft.** The conventions and security review workflows skip drafts and start on `ready_for_review`. A human marks the PR ready; agents never do.
+- **Open every PR as a draft, against `acke/neo4j-cli:main`.** The conventions and security review workflows skip drafts and start on `ready_for_review`. A human marks the PR ready; agents never do.
 - **PR title** is a conventional-commit subject matching the squashed commit. **PR body** describes the final squashed diff, lists what verification actually ran, and is re-checked after every re-squash.
 
 ### Before every push
