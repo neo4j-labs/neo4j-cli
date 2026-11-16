@@ -1,0 +1,31 @@
+{
+ "task": "T5",
+ "run": 3,
+ "status": "ok",
+ "success": true,
+ "binary_sha_matches_pin": true,
+ "seconds": 11.4,
+ "turns": 3,
+ "bash_calls": 2,
+ "cost_usd": 0.0110776,
+ "tokens": {
+  "input_tokens": 6,
+  "output_tokens": 171,
+  "cache_read_input_tokens": 11681,
+  "cache_creation_input_tokens": 3275
+ },
+ "session_init": {
+  "tools": [
+   "Bash"
+  ],
+  "mcp_servers": [],
+  "skills": [],
+  "slash_commands": [],
+  "model": "claude-sonnet-5-5"
+ },
+ "commands": [
+  "neo4j-cli aura instance --help",
+  "neo4j-cli aura instance snapshot --help"
+ ],
+ "final": "create\ndelete\ndeploy\nload\noverwrite\npause\nresume\nupdate\nsnapshot create"
+}

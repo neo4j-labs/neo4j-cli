@@ -1,0 +1,48 @@
+{
+  "protocol": "swf-bench-protocol/1",
+  "frozen": true,
+  "pins": {
+    "neo4j_cli": {
+      "version": "v1.19.0",
+      "path": "/opt/homebrew/bin/neo4j-cli",
+      "sha256": "a7d6ea4ae146fcdfb0809155485727b3049051a41b635e1f9cd762e707a63e32"
+    },
+    "claude_code": "2.1.311",
+    "model": "claude-sonnet-5-5",
+    "relate": "v1.0.1",
+    "gbuild": {
+      "version": "0.13.1",
+      "commit": "d089ee975074cbe67990550b5cac536c7afcc913"
+    }
+  },
+  "harness": {
+    "invocation": "claude -p <prompt> --model <model> --output-format stream-json --verbose --tools Bash --setting-sources project --disable-slash-commands --strict-mcp-config --no-session-persistence --permission-mode dontAsk --allowedTools \"Bash(neo4j-cli:*)\" \"Bash(head:*)\" \"Bash(tail:*)\" \"Bash(jq:*)\" \"Bash(wc:*)\" --max-budget-usd 2 --append-system-prompt <allowlist notice>",
+    "cwd": "fresh empty dir per run",
+    "agent_shell_scope": "dontAsk plus allowlist, so the agent cannot read the real HOME (a first T6 run read shell history and leaked a credential; scrubbed)",
+    "neo4j_cli_isolation": "PATH wrapper sets HOME=<run>/home before exec of the pinned binary; the agent's own HOME is untouched",
+    "timeout_seconds": 600,
+    "runs_per_task": 3,
+    "docker": "T7 only: the PATH wrapper sets DOCKER_HOST to the Docker Desktop socket (~/.docker/run/docker.sock), because the throwaway HOME hides the docker context. The agent shell still cannot run docker itself. Leftover managed containers fail the check and are removed after the run."
+  },
+  "tasks": [
+    "T1",
+    "T2",
+    "T3",
+    "T4",
+    "T5",
+    "T6",
+    "T7"
+  ],
+  "frozen_on": "2026-11-16",
+  "limits": {
+    "seconds_per_run": 600,
+    "usd_per_run": 2
+  },
+  "billing": "ANTHROPIC_API_KEY (API billing); cost_usd in results is the reported total_cost_usd",
+  "notes": [
+    "T1-T7 frozen. T8-T10 need an Aura key.",
+    "Success checks live in run.py check().",
+    "Fixtures use credential-storage insecure under a throwaway HOME.",
+    "T7 needs Docker running and the neo4j:community image pulled beforehand (pull time is not part of the run)."
+  ]
+}
