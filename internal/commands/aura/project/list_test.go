@@ -142,7 +142,7 @@ func TestListProjectsWithInvalidFormat(t *testing.T) {
 
 	helper.ExecuteCommand("project list --format invalid")
 
-	helper.AssertErr("Error: invalid format value specified: invalid")
+	helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, table, toon)")
 }
 
 func TestListProjectsWithCredentialFlag(t *testing.T) {

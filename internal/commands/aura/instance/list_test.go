@@ -225,7 +225,7 @@ func TestListCustomerManagedKeysWithInvalidOutput(t *testing.T) {
 
 	helper.ExecuteCommand("instance list --format invalid")
 
-	helper.AssertErr("Error: invalid format value specified: invalid")
+	helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, table, toon)")
 }
 
 func TestListInstancesWithCredentialFlag(t *testing.T) {
