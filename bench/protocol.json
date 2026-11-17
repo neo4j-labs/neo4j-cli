@@ -1,5 +1,5 @@
 {
-  "protocol": "swf-bench-protocol/1",
+  "protocol": "swf-bench-protocol/2",
   "frozen": true,
   "pins": {
     "neo4j_cli": {
@@ -22,7 +22,16 @@
     "neo4j_cli_isolation": "PATH wrapper sets HOME=<run>/home before exec of the pinned binary; the agent's own HOME is untouched",
     "timeout_seconds": 600,
     "runs_per_task": 3,
-    "docker": "T7 only: the PATH wrapper sets DOCKER_HOST to the Docker Desktop socket (~/.docker/run/docker.sock), because the throwaway HOME hides the docker context. The agent shell still cannot run docker itself. Leftover managed containers fail the check and are removed after the run."
+    "docker": "T7 only: the PATH wrapper sets DOCKER_HOST to the Docker Desktop socket (~/.docker/run/docker.sock), because the throwaway HOME hides the docker context. The agent shell still cannot run docker itself. Leftover managed containers fail the check and are removed after the run.",
+    "arms": "--bin PATH --arm LABEL runs the same tasks against another build (for example a card's parent and changed builds). Results go to bench/results/<arm>/. The default arm is the pinned release.",
+    "tasks_file": "bench/tasks.json holds every prompt. expectedAnswer must appear as a whole word of the final answer; mustRun lists commands the agent must have run. State checks live in run.py.",
+    "aura": {
+      "base_url": "https://api-devcliswf.neo4j-dev.io",
+      "auth_url": "https://api-devcliswf.neo4j-dev.io/oauth/token",
+      "workspace": "a63be88d-0d38-4054-ae5b-0e55f1483ea3/a63be88d-0d38-4054-ae5b-0e55f1483ea3",
+      "credential_name": "swf-bench",
+      "credential_source": "AURA_CLIENT_ID and AURA_CLIENT_SECRET, read from the environment or ~/.config/aura/env. The runner seeds them into the throwaway HOME for tasks marked \"aura\": true in tasks.json, and removes them from the environment of the claude process. The agent never sees the secret."
+    }
   },
   "tasks": [
     "T1",
@@ -31,9 +40,12 @@
     "T4",
     "T5",
     "T6",
-    "T7"
+    "T7",
+    "T8",
+    "T9",
+    "T10"
   ],
-  "frozen_on": "2026-11-16",
+  "frozen_on": "2026-11-17",
   "limits": {
     "seconds_per_run": 600,
     "usd_per_run": 2
@@ -41,8 +53,16 @@
   "billing": "ANTHROPIC_API_KEY (API billing); cost_usd in results is the reported total_cost_usd",
   "notes": [
     "T1-T7 frozen. T8-T10 need an Aura key.",
-    "Success checks live in run.py check().",
+    "Success checks: expectedAnswer and mustRun in tasks.json, state checks in run.py.",
     "Fixtures use credential-storage insecure under a throwaway HOME.",
-    "T7 needs Docker running and the neo4j:community image pulled beforehand (pull time is not part of the run)."
+    "T7 needs Docker running and the neo4j:community image pulled beforehand (pull time is not part of the run).",
+    "Decision rule: a build is better only on a material tool_output_bytes drop with success held. A cheaper arm that answers wrong loses. Report other changes as non-wins."
+  ],
+  "metrics": [
+    "success",
+    "turns",
+    "seconds",
+    "cost_usd",
+    "tool_output_bytes (sum of Bash tool_result bytes the agent read back)"
   ]
 }

@@ -3,16 +3,21 @@
  "run": 1,
  "status": "ok",
  "success": true,
+ "arm": null,
+ "binary": "/opt/homebrew/bin/neo4j-cli",
+ "binary_version": "neo4j-cli version v1.19.0",
+ "binary_sha256": "a7d6ea4ae146fcdfb0809155485727b3049051a41b635e1f9cd762e707a63e32",
  "binary_sha_matches_pin": true,
- "seconds": 16.3,
+ "tool_output_bytes": 6956,
+ "seconds": 12.6,
  "turns": 5,
  "bash_calls": 4,
- "cost_usd": 0.021094800000000004,
+ "cost_usd": 0.0219306,
  "tokens": {
   "input_tokens": 10,
-  "output_tokens": 569,
-  "cache_read_input_tokens": 23873,
-  "cache_creation_input_tokens": 5199
+  "output_tokens": 642,
+  "cache_read_input_tokens": 24131,
+  "cache_creation_input_tokens": 5231
  },
  "session_init": {
   "tools": [
@@ -26,8 +31,8 @@
  "commands": [
   "neo4j-cli --help",
   "neo4j-cli skill --help; neo4j-cli skill install --help",
-  "neo4j-cli skill install --agent claude-code --format toon --rw",
-  "neo4j-cli skill list --format toon"
+  "neo4j-cli skill install --agent claude-code --format json --rw",
+  "neo4j-cli skill list --format json"
  ],
- "final": "I installed the neo4j-cli self-skill for Claude Code only, using `neo4j-cli skill install --agent claude-code --rw`. No other agents were touched.\n\n- **Install location:** `/tmp/claude/swf-T4-sl75w4e_/home/.claude/skills/neo4j-cli`\n- **Version:** v1.19.0, which is also the latest available.\n\nThe install command only reported the directory, and I can't list directories in this shell. So I can't name the individual files inside it. `neo4j-cli skill print` would show its `SKILL.md`, but I didn't run it. `neo4j-cli skill list` confirms the self-skill is installed for Claude Code and not installed for any other agent.\n\nI didn't install any of the catalog skills, such as `neo4j-cypher-skill`. They're a separate, optional install."
+ "final": "I installed the `neo4j-cli` skill for Claude Code only. I used `neo4j-cli skill install --agent claude-code --rw`.\n\n- **Location:** `/var/folders/d1/549jj01d05l_4w_bj97034c00000gp/T/swf-T4-8a0g9kdj/home/.claude/skills/neo4j-cli`\n- **Version:** `skill list` shows v1.19.0 installed for `claude-code`, matching the available version.\n- **Other agents:** None were touched. They show as not detected and not installed.\n\nI can't give you the individual file names. The install output only reports the directory, and my shell is limited to `neo4j-cli`, `head`, `tail`, `jq` and `wc`, so I couldn't list its contents. The skill is the embedded self-skill, so it should include a `SKILL.md`. `neo4j-cli skill print` will show you that file's contents, but I haven't run it."
 }

@@ -3,16 +3,21 @@
  "run": 2,
  "status": "ok",
  "success": true,
+ "arm": null,
+ "binary": "/opt/homebrew/bin/neo4j-cli",
+ "binary_version": "neo4j-cli version v1.19.0",
+ "binary_sha256": "a7d6ea4ae146fcdfb0809155485727b3049051a41b635e1f9cd762e707a63e32",
  "binary_sha_matches_pin": true,
- "seconds": 12.1,
+ "tool_output_bytes": 3027,
+ "seconds": 7.8,
  "turns": 3,
  "bash_calls": 2,
- "cost_usd": 0.0117097,
+ "cost_usd": 0.0114643,
  "tokens": {
   "input_tokens": 6,
-  "output_tokens": 222,
-  "cache_read_input_tokens": 11677,
-  "cache_creation_input_tokens": 3324
+  "output_tokens": 192,
+  "cache_read_input_tokens": 11773,
+  "cache_creation_input_tokens": 3342
  },
  "session_init": {
   "tools": [

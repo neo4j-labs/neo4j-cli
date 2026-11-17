@@ -3,16 +3,21 @@
  "run": 3,
  "status": "ok",
  "success": true,
+ "arm": null,
+ "binary": "/opt/homebrew/bin/neo4j-cli",
+ "binary_version": "neo4j-cli version v1.19.0",
+ "binary_sha256": "a7d6ea4ae146fcdfb0809155485727b3049051a41b635e1f9cd762e707a63e32",
  "binary_sha_matches_pin": true,
- "seconds": 12.0,
+ "tool_output_bytes": 2940,
+ "seconds": 9.3,
  "turns": 4,
  "bash_calls": 3,
- "cost_usd": 0.0129085,
+ "cost_usd": 0.0132854,
  "tokens": {
   "input_tokens": 8,
-  "output_tokens": 284,
-  "cache_read_input_tokens": 17100,
-  "cache_creation_input_tokens": 3337
+  "output_tokens": 308,
+  "cache_read_input_tokens": 17244,
+  "cache_creation_input_tokens": 3386
  },
  "session_init": {
   "tools": [
@@ -28,5 +33,5 @@
   "neo4j-cli credential --help",
   "neo4j-cli credential dbms list --format toon"
  ],
- "final": "There is one stored DBMS credential, named **bench-db**.\n\n- **URI:** `neo4j://localhost:7687`\n- **Username:** `neo4j`\n- **Database:** `neo4j`\n- **Default:** yes\n- **Embed credential:** none\n\nI found it with `neo4j-cli credential dbms list`."
+ "final": "There is one stored DBMS credential, named **`bench-db`**. I found it with `neo4j-cli credential dbms list`.\n\n- **URI:** `neo4j://localhost:7687`\n- **Username:** `neo4j`\n- **Database:** `neo4j`\n- **Default:** yes\n- **Embed credential:** none\n\nThe list output doesn't include a password, so I can't tell you what it is."
 }

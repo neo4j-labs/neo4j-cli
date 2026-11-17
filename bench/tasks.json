@@ -1,0 +1,58 @@
+[
+  {
+    "id": "T1",
+    "prompt": "Using the neo4j-cli command, find out which stored database (DBMS) credentials exist and tell me the name of the stored credential. Use the CLI itself to discover how, not the internet.",
+    "expectedAnswer": "bench-db",
+    "mustRun": [
+      "credential dbms list"
+    ]
+  },
+  {
+    "id": "T2",
+    "prompt": "Using neo4j-cli, set the global default output format to json and confirm the change took effect."
+  },
+  {
+    "id": "T3",
+    "prompt": "Run `neo4j-cli --format nope config list`. It will fail. Fix the command using only the information in the error message, and run it successfully. Tell me the command that worked."
+  },
+  {
+    "id": "T4",
+    "prompt": "Install the neo4j-cli agent skill for Claude Code only (not other agents) and tell me which skill files were installed."
+  },
+  {
+    "id": "T5",
+    "prompt": "Using neo4j-cli's own discovery output (not source code or the internet), list the `aura instance` subcommands that change state, so they need --rw. Reply with the subcommand names only."
+  },
+  {
+    "id": "T6",
+    "prompt": "Show the 5 most recent neo4j-cli command history entries, newest first, as a JSON array of the command strings only. Reply with the JSON array and nothing else."
+  },
+  {
+    "id": "T7",
+    "prompt": "Using neo4j-cli, start a throwaway local Neo4j in Docker (community edition), run the Cypher `RETURN 1+41 AS answer` against it, and tell me the answer. Remove the container when done.",
+    "expectedAnswer": "42",
+    "mustRun": [
+      "docker create",
+      " query"
+    ]
+  },
+  {
+    "id": "T8",
+    "aura": true,
+    "prompt": "Using neo4j-cli, find out what the Aura project in my default workspace is called. Reply with the project name only. Use the CLI itself to discover how, not the internet.",
+    "expectedAnswer": "New project",
+    "mustRun": [
+      "neo4j-cli aura"
+    ]
+  },
+  {
+    "id": "T9",
+    "aura": true,
+    "prompt": "Using neo4j-cli, create a free Aura instance named bench-t9-{run} in my default workspace, wait until it is running, and tell me its instance ID. Do not store or show its password."
+  },
+  {
+    "id": "T10",
+    "aura": true,
+    "prompt": "Using neo4j-cli, delete the Aura instance named bench-t10-{run} in my default workspace, and tell me its instance ID."
+  }
+]

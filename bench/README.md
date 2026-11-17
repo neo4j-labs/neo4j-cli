@@ -3,10 +3,18 @@
 Agent benchmark for `neo4j-cli`. Each task gives a headless Claude Code session a prompt and checks the outcome with code. The protocol is frozen in `protocol.json`; change it and the old results stop being comparable.
 
 ```
-python3 -I bench/run.py <task> <run>     # T1..T7, writes bench/results/<task>-<run>/
+python3 -I bench/run.py <task> <run>                          # T1..T10, writes bench/results/<task>-<run>/
+python3 -I bench/run.py <task> <run> --bin PATH --arm LABEL   # same task on another build, writes bench/results/<arm>/<task>-<run>/
+python3 -I bench/report.py                                    # one row per arm and task, p25/median/p75
 ```
 
-Each run writes `stream.jsonl` (full transcript) and `result.json` (success, tokens, turns, commands, cost).
+Each run writes `stream.jsonl` (full transcript) and `result.json` (success, tokens, turns, commands, cost, `tool_output_bytes`, binary version and SHA-256).
+
+`tasks.json` holds every prompt. `expectedAnswer` must appear as a whole word of the final answer, and `mustRun` lists commands the agent must have run. State checks (config, skill files, history, containers) live in `run.py`.
+
+## Comparing two builds
+
+Run the same task set with `--bin` and `--arm` once per build, for example `parent` and `changed`, then `report.py`. Only `--bin` changes between arms. A build wins only on a material drop in `tool_output_bytes` with the success rate held. A cheaper arm that answers wrong loses. Any other change is a non-win and is reported as one. This is the decision rule of relate's `relate-agentbench`.
 
 ## Isolation
 
@@ -27,20 +35,27 @@ Each run writes `stream.jsonl` (full transcript) and `result.json` (success, tok
 | T6 | show the last 5 history entries as JSON | a JSON array of 5 `neo4j-cli ...` strings |
 | T7 | start a throwaway community Neo4j in Docker, run `RETURN 1+41 AS answer`, remove it | answer is 42, the agent ran `docker create` and `query`, no managed container is left |
 
-T8 to T10 (Aura read, pause, preview-then-delete) need an Aura key and are not written yet. T7 needs Docker running and `docker pull neo4j:community` done first.
+| T8 | find the project name of the default Aura workspace | answer is `New project`, the agent ran `neo4j-cli aura ...` |
+| T9 | create a free Aura instance `bench-t9-<run>`, wait until running, report its ID | the instance exists, is running and its ID is in the answer |
+| T10 | delete the Aura instance `bench-t10-<run>` (the setup creates it), report its ID | the instance is gone or destroying and its real ID is in the answer |
+
+T7 needs Docker running and `docker pull neo4j:community` done first. T8 to T10 run against the Aura dev environment frozen in `protocol.json` and need `AURA_CLIENT_ID` and `AURA_CLIENT_SECRET` in the environment or in `~/.config/aura/env`. The runner deletes every `bench-*` instance before and after a run, because the workspace holds one free instance at a time, so run these tasks one at a time. Free instances cannot be paused, so there is no pause task. Run the harness outside the Claude Code sandbox: inside it the agent's shell drops the PATH wrapper and the CLI runs with the wrong HOME.
 
 ## Baseline
 
-`neo4j-cli` v1.19.0, model `claude-sonnet-5-5`, Claude Code 2.1.311, 3 runs per task, 2026-11-16. Three runs are a smoke baseline.
+`neo4j-cli` v1.19.0, model `claude-sonnet-5-5`, Claude Code 2.1.311, protocol `swf-bench-protocol/2`, 3 runs per task, 2026-11-17. Three runs are a smoke baseline. Medians; `python3 -I bench/report.py` prints p25 and p75 too.
 
-| Task | Success | Median cost (USD) | Turns |
-| --- | --- | --- | --- |
-| T1 | 3/3 | 0.013 | 4 |
-| T2 | 3/3 | 0.014 | 5 |
-| T3 | 0/3 | 0.015 | 3 |
-| T4 | 3/3 | 0.020 | 5 |
-| T5 | 3/3 | 0.012 | 3 |
-| T6 | 3/3 | 0.015 | 4 to 6 |
-| T7 | 3/3 | 0.042 | 8 to 9 |
+| Task | Success | Turns | Tool output (bytes) | Cost (USD) |
+| --- | --- | --- | --- | --- |
+| T1 | 3/3 | 4 | 2940 | 0.0131 |
+| T2 | 3/3 | 5 | 3366 | 0.0148 |
+| T3 | 1/3 | 3 | 951 | 0.0158 |
+| T4 | 3/3 | 5 | 6956 | 0.0220 |
+| T5 | 3/3 | 3 | 3027 | 0.0115 |
+| T6 | 3/3 | 5 | 4049 | 0.0151 |
+| T7 | 3/3 | 9 | 20176 | 0.0421 |
+| T8 | 3/3 | 5 | 5626 | 0.0163 |
+| T9 | 3/3 | 5 | 8630 | 0.0209 |
+| T10 | 3/3 | 5 | 2593 | 0.0157 |
 
-T3 fails because the error names the rejected value but not the valid ones. Every run gave up or guessed.
+T3 fails 2 of 3 because the error names the rejected value but not the valid ones. The run that passed guessed a valid value after reading help. The protocol `/1` baseline (T1 to T6 on 2026-11-16) had T3 at 0 of 3.

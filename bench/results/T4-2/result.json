@@ -3,16 +3,21 @@
  "run": 2,
  "status": "ok",
  "success": true,
+ "arm": null,
+ "binary": "/opt/homebrew/bin/neo4j-cli",
+ "binary_version": "neo4j-cli version v1.19.0",
+ "binary_sha256": "a7d6ea4ae146fcdfb0809155485727b3049051a41b635e1f9cd762e707a63e32",
  "binary_sha_matches_pin": true,
- "seconds": 16.4,
+ "tool_output_bytes": 6956,
+ "seconds": 12.5,
  "turns": 5,
  "bash_calls": 4,
- "cost_usd": 0.0203637,
+ "cost_usd": 0.0219931,
  "tokens": {
   "input_tokens": 10,
-  "output_tokens": 519,
-  "cache_read_input_tokens": 23912,
-  "cache_creation_input_tokens": 5105
+  "output_tokens": 652,
+  "cache_read_input_tokens": 24131,
+  "cache_creation_input_tokens": 5216
  },
  "session_init": {
   "tools": [
@@ -29,5 +34,5 @@
   "neo4j-cli skill install --agent claude-code --rw --format json",
   "neo4j-cli skill list --format json"
  ],
- "final": "I installed the `neo4j-cli` skill for Claude Code only. I didn't pass `--all`, so none of the catalog skills were installed.\n\n- **Install location:** `/tmp/claude/swf-T4-9utnkgc9/home/.claude/skills/neo4j-cli`\n- **Version:** v1.19.0, shown as installed for `claude-code` in `neo4j-cli skill list`.\n\nI can't list the individual files inside that directory. The shell here only allows `neo4j-cli`, `head`, `tail`, `jq` and `wc`, and the install output doesn't name the files. The skill's main file is `SKILL.md`, which you can view with `neo4j-cli skill print`. The install may have written other files too, which I haven't confirmed."
+ "final": "I installed the `neo4j-cli` skill for Claude Code only. I can't list the individual files, because this shell only allows `neo4j-cli`, `head`, `tail`, `jq` and `wc`.\n\n- **Install location:** `/var/folders/d1/549jj01d05l_4w_bj97034c00000gp/T/swf-T4-zu3tt9cw/home/.claude/skills/neo4j-cli`\n- **Skill:** `neo4j-cli`, the embedded self-skill, version v1.19.0.\n- **Result:** the install reported `installed`. `neo4j-cli skill list` confirms `neo4j-cli` is installed for `claude-code` and not installed for any other agent.\n\nThe install output names only the skill directory, not the files inside it. I haven't seen the contents, though the CLI's `skill print` command describes the skill as a `SKILL.md`. If you want the exact file list, run `ls -R` on that directory in your own terminal."
 }
