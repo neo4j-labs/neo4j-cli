@@ -1553,9 +1553,17 @@ Returns a list of instances
 
 This subcommand returns a list containing a summary of each of your Aura instances in the specified project. To find out more about a specific instance, retrieve the details using the get subcommand.
 
+Use --limit to return at most that many instances, in which case a note is written to stderr saying more instances exist.
+
 Use --organization-id and --project-id to specify which project's instances to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.
 
-Usage: `neo4j-cli aura instance list`
+Usage: `neo4j-cli aura instance list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--limit` | int | 0 | The maximum number of instances to return. Omit to return all of them. |
 
 Examples:
 
@@ -1565,6 +1573,9 @@ neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000
 
 # List instances using a configured default workspace
 neo4j-cli aura instance list
+
+# Return at most 10 instances and emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura instance list --limit 10 --format json
 
 # Emit JSON for scripting (e.g. piping into jq)
 neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
