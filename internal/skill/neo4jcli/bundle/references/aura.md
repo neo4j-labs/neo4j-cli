@@ -1460,12 +1460,15 @@ If another operation is being performed on the instance you are trying to delete
 
 Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
 
+--dry-run looks the instance up and prints what would be deleted without sending the DELETE. It needs no --yes --force.
+
 Usage: `neo4j-cli aura instance delete <id> [flags]`
 
 Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--dry-run` | bool | false | Look up the instance and print what would be deleted without deleting it |
 | `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
 | `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
@@ -1474,6 +1477,9 @@ Examples:
 ```
 # Delete an instance by ID
 neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+
+# Preview the deletion without deleting anything
+neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --dry-run --format json
 
 # Delete an instance and emit the response as JSON
 neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json
