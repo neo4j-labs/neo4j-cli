@@ -207,7 +207,7 @@ func disabled() bool {
 // shouldSuppress checks the per-invocation suppression rules (the env-var
 // gate is in disabled()).
 func shouldSuppress(cmd *cobra.Command, cfg *clicfg.Config) bool {
-	if cfg.Global != nil && cfg.Global.Format() == "json" {
+	if cfg.Global != nil && (cfg.Global.Format() == "json" || cfg.Global.Format() == "jsonl") {
 		return true
 	}
 	// `--help` and `--version` short-circuit the cobra dispatch, but

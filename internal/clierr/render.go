@@ -79,7 +79,7 @@ func Render(err error, stdout, stderr io.Writer, format string) {
 	}
 
 	switch format {
-	case "json":
+	case "json", "jsonl":
 		// Marshal to stdout first; if marshalling somehow fails, fall back
 		// to the plaintext path so the user still sees something useful.
 		if buf, mErr := json.Marshal(ce.BuildEnvelope()); mErr == nil {

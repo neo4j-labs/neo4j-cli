@@ -136,13 +136,30 @@ func TestListProjectsMissingOrganizationId(t *testing.T) {
 	helper.AssertErrContainsStrings([]string{"organization-id", "aura.default-workspace"})
 }
 
+func TestListProjectsJSONL(t *testing.T) {
+	const orgID = "org-111"
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock(
+		fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
+		http.StatusOK,
+		`{"data": [{"id": "proj-1", "name": "My Project"}, {"id": "proj-2", "name": "Another Project"}]}`,
+	)
+
+	helper.ExecuteCommand(fmt.Sprintf("project list --organization-id=%s --format jsonl", orgID))
+
+	helper.AssertOut("{\"id\":\"proj-1\",\"name\":\"My Project\"}\n{\"id\":\"proj-2\",\"name\":\"Another Project\"}")
+}
+
 func TestListProjectsWithInvalidFormat(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
 	helper.ExecuteCommand("project list --format invalid")
 
-	helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, table, toon)")
+	helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, jsonl, table, toon)")
 }
 
 func TestListProjectsWithCredentialFlag(t *testing.T) {

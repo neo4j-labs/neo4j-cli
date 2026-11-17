@@ -203,7 +203,7 @@ func TestComposeRootPersistentPreRunE_SilencesUsageOnError(t *testing.T) {
 		{
 			name:             "invalid --format errors and silences usage",
 			args:             []string{"resource", "--format", "bogus"},
-			wantErrContains:  "invalid format value specified: bogus (valid values: default, json, table, toon)",
+			wantErrContains:  "invalid format value specified: bogus (valid values: default, json, jsonl, table, toon)",
 			wantSilenceUsage: true,
 		},
 		{

@@ -190,5 +190,5 @@ func TestWorkspaceListWithInvalidFormat(t *testing.T) {
 
 	helper.ExecuteCommand("workspace list --format invalid")
 
-	helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, table, toon)")
+	helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, jsonl, table, toon)")
 }

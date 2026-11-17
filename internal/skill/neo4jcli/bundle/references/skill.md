@@ -19,7 +19,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
+| `--format` | string | - | Format to print console output in, from a choice of [default, json, jsonl, table, toon]. (agents: prefer toon) |
 
 ## neo4j-cli skill check
 
