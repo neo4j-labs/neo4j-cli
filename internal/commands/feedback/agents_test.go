@@ -17,8 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMain keeps every test away from a real `claude` binary: without it the
-// enable and disable tests would change the developer's Claude Code config.
+// TestMain keeps every test away from real `claude` and `codex` binaries:
+// without it the enable and disable tests would change the developer's Claude
+// Code or Codex config.
 func TestMain(m *testing.M) {
 	// Output format resolution must not depend on the developer's terminal or
 	// on running inside an agent (CLAUDECODE): no explicit --format means json.
@@ -26,6 +27,7 @@ func TestMain(m *testing.M) {
 	output.StdoutIsTerminal = func() bool { return false }
 	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }
 	execClaude = func(context.Context, ...string) error { return errors.New("execClaude not stubbed") }
+	execCodex = func(context.Context, ...string) error { return errors.New("execCodex not stubbed") }
 	os.Exit(m.Run())
 }
 
@@ -36,7 +38,13 @@ func fakeClaude(t *testing.T, registered, failAdd bool) *[]string {
 	var calls []string
 	prevLook, prevExec, prevPath := lookPath, execClaude, executablePath
 	t.Cleanup(func() { lookPath, execClaude, executablePath = prevLook, prevExec, prevPath })
-	lookPath = func(string) (string, error) { return "/usr/bin/claude", nil }
+	prev := lookPath
+	lookPath = func(name string) (string, error) {
+		if name == claudeBinary {
+			return "/usr/bin/claude", nil
+		}
+		return prev(name)
+	}
 	executablePath = func() (string, error) { return "/opt/neo4j-cli", nil }
 	execClaude = func(_ context.Context, args ...string) error {
 		calls = append(calls, strings.Join(args, " "))
