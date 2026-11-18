@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 6,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Final answer repeats the instance ID and restates the status and the flag justification, and adds unasked location/size detail; trace is short, with only a mild help-check before the list and delete."
+}

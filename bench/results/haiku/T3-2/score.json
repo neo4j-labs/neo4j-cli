@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 7,
+  "redundant_work": 3
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Final answer pads a no-result report with explanation, options and offers; trace is short, with one denied read of a log that `--help` could have replaced."
+}

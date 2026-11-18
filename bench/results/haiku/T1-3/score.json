@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 4,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Final answer covers the asked facts but adds unasked method and password remarks; three help calls precede the one list call, with no repeats or dead ends."
+}

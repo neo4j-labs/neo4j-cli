@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 5,
+  "redundant_work": 1
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Answer lists the right subcommands but adds unasked caveats and repeats the list in the message; trace is two non-overlapping help calls."
+}

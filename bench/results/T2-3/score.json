@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 5,
+  "redundant_work": 4
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": false
+ },
+ "notes": "Final answer restates the commands and is cut off mid-sentence; trace spends three help calls and a config list before the one needed set/get."
+}

@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 1,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Final answer is a bare subcommand list with no padding, though it repeats 'snapshot create' at the end. Trace is two help calls, the second needed to expand the snapshot subtree."
+}

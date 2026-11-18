@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 0,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Final answer is only the task title with no result; trace is mostly help lookups plus one workspace list, with no repeats."
+}

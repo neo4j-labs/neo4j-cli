@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 4,
+  "redundant_work": 4
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": false
+ },
+ "notes": "Answer adds an unasked method sentence and a full field list; trace runs two --help calls before the one needed list command."
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""neo4j-cli agent benchmark runner: python3 -I bench/run.py <task> <run-number> [--bin PATH --arm LABEL].
-Writes bench/results/<task>-<n>/, or bench/results/<arm>/<task>-<n>/ for a non-pinned binary."""
+"""neo4j-cli agent benchmark runner: python3 -I bench/run.py <task> <run-number> [--bin PATH --arm LABEL --model NAME].
+Writes bench/results/<task>-<n>/ for the pinned build and model, bench/results/<arm>/<task>-<n>/ for a
+non-pinned binary, and bench/results/<model-slug>/<task>-<n>/ when only the model differs from the pin."""
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, time, tempfile
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -9,12 +10,15 @@ ap = argparse.ArgumentParser()
 ap.add_argument("task"); ap.add_argument("run")
 ap.add_argument("--bin", help="neo4j-cli binary to test instead of the pinned release (needs --arm)")
 ap.add_argument("--arm", help="label for the binary, e.g. parent or changed")
+ap.add_argument("--model", help="model to run instead of the pinned one; results go to results/<model-slug>/ unless --arm is given")
 ARGS = ap.parse_args()
 if bool(ARGS.bin) != bool(ARGS.arm):
     ap.error("--bin and --arm go together")
 PINNED = P["pins"]["neo4j_cli"]
 BIN = os.path.abspath(ARGS.bin) if ARGS.bin else PINNED["path"]
-MODEL = P["pins"]["model"]
+MODEL = ARGS.model or P["pins"]["model"]
+SLUG = re.sub(r"[^A-Za-z0-9._-]+", "-", MODEL)
+SUBDIR = ARGS.arm or (SLUG if (ARGS.model and MODEL != P["pins"]["model"]) else None)
 H = P["harness"]
 
 TASKS = {t["id"]: t for t in json.load(open(os.path.join(ROOT, "tasks.json")))}
@@ -211,7 +215,7 @@ def check(task, home, bash, results, final):
 def main():
     task, n = ARGS.task, ARGS.run
     sha = hashlib.sha256(open(BIN, "rb").read()).hexdigest()
-    out = os.path.join(ROOT, "results", *([ARGS.arm] if ARGS.arm else []), f"{task}-{n}")
+    out = os.path.join(ROOT, "results", *([SUBDIR] if SUBDIR else []), f"{task}-{n}")
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(out)
     version = subprocess.run([BIN, "--version"], capture_output=True, text=True).stdout.strip()
@@ -249,7 +253,8 @@ def main():
     usage = (res or {}).get("usage", {})
     rec = {
         "task": task, "run": int(n), "status": status, "success": bool(success),
-        "arm": ARGS.arm, "binary": BIN, "binary_version": version, "binary_sha256": sha,
+        "arm": ARGS.arm, "model": MODEL,
+        "binary": BIN, "binary_version": version, "binary_sha256": sha,
         "binary_sha_matches_pin": sha == PINNED["sha256"] if not ARGS.bin else None,
         "tool_output_bytes": sum(len(r.encode()) for r in results),
         "seconds": secs, "turns": (res or {}).get("num_turns"), "bash_calls": len(bash),

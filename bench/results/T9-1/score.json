@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 5,
+  "redundant_work": 4
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": false
+ },
+ "notes": "Final answer adds unasked specs, region, URL and password caveats; trace has root --help, create --help and config list/aura --help before a single create call."
+}

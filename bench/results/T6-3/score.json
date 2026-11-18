@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 1,
+  "redundant_work": 6
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": false
+ },
+ "notes": "Final answer is only the requested command list, but the trace has no run of those five commands. It spent four calls on --help and history exploration that didn't advance the task."
+}

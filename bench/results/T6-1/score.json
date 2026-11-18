@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 1,
+  "redundant_work": 5
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": false
+ },
+ "notes": "Final answer is only the five task commands, with no padding. Trace spends four calls on root and history help plus a history list query that the task never needed."
+}

@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 3,
+  "redundant_work": 3
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Answer restates the before-state and ends mid-sentence, but is short; ran three --help calls before the needed config list and set, one of which (config set --help) was likely unnecessary."
+}

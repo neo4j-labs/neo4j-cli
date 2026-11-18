@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 0,
+  "redundant_work": 4
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": false
+ },
+ "notes": "Final answer is only the task title with no result; trace reads root and aura help before the specific help and list calls, and never attempts project creation."
+}

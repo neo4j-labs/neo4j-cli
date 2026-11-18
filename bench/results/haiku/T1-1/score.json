@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 3,
+  "redundant_work": 3
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Answer gives the requested credential facts with one unrequested password caveat and narrated discovery; three help calls preceded the single list call, which a competent agent could have trimmed."
+}

@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 4,
+  "redundant_work": 4
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": false
+ },
+ "notes": "Answer restates list fields and adds an unasked password caveat; two help calls (top-level and credential) preceded the one needed list command."
+}

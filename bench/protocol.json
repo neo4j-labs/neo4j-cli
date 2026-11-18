@@ -1,6 +1,7 @@
 {
-  "protocol": "swf-bench-protocol/2",
+  "protocol": "swf-bench-protocol/4",
   "frozen": true,
+  "model_dimension": "Since protocol /4 the model is a variable dimension: run.py --model NAME records it in every result.json and files runs under bench/results/<model-slug>/. pins.model stays the baseline arm; /2 and /3 results have no model field and report as the pin. (/3 added task T11 on branch chore/bench-protocol-3.)",
   "pins": {
     "neo4j_cli": {
       "version": "v1.19.0",
@@ -23,7 +24,7 @@
     "timeout_seconds": 600,
     "runs_per_task": 3,
     "docker": "T7 only: the PATH wrapper sets DOCKER_HOST to the Docker Desktop socket (~/.docker/run/docker.sock), because the throwaway HOME hides the docker context. The agent shell still cannot run docker itself. Leftover managed containers fail the check and are removed after the run.",
-    "arms": "--bin PATH --arm LABEL runs the same tasks against another build (for example a card's parent and changed builds). Results go to bench/results/<arm>/. The default arm is the pinned release.",
+    "arms": "--bin PATH --arm LABEL runs the same tasks against another build (for example a card's parent and changed builds). Results go to bench/results/<arm>/. The default arm is the pinned release. --model NAME varies the model instead of (or together with) the binary; model-only runs go to bench/results/<model-slug>/ and every result.json records its model.",
     "tasks_file": "bench/tasks.json holds every prompt. expectedAnswer must appear as a whole word of the final answer; mustRun lists commands the agent must have run. State checks live in run.py.",
     "aura": {
       "base_url": "https://api-devcliswf.neo4j-dev.io",
@@ -56,7 +57,8 @@
     "Success checks: expectedAnswer and mustRun in tasks.json, state checks in run.py.",
     "Fixtures use credential-storage insecure under a throwaway HOME.",
     "T7 needs Docker running and the neo4j:community image pulled beforehand (pull time is not part of the run).",
-    "Decision rule: a build is better only on a material tool_output_bytes drop with success held. A cheaper arm that answers wrong loses. Report other changes as non-wins."
+    "Decision rule: a build is better only on a material tool_output_bytes drop with success held. A cheaper arm that answers wrong loses. Report other changes as non-wins.",
+  "The same rule prices models: a cheaper model wins on a task only if its success rate holds. The per-(model, arm) totals in report.py are the cost-vs-correctness matrix."
   ],
   "metrics": [
     "success",

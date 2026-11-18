@@ -1,0 +1,37 @@
+{
+ "task": "T5",
+ "run": 1,
+ "status": "ok",
+ "success": true,
+ "arm": null,
+ "model": "haiku",
+ "binary": "/opt/homebrew/bin/neo4j-cli",
+ "binary_version": "neo4j-cli version v1.19.0",
+ "binary_sha256": "a7d6ea4ae146fcdfb0809155485727b3049051a41b635e1f9cd762e707a63e32",
+ "binary_sha_matches_pin": true,
+ "tool_output_bytes": 3027,
+ "seconds": 7.9,
+ "turns": 3,
+ "bash_calls": 2,
+ "cost_usd": 0.0013862600000000003,
+ "tokens": {
+  "input_tokens": 6,
+  "output_tokens": 600,
+  "cache_read_input_tokens": 13986,
+  "cache_creation_input_tokens": 4729
+ },
+ "session_init": {
+  "tools": [
+   "Bash"
+  ],
+  "mcp_servers": [],
+  "skills": [],
+  "slash_commands": [],
+  "model": "claude-haiku-5-5"
+ },
+ "commands": [
+  "neo4j-cli aura instance --help",
+  "neo4j-cli aura instance snapshot --help"
+ ],
+ "final": "create\ndelete\ndeploy\nload\noverwrite\npause\nresume\nupdate"
+}

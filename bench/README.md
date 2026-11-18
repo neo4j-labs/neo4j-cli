@@ -5,16 +5,26 @@ Agent benchmark for `neo4j-cli`. Each task gives a headless Claude Code session 
 ```
 python3 -I bench/run.py <task> <run>                          # T1..T10, writes bench/results/<task>-<run>/
 python3 -I bench/run.py <task> <run> --bin PATH --arm LABEL   # same task on another build, writes bench/results/<arm>/<task>-<run>/
-python3 -I bench/report.py                                    # one row per arm and task, p25/median/p75
+python3 -I bench/run.py <task> <run> --model NAME             # same task on another model, writes bench/results/<model-slug>/<task>-<run>/
+python3 -I bench/report.py                                    # one row per arm, model and task, p25/median/p75, plus per-(model, arm) totals
+python3 -I bench/score.py [--force] [--task T1]               # LLM-as-judge scores per run (see below)
 ```
 
-Each run writes `stream.jsonl` (full transcript) and `result.json` (success, tokens, turns, commands, cost, `tool_output_bytes`, binary version and SHA-256).
+Each run writes `stream.jsonl` (full transcript) and `result.json` (success, model, tokens, turns, commands, cost, `tool_output_bytes`, binary version and SHA-256).
 
 `tasks.json` holds every prompt. `expectedAnswer` must appear as a whole word of the final answer, and `mustRun` lists commands the agent must have run. State checks (config, skill files, history, containers) live in `run.py`.
 
 ## Comparing two builds
 
 Run the same task set with `--bin` and `--arm` once per build, for example `parent` and `changed`, then `report.py`. Only `--bin` changes between arms. A build wins only on a material drop in `tool_output_bytes` with the success rate held. A cheaper arm that answers wrong loses. Any other change is a non-win and is reported as one. This is the decision rule of relate's `relate-agentbench`.
+
+## Comparing models
+
+`--model NAME` runs the same tasks on another model and files the runs under `bench/results/<model-slug>/`; every `result.json` records its `model`, and `report.py` groups by (arm, model, task) and prints one totals row per model: tasks passed, total cost, cost per run — the cost-vs-correctness matrix (the upper-left corner is cheapest-and-most-correct). The same decision rule prices models: a cheaper model wins on a task only if its success rate holds. The model became a variable dimension in protocol `/4` (`/3` added task T11 on branch `chore/bench-protocol-3`); `/2` and `/3` results carry no model field and report as the pinned one.
+
+## Scorers
+
+`score.py` judges stored runs after the fact: it compacts each transcript (commands with output sizes, agent messages, final answer) and asks the judge model from `scorers.json` for a 0-10 grade per scorer (lower is better), currently `verbosity` and `redundant_work`, each with a pass threshold. The judge cost is bounded by `max_budget_usd`, `sampling_rate` skips runs below the rate (recorded as not judged, never silently dropped), and re-runs skip runs that already have a `score.json` unless `--force`. The deterministic checks in `run.py` stay the source of truth for success; the judges grade only what code cannot check, and their grades are heuristics, not measurements.
 
 ## Isolation
 

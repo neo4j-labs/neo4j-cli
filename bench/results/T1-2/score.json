@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 3,
+  "redundant_work": 3
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Answer lists the requested fields plus an unasked-for sentence on how it was found; two help calls preceded the one list call that answered it."
+}

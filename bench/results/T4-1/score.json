@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 5,
+  "redundant_work": 3
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Final answer restates the command and pads with unasked details and a caveat; trace has three help calls before the install, and the agent message is duplicated."
+}

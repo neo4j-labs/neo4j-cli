@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 1,
+  "redundant_work": 6
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": false
+ },
+ "notes": "Final answer is only the echoed command list, with no padding. Trace shows root/history help and a history list, but none of the five task commands were run, so the exploration was off-task."
+}

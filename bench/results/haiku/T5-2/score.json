@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 2,
+  "redundant_work": 3
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Final answer is a bare list echoing the task, with no added detail; trace has no repeats, but it pulled help for get and list, which T5 does not name."
+}

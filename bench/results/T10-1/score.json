@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 4,
+  "redundant_work": 3
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Final answer restates the outcome well but adds unasked instance specs and flag rationale; trace has a help lookup and list check before a probe delete, which is mostly reasonable."
+}

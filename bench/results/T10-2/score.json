@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 5,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Final answer restates the deletion and adds unasked detail (region, tier, confirmation reasoning) and repeats its own paragraph; trace is short, with only a --help probe as mild exploration."
+}

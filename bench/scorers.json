@@ -1,0 +1,15 @@
+{
+  "judge_model": "haiku",
+  "sampling_rate": 1.0,
+  "max_budget_usd": 0.5,
+  "scorers": {
+    "verbosity": {
+      "max": 4,
+      "ask": "Verbosity of the final answer: 0 means the answer says exactly what the task asked and nothing else, 10 means it is padded with restatements, caveats or unasked-for detail."
+    },
+    "redundant_work": {
+      "max": 3,
+      "ask": "Redundant work in the tool trace: 0 means every command moved the task forward, 10 means several commands repeated the same call, re-read output already seen, or explored dead ends that a competent agent would skip."
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 5,
+  "redundant_work": 3
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Final answer restates the install report and adds an unasked shell-limits caveat; trace is short, with two help calls before install and a verifying list after, no repeated calls."
+}

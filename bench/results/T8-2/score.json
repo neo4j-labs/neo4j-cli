@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 0,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Final answer is a bare two-word reply with no padding, though it does not show a project was created; trace has some help-text discovery but no repeated calls."
+}

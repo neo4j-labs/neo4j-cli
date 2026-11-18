@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 6,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Final answer restates the error and explains the reasoning at length before asking its question; trace is two commands with no repeats, though the answer's denied-read claim conflicts with the 727-byte head output."
+}

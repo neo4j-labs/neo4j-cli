@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 1,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": true
+ },
+ "notes": "Final answer is a bare subcommand list with no padding; two help calls, with the snapshot lookup not reflected in the answer."
+}

@@ -1,0 +1,37 @@
+{
+ "task": "T5",
+ "run": 3,
+ "status": "ok",
+ "success": false,
+ "arm": null,
+ "model": "haiku",
+ "binary": "/opt/homebrew/bin/neo4j-cli",
+ "binary_version": "neo4j-cli version v1.19.0",
+ "binary_sha256": "a7d6ea4ae146fcdfb0809155485727b3049051a41b635e1f9cd762e707a63e32",
+ "binary_sha_matches_pin": true,
+ "tool_output_bytes": 3027,
+ "seconds": 8.2,
+ "turns": 3,
+ "bash_calls": 2,
+ "cost_usd": 0.0014564100000000002,
+ "tokens": {
+  "input_tokens": 6,
+  "output_tokens": 731,
+  "cache_read_input_tokens": 14051,
+  "cache_creation_input_tokens": 4749
+ },
+ "session_init": {
+  "tools": [
+   "Bash"
+  ],
+  "mcp_servers": [],
+  "skills": [],
+  "slash_commands": [],
+  "model": "claude-haiku-5-5"
+ },
+ "commands": [
+  "neo4j-cli aura instance --help",
+  "neo4j-cli aura instance snapshot --help"
+ ],
+ "final": "create\ndelete\ndeploy\nload\noverwrite\npause\nresume\nupdate\nsnapshot create\n\nThese are inferred from the command descriptions. The help output doesn't mark which subcommands need `--rw`. I left out `get`, `list`, `snapshot get` and `snapshot list`, which read state only."
+}

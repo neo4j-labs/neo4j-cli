@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 6,
+  "redundant_work": 4
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": false
+ },
+ "notes": "Final answer adds unasked detail on the refused delete and the leftover n.env, and the trace has four help lookups before the real work."
+}

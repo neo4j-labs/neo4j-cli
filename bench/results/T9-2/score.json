@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 5,
+  "redundant_work": 4
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": false
+ },
+ "notes": "Answer restates URL, region, size and workspace plus an unrequested password caveat; trace has two --help exploration calls before the one create, and the project ID is repeated after the agent said it would omit it."
+}

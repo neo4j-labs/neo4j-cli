@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 6,
+  "redundant_work": 4
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": false
+ },
+ "notes": "Final answer restates the whole process and adds unasked caveats about flags and the leftover env file; trace has a dead-end docker run --help and a failed delete retried with flags."
+}

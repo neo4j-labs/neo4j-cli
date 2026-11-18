@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 6,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Answer is a non-answer with repeated caveats and a truncated sentence; trace is short, but the agent claims head was denied while it returned 727 bytes."
+}

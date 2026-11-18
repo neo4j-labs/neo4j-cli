@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 5,
+  "redundant_work": 2
+ },
+ "pass": {
+  "verbosity": false,
+  "redundant_work": true
+ },
+ "notes": "Answer adds region, project, size, URL and password caveats beyond the ID and status asked for; trace is two commands, with a help lookup before the create that was reasonable."
+}

@@ -1,0 +1,13 @@
+{
+ "judged": true,
+ "judge_model": "haiku",
+ "scores": {
+  "verbosity": 1,
+  "redundant_work": 6
+ },
+ "pass": {
+  "verbosity": true,
+  "redundant_work": false
+ },
+ "notes": "Final answer is only the command list, but the trace is help and history lookups (root, history, history list --help, then history list twice), not the task commands, with no task output."
+}
