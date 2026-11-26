@@ -259,3 +259,61 @@ func TestDeleteInstanceConfirmGate(t *testing.T) {
 		},
 	})
 }
+
+func TestDeleteInstanceDryRun(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(testDeleteInstanceID), http.StatusOK, `{
+		"data": {
+		  "id": "2f49c2b3",
+		  "name": "Production",
+		  "status": "running",
+		  "tenant_id": "YOUR_TENANT_ID"
+		}
+	  }`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --dry-run", testDeleteInstanceID, testListOrgID, testListProjectID))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	helper.AssertOutJson(`{
+	  "data": {
+		"action": "delete",
+		"dry_run": true,
+		"name": "Production",
+		"resource_id": "2f49c2b3",
+		"resource_type": "instance"
+	  }
+	}`)
+}
+
+func TestDeleteInstanceDryRunNotFound(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	mockHandler := helper.NewRequestHandlerMock(scopedInstancePath(testDeleteInstanceID), http.StatusNotFound, fmt.Sprintf(`{
+		"errors": [
+			{
+			"message": "DB not found: %s",
+			"reason": "db-not-found"
+			}
+		]
+	}`, testDeleteInstanceID))
+
+	err := helper.ExecuteCommandE(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --dry-run", testDeleteInstanceID, testListOrgID, testListProjectID))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	require.Equal(t, 3, ce.Code)
+	require.Equal(t, "instance", ce.ResourceType)
+	require.Equal(t, testDeleteInstanceID, ce.ResourceID)
+}

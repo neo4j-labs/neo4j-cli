@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'aura instance delete accepts --dry-run: looks up the instance and prints dry_run, action, resource_type, resource_id and name without deleting; needs no --yes --force'
+time: 2026-11-17T15:21:37.000000Z
