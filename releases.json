@@ -1,8 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-05T22:08:05Z",
+  "generated_at": "2026-11-26T19:33:46Z",
   "repository": "neo4j-labs/neo4j-cli",
   "releases": [
+    {
+      "tag": "v1.19.1",
+      "name": "v1.19.1",
+      "prerelease": false,
+      "published_at": "2026-11-26T19:33:29Z",
+      "body": "## Versions\n\n- neo4j-cli: v1.19.1\n\n## Changes\n\n### neo4j-cli\n\n### Patch\n* Skill catalog is now fetched from github.com/neo4j/agent-skills (moved from neo4j-contrib/neo4j-skills); help text and docs updated\n\n\n"
+    },
     {
       "tag": "v1.19.0",
       "name": "v1.19.0",
