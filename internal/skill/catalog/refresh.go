@@ -31,7 +31,7 @@ const maxPluginJSONBytes int64 = 1 << 20
 // response. Extract enforces a 20 MiB decompressed cap, but a malicious
 // upstream could otherwise stream arbitrarily large compressed payloads
 // until the 30 s context deadline fires, burning CPU and bandwidth. Real
-// neo4j-contrib/neo4j-skills tarballs are well under 1 MiB compressed;
+// neo4j/agent-skills tarballs are well under 1 MiB compressed;
 // 50 MiB is ample headroom for project growth.
 const maxCompressedTarballBytes int64 = 50 << 20
 
@@ -108,7 +108,7 @@ func (c *Catalog) Refresh(ctx context.Context, filesystem afero.Fs) error {
 	// refresh network or extraction failure leaves the prior cache intact.
 	//
 	// security: tarball integrity rests on HTTPS + GitHub's hosting of the
-	// neo4j-contrib/neo4j-skills repo. Upstream plugin.json does not publish a
+	// neo4j/agent-skills repo. Upstream plugin.json does not publish a
 	// cryptographic digest (sha256/sha512) — the bytes-on-the-wire trust model
 	// is "whatever codeload.github.com serves for refs/heads/main". The
 	// extractor (Extract + classifyEntry + the inline Zip Slip prefix check)

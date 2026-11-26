@@ -20,7 +20,7 @@ import (
 // MaxDecompressedBytes caps the total decompressed payload size accepted by
 // Extract. Defends against a gzip bomb feeding an unbounded tar body. Sized
 // per the PRD (20 MiB) — comfortable headroom over the current
-// neo4j-contrib/neo4j-skills tarball.
+// neo4j/agent-skills tarball.
 const MaxDecompressedBytes int64 = 20 << 20
 
 // Extract streams a gzip+tar archive from r, strips the single top-level

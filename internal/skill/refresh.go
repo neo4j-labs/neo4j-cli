@@ -20,7 +20,7 @@ func newRefreshCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
 		Short:       "Force a fresh download of the curated skill catalog",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Forces a network fetch of the curated catalog `plugin.json` " +
-			"from github.com/neo4j-contrib/neo4j-skills. When the upstream " +
+			"from github.com/neo4j/agent-skills. When the upstream " +
 			"version differs from the cached one, the repo tarball is re-" +
 			"downloaded and extracted into the local cache. On network " +
 			"failure with a usable cache the previous content is preserved " +
