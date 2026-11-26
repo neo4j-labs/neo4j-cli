@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'New `neo4j-cli k8s` command group behind the `flag.k8s-commands` feature flag (`NEO4J_CLI_FLAG_K8S_COMMANDS=1` or `neo4j-cli config set flag.k8s-commands true --rw`), for managing Neo4j on Kubernetes through the open-source Neo4j operator. This preview adds `k8s doctor`, which checks that kubectl (1.22 or newer) and helm (3.8 or newer) are on PATH, that the cluster answers, that it runs Kubernetes 1.35 or newer, and that kubectl is within one minor version of the server. It follows `--format`, accepts `--kubeconfig`, `--context` and `-n/--namespace`, and always exits 0 with `summary.ready` saying whether the setup is ready. The group shells out to the host kubectl and helm and is not available through the `neo4j-cli mcp` server.'
+time: 2026-11-06T12:00:00+00:00

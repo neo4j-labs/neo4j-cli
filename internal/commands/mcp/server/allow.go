@@ -52,12 +52,16 @@ type Gates struct {
 // audit trail of what the model did. `feedback` has its own MCP server
 // (`feedback serve`) with its own consent; it must not be reachable here,
 // where a tool call could run `feedback enable --accept` for the person.
+// `k8s` is a flag-gated preview that spends real cluster resources and whose
+// `instance connect` runs a long-lived port-forward; the whole group stays
+// denied until the flag is promoted and the policy is decided per leaf.
 var deniedPaths = [][]string{
 	{"update"},
 	{"mcp"},
 	{"completion"},
 	{"history", "clear"},
 	{"feedback"},
+	{"k8s"},
 }
 
 // deniedArgs deny a single leaf only when a specific token appears among its
