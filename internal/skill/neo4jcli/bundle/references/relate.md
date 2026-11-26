@@ -61,7 +61,7 @@ neo4j-cli relate create ./mydb
 neo4j-cli relate create movies --force
 
 # Create a Markdown vault (one note per node) instead of the default snapshot codec
-neo4j-cli relate create notes --relate-opt snapshot-format=markdown --relate-opt 'markdown-body-properties=Person=bio'
+neo4j-cli relate create notes --rw --relate-opt snapshot-format=markdown --relate-opt 'markdown-body-properties=Person=bio'
 
 # Then populate it
 neo4j-cli query "CREATE (:Movie {title: 'The Matrix'})" --relate movies --rw
