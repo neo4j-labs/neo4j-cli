@@ -38,9 +38,6 @@ func validateBinary(name, path string) error {
 	if !info.Mode().IsRegular() {
 		return untrustedBinaryErr(name, path, "the resolved path is not a regular file")
 	}
-	if info.Mode().Perm()&0o111 == 0 {
-		return untrustedBinaryErr(name, path, "the resolved file is not executable")
-	}
 	return validateLocation(name, resolved, info)
 }
 
