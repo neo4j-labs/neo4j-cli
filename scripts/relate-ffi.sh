@@ -89,6 +89,26 @@ expected_sha() {
 triple="$1"
 dest="$2"
 
+# <dest> ends up in a path handed to tar/cp/mkdir AND in the `export` lines the
+# caller eval's, so it is validated before anything touches disk or stdout.
+# Absolute paths are legitimate (CI passes $RUNNER_TEMP, the docs use /tmp), so
+# the checks are on content: no `..` path component (cannot climb out of the
+# directory the caller named), no leading `-` (cannot be read as an option) and
+# a closed character set — letters, digits, `. _ / : \ -` (the last two for
+# Windows paths). Anything else, in particular quotes, `$`, backticks, spaces
+# and newlines, could break out of the quoted value when the output is eval'd.
+case "$dest" in
+    "") fail "empty <dest>" ;;
+    -*) fail "refusing <dest> starting with '-': $dest" ;;
+esac
+if [[ ! "$dest" =~ ^[A-Za-z0-9._/:\\-]+$ ]]; then
+    fail "refusing <dest> with characters outside [A-Za-z0-9._/:\\-]"
+fi
+IFS='/\\' read -r -a dest_parts <<< "$dest"
+for part in "${dest_parts[@]}"; do
+    [[ "$part" != ".." ]] || fail "refusing <dest> containing a '..' component: $dest"
+done
+
 want_sha="$(expected_sha "$triple")"
 [[ -n "$want_sha" ]] || { echo "relate-ffi: unknown target triple '$triple'" >&2; usage; exit 2; }
 

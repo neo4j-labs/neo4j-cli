@@ -47,6 +47,11 @@ jobs:
               # CGO_ENABLED goes to GITHUB_ENV, not a per-step `env:` — every
               # later step that compiles must see it, or cgo is silently off.
               #
+              # eval is safe here: the script refuses a <dest> with anything but
+              # [A-Za-z0-9._/:\-] or a `..` component and a triple outside its
+              # fixed allow-list, so no caller-controlled text reaches the
+              # exports it prints (CWE-77).
+              #
               # The script output is captured before it is eval'd: `eval "$(…)"`
               # discards the substitution's exit status, so a failing script
               # would otherwise leave the vars empty and only surface much
