@@ -40,7 +40,7 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli query :embed [text]` — compute an embedding vector standalone (no Bolt connection)
 - `neo4j-cli query --param NAME:embed=<text>` — bind an inline-embedded vector parameter
 - `neo4j-cli query 'CREATE ...' --rw` — write operations require `--rw`
-- `neo4j-cli skill install` — install the embedded self-skill into your AI assistant; pass a positional skill name to install a curated catalog skill from neo4j-contrib/neo4j-skills, `--agent <name>` to scope to one agent (positional agent name is a hard error), `--all` for self + every catalog skill, `--refresh` to re-download the catalog first
+- `neo4j-cli skill install` — install the embedded self-skill into your AI assistant; pass a positional skill name to install a curated catalog skill from neo4j/agent-skills, `--agent <name>` to scope to one agent (positional agent name is a hard error), `--all` for self + every catalog skill, `--refresh` to re-download the catalog first
 - `neo4j-cli skill list` — list skills × agents and per-agent install state
 - `neo4j-cli skill check` — verify installed bundles for version drift
 - `neo4j-cli skill print` — preview a skill's SKILL.md before installing
@@ -79,7 +79,7 @@ Installed skill bundles are auto-refreshed in the background whenever the binary
 
 Destructive leaves (any `… delete` / `… remove` — Aura instance/agent/agent evaluation-dataset/evaluation-run/CMK/data-api/graph-analytics/auth-provider/CORS allowed-origin, `docker delete`, `desktop dbms/connection/project/tag delete`, `credential aura-client/dbms/embed remove`) gate on both `--yes` and `--force` in addition to `--rw`. On a TTY either missing flag prompts y/N; in non-TTY contexts both must be passed or the command exits 2.
 
-Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-skills
+Additional Neo4j skills for AI agents: https://github.com/neo4j/agent-skills
 
 ## Links
 
@@ -88,5 +88,5 @@ Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-sk
 - Issues: https://github.com/neo4j-labs/neo4j-cli/issues
 - Neo4j Docs: https://neo4j.com/docs/
 - Aura Console: https://console.neo4j.io/
-- Neo4j Agent Skills: https://skills.sh/neo4j-contrib/neo4j-skills
+- Neo4j Agent Skills: https://skills.sh/neo4j/agent-skills
 - Neo4j Labs disclaimer: https://github.com/neo4j-labs/neo4j-cli/blob/main/LABS_DISCLAIMER.txt
