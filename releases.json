@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-26T19:33:46Z",
+  "generated_at": "2026-11-26T19:34:29Z",
   "repository": "neo4j-labs/neo4j-cli",
   "releases": [
     {
@@ -8,7 +8,7 @@
       "name": "v1.19.1",
       "prerelease": false,
       "published_at": "2026-11-26T19:33:29Z",
-      "body": "## Versions\n\n- neo4j-cli: v1.19.1\n\n## Changes\n\n### neo4j-cli\n\n### Patch\n* Skill catalog is now fetched from github.com/neo4j/agent-skills (moved from neo4j-contrib/neo4j-skills); help text and docs updated\n\n\n"
+      "body": "## Release notes\n\n### Highlights\n\n- **Skill catalog moved to `neo4j/agent-skills`** — the curated skill catalog now comes from [`github.com/neo4j/agent-skills`](https://github.com/neo4j/agent-skills) instead of `neo4j-contrib/neo4j-skills`, so `skill install`, `list`, `check` and `refresh` read from the new home. Help text and docs point there too. Same skills, new address. Example:\n  ```\n  neo4j-cli skill list --refresh --format json\n  ```\n\n\n---\n\n## Versions\n\n- neo4j-cli: v1.19.1\n\n## Changes\n\n### neo4j-cli\n\n### Patch\n* Skill catalog is now fetched from github.com/neo4j/agent-skills (moved from neo4j-contrib/neo4j-skills); help text and docs updated\n"
     },
     {
       "tag": "v1.19.0",
