@@ -23,6 +23,7 @@ import (
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	"github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -98,6 +99,7 @@ type Command struct {
 	Aliases     []string           `json:"aliases"`
 	Hidden      bool               `json:"hidden"`
 	Deprecated  string             `json:"deprecated"`
+	ReadOnly    bool               `json:"read_only"`
 	Flags       []Flag             `json:"flags"`
 	Subcommands map[string]Command `json:"subcommands"`
 }
@@ -159,6 +161,7 @@ func walkCommand(cmd *cobra.Command, depth int) Command {
 		Aliases:     aliases,
 		Hidden:      false, // hidden commands are filtered upstream; field is kept for forward compatibility
 		Deprecated:  cmd.Deprecated,
+		ReadOnly:    !flags.IsWriteCommand(cmd),
 		Flags:       collectFlags(cmd),
 		Subcommands: walkChildren(cmd, depth),
 	}
@@ -220,8 +223,9 @@ func firstToken(use string) string {
 // IndexEntry is one row of the compact command index: the space-joined command
 // path below the binary (e.g. "aura instance list") and its one-line summary.
 type IndexEntry struct {
-	Path  string `json:"path"`
-	Short string `json:"short"`
+	Path     string `json:"path"`
+	Short    string `json:"short"`
+	ReadOnly bool   `json:"read_only"`
 }
 
 // Index is the compact default envelope: the hand-coded CLI constants plus a
@@ -251,6 +255,7 @@ type Detail struct {
 	Example       string       `json:"example"`
 	Aliases       []string     `json:"aliases"`
 	Deprecated    string       `json:"deprecated"`
+	ReadOnly      bool         `json:"read_only"`
 	Flags         []Flag       `json:"flags"`
 	Subcommands   []IndexEntry `json:"subcommands"`
 }
@@ -300,6 +305,7 @@ func BuildDetail(root *cobra.Command, cliVersion string, path []string) (Detail,
 		Example:       cmd.Example,
 		Aliases:       append([]string{}, cmd.Aliases...),
 		Deprecated:    cmd.Deprecated,
+		ReadOnly:      !flags.IsWriteCommand(cmd),
 		Flags:         collectFlags(cmd),
 		Subcommands:   flattenIndex(prefix, cmd, 0),
 	}, true
@@ -320,7 +326,7 @@ func flattenIndex(prefix string, parent *cobra.Command, depth int) []IndexEntry 
 		if prefix != "" {
 			path = prefix + " " + path
 		}
-		out = append(out, IndexEntry{Path: path, Short: sub.Short})
+		out = append(out, IndexEntry{Path: path, Short: sub.Short, ReadOnly: !flags.IsWriteCommand(sub)})
 		out = append(out, flattenIndex(path, sub, depth+1)...)
 	}
 	return out

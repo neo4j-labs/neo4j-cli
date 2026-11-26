@@ -365,3 +365,75 @@ func TestAgentContext_UnknownPathAndFullConflict(t *testing.T) {
 	require.ErrorAs(t, err, &ce)
 	assert.Equal(t, 2, ce.Code)
 }
+
+// TestAgentContext_ReadOnlyMatchesWriteAnnotation checks, for every runnable
+// available leaf in the whole tree, that the index, the full tree and the
+// per-command detail all emit read_only as a boolean equal to the absence of
+// the write annotation.
+func TestAgentContext_ReadOnlyMatchesWriteAnnotation(t *testing.T) {
+	run := func(args ...string) []byte {
+		root := newAppCmdEveryFlagEnabled(t)
+		root.SetArgs(append([]string{"agent-context"}, args...))
+		var out bytes.Buffer
+		root.SetOut(&out)
+		root.SetErr(&bytes.Buffer{})
+		require.NoError(t, root.Execute())
+		return out.Bytes()
+	}
+
+	var idx struct {
+		Commands []map[string]any `json:"commands"`
+	}
+	require.NoError(t, json.Unmarshal(run("--format", "json"), &idx))
+	indexRO := map[string]any{}
+	for _, e := range idx.Commands {
+		indexRO[e["path"].(string)] = e["read_only"]
+	}
+
+	var full struct {
+		Commands map[string]map[string]any `json:"commands"`
+	}
+	require.NoError(t, json.Unmarshal(run("--full", "--format", "json"), &full))
+	lookup := func(path []string) map[string]any {
+		node := full.Commands[path[0]]
+		for _, name := range path[1:] {
+			subs, _ := node["subcommands"].(map[string]any)
+			node, _ = subs[name].(map[string]any)
+		}
+		return node
+	}
+
+	tree := newAppCmdEveryFlagEnabled(t)
+	leaves, writes := 0, 0
+	var walk func(c *cobra.Command, path []string)
+	walk = func(c *cobra.Command, path []string) {
+		hasChild := false
+		for _, sub := range c.Commands() {
+			if sub.IsAvailableCommand() {
+				hasChild = true
+				walk(sub, append(append([]string{}, path...), sub.Name()))
+			}
+		}
+		if hasChild || !c.Runnable() {
+			return
+		}
+		leaves++
+		want := c.Annotations["write"] != "true"
+		if !want {
+			writes++
+		}
+		p := strings.Join(path, " ")
+		assert.Equal(t, want, indexRO[p], "index read_only for %q", p)
+		node := lookup(path)
+		require.NotNil(t, node, "full tree missing %q", p)
+		assert.Equal(t, want, node["read_only"], "full read_only for %q", p)
+	}
+	for _, sub := range tree.Commands() {
+		if sub.IsAvailableCommand() {
+			walk(sub, []string{sub.Name()})
+		}
+	}
+	assert.Positive(t, leaves)
+	assert.Positive(t, writes, "at least one leaf must be read_only=false")
+	t.Logf("leaves=%d write=%d", leaves, writes)
+}

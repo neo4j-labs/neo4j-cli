@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'agent-context output now includes a read_only boolean on every command entry (false for commands that require --rw)'
+time: 2026-11-16T20:00:00+00:00

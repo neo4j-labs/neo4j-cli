@@ -43,7 +43,7 @@ var outputStructAllowlist = map[string][]string{
 	"internal/desktopclient/output.go":         {"DbmsInfoOutput", "ConnectionOutput", "DbmsPluginOutput"},
 	"internal/commands/aura/workspace/list.go": {"workspaceEntry"},
 	"internal/clierr/render.go":                {"Envelope", "EnvelopeBody"},
-	"internal/commands/agentcontext/build.go":  {"Context", "Command", "Flag"},
+	"internal/agentcontext/build.go":           {"Context", "Command", "Flag", "IndexEntry", "Index", "Detail"},
 	"internal/commands/feedback/status.go":     {"statusObj"},
 	"internal/commands/feedback/policy.go":     {"Payload", "Agent", "Violation"},
 	"internal/commands/feedback/receipt.go":    {"Receipt"},
