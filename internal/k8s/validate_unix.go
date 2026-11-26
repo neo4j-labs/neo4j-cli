@@ -16,6 +16,9 @@ import (
 // file must belong to the current user or to root. A binary that fails these
 // rules is replaceable by a local attacker, so the engine refuses to run it.
 func validateLocation(name, resolved string, info os.FileInfo) error {
+	if info.Mode().Perm()&0o111 == 0 {
+		return untrustedBinaryErr(name, resolved, "the resolved file is not executable")
+	}
 	if info.Mode().Perm()&0o002 != 0 {
 		return untrustedBinaryErr(name, resolved, "the binary is writable by other users")
 	}
