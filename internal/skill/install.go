@@ -29,7 +29,7 @@ func newInstallCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Co
 		Long: "Without a positional, installs the embedded self-skill into " +
 			"every detected agent. With a [skill-name] positional, installs " +
 			"that named skill (self-skill or a curated catalog skill from " +
-			"github.com/neo4j-contrib/neo4j-skills). Use --all to install " +
+			"github.com/neo4j/agent-skills). Use --all to install " +
 			"the self-skill plus every catalog entry, --agent <name> " +
 			"(case-insensitive) to scope to one agent, and --refresh to " +
 			"force a network fetch of the catalog before installing. " +
