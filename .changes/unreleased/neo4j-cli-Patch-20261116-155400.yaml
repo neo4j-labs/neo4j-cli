@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'The invalid --format error now lists the valid values: invalid format value specified: <value> (valid values: default, json, table, toon)'
+time: 2026-11-16T15:54:00+00:00
