@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-26T20:43:58Z",
+  "generated_at": "2026-11-26T20:44:49Z",
   "repository": "neo4j-labs/neo4j-cli",
   "releases": [
     {
@@ -8,7 +8,7 @@
       "name": "v1.19.2",
       "prerelease": false,
       "published_at": "2026-11-26T20:43:41Z",
-      "body": "## Versions\n\n- neo4j-cli: v1.19.2\n\n## Changes\n\n### neo4j-cli\n\n### Patch\n* The invalid --format error now lists the valid values: invalid format value specified: \u003cvalue\u003e (valid values: default, json, table, toon)\n\n\n"
+      "body": "## Release notes\n\n### Highlights\n\n- **`--format` typos now come with the answer** — an invalid `--format` value now lists the valid values in the error, so you can fix the typo without a trip to `--help`. Example:\n  ```\n  neo4j-cli aura instance list --format yaml\n  ```\n\n\n---\n\n## Versions\n\n- neo4j-cli: v1.19.2\n\n## Changes\n\n### neo4j-cli\n\n### Patch\n* The invalid --format error now lists the valid values: invalid format value specified: \u003cvalue\u003e (valid values: default, json, table, toon)\n"
     },
     {
       "tag": "v1.19.1",
