@@ -4,10 +4,14 @@
 package instance_test
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 
+	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/commands/aura/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 const listInstancesPath = "/v2beta1/organizations/" + testListOrgID + "/projects/" + testListProjectID + "/instances"
@@ -118,6 +122,88 @@ func TestListInstances_EmptyData(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
 	helper.AssertOutJson(`{"data": []}`)
+}
+
+const threeInstancesBody = `{"data": [
+	{"id": "inst0001", "name": "One", "tenant_id": "YOUR_TENANT_ID"},
+	{"id": "inst0002", "name": "Two", "tenant_id": "YOUR_TENANT_ID"},
+	{"id": "inst0003", "name": "Three", "tenant_id": "YOUR_TENANT_ID"}
+]}`
+
+func TestListInstancesLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		limit      string
+		wantIDs    []string
+		wantCut    bool
+		wantAbsent string
+	}{
+		{name: "cuts a longer list", limit: "--limit 2", wantIDs: []string{"inst0001", "inst0002"}, wantCut: true, wantAbsent: "inst0003"},
+		{name: "limit equal to total is not cut", limit: "--limit 3", wantIDs: []string{"inst0001", "inst0002", "inst0003"}},
+		{name: "limit above total is not cut", limit: "--limit 10", wantIDs: []string{"inst0001", "inst0002", "inst0003"}},
+		{name: "zero returns everything", limit: "--limit 0", wantIDs: []string{"inst0001", "inst0002", "inst0003"}},
+		{name: "omitted returns everything", limit: "", wantIDs: []string{"inst0001", "inst0002", "inst0003"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			registerProjectsMock(&helper)
+
+			// The v2beta1 list endpoint is unpaginated: one GET carries the whole
+			// collection, so --limit trims it locally and never adds a second request.
+			mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, threeInstancesBody)
+
+			helper.ExecuteCommand("instance list --organization-id " + testListOrgID + " --project-id " + testListProjectID + " --format json " + tc.limit)
+
+			mockHandler.AssertCalledTimes(1)
+			// The helper's buffers drain on read, so read each stream once.
+			stdout, stderr := helper.PrintOut(), helper.PrintErr()
+			for _, id := range tc.wantIDs {
+				require.Contains(t, stdout, id)
+			}
+			if tc.wantAbsent != "" {
+				require.NotContains(t, stdout, tc.wantAbsent, "results beyond --limit must be trimmed")
+			}
+			if tc.wantCut {
+				require.Contains(t, stderr, "Showing the first 2 instances; more are available")
+			} else {
+				require.NotContains(t, stderr, "more are available")
+			}
+		})
+	}
+}
+
+func TestListInstancesLimitKeepsStdoutValidJSON(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, threeInstancesBody)
+
+	helper.ExecuteCommand("instance list --limit 1 --organization-id " + testListOrgID + " --project-id " + testListProjectID + " --format json")
+
+	var out struct {
+		Data []map[string]any `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(helper.PrintOut()), &out), "the stderr note must not leak into stdout")
+	require.Len(t, out.Data, 1)
+}
+
+func TestListInstancesRejectsNegativeLimit(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(listInstancesPath, http.StatusOK, threeInstancesBody)
+
+	err := helper.ExecuteCommandE("instance list --limit -1 --organization-id " + testListOrgID + " --project-id " + testListProjectID)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	require.Equal(t, 2, ce.Code)
+	require.Contains(t, ce.Message, "--limit must be zero or greater")
+	mockHandler.AssertCalledTimes(0)
 }
 
 func TestListInstancesWithProjectIdFlag(t *testing.T) {

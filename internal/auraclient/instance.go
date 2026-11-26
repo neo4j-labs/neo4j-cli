@@ -117,11 +117,23 @@ func (s instanceService) Get(ctx context.Context, scope Scope, id string) (*Inst
 	return &inst, nil
 }
 
+// InstancePage is the result of an instance listing.
+type InstancePage struct {
+	Items []Instance
+	// LimitReached reports that the list was cut at the caller's limit while
+	// more instances were available.
+	LimitReached bool
+}
+
 // List returns the project's instances. The v2beta1 spec declares no
 // pagination parameters for this endpoint
 // (GET /organizations/{o}/projects/{p}/instances) and its 200 schema has no
-// links object; one GET returns the full collection.
-func (s instanceService) List(ctx context.Context, scope Scope) ([]Instance, error) {
+// links object; one GET returns the full collection, so a positive limit
+// trims it client-side.
+func (s instanceService) List(ctx context.Context, scope Scope, limit int) (*InstancePage, error) {
+	if limit < 0 {
+		return nil, clierr.NewUsageError("--limit must be zero or greater; zero returns every instance")
+	}
 	body, err := s.get(ctx, transport.ScopedInstancesPath(scope.OrgID, scope.ProjectID), "listing instances")
 	if err != nil {
 		return nil, err
@@ -130,16 +142,21 @@ func (s instanceService) List(ctx context.Context, scope Scope) ([]Instance, err
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Instance, len(rows))
+	page := &InstancePage{}
+	if limit > 0 && len(rows) > limit {
+		rows = rows[:limit]
+		page.LimitReached = true
+	}
+	page.Items = make([]Instance, len(rows))
 	for i, row := range rows {
 		inst := newInstance(row)
 		if _, ok := inst.Record["organization_id"]; !ok {
 			inst.Record["organization_id"] = scope.OrgID
 			inst.OrganizationID = scope.OrgID
 		}
-		out[i] = inst
+		page.Items[i] = inst
 	}
-	return out, nil
+	return page, nil
 }
 
 func (s instanceService) Delete(ctx context.Context, scope Scope, id string) (*Instance, error) {
@@ -281,12 +298,12 @@ func (s instanceService) Create(ctx context.Context, scope Scope, spec InstanceC
 		return nil, err
 	}
 	if spec.Name == "" {
-		existing, err := s.List(ctx, scope)
+		existing, err := s.List(ctx, scope, 0)
 		if err != nil {
 			return nil, err
 		}
-		names := make([]string, 0, len(existing))
-		for _, e := range existing {
+		names := make([]string, 0, len(existing.Items))
+		for _, e := range existing.Items {
 			if e.Name != "" {
 				names = append(names, e.Name)
 			}

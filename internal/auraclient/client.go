@@ -89,7 +89,10 @@ const (
 // cancel with it.
 type InstanceService interface {
 	Get(ctx context.Context, scope Scope, id string) (*Instance, error)
-	List(ctx context.Context, scope Scope) ([]Instance, error)
+	// List returns the project's instances. A limit of zero returns every
+	// instance, a positive limit truncates the list, and a negative one is a
+	// usage error.
+	List(ctx context.Context, scope Scope, limit int) (*InstancePage, error)
 	Delete(ctx context.Context, scope Scope, id string) (*Instance, error)
 	Pause(ctx context.Context, scope Scope, id string) (*Instance, error)
 	Resume(ctx context.Context, scope Scope, id string) (*Instance, error)
