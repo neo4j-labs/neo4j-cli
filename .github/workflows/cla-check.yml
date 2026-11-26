@@ -1,6 +1,15 @@
 name: "CLA Check"
 
 on:
+    # pull_request_target is required, not incidental: the job needs
+    # secrets.TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN (private-repo checkout plus
+    # org GraphQL queries), and secrets are not exposed to `pull_request`
+    # runs from forks — which is exactly where the CLA check matters.
+    # Safe here: the checkout targets neo-technology/whitelist-check at a
+    # fixed ref; the PR head is never checked out or executed.
+    # GitHub blocks pull_request_target by default in public repositories
+    # from 2026-12-02 — this repo's Actions event policy must explicitly
+    # allow it, or this check silently stops running on PRs.
     pull_request_target:
         branches: ["main"]
 
