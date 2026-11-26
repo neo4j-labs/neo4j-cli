@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'agent detection now honours AI_AGENT and recognises Junie, GitHub Copilot, Cline and Antigravity, so those harnesses get agent-mode output and are classified as `agent`; a person typing in the Kiro IDE terminal is no longer treated as an agent, so write commands run there without requiring --rw'
+time: 2026-11-26T12:00:00.000000Z
