@@ -126,7 +126,6 @@ func TestState_UnwritableConfigFailsCleanly(t *testing.T) {
 	base, err := testfs.GetTestFs("{}", "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(afero.NewReadOnlyFs(base), "test-version")
-	cfg.Flags.SetForTest("flag.feedback-command", true)
 	withSeams(t, true, claudeCodeAgent)
 	prev := lookupEnv
 	t.Cleanup(func() { lookupEnv = prev })

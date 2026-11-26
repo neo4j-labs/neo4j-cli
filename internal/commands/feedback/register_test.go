@@ -20,7 +20,7 @@ func TestRegister_DoesNotAuthorizeAndIsAllowedUnderAgent(t *testing.T) {
 	st := parseJSON(t, stdout)
 	assert.Equal(t, false, st["enabled"], "register authorizes nothing")
 	assert.Equal(t, []any{"claude-code"}, st["registered_agents"])
-	assert.Contains(t, *calls, "mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -e NEO4J_CLI_FLAG_FEEDBACK_COMMAND=true -- /opt/neo4j-cli feedback serve")
+	assert.Contains(t, *calls, "mcp add -s user neo4j-feedback -e NEO4J_CLI_FEEDBACK_INSTRUCTIONS=basic -- /opt/neo4j-cli feedback serve")
 	assert.False(t, Authorized(cfg, time.Now()))
 	assert.Equal(t, loopback, endpoint(cfg))
 }
