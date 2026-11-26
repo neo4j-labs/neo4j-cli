@@ -78,6 +78,7 @@ neo4j-cli relate pull recent --rw --uri neo4j://localhost:7687 -u neo4j -p pw \\
 
 	// Pull flags — Relate's names verbatim.
 	cmd.Flags().String("query", "", "Remote Cypher to pull; must return nodes, relationships or paths (not scalars)")
+	cmd.Flags().StringArray(engine.OpenOptFlag, nil, engine.OpenOptFlagUsage)
 	cmd.Flags().StringArray("param", nil, "Remote query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise a string")
 	cmd.Flags().Int("batch-size", engine.DefaultPullBatchSize, "Rows per write statement into the local store, 1-10000 (property values are inlined as literals, so smaller batches mean smaller statements)")
 
@@ -149,6 +150,10 @@ func runPull(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 
 	// Local store: created when missing (the pull itself is the creation).
 	storePath := engine.ResolveStorePath(storeArg)
+	opts, _ := cmd.Flags().GetStringArray(engine.OpenOptFlag)
+	if err := engine.ApplyOpenOpts(opts); err != nil {
+		return err
+	}
 	store, err := engine.OpenStore(storePath, "")
 	if err != nil {
 		return clierr.NewFatalError("cannot open the local Relate store at %s: %w", storePath, err)

@@ -46,6 +46,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--force` | bool | false | Keep an existing store instead of refusing (its data is untouched) |
+| `--relate-opt` | stringArray | [] | Relate engine open option as key=value (repeatable; the first '=' splits key from value, so values may contain ';' and '='). Keys: snapshot-format (parquet\|json\|markdown; a new store only), markdown-body-properties, checkpoint-interval-secs, durability-mode (full\|everysecond\|snapshot), logical-graph-size-limit, expression-memory-limit. Same names and values as the standalone `relate` CLI flags; overrides the matching RELATE_* environment variable |
 
 Examples:
 
@@ -58,6 +59,9 @@ neo4j-cli relate create ./mydb
 
 # Accept an existing store instead of refusing
 neo4j-cli relate create movies --force
+
+# Create a Markdown vault (one note per node) instead of the default snapshot codec
+neo4j-cli relate create notes --relate-opt snapshot-format=markdown --relate-opt 'markdown-body-properties=Person=bio'
 
 # Then populate it
 neo4j-cli query "CREATE (:Movie {title: 'The Matrix'})" --relate movies --rw
@@ -146,6 +150,7 @@ Flags:
 | `--param` | stringArray | [] | Remote query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise a string |
 | `-p, --password` | string | - | Neo4j password of the remote; prompted on TTY if unset |
 | `--query` | string | - | Remote Cypher to pull; must return nodes, relationships or paths (not scalars) |
+| `--relate-opt` | stringArray | [] | Relate engine open option as key=value (repeatable; the first '=' splits key from value, so values may contain ';' and '='). Keys: snapshot-format (parquet\|json\|markdown; a new store only), markdown-body-properties, checkpoint-interval-secs, durability-mode (full\|everysecond\|snapshot), logical-graph-size-limit, expression-memory-limit. Same names and values as the standalone `relate` CLI flags; overrides the matching RELATE_* environment variable |
 | `--uri` | string | - | Neo4j Bolt URI of the remote to pull from. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default "neo4j://localhost:7687") |
 | `-u, --username` | string | - | Neo4j username of the remote (default "neo4j") |
 
@@ -186,6 +191,7 @@ Flags:
 | `--merge-key` | stringArray | [] | Identity key override as Label.property (repeatable); default is the remote's uniqueness constraint per label |
 | `-p, --password` | string | - | Neo4j password of the remote; prompted on TTY if unset |
 | `--rel-key` | string | - | Relationship property to key the remote MERGE on (for multiple rels of one type between the same pair) |
+| `--relate-opt` | stringArray | [] | Relate engine open option as key=value (repeatable; the first '=' splits key from value, so values may contain ';' and '='). Keys: snapshot-format (parquet\|json\|markdown; a new store only), markdown-body-properties, checkpoint-interval-secs, durability-mode (full\|everysecond\|snapshot), logical-graph-size-limit, expression-memory-limit. Same names and values as the standalone `relate` CLI flags; overrides the matching RELATE_* environment variable |
 | `--types` | stringArray | [] | Comma-separated relationship types to push (default: every type in the store) |
 | `--uri` | string | - | Neo4j Bolt URI of the remote to push to. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default "neo4j://localhost:7687") |
 | `-u, --username` | string | - | Neo4j username of the remote (default "neo4j") |

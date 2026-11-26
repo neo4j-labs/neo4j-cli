@@ -35,6 +35,10 @@ func resolveRelateConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	}
 	path, _ := cmd.Flags().GetString("relate")
 	namespace, _ := cmd.Flags().GetString("relate-namespace")
+	opts, _ := cmd.Flags().GetStringArray(relate.OpenOptFlag)
+	if err := relate.ApplyOpenOpts(opts); err != nil {
+		return nil, err
+	}
 	store, err := relate.OpenStore(relate.ResolveStorePath(path), namespace)
 	if err != nil {
 		return nil, categorizeRelateError(err)

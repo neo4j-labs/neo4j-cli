@@ -5,6 +5,7 @@ package relate
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -99,4 +100,31 @@ func TestRelateCreate_AcceptsExistingEmptyDir(t *testing.T) {
 
 	require.NoError(t, h.execute(t, "create", "/tmp/empty"))
 	assert.Equal(t, "/tmp/empty", f.openedPath)
+}
+
+func TestRelateCreate_OpenOptsExportedBeforeOpen(t *testing.T) {
+	t.Setenv("RELATE_SNAPSHOT_FORMAT", "")
+	var seen string
+	f := &fakeStore{}
+	installFakeOpen(t, f)
+	inner := relate.OpenStore
+	relate.OpenStore = func(path, namespace string) (relate.Store, error) {
+		seen = os.Getenv("RELATE_SNAPSHOT_FORMAT")
+		return inner(path, namespace)
+	}
+
+	h := newHarness(t, "json")
+	require.NoError(t, h.execute(t, "create", "vault", "--relate-opt", "snapshot-format=markdown"))
+	assert.Equal(t, "markdown", seen)
+}
+
+func TestRelateCreate_BadOpenOptFailsBeforeOpen(t *testing.T) {
+	f := &fakeStore{}
+	installFakeOpen(t, f)
+
+	h := newHarness(t, "json")
+	err := h.execute(t, "create", "vault", "--relate-opt", "snapshot-format=csv")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be one of parquet, json, markdown")
+	assert.Empty(t, f.openedPath)
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/flags"
+	"github.com/neo4j/cli/internal/relate"
 )
 
 // NewCmd returns the `query` parent cobra command, with all persistent flags
@@ -104,6 +105,7 @@ neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bo
 	cmd.PersistentFlags().String("env", "", "Path to a .env file (auto-discovered by walking up from cwd if unset)")
 	cmd.PersistentFlags().String("relate", "", "Run against a local embedded Relate graph store instead of a server (no Bolt connection). PATH is a store directory or .rl bundle, created when missing; a bare name resolves under the CLI's managed store directory (see `neo4j-cli relate`). Mutually exclusive with --uri, --username, --password, --database and --credential; connection env vars and .env files are not consulted with --relate. Requires a build that includes the Relate engine (-tags relate)")
 	cmd.PersistentFlags().String("relate-namespace", "neo4j", "Relate session namespace to use with --relate: neo4j (the user database), system, or system_ontologies")
+	cmd.PersistentFlags().StringArray(relate.OpenOptFlag, nil, relate.OpenOptFlagUsage+". Only with --relate")
 	cmd.PersistentFlags().StringArray("param", nil, "Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string. Use `key:embed=<text>` to embed text via the configured provider and bind the resulting vector to $key (see `query :embed`).")
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")

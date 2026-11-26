@@ -61,6 +61,7 @@ neo4j-cli relate push movies --rw --credential local \\
 	}
 
 	// Remote connection flags — the same vocabulary as pull.
+	cmd.Flags().StringArray(engine.OpenOptFlag, nil, engine.OpenOptFlagUsage)
 	cmd.Flags().String("uri", "", "Neo4j Bolt URI of the remote to push to. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default \"neo4j://localhost:7687\")")
 	cmd.Flags().StringP("username", "u", "", "Neo4j username of the remote (default \"neo4j\")")
 	cmd.Flags().StringP("password", "p", "", "Neo4j password of the remote; prompted on TTY if unset")
@@ -148,6 +149,10 @@ func runPush(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 	storePath := engine.ResolveStorePath(storeArg)
 	if !engine.IsStore(cfg.Fs(), storePath) {
 		return unknownStoreError(storePath)
+	}
+	opts, _ := cmd.Flags().GetStringArray(engine.OpenOptFlag)
+	if err := engine.ApplyOpenOpts(opts); err != nil {
+		return err
 	}
 	store, err := engine.OpenStore(storePath, "")
 	if err != nil {

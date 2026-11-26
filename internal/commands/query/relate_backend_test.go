@@ -6,6 +6,7 @@ package query
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
@@ -406,4 +407,39 @@ func TestRunQueryRelate_WriteStatsRendered(t *testing.T) {
 		assert.Contains(t, h.stdout.String(),
 			"2 nodes created, 1 relationship created, 3 properties set, 2 labels added")
 	})
+}
+
+func TestRunQueryRelate_OpenOptsExportedBeforeOpen(t *testing.T) {
+	t.Setenv("RELATE_SNAPSHOT_FORMAT", "")
+	t.Setenv("RELATE_MARKDOWN_BODY_PROPERTIES", "")
+	var seen string
+	orig := relate.OpenStore
+	t.Cleanup(func() { relate.OpenStore = orig })
+	f := &fakeRelateStore{respond: func(stmt string) (relate.StatementResult, error) {
+		return resultOf(nil, nil), nil
+	}}
+	relate.OpenStore = func(path, namespace string) (relate.Store, error) {
+		seen = os.Getenv("RELATE_SNAPSHOT_FORMAT") + "|" + os.Getenv("RELATE_MARKDOWN_BODY_PROPERTIES")
+		return f, nil
+	}
+
+	h := newRunHarness(t, "json")
+	require.NoError(t, h.execute(t, "--relate=movies",
+		"--relate-opt=snapshot-format=markdown", "--relate-opt=markdown-body-properties=Person=bio;summary", "RETURN 1"))
+
+	assert.Equal(t, "markdown|Person=bio;summary", seen, "the engine reads these at open, so they must be set before OpenStore")
+}
+
+func TestRunQueryRelate_BadOpenOptFailsBeforeOpen(t *testing.T) {
+	f := &fakeRelateStore{}
+	installFakeStore(t, f)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t, "--relate=movies", "--relate-opt=preview=ontology", "RETURN 1")
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.ErrorAs(t, err, &ce)
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, err.Error(), `unknown key "preview"`)
+	assert.Empty(t, f.openedPath, "a rejected option must not open the store")
 }

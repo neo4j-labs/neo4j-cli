@@ -39,6 +39,9 @@ neo4j-cli relate create ./mydb
 # Accept an existing store instead of refusing
 neo4j-cli relate create movies --force
 
+# Create a Markdown vault (one note per node) instead of the default snapshot codec
+neo4j-cli relate create notes --relate-opt snapshot-format=markdown --relate-opt 'markdown-body-properties=Person=bio'
+
 # Then populate it
 neo4j-cli query "CREATE (:Movie {title: 'The Matrix'})" --relate movies --rw`,
 		Args: cobra.ExactArgs(1),
@@ -67,6 +70,10 @@ neo4j-cli query "CREATE (:Movie {title: 'The Matrix'})" --relate movies --rw`,
 					"path %s exists and is neither a Relate store nor an empty directory", path)
 			}
 
+			opts, _ := cmd.Flags().GetStringArray(engine.OpenOptFlag)
+			if err := engine.ApplyOpenOpts(opts); err != nil {
+				return err
+			}
 			store, err := engine.OpenStore(path, "")
 			if err != nil {
 				return clierr.NewFatalError("cannot create the Relate store at %s: %w", path, err)
@@ -82,6 +89,7 @@ neo4j-cli query "CREATE (:Movie {title: 'The Matrix'})" --relate movies --rw`,
 		},
 	}
 
+	cmd.Flags().StringArray(engine.OpenOptFlag, nil, engine.OpenOptFlagUsage)
 	cmd.Flags().Bool("force", false, "Keep an existing store instead of refusing (its data is untouched)")
 
 	return cmd

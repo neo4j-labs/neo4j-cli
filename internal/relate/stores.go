@@ -45,8 +45,14 @@ func IsStore(fs afero.Fs, path string) bool {
 	if !info.IsDir() {
 		return strings.HasSuffix(path, ".rl")
 	}
-	_, err = fs.Stat(filepath.Join(path, "manifest.json"))
-	return err == nil
+	// Parquet/JSON stores keep the marker at the root; a markdown vault keeps
+	// it under .relate/ so the root holds only notes.
+	for _, marker := range []string{"manifest.json", filepath.Join(".relate", "manifest.json")} {
+		if _, err := fs.Stat(filepath.Join(path, marker)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // IsEmptyDir reports whether path is an existing directory with no entries.
