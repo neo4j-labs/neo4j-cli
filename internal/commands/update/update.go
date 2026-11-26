@@ -321,7 +321,7 @@ func fieldOrder(r updateResult) []string {
 // TTY (auto-detection in ResolveOutput would otherwise pick "table").
 func isStructuredFormat(format string) bool {
 	switch format {
-	case "json", "table", "toon":
+	case "json", "jsonl", "table", "toon":
 		return true
 	}
 	return false

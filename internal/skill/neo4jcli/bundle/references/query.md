@@ -26,7 +26,7 @@ Flags:
 | `--embed-model` | string | - | Embedding model name |
 | `--embed-provider` | string | - | Embedding provider: openai \| ollama \| huggingface \| gemini \| vertex |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
-| `--format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
+| `--format` | string | - | Format to print console output in, from a choice of [default, json, jsonl, table, toon]. (agents: prefer toon) |
 | `--max-rows` | int | 100 | Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON |
 | `--param` | stringArray | [] | Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string. Use `key:embed=<text>` to embed text via the configured provider and bind the resulting vector to $key (see `query :embed`). |
 | `-p, --password` | string | - | Neo4j password; prompted on TTY if unset |

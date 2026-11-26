@@ -148,7 +148,7 @@ func TestListCustomerManagedKeysWithInvalidOutput(t *testing.T) {
 
 		helper.ExecuteCommand(fmt.Sprintf("%s list --format invalid", command))
 
-		helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, table, toon)")
+		helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, jsonl, table, toon)")
 	}
 }
 

@@ -75,11 +75,16 @@ var IsAgent = agent.Detect
 // ResolveOutput returns the effective output mode ("json", "table", or "toon")
 // for the current invocation. When cfg.Global.Format() is "json", "table", or
 // "toon" that value is returned unchanged — an explicit --format flag always
-// wins. Otherwise the mode is auto-detected: an agent harness yields "toon", a
+// wins. "jsonl" resolves to "json", so every caller that branches on JSON treats
+// it as JSON; only the Print* functions in this package check IsJSONL to print
+// one record per line. Otherwise the mode is auto-detected: an agent harness yields "toon", a
 // TTY stdout yields "table", and a non-TTY (piped/redirected) stdout yields
 // "json". The cmd parameter is retained for call-site compatibility.
 func ResolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string {
 	v := cfg.Global.Format()
+	if v == "jsonl" {
+		return "json"
+	}
 	if v == "json" || v == "table" || v == "toon" {
 		return v
 	}
@@ -90,6 +95,22 @@ func ResolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string {
 		return "table"
 	}
 	return "json"
+}
+
+// IsJSONL reports whether the explicit --format is "jsonl".
+func IsJSONL(cfg *clicfg.Config) bool {
+	return cfg.Global.Format() == "jsonl"
+}
+
+// printJSONLines writes one compact JSON object per line, with no envelope.
+func printJSONLines(cmd *cobra.Command, rows []map[string]any) {
+	for _, row := range rows {
+		b, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		cmd.Println(string(b))
+	}
 }
 
 // ResponseData is the interface that all API response types must satisfy to be
@@ -103,6 +124,10 @@ type ResponseData interface {
 func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values ResponseData, fields []string) {
 	switch ResolveOutput(cmd, cfg) {
 	case "json":
+		if IsJSONL(cfg) {
+			printJSONLines(cmd, values.AsArray())
+			return
+		}
 		bytes, err := json.MarshalIndent(values, "", "\t")
 		if err != nil {
 			panic(err)
@@ -125,6 +150,12 @@ func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values ResponseData, f
 func PrintBodyMaps(cmd *cobra.Command, cfg *clicfg.Config, items []ResponseData, fields [][]string) {
 	switch ResolveOutput(cmd, cfg) {
 	case "json":
+		if IsJSONL(cfg) {
+			for _, item := range items {
+				printJSONLines(cmd, item.AsArray())
+			}
+			return
+		}
 		bytes, err := json.MarshalIndent(items, "", "\t")
 		if err != nil {
 			panic(err)
@@ -169,6 +200,10 @@ func PrintPassthrough(cmd *cobra.Command, cfg *clicfg.Config, body []byte) {
 	}
 	switch ResolveOutput(cmd, cfg) {
 	case "json":
+		if IsJSONL(cfg) {
+			printPassthroughJSONL(cmd, body)
+			return
+		}
 		writePassthrough(cmd, body)
 	case "toon":
 		printPassthroughToon(cmd, body)
@@ -191,6 +226,26 @@ func writePassthrough(cmd *cobra.Command, b []byte) {
 // stripped here — an unparseable upstream body is attacker-influenced text.
 func writeUnrenderable(cmd *cobra.Command, body []byte) {
 	writePassthrough(cmd, []byte(StripControl(string(body))))
+}
+
+// printPassthroughJSONL prints each row of the body on its own line, using the
+// same row shape as the table. Numbers keep their digits (json.Number); keys are
+// sorted, not in server order. A body with no row shape (a scalar, a null, an
+// array of non-objects, invalid JSON) is written verbatim, like json.
+func printPassthroughJSONL(cmd *cobra.Command, body []byte) {
+	var v any
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if err := dec.Decode(&v); err != nil {
+		writePassthrough(cmd, body)
+		return
+	}
+	rows, ok := passthroughRows(v)
+	if !ok {
+		writePassthrough(cmd, body)
+		return
+	}
+	printJSONLines(cmd, rows)
 }
 
 func printPassthroughToon(cmd *cobra.Command, body []byte) {

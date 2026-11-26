@@ -76,7 +76,7 @@ func TestListOrganizationsWithInvalidFormat(t *testing.T) {
 
 	helper.ExecuteCommand("organization list --format invalid")
 
-	helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, table, toon)")
+	helper.AssertErr("Error: invalid format value specified: invalid (valid values: default, json, jsonl, table, toon)")
 }
 
 func TestListOrganizationsWithCredentialFlag(t *testing.T) {

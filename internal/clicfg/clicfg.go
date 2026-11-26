@@ -26,7 +26,7 @@ const (
 	DefaultmixpanelToken    = "4bfb2414ab973c741b6f067bf06d5575"
 )
 
-var ValidFormatValues = [4]string{"default", "json", "table", "toon"}
+var ValidFormatValues = [5]string{"default", "json", "jsonl", "table", "toon"}
 
 type ConfigScope string
 

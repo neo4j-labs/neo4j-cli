@@ -56,7 +56,7 @@ func TestConfigSet(t *testing.T) {
 		{
 			name:         "set format to invalid value with rw returns error",
 			command:      "config set --rw format invalid",
-			wantErr:      "Error: invalid value for 'format': invalid (valid values: default, json, table, toon)",
+			wantErr:      "Error: invalid value for 'format': invalid (valid values: default, json, jsonl, table, toon)",
 			wantOutEmpty: true,
 		},
 		{

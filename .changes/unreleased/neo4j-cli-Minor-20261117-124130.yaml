@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add --format jsonl: list output prints one compact JSON object per line, with no data envelope'
+time: 2026-11-17T12:41:30+00:00
