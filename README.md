@@ -415,6 +415,40 @@ neo4j-cli relate delete movies --yes --force
 
 `query --relate <name-or-path>` switches the query command to the embedded backend — no Bolt connection is opened (`--uri`/`--username`/`--password`/`--database`/`--credential` are mutually exclusive with it). Everything else works as with a server: parameters, `--atomic`, `--continue-on-error`, `:schema`, output formats, and the `--rw` write guard. `--relate-namespace` selects the session namespace (`neo4j`, `system`, `system_ontologies`).
 
+#### Engine open options
+
+`query --relate`, `relate create`, `relate pull` and `relate push` take a repeatable `--relate-opt key=value` flag that passes open options to the engine. The first `=` splits key from value, so a value may itself contain `;` and `=`. An unknown key or invalid value is a usage error that lists the valid keys, and nothing is opened.
+
+| Key | Values | Notes |
+|---|---|---|
+| `snapshot-format` | `parquet`, `json`, `markdown` | Storage codec; applies only to a new or empty store — an existing store keeps its codec |
+| `markdown-body-properties` | `LIST` or `Label=LIST`, entries separated by `;` | Which properties become the note body in a Markdown vault (default `body`) |
+| `checkpoint-interval-secs` | integer ≥ 0 | Timed checkpoint period; `0` disables |
+| `durability-mode` | `full`, `everysecond`, `snapshot` | WAL durability |
+| `logical-graph-size-limit` | bytes or `mb`/`mib`/`gb`/`gib` | Cap on the live graph plus indexes |
+| `expression-memory-limit` | bytes, `mb`/`mib`/`gb`/`gib`, or `none` | Per-value expression build cap |
+
+The names and values match the standalone `relate` CLI flags. The Go client opens a store by path only, so the CLI maps each key onto the `RELATE_*` environment variable the engine reads at open time (an explicit option wins over an ambient variable); only these keys are accepted.
+
+```bash
+# A Markdown vault: one note per node, relationships as wiki-linked frontmatter
+neo4j-cli relate create notes --rw \
+  --relate-opt snapshot-format=markdown \
+  --relate-opt 'markdown-body-properties=Person=bio'
+neo4j-cli query "CREATE (:Person {name: 'Ada', bio: 'First programmer'})" --relate notes --rw   # -> notes/Person/Ada.md
+
+# Reopening needs no option: the codec is detected from the store
+neo4j-cli query "MATCH (p:Person) RETURN p.name" --relate notes
+
+# Looser durability and a timed checkpoint for a bulk load
+neo4j-cli query --relate ./db --rw --relate-opt durability-mode=everysecond --relate-opt checkpoint-interval-secs=30 "CREATE (:T)"
+
+# Pull a remote subgraph straight into a vault
+neo4j-cli relate pull people --rw --relate-opt snapshot-format=markdown --uri neo4j://localhost:7687 -u neo4j -p '<pw>' --query "MATCH (n:Person) RETURN n"
+```
+
+`neo4j-cli` has no Markdown *output* format; to print results as a Markdown table, open the same store with the standalone `relate -d <path> --markdown "..."`.
+
 ### Pull a subgraph from a server
 
 `relate pull <name-or-path> --query '...'` streams a subgraph from a remote Neo4j over Bolt (same connection flags as `query`) and upserts it into the local store — created when missing. The query must return nodes, relationships or paths (e.g. `MATCH (a)-[r:ACTED_IN]->(m) RETURN a, r, m`); scalar-only results are refused. Entities are keyed by source identity, so a repeated pull updates in place instead of duplicating (a `pull-identity.json` sidecar beside the store carries the mapping per source). Relationships whose endpoints are not part of the pull are skipped and reported. The store is checkpointed after a successful pull.
