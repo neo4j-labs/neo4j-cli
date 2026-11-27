@@ -135,7 +135,7 @@ neo4j-cli relate list --format json
 
 Pull a subgraph from a remote Neo4j into a local Relate store
 
-Pull a subgraph from a remote Neo4j database into a local embedded Relate store, over Bolt. The remote is selected with the same connection flags as `query` (--uri, --username, --password, --database for the remote database name, --credential, --env); the first argument is the LOCAL store (a bare name under the managed directory, or a path — created when missing). --query is the remote Cypher; it must return graph entities — nodes, relationships or paths (e.g. `MATCH (n:Person) RETURN n` or `MATCH (a)-[r:KNOWS]->(b) RETURN a, r, b`); scalar-only results are refused. --param binds remote query parameters (key=value, JSON-typed). Pulled entities are upserted by source identity: a second pull from the same source updates the entities in place instead of duplicating them (properties are replaced wholesale). Relationships whose endpoints are not part of the pulled result are skipped and reported. --batch-size bounds the rows per write statement (default 500; property values are inlined as literals, so smaller batches mean smaller statements). The store is checkpointed after a successful pull. Requires a build with the Relate engine (-tags relate).
+Pull a subgraph from a remote Neo4j database into a local embedded Relate store, over Bolt. The remote is selected with the same connection flags as `query` (--uri, --username, --password, --database for the remote database name, --credential, --env); the first argument is the LOCAL store (a bare name under the managed directory, or a path — created when missing). --query is the remote Cypher; it must return graph entities — nodes, relationships or paths (e.g. `MATCH (n:Person) RETURN n` or `MATCH (a)-[r:KNOWS]->(b) RETURN a, r, b`); scalar-only results are refused. --param binds remote query parameters (key=value, JSON-typed). Pulled entities are upserted by source identity: a second pull from the same source updates the entities in place instead of duplicating them (properties are replaced wholesale). Relationships whose endpoints are not part of the pulled result are skipped and reported. --batch-size bounds the rows bound into one write statement (default 5000; values cross as typed parameters, so temporals, points and vectors keep their type). The store is checkpointed after a successful pull. Requires a build with the Relate engine (-tags relate).
 
 Usage: `neo4j-cli relate pull <name-or-path> [flags]`
 
@@ -143,7 +143,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--batch-size` | int | 500 | Rows per write statement into the local store, 1-10000 (property values are inlined as literals, so smaller batches mean smaller statements) |
+| `--batch-size` | int | 5000 | Rows per write statement into the local store, 1-10000 |
 | `-c, --credential` | string | - | Credential to use for the remote connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>', or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Remote database name; defaults to the connecting user's home database when unset |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
@@ -182,7 +182,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--batch-size` | int | 500 | Rows per remote write statement, 1-10000 |
+| `--batch-size` | int | 5000 | Rows per remote write statement, 1-10000 |
 | `-c, --credential` | string | - | Credential to use for the remote connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>', or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Remote database name; defaults to the connecting user's home database when unset |
 | `--dry-run` | bool | false | Print the push plan (labels, keys, counts, batches) and write nothing; still reads the remote's constraints |
