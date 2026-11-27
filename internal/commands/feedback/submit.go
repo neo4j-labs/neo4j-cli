@@ -53,7 +53,7 @@ neo4j-cli feedback submit --category unclear_error --expected "The error should 
 	}
 
 	f := cmd.Flags()
-	f.StringVar(&in.Category, "category", "", "Category: unclear_error, unexpected_behavior, missing_capability or other_friction")
+	f.StringVar(&in.Category, "category", "friction", "Category: friction, unclear_error, unexpected_behavior or missing_capability")
 	f.StringVar(&in.Expected, "expected", "", "What you expected neo4j-cli to do (product behavior, no query text or data)")
 	f.StringVar(&in.Observed, "observed", "", "What neo4j-cli actually did (product behavior, no query text or data)")
 	f.StringVar(&in.Command, "command", "", "Optional: the neo4j-cli command involved, e.g. query")

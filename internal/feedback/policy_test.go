@@ -70,6 +70,30 @@ func detectors(vs []Violation) []string {
 	return out
 }
 
+func TestValidate_Categories(t *testing.T) {
+	for _, tc := range []struct {
+		category string
+		valid    bool
+	}{
+		{"friction", true},
+		{"unclear_error", true},
+		{"unexpected_behavior", true},
+		{"missing_capability", true},
+		{"other_friction", false}, // the retired pre-parity name
+		{"Friction", false},
+		{"", false},
+	} {
+		in := baseInput()
+		in.Category = tc.category
+		_, vs, _ := Validate(in, testRoot())
+		if tc.valid {
+			assert.Empty(t, vs, "category %q", tc.category)
+		} else {
+			assert.Contains(t, detectors(vs), DetInvalidInput, "category %q", tc.category)
+		}
+	}
+}
+
 func TestValidate_BaseInputPasses(t *testing.T) {
 	_, vs, dropped := Validate(baseInput(), testRoot())
 	assert.Empty(t, vs)

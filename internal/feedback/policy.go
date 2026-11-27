@@ -53,7 +53,9 @@ const (
 	droppedModel     = "agent.model"
 )
 
-var validCategories = []string{"unclear_error", "unexpected_behavior", "missing_capability", "other_friction"}
+// validCategories is the closed category vocabulary shared with Relate
+// (ADR-0588); `friction` is the catch-all and the commands' default.
+var validCategories = []string{"friction", "unclear_error", "unexpected_behavior", "missing_capability"}
 
 // Input is what the caller (flags plus environment) hands to Validate.
 type Input struct {
