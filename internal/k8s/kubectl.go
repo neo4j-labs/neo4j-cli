@@ -33,9 +33,9 @@ func appendGlobalArgs(args []string, s Settings) []string {
 }
 
 // kubectlApplyCRDArgs builds the server-side apply of the operator CRD
-// manifest. source is the release asset URL or a local path; kubectl fetches
-// a URL itself. --force-conflicts matches the operator's own install
-// instructions, and the field manager keeps the CLI's ownership attributable.
+// manifest. source is a verified local copy of a release asset or a user-supplied
+// local path. --force-conflicts matches the operator's own install instructions,
+// and the field manager keeps the CLI's ownership attributable.
 func kubectlApplyCRDArgs(s Settings, source string) []string {
 	return kubectlArgs(s,
 		"apply",

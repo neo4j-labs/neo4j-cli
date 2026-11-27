@@ -37,6 +37,7 @@ func newUpgradeCmd(cfg *clicfg.Config) *cobra.Command {
 			"settings such as a pinned image digest survive while defaults added by a newer chart still apply; a --watch-namespace " +
 			"you pass here overrides the deployed watch scope. The release must already exist: use `k8s operator install` for a fresh " +
 			"install. Pass --crd-file to apply a CRD manifest from disk instead of the GitHub release asset. " +
+			"Remote CRD assets are checked against the SHA256 digest in the GitHub release metadata before they are applied. " +
 			"The command does not wait for the controller to become ready; run `k8s operator status` afterwards. Requires --rw.",
 		Example: `# Upgrade to the operator release this CLI pins, keeping the deployed values
 neo4j-cli k8s operator upgrade --rw

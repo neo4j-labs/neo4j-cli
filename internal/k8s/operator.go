@@ -41,8 +41,8 @@ var OperatorCRDNames = []string{
 }
 
 // OperatorCRDManifest returns the release asset URL that bundles all four
-// CRDs for one operator version. kubectl fetches the URL itself, so the
-// engine needs no HTTP client and the CLI keeps no copy of the schema.
+// CRDs for one operator version. ApplyCRDs downloads the asset, verifies its
+// SHA256 against the GitHub release metadata, and gives kubectl a local copy.
 func OperatorCRDManifest(version string) string {
 	return fmt.Sprintf(
 		"https://github.com/neo4j-partners/neo4j-kubernetes-operator/releases/download/v%s/neo4j-crd-%s.yaml",

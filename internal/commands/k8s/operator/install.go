@@ -35,6 +35,7 @@ func newInstallCmd(cfg *clicfg.Config) *cobra.Command {
 			"-n/--namespace, or " + engine.DefaultOperatorNamespace + " when that flag is empty; the namespace is created if missing. " +
 			"--watch-namespace is required: the chart refuses to render without a watch scope, and the operator never watches its own " +
 			"namespace. Pass --crd-file to apply a CRD manifest from disk instead of the GitHub release asset. " +
+			"Remote CRD assets are checked against the SHA256 digest in the GitHub release metadata before they are applied. " +
 			"The command does not wait for the controller to become ready; run `k8s operator status` afterwards. Requires --rw.",
 		Example: `# Install the pinned operator release, watching the default namespace
 neo4j-cli k8s operator install --watch-namespace default --rw

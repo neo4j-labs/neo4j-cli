@@ -220,7 +220,7 @@ func TestApplyCRDs_ArgvIsServerSideWithTheCLIFieldManager(t *testing.T) {
 		Kubeconfig: "/tmp/kube",
 		Context:    "kind-kind",
 		Namespace:  "neo4j-operator-system",
-	}).ApplyCRDs(context.Background(), "https://example.test/neo4j-crd-1.0.0.yaml")
+	}).ApplyCRDs(context.Background(), "/tmp/neo4j-crd-1.0.0.yaml")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"neo4js.neo4j.com"}, names)
 
@@ -228,7 +228,7 @@ func TestApplyCRDs_ArgvIsServerSideWithTheCLIFieldManager(t *testing.T) {
 	assert.Equal(t, "/usr/local/bin/fake-kubectl", (*calls)[0].path)
 	assert.Equal(t, []string{
 		"apply", "--server-side", "--force-conflicts", "--field-manager=neo4j-cli",
-		"-f", "https://example.test/neo4j-crd-1.0.0.yaml",
+		"-f", "/tmp/neo4j-crd-1.0.0.yaml",
 		"--kubeconfig", "/tmp/kube", "--context", "kind-kind", "-n", "neo4j-operator-system",
 	}, (*calls)[0].args)
 }

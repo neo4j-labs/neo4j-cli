@@ -8,12 +8,27 @@ import (
 	"strings"
 )
 
+// isRemoteCRDSource reports whether ApplyCRDs must download and verify the
+// manifest before kubectl can apply it.
+func isRemoteCRDSource(source string) bool {
+	lower := strings.ToLower(source)
+	return strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://")
+}
+
 // ApplyCRDs implements Client. It server-side applies the operator CRD
 // manifest and returns the CRD names kubectl reported.
 func (c *execClient) ApplyCRDs(ctx context.Context, source string) ([]string, error) {
 	path, err := resolveKubectl()
 	if err != nil {
 		return nil, err
+	}
+	if isRemoteCRDSource(source) {
+		verifiedPath, cleanup, err := downloadVerifiedCRD(ctx, source)
+		if err != nil {
+			return nil, err
+		}
+		defer cleanup()
+		source = verifiedPath
 	}
 	args := kubectlApplyCRDArgs(c.settings, source)
 	res := c.exec(ctx, "kubectl", path, args)
@@ -24,7 +39,7 @@ func (c *execClient) ApplyCRDs(ctx context.Context, source string) ([]string, er
 }
 
 // DeleteCRDs implements Client. It deletes the four operator CRDs by name and
-// returns the names kubectl reported deleting; CRDs that are already gone are
+// returns the names kubectl reported deleting. CRDs that are already gone are
 // omitted rather than an error.
 func (c *execClient) DeleteCRDs(ctx context.Context) ([]string, error) {
 	path, err := resolveKubectl()
