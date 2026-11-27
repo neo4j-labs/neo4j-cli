@@ -6,6 +6,7 @@ package relate
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -84,6 +85,11 @@ type fakeStore struct {
 	checkpoints     int
 	closed          bool
 	created         int
+	// failCreateAfter, when > 0, makes the default responder fail the
+	// identity-capturing statement once that many have succeeded — a pull that
+	// dies part-way through its batches.
+	failCreateAfter int
+	creates         int
 	respond         func(stmt string) (relate.StatementResult, error)
 }
 
@@ -98,6 +104,10 @@ func (f *fakeStore) Run(statements []string, params map[string]any, atomic bool)
 			// else answers empty.
 			res := relate.StatementResult{Rows: [][]any{}}
 			if strings.Contains(stmt, "RETURN elementId") {
+				f.creates++
+				if f.failCreateAfter > 0 && f.creates > f.failCreateAfter {
+					return nil, errors.New("engine: simulated failure mid-pull")
+				}
 				res.Columns = []string{"eid", "src"}
 				for _, m := range srcLiteralPattern.FindAllStringSubmatch(stmt, -1) {
 					f.created++

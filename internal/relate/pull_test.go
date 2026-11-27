@@ -4,6 +4,7 @@
 package relate
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -226,5 +227,32 @@ func TestLoadIdentityMap_CorruptFileErrors(t *testing.T) {
 
 	_, err := LoadIdentityMap(fs, "/store")
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), identityMapName)
+}
+
+// deniedFs fails every open of one path with a permission error, standing in for
+// an unreadable sidecar.
+type deniedFs struct {
+	afero.Fs
+	path string
+}
+
+func (d deniedFs) Open(name string) (afero.File, error) {
+	if name == d.path {
+		return nil, &os.PathError{Op: "open", Path: name, Err: os.ErrPermission}
+	}
+	return d.Fs.Open(name)
+}
+
+func TestLoadIdentityMap_OnlyAMissingFileMeansEmpty(t *testing.T) {
+	mem := afero.NewMemMapFs()
+
+	m, err := LoadIdentityMap(mem, "/store")
+	require.NoError(t, err, "no sidecar yet is the normal first-pull case")
+	assert.Empty(t, m.Sources)
+
+	require.NoError(t, afero.WriteFile(mem, filepath.Join("/store", identityMapName), []byte("{}"), 0o600))
+	_, err = LoadIdentityMap(deniedFs{Fs: mem, path: filepath.Join("/store", identityMapName)}, "/store")
+	require.Error(t, err, "an unreadable sidecar must not silently reset the identity table")
 	assert.Contains(t, err.Error(), identityMapName)
 }

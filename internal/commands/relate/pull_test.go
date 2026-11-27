@@ -85,6 +85,29 @@ func TestRelatePull_MaterializesAndReports(t *testing.T) {
 	assert.Contains(t, h.stderr.String(), "1 relationships (1 new, 0 reused, 0 skipped: endpoint not pulled)")
 }
 
+// Regression: a pull that failed after committing its node batch left no
+// identity map, so the retry re-created every node.
+func TestRelatePull_FailurePartwayStillSavesIdentities(t *testing.T) {
+	f := &fakeStore{failCreateAfter: 1} // nodes commit, the relationship batch fails
+	installFakeOpen(t, f)
+	installFakeStream(t, [][]any{tripleRecord("4:a:0", "5:a:9", "4:a:1")}, nil)
+
+	h := newHarness(t, "json")
+	storePath := relate.ResolveStorePath("movies")
+	require.NoError(t, h.cfg.Fs().MkdirAll(storePath, 0o700))
+
+	err := h.execute(t, "pull", "movies",
+		"--uri", "neo4j://remote:7687", "--username", "neo4j", "--password", "pw",
+		"--query", "MATCH (a)-[r:KNOWS]->(b) RETURN a, r, b",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated failure mid-pull")
+
+	m, loadErr := relate.LoadIdentityMap(h.cfg.Fs(), storePath)
+	require.NoError(t, loadErr)
+	assert.Len(t, m.Sources["neo4j://remote:7687/neo4j"].Nodes, 2, "the committed nodes keep their identities for the retry")
+}
+
 func TestRelatePull_ScalarOnlyIsUsageError(t *testing.T) {
 	installFakeOpen(t, &fakeStore{})
 	installFakeStream(t, [][]any{{"Ada", int64(1)}}, nil)

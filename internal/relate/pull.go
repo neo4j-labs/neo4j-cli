@@ -5,7 +5,9 @@ package relate
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -141,8 +143,13 @@ type SourceIdentities struct {
 // file is an empty map, not an error.
 func LoadIdentityMap(fs afero.Fs, storePath string) (*IdentityMap, error) {
 	raw, err := afero.ReadFile(fs, filepath.Join(storePath, identityMapName))
-	if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
 		return &IdentityMap{Sources: map[string]SourceIdentities{}}, nil
+	}
+	if err != nil {
+		// Anything but "no sidecar yet" (permissions, I/O) must not reset the
+		// table: the next pull would re-create every entity it already holds.
+		return nil, fmt.Errorf("cannot read %s: %w", identityMapName, err)
 	}
 	var m IdentityMap
 	if err := json.Unmarshal(raw, &m); err != nil {

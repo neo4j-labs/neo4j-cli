@@ -211,6 +211,13 @@ func runPull(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 	source := identitySourceOf(conn)
 	stats, err := engine.Materialize(store, subgraph, identityMap, source, batchSize)
 	if err != nil {
+		// Earlier batches are already committed. Persist the identities they
+		// produced so a retry updates those entities instead of duplicating
+		// them; the pull's own error stays the one reported.
+		if saveErr := identityMap.Save(cfg.Fs(), storePath); saveErr != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+				"warning: the pull failed part-way and its identity map could not be saved (%v); re-pulling may duplicate entities already written\n", saveErr)
+		}
 		return err
 	}
 	if err := store.Checkpoint(); err != nil {
