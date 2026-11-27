@@ -158,6 +158,30 @@ func TestValidate_LongFieldIsTooLongNotTruncated(t *testing.T) {
 	assert.Equal(t, in.Observed, p.Observed, "the validator never truncates")
 }
 
+func TestValidate_RequestID_MustBeLowercaseV4(t *testing.T) {
+	for _, id := range []string{
+		"11111111-1111-4111-8111-111111111111", // lowercase v4: kept as given
+	} {
+		in := baseInput()
+		in.RequestID = id
+		p, vs, _ := Validate(in, testRoot())
+		assert.Empty(t, vs)
+		assert.Equal(t, id, p.RequestID)
+	}
+	for _, id := range []string{
+		"AAAAAAAA-1111-4111-8111-111111111111", // uppercase is refused, never lowercased
+		"11111111-1111-1111-8111-111111111111", // not version 4
+		"11111111-1111-4111-c111-111111111111", // not the RFC 4122 variant
+	} {
+		in := baseInput()
+		in.RequestID = id
+		p, vs, _ := Validate(in, testRoot())
+		assert.Contains(t, vs, Violation{"request_id", "invalid_input"}, "id %q", id)
+		assert.NotEqual(t, id, p.RequestID, "an invalid id is replaced by a fresh one")
+		assert.Regexp(t, uuidV4, p.RequestID)
+	}
+}
+
 func TestValidate_RequestID(t *testing.T) {
 	p, vs, _ := Validate(baseInput(), testRoot())
 	assert.Empty(t, vs)

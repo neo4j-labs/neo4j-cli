@@ -200,7 +200,7 @@ func ResolveRequestID(s string) (id string, ok bool) {
 		return newUUIDv4(), true
 	}
 	if uuidV4.MatchString(s) {
-		return strings.ToLower(s), true
+		return s, true
 	}
 	return newUUIDv4(), false
 }
@@ -213,7 +213,9 @@ func newUUIDv4() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-var uuidV4 = regexp.MustCompile(`^(?i)[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+// uuidV4 is a lowercase canonical UUIDv4, the one request-id shape (ADR-0588):
+// uppercase and non-v4 version or variant nibbles are refused, not normalised.
+var uuidV4 = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 func errorCodeValid(s string) bool {
 	for _, name := range clierr.CodeNames {
