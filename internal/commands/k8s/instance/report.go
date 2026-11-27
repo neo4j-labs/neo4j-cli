@@ -56,3 +56,30 @@ func printInstance(cmd *cobra.Command, cfg *clicfg.Config, instance engine.Neo4j
 func printInstances(cmd *cobra.Command, cfg *clicfg.Config, instances []engine.Neo4j) {
 	commonoutput.PrintBodyMap(cmd, cfg, instanceListResult(instances), instanceFields)
 }
+
+var credentialFields = []string{"name", "instance_name", "context", "namespace", "uri", "username", "bolt_tls"}
+
+type credentialResult struct {
+	credential engine.InstanceCredential
+}
+
+func (r credentialResult) AsArray() []map[string]any {
+	c := r.credential
+	return []map[string]any{{
+		"name":          c.Name,
+		"instance_name": c.InstanceName,
+		"context":       c.Context,
+		"namespace":     c.Namespace,
+		"uri":           c.URI,
+		"username":      c.Username,
+		"bolt_tls":      c.BoltTLS,
+	}}
+}
+
+func (r credentialResult) MarshalJSON() ([]byte, error) {
+	return json.Marshal(r.AsArray()[0])
+}
+
+func printCredential(cmd *cobra.Command, cfg *clicfg.Config, credential engine.InstanceCredential) {
+	commonoutput.PrintBodyMap(cmd, cfg, credentialResult{credential: credential}, credentialFields)
+}

@@ -5,6 +5,7 @@ package instance
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	engine "github.com/neo4j/cli/internal/k8s"
@@ -34,6 +35,8 @@ spec:
 
 type instanceEnv struct {
 	fake *engine.FakeClient
+	cfg  *clicfg.Config
+	ctx  context.Context
 	// namespaces records the namespace of each client the leaf builds, in
 	// order. create builds a workload client, then an operator client.
 	namespaces []string
@@ -43,13 +46,17 @@ func newInstanceEnv() *instanceEnv {
 	return &instanceEnv{fake: engine.NewFakeClient()}
 }
 
-func runInstance(t *testing.T, env *instanceEnv, args string) (string, string, error) {
+func instanceCommand(t *testing.T, env *instanceEnv) (*cobra.Command, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
-	fs, err := testfs.GetDefaultTestFs()
-	require.NoError(t, err)
-	require.NoError(t, afero.WriteFile(fs, "/tmp/kube", []byte("apiVersion: v1\n"), 0o600))
-	require.NoError(t, afero.WriteFile(fs, "/tmp/neo4j.yaml", []byte(testManifest), 0o600))
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := env.cfg
+	if cfg == nil {
+		fs, err := testfs.GetDefaultTestFs()
+		require.NoError(t, err)
+		cfg = clicfg.NewConfig(fs, "test")
+		env.cfg = cfg
+	}
+	require.NoError(t, afero.WriteFile(cfg.Fs(), "/tmp/kube", []byte("apiVersion: v1\n"), 0o600))
+	require.NoError(t, afero.WriteFile(cfg.Fs(), "/tmp/neo4j.yaml", []byte(testManifest), 0o600))
 
 	original := clientFactory
 	clientFactory = func(settings engine.Settings) engine.Client {
@@ -64,14 +71,24 @@ func runInstance(t *testing.T, env *instanceEnv, args string) (string, string, e
 	flags.RegisterOutputFlag(root, cfg)
 	root.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
 	root.AddCommand(NewCmd(cfg))
-
 	out := bytes.NewBuffer(nil)
 	errOut := bytes.NewBuffer(nil)
 	root.SetOut(out)
 	root.SetErr(errOut)
+	return root, out, errOut
+}
+
+func runInstance(t *testing.T, env *instanceEnv, args string) (string, string, error) {
+	t.Helper()
+	root, out, errOut := instanceCommand(t, env)
 	argv, err := shlex.Split(args)
 	require.NoError(t, err)
 	root.SetArgs(append([]string{"instance"}, argv...))
-	execErr := root.Execute()
+	var execErr error
+	if env.ctx != nil {
+		execErr = root.ExecuteContext(env.ctx)
+	} else {
+		execErr = root.Execute()
+	}
 	return out.String(), errOut.String(), execErr
 }

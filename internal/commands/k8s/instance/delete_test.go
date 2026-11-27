@@ -50,6 +50,8 @@ func TestWriteLeaves_RequireRw(t *testing.T) {
 	for _, args := range []string{
 		"create dev --accept-license eval",
 		"delete dev",
+		"credential dev",
+		"connect dev",
 	} {
 		t.Run(args, func(t *testing.T) {
 			env := newInstanceEnv()
@@ -59,6 +61,8 @@ func TestWriteLeaves_RequireRw(t *testing.T) {
 			assert.Zero(t, env.fake.CurrentContextCalls)
 			assert.Zero(t, env.fake.CreateNeo4jCalls)
 			assert.Zero(t, env.fake.DeleteNeo4jCalls)
+			assert.Zero(t, env.fake.GetSecretCalls)
+			assert.Zero(t, env.fake.PortForwardCalls)
 		})
 	}
 }

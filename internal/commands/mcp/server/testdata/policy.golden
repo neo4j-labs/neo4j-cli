@@ -207,7 +207,9 @@ history list	allow
 k8s	deny
 k8s doctor	deny
 k8s instance	deny
+k8s instance connect	deny
 k8s instance create	deny
+k8s instance credential	deny
 k8s instance delete	deny
 k8s instance get	deny
 k8s instance list	deny
