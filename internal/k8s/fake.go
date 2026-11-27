@@ -28,6 +28,9 @@ type FakeClient struct {
 	ListNeo4jCalls      int
 	CreateNeo4jCalls    int
 	DeleteNeo4jCalls    int
+	GetSecretCalls      int
+	ListPodsCalls       int
+	PortForwardCalls    int
 
 	// Recorded arguments.
 	AppliedCRDSources []string
@@ -38,6 +41,9 @@ type FakeClient struct {
 	GetNeo4jNames     []string
 	DeleteNeo4jNames  []string
 	CreatedManifests  [][]byte
+	GetSecretNames    []string
+	PodSelectors      []string
+	ForwardOptions    []PortForwardOptions
 
 	// Canned return values.
 	KubectlVersionResult VersionInfo
@@ -69,6 +75,11 @@ type FakeClient struct {
 	CreateNeo4jResult    Neo4j
 	CreateNeo4jErr       error
 	DeleteNeo4jErr       error
+	GetSecretResult      map[string][]byte
+	GetSecretErr         error
+	ListPodsResult       []Pod
+	ListPodsErr          error
+	PortForwardErr       error
 
 	// Optional behaviour overrides. When set they take precedence over the
 	// canned fields.
@@ -85,6 +96,9 @@ type FakeClient struct {
 	ListNeo4jFn      func(ctx context.Context) ([]Neo4j, error)
 	CreateNeo4jFn    func(ctx context.Context, manifest []byte) (Neo4j, error)
 	DeleteNeo4jFn    func(ctx context.Context, name string) error
+	GetSecretFn      func(ctx context.Context, name string) (map[string][]byte, error)
+	ListPodsFn       func(ctx context.Context, selector string) ([]Pod, error)
+	PortForwardFn    func(ctx context.Context, opts PortForwardOptions) error
 }
 
 // NewFakeClient returns a FakeClient with a healthy default: a matching
@@ -119,6 +133,8 @@ func NewFakeClient() *FakeClient {
 		GetNeo4jResult:    defaultFakeNeo4j(),
 		CreateNeo4jResult: defaultFakeNeo4j(),
 		ListNeo4jResult:   []Neo4j{defaultFakeNeo4j()},
+		GetSecretResult:   map[string][]byte{"NEO4J_AUTH": []byte("neo4j/test-password")},
+		ListPodsResult:    []Pod{{Name: "dev-server-0", Ready: true, Phase: "Running", BoltPort: 7687}},
 	}
 }
 
@@ -281,4 +297,42 @@ func (f *FakeClient) DeleteNeo4j(ctx context.Context, name string) error {
 		return f.DeleteNeo4jFn(ctx, name)
 	}
 	return f.DeleteNeo4jErr
+}
+
+// GetSecret implements Client.
+func (f *FakeClient) GetSecret(ctx context.Context, name string) (map[string][]byte, error) {
+	f.GetSecretCalls++
+	f.GetSecretNames = append(f.GetSecretNames, name)
+	if f.GetSecretFn != nil {
+		return f.GetSecretFn(ctx, name)
+	}
+	return f.GetSecretResult, f.GetSecretErr
+}
+
+// ListPods implements Client.
+func (f *FakeClient) ListPods(ctx context.Context, selector string) ([]Pod, error) {
+	f.ListPodsCalls++
+	f.PodSelectors = append(f.PodSelectors, selector)
+	if f.ListPodsFn != nil {
+		return f.ListPodsFn(ctx, selector)
+	}
+	return f.ListPodsResult, f.ListPodsErr
+}
+
+// PortForward implements Client. Without an override it calls the readiness
+// callback, then waits for the context as the real client does.
+func (f *FakeClient) PortForward(ctx context.Context, opts PortForwardOptions) error {
+	f.PortForwardCalls++
+	f.ForwardOptions = append(f.ForwardOptions, opts)
+	if f.PortForwardFn != nil {
+		return f.PortForwardFn(ctx, opts)
+	}
+	if f.PortForwardErr != nil {
+		return f.PortForwardErr
+	}
+	if err := opts.OnReady(ctx, opts.LocalPort); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	return ctx.Err()
 }

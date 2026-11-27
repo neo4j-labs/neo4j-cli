@@ -83,6 +83,14 @@ type Client interface {
 	CreateNeo4j(ctx context.Context, manifest []byte) (Neo4j, error)
 	// DeleteNeo4j starts deletion without waiting for finalisers.
 	DeleteNeo4j(ctx context.Context, name string) error
+	// GetSecret returns one Secret's decoded data in the client's namespace.
+	GetSecret(ctx context.Context, name string) (map[string][]byte, error)
+	// ListPods returns pods that match a Kubernetes label selector.
+	ListPods(ctx context.Context, selector string) ([]Pod, error)
+	// PortForward keeps a foreground connection to a pod. After the callback
+	// confirms readiness, it waits for context cancellation or child failure.
+	// The callback receives the process context and the allocated local port.
+	PortForward(ctx context.Context, opts PortForwardOptions) error
 }
 
 // VersionInfo is the parsed output of `kubectl version -o json`. The
