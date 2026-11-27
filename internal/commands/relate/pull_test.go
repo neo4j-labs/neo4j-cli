@@ -108,6 +108,36 @@ func TestRelatePull_FailurePartwayStillSavesIdentities(t *testing.T) {
 	assert.Len(t, m.Sources["neo4j://remote:7687/neo4j"].Nodes, 2, "the committed nodes keep their identities for the retry")
 }
 
+// A Cypher mistake in --query is a validation failure (exit 6), not an upstream
+// one (exit 8): retry-on-upstream scripts must not loop on an unfixable query.
+func TestRelatePull_RemoteErrorsAreClassifiedLikeQuery(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		wantExit int
+	}{
+		{"cypher syntax error", &neo4j.Neo4jError{Code: "Neo.ClientError.Statement.SyntaxError", Msg: "Invalid input"}, 6},
+		{"transient failure stays upstream", &neo4j.Neo4jError{Code: "Neo.TransientError.General.DatabaseUnavailable", Msg: "down"}, 8},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			installFakeOpen(t, &fakeStore{})
+			installFakeStream(t, nil, tt.err)
+
+			h := newHarness(t, "json")
+			require.NoError(t, h.cfg.Fs().MkdirAll(relate.ResolveStorePath("movies"), 0o700))
+			err := h.execute(t, "pull", "movies",
+				"--uri", "neo4j://remote:7687", "--username", "neo4j", "--password", "pw",
+				"--query", "MATCH (n RETURN n",
+			)
+			require.Error(t, err)
+			var ce *clierr.CLIError
+			require.ErrorAs(t, err, &ce)
+			assert.Equal(t, tt.wantExit, ce.Code)
+		})
+	}
+}
+
 func TestRelatePull_ScalarOnlyIsUsageError(t *testing.T) {
 	installFakeOpen(t, &fakeStore{})
 	installFakeStream(t, [][]any{{"Ada", int64(1)}}, nil)

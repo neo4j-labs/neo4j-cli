@@ -263,6 +263,39 @@ func TestRelatePush_RelKeyBindsRkeyPerRow(t *testing.T) {
 	assert.Equal(t, int64(2021), rows[1].(map[string]any)["rkey"])
 }
 
+// Remote failures during push classify like `query`: a rejected statement is a
+// validation error (exit 6), a transient server failure stays upstream (exit 8).
+func TestRelatePush_RemoteErrorsAreClassifiedLikeQuery(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		wantExit int
+	}{
+		{"statement rejected", &neo4j.Neo4jError{Code: "Neo.ClientError.Statement.SyntaxError", Msg: "bad"}, 6},
+		{"transient failure", &neo4j.Neo4jError{Code: "Neo.TransientError.General.DatabaseUnavailable", Msg: "down"}, 8},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pushStore(t)
+			orig := remoteExecute
+			remoteExecute = func(ctx context.Context, driver neo4j.Driver, database, query string, params map[string]any, write bool) ([]string, [][]any, error) {
+				return nil, nil, tt.err
+			}
+			t.Cleanup(func() { remoteExecute = orig })
+
+			h := newHarness(t, "json")
+			h.seedStoreDir(t, "movies")
+			err := h.execute(t, "push", "movies",
+				"--uri", "neo4j+s://remote:7687", "--username", "neo4j", "--password", "pw",
+			)
+			require.Error(t, err)
+			var ce *clierr.CLIError
+			require.ErrorAs(t, err, &ce)
+			assert.Equal(t, tt.wantExit, ce.Code)
+		})
+	}
+}
+
 func TestRelatePush_MissingStoreIsUsageError(t *testing.T) {
 	// The engine hook must be installed (even a fake) so the command gets
 	// past the not-compiled gate and reaches the missing-store check.

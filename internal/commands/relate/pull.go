@@ -5,7 +5,6 @@ package relate
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -174,7 +173,7 @@ func runPull(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 	}
 	driver, err := pullDriverOpener(conn.URI, conn.Username, conn.Password, conn.UserAgent, conn.Debug)
 	if err != nil {
-		return clierr.NewUpstreamError("pull: open driver: %w", err)
+		return dbconn.CategorizeBoltError(fmt.Errorf("pull: open driver: %w", err))
 	}
 	defer driver.Close(cmd.Context()) //nolint:errcheck // driver close error not actionable in defer
 
@@ -190,11 +189,7 @@ func runPull(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 		return nil
 	})
 	if err != nil {
-		var ce *clierr.CLIError
-		if errors.As(err, &ce) {
-			return err
-		}
-		return clierr.NewUpstreamError("%w", err)
+		return dbconn.CategorizeBoltError(err)
 	}
 	if rows > 0 && entityRows == 0 {
 		return clierr.NewUsageError(

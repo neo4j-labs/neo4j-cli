@@ -175,7 +175,7 @@ func runPush(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 	}
 	driver, err := pullDriverOpener(conn.URI, conn.Username, conn.Password, conn.UserAgent, conn.Debug)
 	if err != nil {
-		return clierr.NewUpstreamError("push: open driver: %w", err)
+		return dbconn.CategorizeBoltError(fmt.Errorf("push: open driver: %w", err))
 	}
 	defer driver.Close(cmd.Context()) //nolint:errcheck // driver close error not actionable in defer
 	ctx := cmd.Context()
@@ -262,11 +262,7 @@ func resolveRemoteKeys(ctx context.Context, driver neo4j.Driver, database string
 	_, rows, err := remoteExecute(ctx, driver, database,
 		"SHOW CONSTRAINTS YIELD name, type, entityType, labelsOrTypes, properties", nil, false)
 	if err != nil {
-		var ce *clierr.CLIError
-		if errors.As(err, &ce) {
-			return nil, err
-		}
-		return nil, clierr.NewUpstreamError("%w", err)
+		return nil, dbconn.CategorizeBoltError(err)
 	}
 	for _, row := range rows {
 		typ, _ := row[1].(string)
@@ -309,11 +305,7 @@ func upsertRemote(ctx context.Context, driver neo4j.Driver, database, stmt strin
 		}
 		_, resultRows, err := remoteExecute(ctx, driver, database, stmt, map[string]any{"rows": batch}, true)
 		if err != nil {
-			var ce *clierr.CLIError
-			if errors.As(err, &ce) {
-				return err
-			}
-			return clierr.NewUpstreamError("%w", err)
+			return dbconn.CategorizeBoltError(err)
 		}
 		onBatch(len(batch), len(resultRows))
 	}
