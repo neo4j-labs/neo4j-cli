@@ -5,6 +5,8 @@ package k8s
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/neo4j/cli/internal/clierr"
@@ -18,10 +20,11 @@ var waitPollInterval = 2 * time.Second
 func WaitForReady(ctx context.Context, client Client, name string, timeout time.Duration) (Neo4j, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	lastPhase := "unknown"
 	for {
 		instance, err := client.GetNeo4j(ctx, name)
 		if err != nil {
-			return Neo4j{}, err
+			return Neo4j{}, timeoutError(ctx, err, timeout, "Neo4j %q to become ready (last phase: %s)", name, lastPhase)
 		}
 		if instance.Ready {
 			return instance, nil
@@ -33,8 +36,11 @@ func WaitForReady(ctx context.Context, client Client, name string, timeout time.
 			}
 			return Neo4j{}, clierr.NewUpstreamError("Neo4j %q failed: %s", name, message)
 		}
+		if instance.Phase != "" {
+			lastPhase = instance.Phase
+		}
 		if err := sleepContext(ctx, waitPollInterval); err != nil {
-			return Neo4j{}, waitTimeoutError(ctx, err, name, instance.Phase, timeout)
+			return Neo4j{}, timeoutError(ctx, err, timeout, "Neo4j %q to become ready (last phase: %s)", name, lastPhase)
 		}
 	}
 }
@@ -49,13 +55,10 @@ func WaitForDelete(ctx context.Context, client Client, name string, timeout time
 			return nil
 		}
 		if err != nil {
-			return err
+			return timeoutError(ctx, err, timeout, "Neo4j %q to be deleted", name)
 		}
 		if err := sleepContext(ctx, waitPollInterval); err != nil {
-			if ctx.Err() == context.DeadlineExceeded {
-				return clierr.NewUpstreamError("timed out after %s waiting for Neo4j %q to be deleted", timeout, name)
-			}
-			return err
+			return timeoutError(ctx, err, timeout, "Neo4j %q to be deleted", name)
 		}
 	}
 }
@@ -71,9 +74,13 @@ func sleepContext(ctx context.Context, duration time.Duration) error {
 	}
 }
 
-func waitTimeoutError(ctx context.Context, err error, name, phase string, timeout time.Duration) error {
-	if ctx.Err() == context.DeadlineExceeded {
-		return clierr.NewUpstreamError("timed out after %s waiting for Neo4j %q to become ready (last phase: %s)", timeout, name, phase)
+// timeoutError turns a poll failure caused by the wait's own deadline into a
+// clear timeout message. The deadline can expire during a read or during the
+// sleep between reads. Any other error, including a Ctrl-C, passes through
+// unchanged.
+func timeoutError(ctx context.Context, err error, timeout time.Duration, format string, args ...any) error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return clierr.NewUpstreamError("timed out after %s waiting for %s", timeout, fmt.Sprintf(format, args...))
 	}
 	return err
 }

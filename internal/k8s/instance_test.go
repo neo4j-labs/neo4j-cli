@@ -153,6 +153,29 @@ func TestWaitForReady(t *testing.T) {
 		require.ErrorAs(t, err, &cliErr)
 		assert.Equal(t, "upstream_error", cliErr.CodeName)
 	})
+
+	t.Run("deadline inside a read reports the last phase seen", func(t *testing.T) {
+		fake := NewFakeClient()
+		pending := defaultFakeNeo4j()
+		pending.Ready = false
+		pending.Phase = "Provisioning"
+		calls := 0
+		fake.GetNeo4jFn = func(ctx context.Context, _ string) (Neo4j, error) {
+			calls++
+			if calls == 1 {
+				return pending, nil
+			}
+			<-ctx.Done()
+			return Neo4j{}, ctx.Err()
+		}
+		_, err := WaitForReady(context.Background(), fake, "dev", 5*time.Millisecond)
+		require.Error(t, err)
+		var cliErr *clierr.CLIError
+		require.ErrorAs(t, err, &cliErr)
+		assert.Equal(t, "upstream_error", cliErr.CodeName)
+		assert.Contains(t, err.Error(), "timed out")
+		assert.Contains(t, err.Error(), "last phase: Provisioning")
+	})
 }
 
 func TestWaitForDelete(t *testing.T) {
@@ -170,4 +193,18 @@ func TestWaitForDelete(t *testing.T) {
 	}
 	require.NoError(t, WaitForDelete(context.Background(), fake, "dev", time.Second))
 	assert.Equal(t, 2, calls)
+}
+
+func TestWaitForDelete_DeadlineInsideAReadStillReportsTheTimeout(t *testing.T) {
+	fake := NewFakeClient()
+	fake.GetNeo4jFn = func(ctx context.Context, _ string) (Neo4j, error) {
+		<-ctx.Done()
+		return Neo4j{}, ctx.Err()
+	}
+	err := WaitForDelete(context.Background(), fake, "dev", 5*time.Millisecond)
+	require.Error(t, err)
+	var cliErr *clierr.CLIError
+	require.ErrorAs(t, err, &cliErr)
+	assert.Equal(t, "upstream_error", cliErr.CodeName)
+	assert.Contains(t, err.Error(), "to be deleted")
 }
