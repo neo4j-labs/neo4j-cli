@@ -35,7 +35,7 @@ func TestEngineTypedParams_RoundTrip(t *testing.T) {
 		"p2":  dbtype.Point2D{SpatialRefId: 7203, X: 1, Y: 2},
 		"p3":  dbtype.Point3D{SpatialRefId: 4979, X: 1, Y: 2, Z: 3},
 		"v":   dbtype.Vector[float32]{Elems: []float32{0.25, 0.5}},
-		"l":   []any{dbtype.Date(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)), int64(7)},
+		"l":   []any{dbtype.Date(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)), dbtype.Date(time.Date(2022, 3, 4, 0, 0, 0, 0, time.UTC))}, // property lists must be homogeneous
 	}
 	_, err = s.Run([]string{"UNWIND $rows AS row CREATE (n:T) SET n = row.props"},
 		map[string]any{"rows": []any{map[string]any{"props": props}}}, false)
@@ -57,4 +57,34 @@ func TestEngineTypedParams_RoundTrip(t *testing.T) {
 	assert.Equal(t, props["p3"], row[6], "3d point")
 	assert.Equal(t, dbtype.Vector[float64]{Elems: []float64{0.25, 0.5}}, row[7], "vector (read side widens to float64)")
 	assert.Equal(t, props["l"], row[8], "temporal nested in a list")
+}
+
+// Vector (and point/temporal) properties must survive a real pull: this
+// aborted with "cannot render ... as a Cypher literal" before typed binding.
+func TestEngineMaterialize_PullsVectorPointAndTemporalProps(t *testing.T) {
+	s := openTestStore(t)
+	g := NewSubgraph()
+	g.Nodes["4:a:0"] = &SubgraphNode{ElementID: "4:a:0", Labels: []string{"Doc"}, Props: map[string]any{
+		"emb":  dbtype.Vector[float32]{Elems: []float32{0.25, 0.5, 0.75}},
+		"loc":  dbtype.Point2D{SpatialRefId: 7203, X: 1, Y: 2},
+		"when": dbtype.Date(time.Date(2020, 6, 1, 0, 0, 0, 0, time.UTC)),
+	}}
+	g.Nodes["4:a:1"] = &SubgraphNode{ElementID: "4:a:1", Labels: []string{"Doc"}, Props: map[string]any{"emb": dbtype.Vector[float32]{Elems: []float32{1, 2, 3}}}}
+	g.Rels["5:a:0"] = &SubgraphRel{ElementID: "5:a:0", StartElementID: "4:a:0", EndElementID: "4:a:1", Type: "LINKS",
+		Props: map[string]any{"at": dbtype.Duration{Days: 3}}}
+
+	m := &IdentityMap{Sources: map[string]SourceIdentities{}}
+	stats, err := Materialize(s, g, m, "src", 100)
+	require.NoError(t, err)
+	assert.Equal(t, 2, stats.NodesCreated)
+	assert.Equal(t, 1, stats.RelsCreated)
+
+	res, err := s.Run([]string{"MATCH (d:Doc)-[r:LINKS]->() RETURN d.emb, d.loc, d.when, r.at"}, nil, false)
+	require.NoError(t, err)
+	require.Len(t, res[0].Rows, 1)
+	row := res[0].Rows[0]
+	assert.Equal(t, dbtype.Vector[float64]{Elems: []float64{0.25, 0.5, 0.75}}, row[0])
+	assert.Equal(t, dbtype.Point2D{SpatialRefId: 7203, X: 1, Y: 2}, row[1])
+	assert.Equal(t, dbtype.Date(time.Date(2020, 6, 1, 0, 0, 0, 0, time.UTC)), row[2])
+	assert.Equal(t, dbtype.Duration{Days: 3}, row[3])
 }

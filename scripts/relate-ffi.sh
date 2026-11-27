@@ -38,7 +38,7 @@
 
 set -euo pipefail
 
-RELATE_VERSION="1.3.0"
+RELATE_VERSION="1.4.0"
 
 fail() {
     echo "relate-ffi: $*" >&2
@@ -75,11 +75,11 @@ sha256_of() {
 # bump these together with RELATE_VERSION.
 expected_sha() {
     case "$1" in
-        aarch64-apple-darwin) echo "597c22706981c221dd3a47470710f6d6a0ee548693207402f1965f06621c4576" ;;
-        aarch64-unknown-linux-gnu) echo "0d9980b9ab09c8db5fa9f4637058242976b93037ef2371c962f302e5b5ba0702" ;;
-        x86_64-apple-darwin) echo "ca0ed3482b2be6f121438540ca3c7a5da32878288b19d7b070442a2f5f673e37" ;;
-        x86_64-pc-windows-msvc) echo "a087ad5ea6f2426c79f9b679d7d511959f61443c1105c44ba39cb528044af972" ;;
-        x86_64-unknown-linux-gnu) echo "d49574d9f072846a4cfbe81b4ed74f0d4cab7d4c0bf0af65d453ba92060e3b31" ;;
+        aarch64-apple-darwin) echo "763d205aaa2424cdc088dcc7fb4750c3407cdce4b3026e6bcca08769e5e8af9d" ;;
+        aarch64-unknown-linux-gnu) echo "3f23948e12e7b12ef89515d0266b223e97b2b02e7932352c8a80bfa6efabca90" ;;
+        x86_64-apple-darwin) echo "77689c975cce2336eaca17750fd7188b94dcce5c8339cb6e4f91968f039c9bbf" ;;
+        x86_64-pc-windows-msvc) echo "7fe8ba8487179c022da612f9fb2c21b512da6dc22032aedbe3e5c9352d18461e" ;;
+        x86_64-unknown-linux-gnu) echo "6748fa011474d32f408f11df6e8179a51f046a973a7e9faafa204e304e8555a5" ;;
         *) echo "" ;;
     esac
 }
