@@ -15,9 +15,10 @@ import (
 
 func TestInstall_AppliesCRDsThenHelmAndReportsTheChange(t *testing.T) {
 	env := newOperatorEnv()
-	out, _, err := runOperator(t, env,
+	out, stderr, err := runOperator(t, env,
 		"operator install --watch-namespace default --watch-namespace team-a --watch-namespace default --rw --format json")
 	require.NoError(t, err)
+	assert.Contains(t, stderr, `Targeting Kubernetes context "kind-kind" in namespace "neo4j-operator-system"`)
 
 	// The chart does not bundle the CRDs, so the apply must come first.
 	assert.Equal(t, []string{"apply_crds", "helm_upgrade"}, env.order)
@@ -92,9 +93,9 @@ func TestInstall_RejectsBadInputBeforeAnyEngineCall(t *testing.T) {
 			wantErr: "--crd-file \"/tmp/nope.yaml\" does not exist",
 		},
 		{
-			// The chart creates a Role in each watched namespace, so a
-			// namespace that does not exist must fail before the CRDs are
-			// applied, not half way through the release.
+			// The chart creates a Role in each watched namespace. A missing
+			// namespace must fail before the CRDs are applied, not half way
+			// through the release.
 			name:    "watch namespace that does not exist",
 			args:    "operator install --watch-namespace ghost --rw",
 			setup:   func(env *operatorEnv) { env.fake.MissingNamespaces = map[string]bool{"ghost": true} },

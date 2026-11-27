@@ -8,6 +8,7 @@ package operator
 
 import (
 	"context"
+	"fmt"
 
 	engine "github.com/neo4j/cli/internal/k8s"
 
@@ -18,7 +19,7 @@ import (
 )
 
 // clientFactory is the injectable seam for the engine.Client used by the
-// leaves. Production wires the exec-backed client; tests swap in
+// leaves. Production wires the exec-backed client. Tests swap in
 // engine.FakeClient so no child process ever runs.
 var clientFactory = engine.NewClient
 
@@ -31,7 +32,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"The commands drive the host `helm` and `kubectl`, so both must be on PATH. " +
 			"The operator lives in the namespace given by the group's -n/--namespace flag, or in " +
 			engine.DefaultOperatorNamespace + " when that flag is empty. " +
-			"The operator watches the workload namespaces you pass as --watch-namespace; it never watches its own namespace. " +
+			"The operator watches the workload namespaces you pass as --watch-namespace. It never watches its own namespace. " +
 			"The four CRDs ship outside the chart (the Neo4j schema is close to the etcd object limit), so every install and " +
 			"upgrade applies them first with `kubectl apply --server-side --field-manager=" + engine.OperatorFieldManager + "`. " +
 			"Run `k8s doctor` first to check kubectl, helm and the cluster.",
@@ -57,6 +58,16 @@ func operatorSettings(cmd *cobra.Command, cfg *clicfg.Config) (engine.Settings, 
 		settings.Namespace = engine.DefaultOperatorNamespace
 	}
 	return settings, nil
+}
+
+// printWriteTarget reports the cluster and namespace before the first write.
+func printWriteTarget(cmd *cobra.Command, client engine.Client, namespace string) error {
+	kubeContext, err := client.CurrentContext(cmd.Context())
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(cmd.ErrOrStderr(), "Targeting Kubernetes context %q in namespace %q.\n", kubeContext, namespace)
+	return err
 }
 
 // crdSource returns the manifest kubectl applies: the --crd-file path when
@@ -112,12 +123,12 @@ func requireRelease(ctx context.Context, client engine.Client, namespace string)
 
 // requireReadyController fails unless the controller Deployment exists and
 // is ready. Deleting the CRDs relies on the controller to clear its
-// finalisers; without it the delete waits forever.
+// finalisers. Without the controller, the delete waits forever.
 func requireReadyController(ctx context.Context, client engine.Client) error {
 	deployment, err := client.Deployment(ctx, engine.OperatorDeploymentName)
 	if engine.IsNotFound(err) {
 		return clierr.NewConflictError(
-			"the operator controller Deployment %q is missing, so nothing would clear the finalisers on the Neo4j resources and the CRD delete would never finish: reinstall the operator, then retry",
+			"the operator controller Deployment %q is missing, so nothing will clear the finalisers on the Neo4j resources and the CRD delete will not finish: reinstall the operator, then retry",
 			engine.OperatorDeploymentName)
 	}
 	if err != nil {
@@ -125,7 +136,7 @@ func requireReadyController(ctx context.Context, client engine.Client) error {
 	}
 	if !deployment.Available {
 		return clierr.NewConflictError(
-			"the operator controller is not ready, so the finalisers on the Neo4j resources would not clear and the CRD delete would never finish: check `neo4j-cli k8s operator status`, then retry")
+			"the operator controller is not ready, so the finalisers on the Neo4j resources will not clear and the CRD delete will not finish: check `neo4j-cli k8s operator status`, then retry")
 	}
 	return nil
 }
@@ -178,11 +189,10 @@ func validateWatchNamespaces(namespaces []string, operatorNamespace string, requ
 	return nil
 }
 
-// ensureWatchNamespacesExist fails fast when a watched namespace is absent:
-// the chart creates a Role and RoleBinding in each watched namespace, so helm
-// otherwise fails with a raw `namespaces "<name>" not found` after the CRDs
-// are already applied.
-func ensureWatchNamespacesExist(ctx context.Context, client engine.Client, namespaces []string) error {
+// requireWatchNamespacesExist makes sure that every watched namespace exists before Helm runs. The chart
+// creates a Role and RoleBinding in each one. Otherwise, Helm fails with a raw
+// `namespaces "<name>" not found` after the CRDs are already applied.
+func requireWatchNamespacesExist(ctx context.Context, client engine.Client, namespaces []string) error {
 	for _, namespace := range namespaces {
 		exists, err := client.NamespaceExists(ctx, namespace)
 		if err != nil {

@@ -28,17 +28,17 @@ func newUpgradeCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "upgrade",
 		Short:       "Upgrade the Neo4j Kubernetes operator",
 		Annotations: map[string]string{"write": "true"},
-		Long: "Upgrade an installed Neo4j Kubernetes operator: re-apply the four CRDs with server-side apply, then run " +
+		Long: "Upgrade an installed Neo4j Kubernetes operator. Re-apply the four CRDs with server-side apply, then run " +
 			"`helm upgrade` for the `" + engine.OperatorReleaseName + "` release in the namespace given by -n/--namespace, or " +
 			engine.DefaultOperatorNamespace + " when that flag is empty. " +
-			"Without --version it moves to the release this CLI pins, but never rolls back a newer deployed release; an explicit " +
-			"--version is honoured even when it is older. " +
-			"The upgrade reuses the values already deployed (helm's --reset-then-reuse-values, so helm 3.14 or later is required), so " +
-			"settings such as a pinned image digest survive while defaults added by a newer chart still apply; a --watch-namespace " +
-			"you pass here overrides the deployed watch scope. The release must already exist: use `k8s operator install` for a fresh " +
-			"install. Pass --crd-file to apply a CRD manifest from disk instead of the GitHub release asset. " +
+			"Without --version, the command moves to the release this CLI pins. It never rolls back a newer deployed release. " +
+			"An explicit --version is honoured even when it is older. " +
+			"The upgrade uses Helm's --reset-then-reuse-values flag, which requires Helm 3.14 or later. " +
+			"Custom values such as a pinned image digest survive. Defaults added by a newer chart still apply. " +
+			"A --watch-namespace value overrides the deployed watch scope. The release must already exist. " +
+			"Use `k8s operator install` for a fresh installation. Pass --crd-file to apply a CRD manifest from disk instead of the GitHub release asset. " +
 			"Remote CRD assets are checked against the SHA256 digest in the GitHub release metadata before they are applied. " +
-			"The command does not wait for the controller to become ready; run `k8s operator status` afterwards. Requires --rw.",
+			"The command does not wait for the controller to become ready. Run `k8s operator status` afterwards. Requires --rw.",
 		Example: `# Upgrade to the operator release this CLI pins, keeping the deployed values
 neo4j-cli k8s operator upgrade --rw
 
@@ -76,7 +76,10 @@ neo4j-cli k8s operator upgrade --crd-file ./neo4j-crd-1.0.0.yaml --rw`,
 			if err != nil {
 				return err
 			}
-			if err := ensureWatchNamespacesExist(cmd.Context(), client, watchNamespaces); err != nil {
+			if err := requireWatchNamespacesExist(cmd.Context(), client, watchNamespaces); err != nil {
+				return err
+			}
+			if err := printWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
 			target := upgradeVersion(requested, cmd.Flags().Changed(versionFlag), release)

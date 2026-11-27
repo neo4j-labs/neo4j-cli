@@ -21,7 +21,7 @@ func newStatusCmd(cfg *clicfg.Config) *cobra.Command {
 			"given by -n/--namespace (or " + engine.DefaultOperatorNamespace + "), the chart and app version, the watch scope read from the " +
 			"controller Deployment, whether the controller is ready, and the versions of the four CRDs. " +
 			"A missing release, controller Deployment or CRD is reported as absent rather than an error, so the command is safe to run " +
-			"before the operator is installed. It exits 0 whatever it finds; parse `installed` and `deployment.ready` to gate downstream " +
+			"before the operator is installed. The command exits 0 when its queries succeed. Parse `installed` and `deployment.ready` to gate downstream " +
 			"actions. An interrupt still exits 130.",
 		Example: `# Show the operator's release, watch scope, controller health and CRD versions
 neo4j-cli k8s operator status
@@ -50,7 +50,7 @@ neo4j-cli k8s operator status --format json`,
 }
 
 // buildStatus reads the release, the controller Deployment and the four
-// CRDs. A missing release, Deployment or CRD is reported as absent; any
+// CRDs. A missing release, Deployment or CRD is reported as absent. Any
 // other failure propagates.
 func buildStatus(ctx context.Context, client engine.Client, namespace string) (OperatorStatus, error) {
 	report := OperatorStatus{
@@ -83,7 +83,7 @@ func buildStatus(ctx context.Context, client engine.Client, namespace string) (O
 			report.WatchNamespaces = deployment.WatchNamespaces
 			report.WatchAllNamespaces = deployment.WatchAllNamespaces
 		case engine.IsNotFound(err):
-			// The release exists but its Deployment is gone; report it as
+			// The release exists but its Deployment is gone. Report it as
 			// absent and let the operator decide what to do.
 		default:
 			return OperatorStatus{}, err

@@ -32,11 +32,11 @@ func newInstallCmd(cfg *clicfg.Config) *cobra.Command {
 			"from the published OCI registry. The CRDs ship outside the chart (the Neo4j schema is close to the etcd object limit), " +
 			"so they are always applied first, with `--field-manager=" + engine.OperatorFieldManager + "`. " +
 			"The operator is installed as the Helm release `" + engine.OperatorReleaseName + "` in the namespace given by " +
-			"-n/--namespace, or " + engine.DefaultOperatorNamespace + " when that flag is empty; the namespace is created if missing. " +
-			"--watch-namespace is required: the chart refuses to render without a watch scope, and the operator never watches its own " +
-			"namespace. Pass --crd-file to apply a CRD manifest from disk instead of the GitHub release asset. " +
+			"-n/--namespace, or " + engine.DefaultOperatorNamespace + " when that flag is empty. The command creates the namespace if it is missing. " +
+			"--watch-namespace is required because the chart refuses to render without a watch scope. The operator never watches its own namespace. " +
+			"Pass --crd-file to apply a CRD manifest from disk instead of the GitHub release asset. " +
 			"Remote CRD assets are checked against the SHA256 digest in the GitHub release metadata before they are applied. " +
-			"The command does not wait for the controller to become ready; run `k8s operator status` afterwards. Requires --rw.",
+			"The command does not wait for the controller to become ready. Run `k8s operator status` afterwards. Requires --rw.",
 		Example: `# Install the pinned operator release, watching the default namespace
 neo4j-cli k8s operator install --watch-namespace default --rw
 
@@ -65,7 +65,10 @@ neo4j-cli k8s operator install --watch-namespace default --crd-file ./neo4j-crd-
 			}
 
 			client := clientFactory(settings)
-			if err := ensureWatchNamespacesExist(cmd.Context(), client, watchNamespaces); err != nil {
+			if err := requireWatchNamespacesExist(cmd.Context(), client, watchNamespaces); err != nil {
+				return err
+			}
+			if err := printWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
 			crds, err := client.ApplyCRDs(cmd.Context(), crdSource(crdFile, version))

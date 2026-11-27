@@ -24,8 +24,9 @@ func nonInteractive(t *testing.T) {
 
 func TestUninstall_KeepsTheCRDsByDefault(t *testing.T) {
 	env := newOperatorEnv()
-	_, _, err := runOperator(t, env, "operator uninstall --rw")
+	_, stderr, err := runOperator(t, env, "operator uninstall --rw")
 	require.NoError(t, err)
+	assert.Contains(t, stderr, `Targeting Kubernetes context "kind-kind" in namespace "neo4j-operator-system"`)
 
 	assert.Equal(t, []string{"helm_uninstall"}, env.order)
 	assert.Equal(t, 0, env.fake.DeleteCRDsCalls)
@@ -52,7 +53,7 @@ func TestUninstall_RemoveCRDsNeedsConfirmation(t *testing.T) {
 	_, stderr, err := runOperator(t, env, "operator uninstall --remove-crds --rw")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--yes")
-	// The refusal and the warning name the kube context the delete would reach.
+	// The refusal and the warning name the kube context the delete will reach.
 	assert.Contains(t, err.Error(), `"kind-kind"`)
 	assert.Contains(t, stderr, "every Neo4j")
 	assert.Empty(t, env.order, "no engine call may run without confirmation")

@@ -28,8 +28,8 @@ func newUninstallCmd(cfg *clicfg.Config) *cobra.Command {
 			"By default the four CRDs and every Neo4j custom resource are left alone, so a reinstall finds them again. " +
 			"Pass --remove-crds to delete the CRDs too: that deletes EVERY Neo4j, backup, restore and backup schedule in the cluster, " +
 			"and the workloads and volumes behind them. It is irreversible, so it needs a y/N confirmation on a terminal, or both --yes " +
-			"and --force without one. The CRDs are deleted before the release, while the controller still runs, so its finalisers clear " +
-			"the custom resources instead of leaving them stuck; for the same reason --remove-crds refuses to run unless the release is " +
+			"and --force without one. The CRDs are deleted before the release while the controller still runs. This lets its finalisers clear " +
+			"the custom resources instead of leaving them stuck. For the same reason, --remove-crds refuses to run unless the release is " +
 			"installed and its controller is ready. Requires --rw.",
 		Example: `# Remove the Helm release, keeping the CRDs and every Neo4j custom resource
 neo4j-cli k8s operator uninstall --rw
@@ -48,6 +48,9 @@ neo4j-cli k8s operator uninstall --remove-crds --yes --force --rw`,
 				if err := preflightRemoveCRDs(cmd, client, settings.Namespace); err != nil {
 					return err
 				}
+			}
+			if err := printWriteTarget(cmd, client, settings.Namespace); err != nil {
+				return err
 			}
 
 			report := OperatorRemoval{
@@ -75,8 +78,8 @@ neo4j-cli k8s operator uninstall --remove-crds --yes --force --rw`,
 }
 
 // preflightRemoveCRDs runs before any CRD is touched. Deleting the CRDs waits
-// for the controller to clear its finalisers on every Neo4j resource, so the
-// release and a ready controller must both be present, otherwise the delete
+// for the controller to clear its finalisers on every Neo4j resource. The
+// release and a ready controller must both be present. Otherwise, the delete
 // hangs and leaves the CRDs stuck Terminating. Only then does it ask for
 // confirmation, naming the kube context the delete will reach.
 func preflightRemoveCRDs(cmd *cobra.Command, client engine.Client, namespace string) error {

@@ -16,8 +16,9 @@ import (
 
 func TestUpgrade_AppliesCRDsThenReusesTheDeployedValues(t *testing.T) {
 	env := newOperatorEnv()
-	_, _, err := runOperator(t, env, "operator upgrade --rw")
+	_, stderr, err := runOperator(t, env, "operator upgrade --rw")
 	require.NoError(t, err)
+	assert.Contains(t, stderr, `Targeting Kubernetes context "kind-kind" in namespace "neo4j-operator-system"`)
 
 	assert.Equal(t, []string{"apply_crds", "helm_upgrade"}, env.order)
 	require.Len(t, env.fake.UpgradeOptions, 1)
