@@ -71,11 +71,11 @@ func TestBuildNeo4jManifest_LocalAdmissionRules(t *testing.T) {
 		{name: "enterprise licence is explicit", mutate: func(o *Neo4jManifestOptions) { o.AcceptLicense = "" }, wantErr: "licence acceptance"},
 		{name: "primaries are odd", mutate: func(o *Neo4jManifestOptions) {
 			o.Mode, o.Primaries, o.InsecureAdminConnection = "cluster", 2, true
-		}, wantErr: "odd number"},
+		}, wantErr: "must be odd"},
 		{name: "primaries have an upper bound", mutate: func(o *Neo4jManifestOptions) {
 			o.Mode, o.Primaries, o.InsecureAdminConnection = "cluster", 17, true
-		}, wantErr: "odd number"},
-		{name: "cluster needs an admin path", mutate: func(o *Neo4jManifestOptions) { o.Mode = "cluster" }, wantErr: "requires Bolt TLS"},
+		}, wantErr: "must be odd"},
+		{name: "cluster needs an admin path", mutate: func(o *Neo4jManifestOptions) { o.Mode = "cluster" }, wantErr: "requires --insecure-admin-connection"},
 		{name: "community cannot cluster", mutate: func(o *Neo4jManifestOptions) {
 			o.Mode, o.Edition, o.InsecureAdminConnection = "cluster", "community", true
 		}, wantErr: "only standalone"},
@@ -83,27 +83,30 @@ func TestBuildNeo4jManifest_LocalAdmissionRules(t *testing.T) {
 		{name: "standalone rejects insecure cluster admin", mutate: func(o *Neo4jManifestOptions) { o.InsecureAdminConnection = true }, wantErr: "--insecure-admin-connection"},
 		{name: "cluster rejects top-level plugins", mutate: func(o *Neo4jManifestOptions) {
 			o.Mode, o.InsecureAdminConnection, o.Plugins = "cluster", true, []string{"apoc"}
-		}, wantErr: "--plugin"},
+		}, wantErr: "only in standalone mode"},
 		{name: "plugin catalogue is enforced", mutate: func(o *Neo4jManifestOptions) { o.Plugins = []string{"unknown"} }, wantErr: "not one of"},
 		{name: "load balancer needs a source range", mutate: func(o *Neo4jManifestOptions) { o.ServiceType = "LoadBalancer" }, wantErr: "source-range"},
 		{name: "source ranges need a load balancer", mutate: func(o *Neo4jManifestOptions) {
 			o.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
-		}, wantErr: "requires a LoadBalancer"},
+		}, wantErr: "requires --service-type LoadBalancer"},
 		{name: "default memory cannot hold the documentation example", mutate: func(o *Neo4jManifestOptions) {
 			o.Heap, o.PageCache = "2g", "4g"
 		}, wantErr: "Raise --memory"},
-		{name: "heap initial cannot exceed maximum through file validation", mutate: func(o *Neo4jManifestOptions) {
+		{name: "operator-owned keys are refused", mutate: func(o *Neo4jManifestOptions) {
 			o.Config = []string{"server.bolt.enabled=true"}
 		}, wantErr: "owned by the operator"},
 		{name: "dedicated heap flag owns heap keys", mutate: func(o *Neo4jManifestOptions) {
 			o.Config = []string{"server.memory.heap.max_size=2g"}
-		}, wantErr: "Use --heap"},
+		}, wantErr: "with --heap, not --config"},
 		{name: "dedicated page cache flag owns its key", mutate: func(o *Neo4jManifestOptions) {
 			o.Config = []string{"server.memory.pagecache.size=1g"}
-		}, wantErr: "Use --pagecache"},
+		}, wantErr: "with --pagecache, not --config"},
 		{name: "configuration cannot repeat a key", mutate: func(o *Neo4jManifestOptions) {
 			o.Config = []string{"db.transaction.timeout=1s", "db.transaction.timeout=2s"}
 		}, wantErr: "repeated"},
+		{name: "memory takes a Kubernetes quantity", mutate: func(o *Neo4jManifestOptions) {
+			o.Memory, o.Heap = "8g", "2g"
+		}, wantErr: "invalid memory limit"},
 		{name: "storage ceiling matches the CRD", mutate: func(o *Neo4jManifestOptions) { o.StorageSize = "17Ti" }, wantErr: "16Ti"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -189,26 +192,54 @@ spec:
 	}
 }
 
-func TestParseMemoryQuantity(t *testing.T) {
+func TestParseKubeQuantity(t *testing.T) {
 	for _, tc := range []struct {
 		input string
 		want  uint64
 	}{
-		{input: "2g", want: 2_000_000_000},
 		{input: "2Gi", want: 2 << 30},
 		{input: "512Mi", want: 512 << 20},
 		{input: "1.5G", want: 1_500_000_000},
 		{input: "1e3", want: 1000},
+		{input: "4000m", want: 4},
 	} {
 		t.Run(tc.input, func(t *testing.T) {
-			got, err := parseMemoryQuantity(tc.input)
+			got, err := parseKubeQuantity(tc.input)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})
 	}
-	for _, input := range []string{"", "0", "-1Gi", "2 GB", "2XB"} {
+	// Kubernetes has no lowercase g, so a Neo4j-style size is refused here
+	// rather than by the API server.
+	for _, input := range []string{"", "0", "-1Gi", "2 GB", "2XB", "8g", "1m"} {
 		t.Run("invalid "+input, func(t *testing.T) {
-			_, err := parseMemoryQuantity(input)
+			_, err := parseKubeQuantity(input)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestParseNeo4jSize(t *testing.T) {
+	// Neo4j sizes are binary whatever the suffix's case.
+	for _, tc := range []struct {
+		input string
+		want  uint64
+	}{
+		{input: "2g", want: 2 << 30},
+		{input: "2GB", want: 2 << 30},
+		{input: "512m", want: 512 << 20},
+		{input: "1.5k", want: 1536},
+		{input: "1024", want: 1024},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			got, err := parseNeo4jSize(tc.input)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+	for _, input := range []string{"", "0", "2Gi", "2gib", "1e3", "2t"} {
+		t.Run("invalid "+input, func(t *testing.T) {
+			_, err := parseNeo4jSize(input)
 			require.Error(t, err)
 		})
 	}

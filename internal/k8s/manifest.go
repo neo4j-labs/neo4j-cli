@@ -175,9 +175,6 @@ func BuildNeo4jManifest(opts Neo4jManifestOptions) ([]byte, error) {
 	if opts.StorageSize == "" {
 		return nil, clierr.NewUsageError("--storage-size must not be empty")
 	}
-	if _, err := parseMemoryQuantity(opts.StorageSize); err != nil {
-		return nil, clierr.NewUsageError("invalid --storage-size %q: %s", opts.StorageSize, err)
-	}
 	if opts.PrimariesSet && mode == "Standalone" {
 		return nil, clierr.NewUsageError("--primaries is valid only with --mode cluster")
 	}
@@ -223,8 +220,6 @@ func BuildNeo4jManifest(opts Neo4jManifestOptions) ([]byte, error) {
 			Type:                     serviceType,
 			LoadBalancerSourceRanges: opts.LoadBalancerSourceRanges,
 		}}
-	} else if len(opts.LoadBalancerSourceRanges) > 0 {
-		return nil, clierr.NewUsageError("--load-balancer-source-range requires --service-type LoadBalancer")
 	}
 	manifest.Spec.Plugins = dedupeStrings(opts.Plugins)
 
@@ -371,22 +366,22 @@ func validateNeo4jManifest(manifest neo4jManifest) error {
 		}
 		members := manifest.Spec.Topology.Primaries.Members
 		if members < 1 || members > 15 || members%2 == 0 {
-			return clierr.NewUsageError("--primaries must be an odd number from 1 to 15")
+			return clierr.NewUsageError("the number of primaries must be odd, from 1 to 15")
 		}
 		trust := manifest.Spec.Trust
 		hasBoltTLS := trust != nil && trust.Enabled && trust.Certificates != nil && trust.Certificates["bolt"] != nil
 		if trust == nil || (!trust.InsecureAdminConnection && !hasBoltTLS) {
-			return clierr.NewUsageError("cluster mode requires Bolt TLS in --from-file or --insecure-admin-connection")
+			return clierr.NewUsageError("cluster mode requires --insecure-admin-connection, or Bolt TLS in a --from-file trust block")
 		}
 		if len(manifest.Spec.Plugins) > 0 {
-			return clierr.NewUsageError("--plugin is supported only in standalone mode. Use --from-file to configure pool plugins")
+			return clierr.NewUsageError("plugins are supported only in standalone mode. Set pool plugins in a --from-file manifest")
 		}
 	}
 	for _, plugin := range manifest.Spec.Plugins {
 		switch plugin {
 		case "apoc", "gds", "bloom":
 		default:
-			return clierr.NewUsageError("--plugin %q is not one of apoc, gds or bloom", plugin)
+			return clierr.NewUsageError("plugin %q is not one of apoc, gds or bloom", plugin)
 		}
 	}
 	if manifest.Spec.Connectivity != nil {
@@ -395,16 +390,16 @@ func validateNeo4jManifest(manifest neo4jManifest) error {
 			return clierr.NewUsageError("Service type must be ClusterIP, LoadBalancer or NodePort")
 		}
 		if service.Type == "LoadBalancer" && len(service.LoadBalancerSourceRanges) == 0 {
-			return clierr.NewUsageError("--service-type LoadBalancer requires at least one --load-balancer-source-range")
+			return clierr.NewUsageError("a LoadBalancer Service requires at least one --load-balancer-source-range")
 		}
 		if service.Type != "LoadBalancer" && len(service.LoadBalancerSourceRanges) > 0 {
-			return clierr.NewUsageError("loadBalancerSourceRanges requires a LoadBalancer Service")
+			return clierr.NewUsageError("--load-balancer-source-range requires --service-type LoadBalancer")
 		}
 	}
 	if manifest.Spec.Storage != nil {
 		size := manifest.Spec.Storage.Volumes.Data.Dynamic.Size
 		if size != "" {
-			bytes, err := parseMemoryQuantity(string(size))
+			bytes, err := parseKubeQuantity(string(size))
 			if err != nil {
 				return clierr.NewUsageError("invalid storage size %q: %s", size, err)
 			}
@@ -413,31 +408,41 @@ func validateNeo4jManifest(manifest neo4jManifest) error {
 			}
 		}
 	}
-	return validateMemory(manifest.Spec)
-}
-
-func validateMemory(spec manifestSpec) error {
-	config := map[string]quotedString{}
-	if spec.Config != nil {
-		config = spec.Config.Neo4j
+	var config map[string]quotedString
+	if manifest.Spec.Config != nil {
+		config = manifest.Spec.Config.Neo4j
 	}
 	for key := range config {
-		if key == "server.memory.heap.initial_size" || key == "server.memory.heap.max_size" || key == "server.memory.pagecache.size" {
-			continue
-		}
-		if replacement, owned := operatorOwnedConfig[key]; owned {
-			return clierr.NewUsageError("configuration key %q is owned by the operator. Use %s", key, replacement)
-		}
-		if strings.HasPrefix(key, "dbms.ssl.policy.") {
-			return clierr.NewUsageError("configuration key %q is owned by the operator. Use spec.trust in --from-file", key)
+		if err := checkOperatorOwned(key); err != nil {
+			return err
 		}
 	}
+	return validateMemory(config, manifest.Spec.Resources)
+}
 
-	limit := quotedString(defaultMemoryLimit)
-	if spec.Resources != nil && spec.Resources.Limits.Memory != "" {
-		limit = spec.Resources.Limits.Memory
+// checkOperatorOwned rejects a neo4j.conf key that the operator sets itself.
+// The operator would otherwise refuse the resource at admission, or
+// silently overwrite the value.
+func checkOperatorOwned(key string) error {
+	if replacement, owned := operatorOwnedConfig[key]; owned {
+		return clierr.NewUsageError("configuration key %q is owned by the operator. Use %s", key, replacement)
 	}
-	limitBytes, err := parseMemoryQuantity(string(limit))
+	if strings.HasPrefix(key, "dbms.ssl.policy.") {
+		return clierr.NewUsageError("configuration key %q is owned by the operator. Use spec.trust in --from-file", key)
+	}
+	return nil
+}
+
+// validateMemory checks that heap and page cache, plus headroom for the JVM
+// and operating system, fit inside the container's memory limit. Without
+// the check, the pod is killed for running out of memory and restarts in a
+// loop.
+func validateMemory(config map[string]quotedString, resources *resourcesSpec) error {
+	limit := quotedString(defaultMemoryLimit)
+	if resources != nil && resources.Limits.Memory != "" {
+		limit = resources.Limits.Memory
+	}
+	limitBytes, err := parseKubeQuantity(string(limit))
 	if err != nil {
 		return clierr.NewUsageError("invalid memory limit %q: %s", limit, err)
 	}
@@ -452,10 +457,7 @@ func validateMemory(spec manifestSpec) error {
 	if heapInitial > heapMax && heapMax > 0 {
 		return clierr.NewUsageError("heap initial size must not exceed heap maximum size")
 	}
-	heap := heapMax
-	if heapInitial > heap {
-		heap = heapInitial
-	}
+	heap := max(heapInitial, heapMax)
 	pageCache, err := optionalMemory(config["server.memory.pagecache.size"], "page cache")
 	if err != nil {
 		return err
@@ -463,7 +465,8 @@ func validateMemory(spec manifestSpec) error {
 	if heap == 0 && pageCache == 0 {
 		return nil
 	}
-	if heap > math.MaxUint64-pageCache || heap+pageCache > math.MaxUint64-memoryHeadroom || heap+pageCache+memoryHeadroom > limitBytes {
+	// scaleQuantity caps each value below 2^62, so the sum cannot overflow.
+	if heap+pageCache+memoryHeadroom > limitBytes {
 		return clierr.NewUsageError(
 			"heap and page cache plus 1Gi of JVM and operating-system headroom exceed the %s memory limit. Raise --memory or reduce --heap and --pagecache",
 			limit)
@@ -475,43 +478,87 @@ func optionalMemory(value quotedString, name string) (uint64, error) {
 	if value == "" {
 		return 0, nil
 	}
-	parsed, err := parseMemoryQuantity(string(value))
+	parsed, err := parseNeo4jSize(string(value))
 	if err != nil {
 		return 0, clierr.NewUsageError("invalid %s %q: %s", name, value, err)
 	}
 	return parsed, nil
 }
 
-var quantityPattern = regexp.MustCompile(`^([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE]([+-]?[0-9]+))?([a-zA-Z]+)?$`)
+// Kubernetes quantities use decimal suffixes (k, M, G, …) and binary ones
+// (Ki, Mi, Gi, …). A lowercase m means milli, so 512m is half a byte, not
+// 512 megabytes.
+var (
+	kubeQuantityPattern = regexp.MustCompile(`^([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE]([+-]?[0-9]+))?([a-zA-Z]*)$`)
+	kubeQuantityUnits   = map[string]float64{
+		"": 1, "m": 1e-3,
+		"k": 1e3, "M": 1e6, "G": 1e9, "T": 1e12, "P": 1e15, "E": 1e18,
+		"Ki": 1 << 10, "Mi": 1 << 20, "Gi": 1 << 30, "Ti": 1 << 40, "Pi": 1 << 50, "Ei": 1 << 60,
+	}
+)
 
-func parseMemoryQuantity(value string) (uint64, error) {
-	matches := quantityPattern.FindStringSubmatch(value)
+// Neo4j byte sizes are always binary, so 2g is 2GiB. The suffixes match
+// Neo4j's own parser, which is case-sensitive.
+var (
+	neo4jSizePattern = regexp.MustCompile(`^([0-9]+(?:\.[0-9]*)?|\.[0-9]+)([a-zA-Z]*)$`)
+	neo4jSizeUnits   = map[string]float64{
+		"": 1, "B": 1,
+		"k": 1 << 10, "K": 1 << 10, "kb": 1 << 10, "kB": 1 << 10, "KB": 1 << 10, "KiB": 1 << 10,
+		"m": 1 << 20, "M": 1 << 20, "mb": 1 << 20, "mB": 1 << 20, "MB": 1 << 20, "MiB": 1 << 20,
+		"g": 1 << 30, "G": 1 << 30, "gb": 1 << 30, "gB": 1 << 30, "GB": 1 << 30, "GiB": 1 << 30,
+		"TB": 1 << 40, "TiB": 1 << 40,
+	}
+)
+
+// parseKubeQuantity returns the number of bytes in a Kubernetes quantity
+// such as 4Gi or 500M.
+func parseKubeQuantity(value string) (uint64, error) {
+	matches := kubeQuantityPattern.FindStringSubmatch(value)
 	if matches == nil {
-		return 0, fmt.Errorf("use a positive number with an optional unit such as 512Mi, 2g or 4Gi")
+		return 0, fmt.Errorf("use a positive number with an optional unit such as 512Mi or 4Gi")
 	}
 	number, err := strconv.ParseFloat(matches[1], 64)
-	if err != nil || number <= 0 {
-		return 0, fmt.Errorf("quantity must be greater than zero")
+	if err != nil {
+		return 0, err
 	}
 	if matches[2] != "" {
 		exponent, err := strconv.Atoi(matches[2])
 		if err != nil {
-			return 0, fmt.Errorf("invalid exponent")
+			return 0, err
 		}
 		number *= math.Pow10(exponent)
 	}
-	multipliers := map[string]float64{
-		"":  1,
-		"k": 1e3, "K": 1e3, "m": 1e6, "M": 1e6, "g": 1e9, "G": 1e9, "t": 1e12, "T": 1e12,
-		"Ki": 1 << 10, "Mi": 1 << 20, "Gi": 1 << 30, "Ti": 1 << 40,
+	if _, ok := kubeQuantityUnits[matches[3]]; !ok {
+		return 0, fmt.Errorf("unsupported unit %q. Use a Kubernetes unit such as Mi or Gi", matches[3])
 	}
-	multiplier, ok := multipliers[matches[3]]
+	return scaleQuantity(number, matches[3], kubeQuantityUnits)
+}
+
+// parseNeo4jSize returns the number of bytes in a Neo4j size setting such as
+// 2g or 512m.
+func parseNeo4jSize(value string) (uint64, error) {
+	matches := neo4jSizePattern.FindStringSubmatch(value)
+	if matches == nil {
+		return 0, fmt.Errorf("use a positive number with an optional unit such as 512m or 2g")
+	}
+	number, err := strconv.ParseFloat(matches[1], 64)
+	if err != nil {
+		return 0, err
+	}
+	return scaleQuantity(number, matches[2], neo4jSizeUnits)
+}
+
+func scaleQuantity(number float64, unit string, units map[string]float64) (uint64, error) {
+	multiplier, ok := units[unit]
 	if !ok {
-		return 0, fmt.Errorf("unsupported unit %q", matches[3])
+		return 0, fmt.Errorf("unsupported unit %q", unit)
 	}
 	result := number * multiplier
-	if math.IsInf(result, 0) || math.IsNaN(result) || result <= 0 || result >= math.MaxUint64 {
-		return 0, fmt.Errorf("quantity is outside the supported range")
+	if result < 1 {
+		return 0, fmt.Errorf("the size must be at least one byte")
+	}
+	if result >= 1<<62 {
+		return 0, fmt.Errorf("the size is too large")
 	}
 	return uint64(math.Round(result)), nil
 }
@@ -547,9 +594,14 @@ var operatorOwnedConfig = map[string]string{
 	"initial.server.mode_constraint":                      "spec.topology.secondaries in --from-file",
 	"server.logs.config":                                  "spec.logging in --from-file",
 	"server.logs.user.config":                             "spec.logging in --from-file",
-	"server.memory.heap.initial_size":                     "--heap",
-	"server.memory.heap.max_size":                         "--heap",
-	"server.memory.pagecache.size":                        "--pagecache",
+}
+
+// dedicatedFlagConfig lists the neo4j.conf keys that have their own flag, so
+// that each value has one source.
+var dedicatedFlagConfig = map[string]string{
+	"server.memory.heap.initial_size": "--heap",
+	"server.memory.heap.max_size":     "--heap",
+	"server.memory.pagecache.size":    "--pagecache",
 }
 
 func parseConfig(entries []string) (map[string]quotedString, error) {
@@ -562,11 +614,8 @@ func parseConfig(entries []string) (map[string]quotedString, error) {
 		if _, exists := config[key]; exists {
 			return nil, clierr.NewUsageError("--config key %q is repeated", key)
 		}
-		if replacement, owned := operatorOwnedConfig[key]; owned {
-			return nil, clierr.NewUsageError("--config key %q is owned by the operator. Use %s", key, replacement)
-		}
-		if strings.HasPrefix(key, "dbms.ssl.policy.") {
-			return nil, clierr.NewUsageError("--config key %q is owned by the operator. Use spec.trust in --from-file", key)
+		if flag, ok := dedicatedFlagConfig[key]; ok {
+			return nil, clierr.NewUsageError("set %q with %s, not --config", key, flag)
 		}
 		config[key] = quotedString(value)
 	}

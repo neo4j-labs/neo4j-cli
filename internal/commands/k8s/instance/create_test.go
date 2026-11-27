@@ -87,7 +87,7 @@ func TestCreate_LocalValidationRunsBeforeEngineCalls(t *testing.T) {
 	}{
 		{name: "licence", args: "create dev --rw", wantErr: "licence acceptance"},
 		{name: "memory", args: "create dev --accept-license eval --heap 2g --pagecache 4g --rw", wantErr: "Raise --memory"},
-		{name: "cluster admin path", args: "create dev --mode cluster --accept-license eval --rw", wantErr: "requires Bolt TLS"},
+		{name: "cluster admin path", args: "create dev --mode cluster --accept-license eval --rw", wantErr: "requires --insecure-admin-connection"},
 		{name: "file flags are exclusive", args: "create dev --from-file /tmp/neo4j.yaml --heap 2g --rw", wantErr: "cannot be combined"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
