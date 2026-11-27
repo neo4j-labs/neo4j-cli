@@ -36,3 +36,14 @@
 {"id": "p36", "field": "observed", "text": "It could not reach acme-prod：7687 at all.", "expect": "reject", "detector": "host_port"}
 {"id": "p37", "field": "observed", "text": "Logging in with password: Hunter2 failed without a reason.", "expect": "reject", "detector": "secret"}
 {"id": "p38", "field": "observed", "text": "The token Zx9Lq2Vb7Nm4Rt8Yp3Wk6H was rejected.", "expect": "reject", "detector": "secret"}
+{"id": "p39", "field": "observed", "text": "Connecting to db.prod.internal failed without a reason.", "expect": "reject", "detector": "host_port"}
+{"id": "p40", "field": "observed", "text": "The dashboard at grafana.internal/d/abc showed no data.", "expect": "reject", "detector": "host_port"}
+{"id": "p41", "field": "observed", "text": "The call to gds.prod.internal:7687 timed out.", "expect": "reject", "detector": "host_port"}
+{"id": "p42", "field": "observed", "text": "A procedure call to gds.prod.internal was refused.", "expect": "reject", "detector": "host_port"}
+{"id": "p43", "field": "observed", "text": "The proxy box:7687 dropped the connection.", "expect": "reject", "detector": "host_port"}
+{"id": "p44", "field": "expected", "text": "It should have reached localhost without a prompt.", "expect": "reject", "detector": "host_port"}
+{"id": "p45", "field": "observed", "text": "The DATABASE_PASSWORD=x variable was ignored by the command.", "expect": "reject", "detector": "secret"}
+{"id": "p46", "field": "observed", "text": "Setting PGPASSWORD=s3cr3t had no effect on the connection.", "expect": "reject", "detector": "secret"}
+{"id": "p47", "field": "observed", "text": "The password hunter2 did not work and the message did not say why.", "expect": "reject", "detector": "secret"}
+{"id": "p48", "field": "observed", "text": "Our API key abc123 was refused without a reason.", "expect": "reject", "detector": "secret"}
+{"id": "p49", "field": "observed", "text": "The private key a1b2c3 was shown in the failure message.", "expect": "reject", "detector": "secret"}

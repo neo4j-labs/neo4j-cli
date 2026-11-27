@@ -8,7 +8,7 @@
 {"id": "a08", "field": "observed", "text": "Setting accept-env-vars in config.json had no effect until the CLI was restarted.", "expect": "accept", "detector": ""}
 {"id": "a09", "field": "observed", "text": "The error returned Neo.ClientError.Security.Unauthorized without saying which credential source was used.", "expect": "accept", "detector": ""}
 {"id": "a10", "field": "expected", "text": "The help for --max-rows should mention the default of 100 more prominently.", "expect": "accept", "detector": ""}
-{"id": "a11", "field": "observed", "text": "The command took several seconds to start on every invocation, even for help output.", "expect": "accept", "detector": "", "category": "other_friction"}
+{"id": "a11", "field": "observed", "text": "The command took several seconds to start on every invocation, even for help output.", "expect": "accept", "detector": "", "category": "friction"}
 {"id": "a12", "field": "observed", "text": "NEO4J_PASSWORD was set, but the CLI still asked for --password in a non-interactive shell.", "expect": "accept", "detector": ""}
 {"id": "a13", "field": "observed", "text": "The --format flag help says (default: false) for a string option, which is confusing.", "expect": "accept", "detector": ""}
 {"id": "a14", "field": "observed", "text": "A note in the help (note: experimental) did not say what would change.", "expect": "accept", "detector": ""}
@@ -27,3 +27,9 @@
 {"id": "a27", "field": "observed", "text": "It used retry:10 in the message but did not retry.", "expect": "accept", "detector": ""}
 {"id": "a28", "field": "observed", "text": "The help\ttext used a tab where a space was expected.", "expect": "accept", "detector": ""}
 {"id": "a29", "field": "observed", "text": "See https://github.com/neo4j-labs/neo4j-cli/issues for the existing report on this.", "expect": "accept", "detector": ""}
+{"id": "a30", "field": "observed", "text": "Calling apoc.export.json.all printed nothing and exited with success.", "expect": "accept", "detector": ""}
+{"id": "a31", "field": "observed", "text": "gds.pageRank.stream was listed but db.ontology.get was not.", "expect": "accept", "detector": ""}
+{"id": "a32", "field": "observed", "text": "Version 1.2.3 printed the build twice and the check ran at 10:30 without a result.", "expect": "accept", "detector": ""}
+{"id": "a33", "field": "observed", "text": "Neo.TransientError.General.OutOfMemoryError was shown without a hint what to change.", "expect": "accept", "detector": ""}
+{"id": "a34", "field": "observed", "text": "The auth error did not name the missing setting.", "expect": "accept", "detector": ""}
+{"id": "a35", "field": "observed", "text": "The password prompt appeared twice and the token isn't refreshed after login.", "expect": "accept", "detector": ""}

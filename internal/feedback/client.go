@@ -16,25 +16,25 @@ import (
 
 // Outcomes of a submit attempt.
 const (
-	outcomeSent     = "sent"
-	outcomeSkipped  = "skipped"
-	outcomeRejected = "rejected"
-	outcomeFailed   = "failed"
-	outcomeUnknown  = "unknown"
+	OutcomeSent     = "sent"
+	OutcomeSkipped  = "skipped"
+	OutcomeRejected = "rejected"
+	OutcomeFailed   = "failed"
+	OutcomeUnknown  = "unknown"
 )
 
 // Reasons.
 const (
-	reasonInvalidInput    = "invalid_input"
-	reasonPolicyViolation = "policy_violation"
-	reasonEndpointDenied  = "endpoint_not_allowed"
-	reasonServerRejected  = "server_rejected"
-	reasonServerError     = "server_error"
-	reasonUnreachable     = "unreachable"
-	reasonTimeout         = "timeout"
-	reasonNoReceipt       = "no_receipt"
-	reasonNotConfigured   = "not_configured"
-	reasonCancelled       = "cancelled"
+	ReasonInvalidInput    = "invalid_input"
+	ReasonPolicyViolation = "policy_violation"
+	ReasonEndpointDenied  = "endpoint_not_allowed"
+	ReasonServerRejected  = "server_rejected"
+	ReasonServerError     = "server_error"
+	ReasonUnreachable     = "unreachable"
+	ReasonTimeout         = "timeout"
+	ReasonNoReceipt       = "no_receipt"
+	ReasonNotConfigured   = "not_configured"
+	ReasonCancelled       = "cancelled"
 )
 
 // eventName is the Mixpanel event a report is sent as. It follows the CLI's
@@ -132,20 +132,20 @@ func classifyTrack(data []byte) (outcome, reason string) {
 	trimmed := bytes.TrimSpace(data)
 	switch string(trimmed) {
 	case "1":
-		return outcomeSent, ""
+		return OutcomeSent, ""
 	case "0":
-		return outcomeRejected, reasonServerRejected
+		return OutcomeRejected, ReasonServerRejected
 	}
 	var parsed struct {
 		Status *int `json:"status"`
 	}
 	if json.Unmarshal(trimmed, &parsed) != nil || parsed.Status == nil {
-		return outcomeUnknown, reasonNoReceipt
+		return OutcomeUnknown, ReasonNoReceipt
 	}
 	if *parsed.Status == 1 {
-		return outcomeSent, ""
+		return OutcomeSent, ""
 	}
-	return outcomeRejected, reasonServerRejected
+	return OutcomeRejected, ReasonServerRejected
 }
 
 // Send makes exactly one POST of payload to endpoint's /track under a 3 s
@@ -155,22 +155,22 @@ func Send(ctx context.Context, endpoint string, payload Payload) Result {
 	// must never reach anything endpointAllowed refuses.
 	target, ok := trackURL(endpoint)
 	if !ok {
-		return Result{Outcome: outcomeFailed, Reason: reasonEndpointDenied}
+		return Result{Outcome: OutcomeFailed, Reason: ReasonEndpointDenied}
 	}
 	token := mixpanelToken
 	if token == "" && !isLoopbackEndpoint(endpoint) {
-		return Result{Outcome: outcomeFailed, Reason: reasonNotConfigured}
+		return Result{Outcome: OutcomeFailed, Reason: ReasonNotConfigured}
 	}
 	body, err := json.Marshal(trackEvent(token, payload))
 	if err != nil {
-		return Result{Outcome: outcomeFailed, Reason: reasonUnreachable}
+		return Result{Outcome: OutcomeFailed, Reason: ReasonUnreachable}
 	}
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))
 	if err != nil {
-		return Result{Outcome: outcomeFailed, Reason: reasonUnreachable}
+		return Result{Outcome: OutcomeFailed, Reason: ReasonUnreachable}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/plain")
@@ -182,13 +182,13 @@ func Send(ctx context.Context, endpoint string, payload Payload) Result {
 		res := Result{ElapsedMS: time.Since(start).Milliseconds()}
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
-			res.Outcome, res.Reason = outcomeUnknown, reasonTimeout
+			res.Outcome, res.Reason = OutcomeUnknown, ReasonTimeout
 		case errors.Is(err, context.Canceled):
 			// Cancelled mid-request (the person pressed Esc): the server may
 			// already have the report, so this is not a failure to retry.
-			res.Outcome, res.Reason = outcomeUnknown, reasonCancelled
+			res.Outcome, res.Reason = OutcomeUnknown, ReasonCancelled
 		default:
-			res.Outcome, res.Reason = outcomeFailed, reasonUnreachable
+			res.Outcome, res.Reason = OutcomeFailed, ReasonUnreachable
 		}
 		return res
 	}
@@ -199,21 +199,21 @@ func Send(ctx context.Context, endpoint string, payload Payload) Result {
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:
 		if readErr != nil && errors.Is(readErr, context.DeadlineExceeded) {
-			res.Outcome, res.Reason = outcomeUnknown, reasonTimeout
+			res.Outcome, res.Reason = OutcomeUnknown, ReasonTimeout
 			return res
 		}
 		res.Outcome, res.Reason = classifyTrack(data)
-		if res.Outcome == outcomeSent {
+		if res.Outcome == OutcomeSent {
 			res.ReportID = payload.RequestID
 		}
 	case resp.StatusCode == http.StatusTooManyRequests:
 		// Rate limited: nothing was recorded and a later attempt may work.
-		res.Outcome, res.Reason = outcomeFailed, reasonServerError
+		res.Outcome, res.Reason = OutcomeFailed, ReasonServerError
 	case resp.StatusCode >= 400 && resp.StatusCode < 500:
-		res.Outcome, res.Reason = outcomeRejected, reasonServerRejected
+		res.Outcome, res.Reason = OutcomeRejected, ReasonServerRejected
 	default:
 		// 5xx, and anything unexpected (1xx, 3xx since redirects are not followed).
-		res.Outcome, res.Reason = outcomeFailed, reasonServerError
+		res.Outcome, res.Reason = OutcomeFailed, ReasonServerError
 	}
 	return res
 }

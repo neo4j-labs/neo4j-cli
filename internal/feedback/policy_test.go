@@ -70,6 +70,30 @@ func detectors(vs []Violation) []string {
 	return out
 }
 
+func TestValidate_Categories(t *testing.T) {
+	for _, tc := range []struct {
+		category string
+		valid    bool
+	}{
+		{"friction", true},
+		{"unclear_error", true},
+		{"unexpected_behavior", true},
+		{"missing_capability", true},
+		{"other_friction", false}, // the retired pre-parity name
+		{"Friction", false},
+		{"", false},
+	} {
+		in := baseInput()
+		in.Category = tc.category
+		_, vs, _ := Validate(in, testRoot())
+		if tc.valid {
+			assert.Empty(t, vs, "category %q", tc.category)
+		} else {
+			assert.Contains(t, detectors(vs), DetInvalidInput, "category %q", tc.category)
+		}
+	}
+}
+
 func TestValidate_BaseInputPasses(t *testing.T) {
 	_, vs, dropped := Validate(baseInput(), testRoot())
 	assert.Empty(t, vs)
@@ -78,7 +102,7 @@ func TestValidate_BaseInputPasses(t *testing.T) {
 
 func TestValidate_ProhibitedCorpus(t *testing.T) {
 	cases := loadCorpus(t, "prohibited_corpus.jsonl")
-	require.Len(t, cases, 38)
+	require.Len(t, cases, 49)
 	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			_, vs, _ := Validate(inputFor(c), testRoot())
@@ -91,9 +115,25 @@ func TestValidate_ProhibitedCorpus(t *testing.T) {
 	}
 }
 
+// A detector without a rejecting corpus case could silently stop firing, so
+// every content detector must appear in the prohibited corpus: adding a
+// detector to this list without a corpus entry fails here.
+func TestProhibitedCorpus_CoversEveryDetector(t *testing.T) {
+	covered := map[string]bool{}
+	for _, c := range loadCorpus(t, "prohibited_corpus.jsonl") {
+		covered[c.Detector] = true
+	}
+	for _, d := range []string{
+		detEmail, detURL, detHostPort, detIPAddress, detFilePath, detDataFilename,
+		detSecret, detIdentifier, detCypher, detParameter, detPastedOutput, detControlChars,
+	} {
+		assert.True(t, covered[d], "no prohibited corpus case exercises detector %q", d)
+	}
+}
+
 func TestValidate_AllowedCorpus(t *testing.T) {
 	cases := loadCorpus(t, "allowed_corpus.jsonl")
-	require.Len(t, cases, 29)
+	require.Len(t, cases, 35)
 	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			_, vs, _ := Validate(inputFor(c), testRoot())
@@ -130,8 +170,32 @@ func TestValidate_LongFieldIsTooLongNotTruncated(t *testing.T) {
 	in := baseInput()
 	in.Observed = strings.Repeat("The output was unclear. ", 400) // ~9.6 KB, no detector hits
 	p, vs, _ := Validate(in, testRoot())
-	assert.Equal(t, []Violation{{Field: fieldObserved, Detector: detTooLong}}, vs)
+	assert.Equal(t, []Violation{{Field: fieldObserved, Detector: DetTooLong}}, vs)
 	assert.Equal(t, in.Observed, p.Observed, "the validator never truncates")
+}
+
+func TestValidate_RequestID_MustBeLowercaseV4(t *testing.T) {
+	for _, id := range []string{
+		"11111111-1111-4111-8111-111111111111", // lowercase v4: kept as given
+	} {
+		in := baseInput()
+		in.RequestID = id
+		p, vs, _ := Validate(in, testRoot())
+		assert.Empty(t, vs)
+		assert.Equal(t, id, p.RequestID)
+	}
+	for _, id := range []string{
+		"AAAAAAAA-1111-4111-8111-111111111111", // uppercase is refused, never lowercased
+		"11111111-1111-1111-8111-111111111111", // not version 4
+		"11111111-1111-4111-c111-111111111111", // not the RFC 4122 variant
+	} {
+		in := baseInput()
+		in.RequestID = id
+		p, vs, _ := Validate(in, testRoot())
+		assert.Contains(t, vs, Violation{"request_id", "invalid_input"}, "id %q", id)
+		assert.NotEqual(t, id, p.RequestID, "an invalid id is replaced by a fresh one")
+		assert.Regexp(t, uuidV4, p.RequestID)
+	}
 }
 
 func TestValidate_RequestID(t *testing.T) {
@@ -174,6 +238,10 @@ func TestValidate_OptionalFields(t *testing.T) {
 		{"model not in family", func(in *Input) { in.AgentModel = "MyCustomBot" }, "", "", "", "", []string{"agent.model"}},
 		{"model with spaces", func(in *Input) { in.AgentModel = "claude zephyrine" }, "", "", "", "", []string{"agent.model"}},
 		{"model too long", func(in *Input) { in.AgentModel = "claude-" + strings.Repeat("x", 40) }, "", "", "", "", []string{"agent.model"}},
+		{"harness with spaces", func(in *Input) { in.Harness = "my harness" }, "", "", "", "", []string{"agent.harness"}},
+		{"harness uppercase", func(in *Input) { in.Harness = "Claude-Code" }, "", "", "", "", []string{"agent.harness"}},
+		{"harness too long", func(in *Input) { in.Harness = strings.Repeat("x", 41) }, "", "", "", "", []string{"agent.harness"}},
+		{"harness is an arbitrary env value", func(in *Input) { in.Harness = "/Users/me/secret-project" }, "", "", "", "", []string{"agent.harness"}},
 		{"o-series model", func(in *Input) { in.AgentModel = "o3-mini" }, "", "", "o3-mini", "", nil},
 		{"harness only", func(in *Input) { in.Harness = "codex" }, "", "", "", "codex", nil},
 	} {
@@ -282,13 +350,13 @@ func TestValidate_FieldByteCap(t *testing.T) {
 				_, vs, _ := Validate(in, testRoot())
 				got := false
 				for _, v := range vs {
-					if v.Field == field && v.Detector == detTooLong {
+					if v.Field == field && v.Detector == DetTooLong {
 						got = true
 					}
 				}
 				assert.Equal(t, tc.tooLong, got)
 				if tc.tooLong {
-					assert.Equal(t, reasonInvalidInput, rejectionReason(vs), "too_long alone is invalid_input")
+					assert.Equal(t, ReasonInvalidInput, RejectionReason(vs), "too_long alone is invalid_input")
 				}
 			})
 		}

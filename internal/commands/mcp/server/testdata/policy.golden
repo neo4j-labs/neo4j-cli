@@ -197,8 +197,6 @@ docker stop	write
 feedback	deny
 feedback disable	deny
 feedback enable	deny
-feedback register	deny
-feedback serve	deny
 feedback status	deny
 feedback submit	deny
 history	allow

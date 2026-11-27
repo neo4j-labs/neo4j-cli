@@ -26,9 +26,9 @@ type Receipt struct {
 	Payload     *Payload `json:"payload"`
 }
 
-// appendReceipt appends one receipt line with file mode 0600. It returns the
+// AppendReceipt appends one receipt line with file mode 0600. It returns the
 // path written, or "" on error; callers treat receipts as best-effort.
-func appendReceipt(fs afero.Fs, path string, r Receipt) string {
+func AppendReceipt(fs afero.Fs, path string, r Receipt) string {
 	if fs == nil {
 		return ""
 	}

@@ -14,7 +14,6 @@ import (
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
 	"github.com/neo4j/cli/internal/clievents"
-	"github.com/neo4j/cli/internal/commands/feedback"
 	"github.com/neo4j/cli/internal/confirm"
 	"github.com/neo4j/cli/internal/tee"
 	"github.com/spf13/afero"
@@ -214,7 +213,6 @@ func run(ctx context.Context, cfg *clicfg.Config, args []string, stdio IO) int {
 
 	// Runs last, after any error is rendered, so the one-time hint can never
 	// change the exit code or the error output.
-	defer feedback.MaybeRegisterHint(cfg, args, stdio.Err)
 
 	// Capture emitted output into a shared bounded buffer while passing it
 	// through to the real streams, so a failing command can be teed to disk.

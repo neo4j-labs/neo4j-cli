@@ -4,6 +4,7 @@
 package feedback
 
 import (
+	engine "github.com/neo4j/cli/internal/feedback"
 	"testing"
 	"time"
 
@@ -73,17 +74,17 @@ func TestEnable_UsesTheBuildDestinationWhenNoEndpointIsGiven(t *testing.T) {
 	withSeams(t, false, "")
 	withToken(t, "some-token")
 	cfg := newTestConfig(t)
-	stdout, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--register=false")
+	stdout, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept")
 	require.NoError(t, err)
-	assert.Equal(t, mixpanelBase, parseJSON(t, stdout)["endpoint"])
-	assert.Equal(t, mixpanelBase, endpoint(cfg))
+	assert.Equal(t, engine.MixpanelBase(), parseJSON(t, stdout)["endpoint"])
+	assert.Equal(t, engine.MixpanelBase(), endpoint(cfg))
 }
 
 func TestEnable_BuildWithoutADestinationNeedsAnEndpoint(t *testing.T) {
 	withSeams(t, false, "")
 	withToken(t, "")
 	cfg := newTestConfig(t)
-	_, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--register=false")
+	_, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept")
 	assert.Equal(t, 2, exitCode(err))
 	assert.False(t, Authorized(cfg, now()))
 	assert.Empty(t, endpoint(cfg))
@@ -93,7 +94,7 @@ func TestEnable_AcceptNeedsAPersonAtATerminal(t *testing.T) {
 	withSeams(t, false, "")
 	asScript(t) // e.g. an agent harness this CLI does not recognize, or a pipe
 	cfg := newTestConfig(t)
-	_, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--endpoint", loopback, "--register=false")
+	_, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--endpoint", loopback)
 	assert.Equal(t, 4, exitCode(err))
 	assert.False(t, Authorized(cfg, now()))
 

@@ -16,7 +16,7 @@ func newDisableCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "disable",
 		Short: "Revoke permission to send feedback",
-		Long:  "Revoke permission to send feedback immediately. Anyone can run this. Local receipts and the other feedback settings are kept. Unregisters the feedback tool from Claude Code and Codex. Run this before uninstalling neo4j-cli: otherwise the agent keeps a registration that points at a binary that no longer exists (to remove it by hand: `claude mcp remove -s user neo4j-feedback`, or `codex mcp remove neo4j-feedback`).",
+		Long:  "Revoke permission to send feedback immediately. Anyone can run this. Local receipts and the other feedback settings are kept.",
 		Example: `# Revoke feedback authorization
 neo4j-cli feedback disable
 
@@ -25,12 +25,10 @@ neo4j-cli feedback disable --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			if err := setValues(cfg, [2]string{keyAuthorizedUntil, ""}, [2]string{keyAutoRegistered, autoDisabled}); err != nil {
+			if err := setValues(cfg, [2]string{keyAuthorizedUntil, ""}); err != nil {
 				return clierr.NewFatalError("could not revoke feedback, the config file is not writable: %s", err)
 			}
-			st := currentStatus(cfg)
-			st.Notes = unregisterAgents(cmd.Context())
-			return writeStatus(cmd, cfg, st)
+			return writeStatus(cmd, cfg, currentStatus(cfg))
 		},
 	}
 }

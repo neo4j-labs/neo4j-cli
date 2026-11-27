@@ -5,6 +5,7 @@ package feedback
 
 import (
 	"fmt"
+	engine "github.com/neo4j/cli/internal/feedback"
 	"strings"
 	"time"
 
@@ -20,11 +21,9 @@ const (
 
 func newEnableCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
-		accept   bool
-		ep       string
-		days     int
-		register bool
-		instr    string
+		accept bool
+		ep     string
+		days   int
 	)
 
 	cmd := &cobra.Command{
@@ -61,14 +60,11 @@ neo4j-cli feedback enable --accept --rw --format json`,
 			if ep == "" {
 				return clierr.NewUsageError("this build has no feedback destination; pass --endpoint (http on 127.0.0.1, localhost or ::1 only)")
 			}
-			if !endpointAllowed(ep) {
+			if !engine.EndpointAllowed(ep) {
 				return clierr.NewUsageError("endpoint not allowed: only https to Mixpanel's ingestion hosts, or http on 127.0.0.1, localhost or ::1, is accepted")
 			}
 			if days < 1 || days > maxDays {
 				return clierr.NewUsageError("--days must be between 1 and %d", maxDays)
-			}
-			if !validInstructionsVariant(instr) {
-				return clierr.NewUsageError("--instructions must be none, basic or optin")
 			}
 
 			expiry := now().UTC().Add(time.Duration(days) * 24 * time.Hour)
@@ -85,23 +81,14 @@ neo4j-cli feedback enable --accept --rw --format json`,
 
 			if err := setValues(cfg,
 				[2]string{keyEndpoint, ep},
-				[2]string{keyInstructions, instr},
-				[2]string{keyAutoRegistered, autoDone},
 				[2]string{keyAuthorizedUntil, expiry.Format(time.RFC3339)},
 			); err != nil {
 				return clierr.NewFatalError("could not enable feedback, the config file is not writable: %s", err)
 			}
-			st := currentStatus(cfg)
-			if register {
-				st.RegisteredAgents, st.Notes = registerAgents(cmd.Context(), instr)
-			}
-			return writeStatus(cmd, cfg, st)
+			return writeStatus(cmd, cfg, currentStatus(cfg))
 		},
 	}
 
-	cmd.Flags().StringVar(&instr, "instructions", enableInstructions, "Server instructions variant for the registered tool: none, basic or optin")
-	_ = cmd.Flags().MarkHidden("instructions")
-	cmd.Flags().BoolVar(&register, "register", true, "Register the feedback tool with detected agents (Claude Code, Codex); use --register=false to skip")
 	cmd.Flags().BoolVar(&accept, "accept", false, "Accept the disclosure and enable feedback")
 	cmd.Flags().StringVar(&ep, "endpoint", "", "Feedback endpoint URL (loopback test endpoint, or this build's destination)")
 	cmd.Flags().IntVar(&days, "days", defaultDays, "Days until authorization expires (1-90)")

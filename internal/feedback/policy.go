@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -40,9 +41,9 @@ const (
 	detParameter     = "parameter"
 	detPastedOutput  = "pasted_output"
 	detControlChars  = "control_chars"
-	detInvalidInput  = "invalid_input"
-	detTooLarge      = "too_large"
-	detTooLong       = "too_long"
+	DetInvalidInput  = "invalid_input"
+	DetTooLarge      = "too_large"
+	DetTooLong       = "too_long"
 	fieldPayload     = "payload"
 	fieldCategory    = "category"
 	fieldExpected    = "expected"
@@ -51,9 +52,12 @@ const (
 	droppedCommandID = "command_id"
 	droppedErrorCode = "error_code"
 	droppedModel     = "agent.model"
+	droppedHarness   = "agent.harness"
 )
 
-var validCategories = []string{"unclear_error", "unexpected_behavior", "missing_capability", "other_friction"}
+// validCategories is the closed category vocabulary shared with Relate
+// (ADR-0588); `friction` is the catch-all and the commands' default.
+var validCategories = []string{"friction", "unclear_error", "unexpected_behavior", "missing_capability"}
 
 // Input is what the caller (flags plus environment) hands to Validate.
 type Input struct {
@@ -117,9 +121,9 @@ func Validate(in Input, tree *cobra.Command) (Payload, []Violation, []string) {
 		violations = append(violations, Violation{Field: field, Detector: det})
 	}
 
-	rid, ridOK := resolveRequestID(in.RequestID)
+	rid, ridOK := ResolveRequestID(in.RequestID)
 	if !ridOK {
-		add(fieldRequestID, detInvalidInput)
+		add(fieldRequestID, DetInvalidInput)
 	}
 
 	p := Payload{
@@ -142,16 +146,16 @@ func Validate(in Input, tree *cobra.Command) (Payload, []Violation, []string) {
 		}
 	}
 	if !valid {
-		add(fieldCategory, detInvalidInput)
+		add(fieldCategory, DetInvalidInput)
 	}
 
 	for _, f := range []struct{ name, text string }{{fieldExpected, in.Expected}, {fieldObserved, in.Observed}} {
 		if strings.TrimSpace(f.text) == "" {
-			add(f.name, detInvalidInput)
+			add(f.name, DetInvalidInput)
 			continue
 		}
 		if len(f.text) > maxFieldBytes {
-			add(f.name, detTooLong)
+			add(f.name, DetTooLong)
 		}
 		for _, d := range detect(f.text) {
 			add(f.name, d)
@@ -173,7 +177,14 @@ func Validate(in Input, tree *cobra.Command) (Payload, []Violation, []string) {
 		}
 	}
 
-	agent := Agent{Harness: in.Harness}
+	agent := Agent{}
+	if in.Harness != "" {
+		if slugValid(in.Harness) {
+			agent.Harness = in.Harness
+		} else {
+			dropped = append(dropped, droppedHarness)
+		}
+	}
 	if in.AgentModel != "" {
 		if modelValid(in.AgentModel) {
 			agent.Model = in.AgentModel
@@ -186,19 +197,19 @@ func Validate(in Input, tree *cobra.Command) (Payload, []Violation, []string) {
 	}
 
 	if b, err := json.Marshal(p); err != nil || len(b) > maxPayloadBytes {
-		add(fieldPayload, detTooLarge)
+		add(fieldPayload, DetTooLarge)
 	}
 	return p, violations, dropped
 }
 
-// resolveRequestID returns the caller's UUIDv4 when valid, otherwise a fresh
+// ResolveRequestID returns the caller's UUIDv4 when valid, otherwise a fresh
 // one. ok is false only when the caller supplied an invalid value.
-func resolveRequestID(s string) (id string, ok bool) {
+func ResolveRequestID(s string) (id string, ok bool) {
 	if s == "" {
 		return newUUIDv4(), true
 	}
 	if uuidV4.MatchString(s) {
-		return strings.ToLower(s), true
+		return s, true
 	}
 	return newUUIDv4(), false
 }
@@ -211,7 +222,9 @@ func newUUIDv4() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-var uuidV4 = regexp.MustCompile(`^(?i)[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+// uuidV4 is a lowercase canonical UUIDv4, the one request-id shape (ADR-0588):
+// uppercase and non-v4 version or variant nibbles are refused, not normalised.
+var uuidV4 = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 func errorCodeValid(s string) bool {
 	for _, name := range clierr.CodeNames {
@@ -228,8 +241,16 @@ var (
 	modelChars    = regexp.MustCompile(`^[a-z0-9][a-z0-9._:\-]*$`)
 )
 
+// slugValid is the label gate the agent model and the harness label share:
+// non-empty, at most 40 characters, lowercase, and only [a-z0-9._:-] starting
+// with a letter or digit. The harness label comes straight from the
+// environment, so an unvalidated value would otherwise be sent as given.
+func slugValid(s string) bool {
+	return s != "" && len(s) <= 40 && s == strings.ToLower(s) && modelChars.MatchString(s)
+}
+
 func modelValid(s string) bool {
-	if len(s) > 40 || s != strings.ToLower(s) || !modelChars.MatchString(s) {
+	if !slugValid(s) {
 		return false
 	}
 	if modelO.MatchString(s) {
@@ -276,7 +297,6 @@ func commandAllowed(root *cobra.Command, s string) bool {
 var (
 	reEmail    = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}`)
 	reURL      = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://\S+`)
-	reHostPort = regexp.MustCompile(`\b[A-Za-z0-9][A-Za-z0-9.\-]*:([0-9]{2,5})\b`)
 	reIPv4     = regexp.MustCompile(`\b[0-9]{1,3}(?:\.[0-9]{1,3}){3}\b`)
 	reIPv6Cand = regexp.MustCompile(`[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*`)
 	// A POSIX path needs two segments or a file extension, so an agent's own
@@ -285,13 +305,24 @@ var (
 	reHomePath  = regexp.MustCompile(`(?:^|[\s"'(=,])~[A-Za-z0-9._\-]*/`)
 	reRelPath   = regexp.MustCompile(`(?:^|[\s"'(=,])\.{1,2}/`)
 	reWinPath   = regexp.MustCompile(`\b[A-Za-z]:[\\/]`)
-	reDataFile  = regexp.MustCompile(`(?i)\b[\w\-]+\.(?:csv|tsv|json|jsonl|ndjson|cypher|cql|txt|xlsx?|xml|ya?ml|parquet|sql|log|py|js|ts|go|java|sh|md|zip|gz|tar|pdf|db|dump|backup|toml|ini|conf|properties)\b`)
-	reSecretKV  = regexp.MustCompile(`(?i)\b(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|auth|credential)s?(\s*=\s*|\s*:\s*)(\S+)`)
-	reSecretKey = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_\-]{8,}|ghp_[A-Za-z0-9]{8,}|xox[a-z]-[A-Za-z0-9\-]{6,}|AKIA[0-9A-Z]{8,}|nams_[A-Za-z0-9_\-]{6,})`)
-	reLongToken = regexp.MustCompile(`[A-Za-z0-9+/]{20,}`)
-	reUUID      = regexp.MustCompile(`\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b`)
-	reHexRun    = regexp.MustCompile(`\b[0-9a-fA-F]{8,}\b`)
-	reParameter = regexp.MustCompile(`--param(?:\s+|=)[^\s=]+=\S*`)
+	// reDataFile matches a whole dotted name; only its LAST label decides whether it
+	// is a data file, so apoc.export.json.all is a procedure, not a .json file.
+	reDataFile = regexp.MustCompile(`[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.([A-Za-z0-9]{1,10})`)
+	// secretKeywords is spelled once for both arms below.
+	secretKeywords = `(?:pass(?:word|wd)?|pwd|secret|token|api[ _-]?key|access[ _-]?key|private[ _-]?key|auth|credential)s?`
+	// reSecretKV is the assignment arm: `token=abc`, `token: abc`. It has no
+	// leading boundary, so an environment-style name whose keyword is a suffix
+	// is caught too (DATABASE_PASSWORD=x, MY_API_KEY=x, PGPASSWORD=x).
+	reSecretKV = regexp.MustCompile(`(?i)` + secretKeywords + `(\s*=\s*|\s*:\s*)(\S+)`)
+	// reSecretProse is the prose arm: `the password hunter2`. It keeps its
+	// leading boundary so words that merely contain a keyword (compass) stay
+	// prose, and it only fires when the next word looks like a credential.
+	reSecretProse = regexp.MustCompile(`(?i)\b` + secretKeywords + `\b\s+(\S+)`)
+	reSecretKey   = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_\-]{8,}|ghp_[A-Za-z0-9]{8,}|xox[a-z]-[A-Za-z0-9\-]{6,}|AKIA[0-9A-Z]{8,}|nams_[A-Za-z0-9_\-]{6,})`)
+	reLongToken   = regexp.MustCompile(`[A-Za-z0-9+/]{20,}`)
+	reUUID        = regexp.MustCompile(`\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b`)
+	reHexRun      = regexp.MustCompile(`\b[0-9a-fA-F]{8,}\b`)
+	reParameter   = regexp.MustCompile(`--param(?:\s+|=)[^\s=]+=\S*`)
 	// Node and relationship patterns: the label follows the colon directly, as
 	// in (p:Person) or [:KNOWS], unlike prose such as "(default: false)".
 	reCypherNode = regexp.MustCompile(`\(\s*\w*\s*:[A-Za-z_]\w*`)
@@ -419,17 +450,166 @@ func hasDigit(s string) bool {
 	return false
 }
 
-// hasHostPort matches host:port where the host contains a letter, so that
-// clock times like 10:30 are not flagged (numeric hosts are caught as IPs),
-// and where the host has a dot, is localhost, or the port has 4 or 5 digits,
-// so that "retry:10" is not flagged either.
-func hasHostPort(s string) bool {
-	for _, m := range reHostPort.FindAllStringSubmatch(s, -1) {
-		host := m[0][:strings.LastIndex(m[0], ":")]
-		if !hasLetter(host) {
-			continue
+// dataExtensions are the file extensions that make a dotted name a data file
+// (the data-filename detector) and keep it from reading as a host name. One
+// list, so the two detectors cannot drift apart.
+var dataExtensions = []string{
+	"csv", "tsv", "json", "jsonl", "ndjson", "cypher", "cql", "txt", "xls", "xlsx", "xml", "yaml", "yml",
+	"parquet", "sql", "log", "go", "java", "sh", "md", "zip", "gz", "tar", "pdf", "db", "dump", "backup",
+	"toml", "ini", "conf", "properties", "rs", "py", "js", "ts", "html", "htm", "rl", "lock", "env", "bak",
+}
+
+func isDataExtension(ext string) bool {
+	for _, e := range dataExtensions {
+		if strings.EqualFold(e, ext) {
+			return true
 		}
-		if strings.Contains(host, ".") || strings.EqualFold(host, "localhost") || len(m[1]) >= 4 {
+	}
+	return false
+}
+
+// procedurePrefixes are the namespaces a report may name without the token
+// reading as a host: whole-prefix matches with the trailing dot, never a
+// first-label match, so db.prod.internal and gds.prod.internal stay host hits.
+var procedurePrefixes = []string{"apoc.", "gds.", "db.ontology."}
+
+// procedureWords end a procedure reference (apoc.export.json.all,
+// gds.pageRank.stream). A host rarely ends in one, so the exemption cannot
+// swallow an internal host: the shape of the last label separates the two.
+var procedureWords = []string{
+	"all", "stream", "write", "stats", "mutate", "project", "validate", "get", "set", "list", "create",
+	"drop", "delete", "submit", "apply",
+}
+
+// isProcedureName reports whether token names a procedure in an exempted
+// namespace. Only a port-less token is exempt: an explicit port is the
+// strongest host signal a token carries.
+func isProcedureName(token string) bool {
+	if strings.Contains(token, ":") {
+		return false
+	}
+	last := token
+	if i := strings.LastIndex(token, "."); i >= 0 {
+		last = token[i+1:]
+	}
+	if !slices.Contains(procedureWords, last) {
+		return false
+	}
+	for _, p := range procedurePrefixes {
+		if strings.HasPrefix(token, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// isTokenBoundary ends a token: whitespace, or one of "'()[]{}<>,;
+func isTokenBoundary(r rune) bool {
+	return unicode.IsSpace(r) || strings.ContainsRune("\"'()[]{}<>,;", r)
+}
+
+func trimTokenPunct(s string) string { return strings.TrimRight(s, ".,;:!?)]}") }
+
+// authority is the part of a token before the first '/', '?' or '#', so a
+// host with a path attached (grafana.internal/d/abc) is still classified.
+func authority(token string) string {
+	if i := strings.IndexAny(token, "/?#"); i >= 0 {
+		return token[:i]
+	}
+	return token
+}
+
+// hostLabel is one DNS label: 1-63 ASCII alphanumerics or hyphens, no leading
+// or trailing hyphen.
+func hostLabel(l string) bool {
+	if l == "" || len(l) > 63 || l[0] == '-' || l[len(l)-1] == '-' {
+		return false
+	}
+	for i := 0; i < len(l); i++ {
+		c := l[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && c != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func isASCIILetters(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') {
+			return false
+		}
+	}
+	return s != ""
+}
+
+func isDigits(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return s != ""
+}
+
+// hostToken is a bare host name: two or more dotted labels whose last label is
+// only letters (so 1.2.3 and times do not match) and not a data extension.
+func hostToken(token string) bool {
+	token = trimTokenPunct(token)
+	i := strings.LastIndex(token, ".")
+	if i < 0 {
+		return false
+	}
+	tld := token[i+1:]
+	if len(tld) < 2 || !isASCIILetters(tld) || isDataExtension(tld) {
+		return false
+	}
+	for _, l := range strings.Split(token, ".") {
+		if !hostLabel(l) {
+			return false
+		}
+	}
+	return true
+}
+
+// reNeoStatusCode is a Neo4j status code (Neo.ClientError.Security.Unauthorized):
+// an identifier agents cite constantly, never a host. neo4j-cli-specific; the
+// shape is exact (known class, category, title) so a host cannot hide in it.
+var reNeoStatusCode = regexp.MustCompile(`^(?i)neo\.(?:clienterror|transienterror|databaseerror|clientnotification|databasenotification)\.[a-z]+\.[a-z0-9]+$`)
+
+func hostPortToken(token string) bool {
+	token = trimTokenPunct(authority(token))
+	if isProcedureName(strings.ToLower(token)) || reNeoStatusCode.MatchString(token) {
+		return false
+	}
+	host, port := token, ""
+	if i := strings.LastIndex(token, ":"); i >= 0 && isDigits(token[i+1:]) {
+		host, port = token[:i], token[i+1:]
+	}
+	if hostToken(host) || strings.EqualFold(host, "localhost") {
+		return true
+	}
+	// A single label is a host only with an explicit port and a letter: the 10
+	// in 10:30 is a time. neo4j-cli additionally needs a 4+ digit port, so prose
+	// such as retry:10 or timeout:30 is not read as a host (Relate flags any
+	// port; an intentional difference, pinned by the allowed corpus).
+	if len(port) < 4 || !hostLabel(host) {
+		return false
+	}
+	for i := 0; i < len(host); i++ {
+		c := host[i]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' {
+			return true
+		}
+	}
+	return false
+}
+
+// hasHostPort reports a host name in the text, with or without a port.
+func hasHostPort(s string) bool {
+	for _, tok := range strings.FieldsFunc(s, isTokenBoundary) {
+		if hostPortToken(tok) {
 			return true
 		}
 	}
@@ -456,8 +636,8 @@ func hasIP(s string) bool {
 }
 
 func hasDataFilename(s string) bool {
-	for _, m := range reDataFile.FindAllString(s, -1) {
-		if !allowedFilenames[strings.ToLower(m)] {
+	for _, m := range reDataFile.FindAllStringSubmatch(s, -1) {
+		if isDataExtension(m[1]) && !allowedFilenames[strings.ToLower(m[0])] {
 			return true
 		}
 	}
@@ -481,6 +661,11 @@ func hasSecret(s string) bool {
 			return true
 		}
 	}
+	for _, m := range reSecretProse.FindAllStringSubmatch(s, -1) {
+		if credentialShaped(m[1]) {
+			return true
+		}
+	}
 	// A run of 20 or more letters and digits with no separator; hyphenated or
 	// underscored names (x86_64-unknown-linux-gnu) are words, not tokens.
 	for _, m := range reLongToken.FindAllString(s, -1) {
@@ -493,6 +678,19 @@ func hasSecret(s string) bool {
 
 // valueLike reports whether v looks like a credential rather than a word: it
 // has a digit, a symbol, or a capital letter after the first character.
+// credentialShaped reports whether a word following a credential keyword in
+// prose looks like the credential itself: it holds a digit or a symbol, so
+// "the password hunter2" is caught while "the auth error", "password prompt"
+// and "the token isn't refreshed" stay prose. Relate rejects any word here;
+// neo4j-cli feedback is often about authentication, so it needs the narrower
+// rule (an intentional difference).
+func credentialShaped(v string) bool {
+	v = strings.TrimRight(v, ".,;:!?)'\"")
+	return strings.ContainsFunc(v, func(r rune) bool {
+		return unicode.IsDigit(r) || strings.ContainsRune("!@#$%^&*+=/\\|~", r)
+	})
+}
+
 func valueLike(v string) bool {
 	v = strings.TrimRight(v, ".,;:!?)'\"")
 	for i, r := range v {
@@ -536,4 +734,15 @@ func hasCypher(s string) bool {
 		distinct[m] = true
 	}
 	return len(distinct) >= 2
+}
+
+// RejectionReason is policy_violation when any detector fired, otherwise
+// invalid_input (field rules and the size cap).
+func RejectionReason(vs []Violation) string {
+	for _, v := range vs {
+		if v.Detector != DetInvalidInput && v.Detector != DetTooLarge && v.Detector != DetTooLong {
+			return ReasonPolicyViolation
+		}
+	}
+	return ReasonInvalidInput
 }
