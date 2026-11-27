@@ -25,16 +25,16 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "create <name>",
 		Short:       "Create a Neo4j standalone server or cluster",
 		Annotations: map[string]string{"write": "true"},
-		Long: "Create one Neo4j custom resource in the group's workload namespace, or in `default` when no namespace is set. " +
-			"The command checks the operator's watch scope before it creates anything. " +
-			"Enterprise edition requires an explicit --accept-license yes or eval. " +
-			"Cluster mode requires --insecure-admin-connection unless --from-file supplies Bolt TLS. " +
-			"The insecure option sends the operator's admin password over an unencrypted pod-network connection. " +
-			"--memory and --cpu set both container requests and limits. --heap sets the initial and maximum heap together. " +
-			"The command reserves 1Gi for the JVM and operating system when it checks heap and page cache against the memory limit. " +
-			"--from-file accepts one complete Neo4j YAML object and preserves fields that have no dedicated flag, including TLS. " +
-			"The positional name and group namespace replace the file's metadata values. " +
-			"Other specification flags cannot be combined with --from-file. " +
+		Long: "Create one Neo4j custom resource in the workload namespace from -n, or in `default` when no namespace is set. " +
+			"The command makes sure that the operator watches that namespace before it creates anything. " +
+			"Enterprise edition requires --accept-license yes or eval. " +
+			"Cluster mode requires --insecure-admin-connection unless --from-file configures Bolt TLS. " +
+			"With --insecure-admin-connection, the operator sends its admin password over an unencrypted pod network. " +
+			"--memory and --cpu set both container requests and limits, and --heap sets both initial and maximum heap. " +
+			"Heap, page cache and 1Gi for the JVM and operating system must fit within the memory limit. " +
+			"--from-file reads one Neo4j YAML object and keeps fields without a dedicated flag, such as TLS. " +
+			"The positional name and group namespace replace the metadata values in the file. " +
+			"Do not combine --from-file with other specification flags. " +
 			"Pass --wait to poll until Ready=True for the current generation, with a 10 minute timeout. Requires --rw.",
 		Example: `# Create a standalone server with an evaluation licence and wait for readiness
 neo4j-cli k8s instance create dev --accept-license eval --wait --rw
@@ -51,38 +51,19 @@ neo4j-cli k8s instance create dev-tls --from-file ./neo4j.yaml --wait --rw`,
 			if err != nil {
 				return err
 			}
+			if err := engine.ValidateResourceName("--operator-namespace", operatorNamespace); err != nil {
+				return err
+			}
 			opts.Name = args[0]
 			opts.Namespace = settings.Namespace
 			opts.PrimariesSet = cmd.Flags().Changed("primaries")
 
-			var manifest []byte
-			if fromFile != "" {
-				if err := rejectFlagsWithFile(cmd); err != nil {
-					return err
-				}
-				data, err := afero.ReadFile(cfg.Fs(), fromFile)
-				if err != nil {
-					return clierr.NewUsageError("read --from-file %q: %s", fromFile, err)
-				}
-				manifest, err = engine.PrepareNeo4jManifestFromFile(data, opts.Name, opts.Namespace)
-				if err != nil {
-					return err
-				}
-			} else {
-				manifest, err = engine.BuildNeo4jManifest(opts)
-				if err != nil {
-					return err
-				}
-			}
-			summary, err := engine.InspectNeo4jManifest(manifest)
+			manifest, err := prepareManifest(cmd, cfg, opts, fromFile)
 			if err != nil {
 				return err
 			}
-			if summary.Mode == "Cluster" && summary.Primaries == 1 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "Warning: a cluster created with one primary cannot grow its primary pool later.") //nolint:errcheck // Warning output is best effort.
-			}
-			if summary.Mode == "Cluster" && summary.InsecureAdminConnection {
-				fmt.Fprintln(cmd.ErrOrStderr(), "Warning: the operator will send its admin password over an unencrypted pod-network connection.") //nolint:errcheck // Warning output is best effort.
+			for _, warning := range engine.ManifestWarnings(manifest) {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", warning)
 			}
 
 			client := clientFactory(settings)
@@ -99,6 +80,7 @@ neo4j-cli k8s instance create dev-tls --from-file ./neo4j.yaml --wait --rw`,
 				return err
 			}
 			if wait {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Waiting for Neo4j %q to become ready (timeout %s)...\n", opts.Name, waitTimeout)
 				instance, err = engine.WaitForReady(cmd.Context(), client, opts.Name, waitTimeout)
 				if err != nil {
 					return err
@@ -129,6 +111,20 @@ neo4j-cli k8s instance create dev-tls --from-file ./neo4j.yaml --wait --rw`,
 	cmd.Flags().StringVar(&fromFile, "from-file", "", "Create from one complete Neo4j YAML object instead of the specification flags")
 	flags.RegisterWait(cmd, &wait, "Wait until the operator reports the current generation as ready (10 minute timeout).")
 	return cmd
+}
+
+func prepareManifest(cmd *cobra.Command, cfg *clicfg.Config, opts engine.Neo4jManifestOptions, fromFile string) ([]byte, error) {
+	if fromFile == "" {
+		return engine.BuildNeo4jManifest(opts)
+	}
+	if err := rejectFlagsWithFile(cmd); err != nil {
+		return nil, err
+	}
+	data, err := afero.ReadFile(cfg.Fs(), fromFile)
+	if err != nil {
+		return nil, clierr.NewUsageError("read --from-file %q: %s", fromFile, err)
+	}
+	return engine.PrepareNeo4jManifestFromFile(data, opts.Name, opts.Namespace)
 }
 
 func rejectFlagsWithFile(cmd *cobra.Command) error {

@@ -48,6 +48,7 @@ var outputStructAllowlist = map[string][]string{
 	"internal/commands/feedback/policy.go":     {"Payload", "Agent", "Violation"},
 	"internal/commands/feedback/receipt.go":    {"Receipt"},
 	"internal/commands/feedback/submit.go":     {"outcomeObj"},
+	"internal/commands/k8s/doctor.go":          {"CheckResult", "DoctorSummary", "DoctorReport"},
 	"internal/commands/k8s/operator/report.go": {"OperatorChange", "OperatorRemoval", "OperatorStatus", "DeploymentReport", "CRDReport"},
 }
 

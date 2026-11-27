@@ -37,6 +37,15 @@ func TestDelete_WaitPollsUntilAbsent(t *testing.T) {
 	assert.Equal(t, "deleted", report["status"])
 }
 
+func TestDelete_RejectsInvalidNameBeforeTargetPrint(t *testing.T) {
+	env := newInstanceEnv()
+	_, _, err := runInstance(t, env, "delete --rw -- --all")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid Neo4j name")
+	assert.Zero(t, env.fake.CurrentContextCalls)
+	assert.Zero(t, env.fake.DeleteNeo4jCalls)
+}
+
 func TestWriteLeaves_RequireRw(t *testing.T) {
 	for _, args := range []string{
 		"create dev --accept-license eval",

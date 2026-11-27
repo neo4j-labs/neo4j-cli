@@ -33,7 +33,7 @@ var (
 	// classified before the connection markers. The text was recorded on
 	// GKE, where an expired session also prints `Reauthentication failed.
 	// cannot prompt during non-interactive execution`. kubectl does not
-	// promise this wording, so a future release may need a new marker.
+	// promise this wording.
 	markerExecCredential = "getting credentials: exec"
 )
 

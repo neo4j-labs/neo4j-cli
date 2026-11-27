@@ -1,9 +1,9 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-// Package k8s implements the `neo4j-cli k8s` command group, behind the
-// flag.k8s-commands feature flag: manage Neo4j on Kubernetes through the
-// open-source Neo4j operator, by driving the host `kubectl` and `helm`.
+// Package k8s implements the `neo4j-cli k8s` command group behind the
+// flag.k8s-commands feature flag. It manages Neo4j on Kubernetes through the
+// open-source Neo4j operator by driving the host `kubectl` and `helm` binaries.
 package k8s
 
 import (
@@ -33,7 +33,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"The group drives the host `kubectl` and `helm` binaries, so both must be on PATH. " +
 			"Pass --kubeconfig, --context and -n/--namespace on this group to scope every call. " +
 			"This group is a preview behind the flag.k8s-commands feature flag. " +
-			"Write commands require --rw. Start with `k8s doctor` to check the local setup.",
+			"Write commands require --rw. Start with `k8s doctor` to test the local setup.",
 	}
 
 	k8sflags.RegisterPersistentFlags(cmd)

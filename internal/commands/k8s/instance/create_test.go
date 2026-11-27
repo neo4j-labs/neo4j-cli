@@ -65,7 +65,8 @@ func TestCreate_FailsBeforeCreateWhenNamespaceIsNotWatched(t *testing.T) {
 	env.fake.DeploymentResult.WatchNamespaces = []string{"team-b"}
 	_, stderr, err := runInstance(t, env, "create dev --accept-license eval --format json --rw")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `namespace "default" is not in the operator's watch scope`)
+	assert.Contains(t, err.Error(), `namespace "default" is not in the operator's watch scope (team-b)`)
+	assert.Contains(t, err.Error(), "--watch-namespace team-b --watch-namespace default")
 	assert.Zero(t, env.fake.CreateNeo4jCalls)
 	assert.Contains(t, stderr, "Targeting Kubernetes context")
 }

@@ -26,18 +26,17 @@ const (
 	DebugFlag      = "debug"
 )
 
-// RegisterPersistentFlags registers the group's shared flags on cmd.
+// RegisterPersistentFlags registers the shared flags for the k8s group on cmd.
 func RegisterPersistentFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().String(KubeconfigFlag, "", "Path to the kubeconfig file to use (default: kubectl's own resolution)")
+	cmd.PersistentFlags().String(KubeconfigFlag, "", "Path to the kubeconfig file to use (default: kubectl default resolution)")
 	cmd.PersistentFlags().String(ContextFlag, "", "Kubernetes context to use (default: the current context)")
 	cmd.PersistentFlags().StringP(NamespaceFlag, "n", "", "Kubernetes namespace to scope calls to")
-	cmd.PersistentFlags().Bool(DebugFlag, false, "Route kubectl and helm activity (the commands neo4j-cli shells out to, their exit status and captured stderr) to stderr. Stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)]")
+	cmd.PersistentFlags().Bool(DebugFlag, false, "Write kubectl and helm commands, exit codes and stderr to stderr. Stdout is unchanged [env: NEO4J_DEBUG=1]")
 }
 
-// SettingsFrom copies the group's persistent flag values into the engine
-// Settings that reach every kubectl and helm call. A --kubeconfig value
-// that does not exist on disk is rejected here, before any child process
-// runs, because kubectl's own error for it is a raw stat message.
+// SettingsFrom copies the persistent flag values from cmd into engine
+// Settings. If --kubeconfig does not exist on disk or --namespace is not a DNS
+// label, SettingsFrom returns a usage error before any child process runs.
 func SettingsFrom(cmd *cobra.Command, cfg *clicfg.Config) (engine.Settings, error) {
 	kubeconfig, _ := cmd.Flags().GetString(KubeconfigFlag)
 	if kubeconfig != "" {
@@ -47,6 +46,11 @@ func SettingsFrom(cmd *cobra.Command, cfg *clicfg.Config) (engine.Settings, erro
 	}
 	kubeContext, _ := cmd.Flags().GetString(ContextFlag)
 	namespace, _ := cmd.Flags().GetString(NamespaceFlag)
+	if namespace != "" {
+		if err := engine.ValidateResourceName("--namespace", namespace); err != nil {
+			return engine.Settings{}, err
+		}
+	}
 	return engine.Settings{
 		Kubeconfig: kubeconfig,
 		Context:    kubeContext,

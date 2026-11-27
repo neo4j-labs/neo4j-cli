@@ -29,7 +29,8 @@ func TestNoKubernetesOrHelmSDKImports(t *testing.T) {
 			return err
 		}
 		if entry.IsDir() {
-			if entry.Name() == ".git" {
+			switch entry.Name() {
+			case ".git", "bin", "dist", "node_modules":
 				return filepath.SkipDir
 			}
 			return nil

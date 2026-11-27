@@ -157,6 +157,32 @@ func TestWaitForReady(t *testing.T) {
 		assert.Contains(t, err.Error(), "timed out")
 		assert.Contains(t, err.Error(), "last phase: Provisioning")
 	})
+
+	t.Run("parent cancellation passes through unchanged", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		fake := NewFakeClient()
+		fake.GetNeo4jFn = func(ctx context.Context, _ string) (Neo4j, error) {
+			cancel()
+			return Neo4j{}, ctx.Err()
+		}
+		_, err := WaitForReady(ctx, fake, "dev", time.Second)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestNeo4jByName_RejectsInvalidResourceNames(t *testing.T) {
+	stubLookPath(t)
+	calls := captureRun(t, nil)
+	client := NewClient(Settings{Namespace: "default"})
+
+	_, err := client.GetNeo4j(context.Background(), "--all")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid Neo4j name")
+
+	err = client.DeleteNeo4j(context.Background(), "--all")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid Neo4j name")
+	assert.Empty(t, *calls)
 }
 
 func TestWaitForDelete(t *testing.T) {

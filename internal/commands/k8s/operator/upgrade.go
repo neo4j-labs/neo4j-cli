@@ -38,7 +38,7 @@ func newUpgradeCmd(cfg *clicfg.Config) *cobra.Command {
 			"Custom values such as a pinned image digest survive. Defaults added by a newer chart still apply. " +
 			"A --watch-namespace value overrides the deployed watch scope. The release must already exist. " +
 			"Use `k8s operator install` for a fresh installation. Pass --crd-file to apply a CRD manifest from disk instead of the GitHub release asset. " +
-			"Remote CRD assets are checked against the SHA256 digest in the GitHub release metadata before they are applied. " +
+			"Before applying a remote CRD asset, the command matches its SHA256 digest against the GitHub release metadata. " +
 			"The command does not wait for the controller to become ready. Run `k8s operator status` afterwards. Requires --rw.",
 		Example: `# Upgrade to the operator release this CLI pins, keeping the deployed values
 neo4j-cli k8s operator upgrade --rw
@@ -109,7 +109,7 @@ neo4j-cli k8s operator upgrade --crd-file ./neo4j-crd-1.0.0.yaml --rw`,
 	}
 
 	cmd.Flags().StringVar(&version, versionFlag, engine.DefaultOperatorVersion, "Operator release to upgrade to (default: the version this CLI pins, or the deployed one if newer)")
-	cmd.Flags().StringArrayVar(&watchNamespaces, watchNamespaceFlag, nil, "Change the namespaces the operator watches (repeatable; omit to keep the deployed scope)")
+	cmd.Flags().StringArrayVar(&watchNamespaces, watchNamespaceFlag, nil, "Change the namespaces the operator watches (repeatable, omit to keep the deployed scope)")
 	cmd.Flags().StringVar(&crdFile, crdFileFlag, "", "Apply the operator CRDs from this manifest instead of the GitHub release asset")
 
 	return cmd

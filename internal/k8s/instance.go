@@ -10,8 +10,8 @@ import (
 )
 
 // Neo4j is one Neo4j custom resource. Record is the complete server object
-// used for JSON and TOON output. The typed fields support readiness checks and
-// table rendering without remodelling the wire response.
+// used for JSON and TOON output. The typed fields support readiness polling
+// and table rendering without remodelling the wire response.
 type Neo4j struct {
 	Record             map[string]any
 	Name               string
@@ -28,8 +28,8 @@ type Neo4j struct {
 	Message            string
 }
 
-// TableRow returns the summary columns used by instance get and list. It is
-// separate from Record so structured output remains the full server object.
+// TableRow returns the summary columns for table output. Structured output
+// uses Record so that it keeps the full server object.
 func (n Neo4j) TableRow() map[string]any {
 	return map[string]any{
 		"name":          n.Name,
@@ -72,8 +72,8 @@ type neo4jJSON struct {
 	} `json:"status"`
 }
 
-// parseNeo4j decodes one Neo4j object twice: into a map for output, and
-// into the typed fields the CLI reads.
+// parseNeo4j decodes one Neo4j object into a map for output and into the typed
+// fields that the CLI reads.
 func parseNeo4j(data []byte) (Neo4j, error) {
 	var record map[string]any
 	if err := json.Unmarshal(data, &record); err != nil {
@@ -98,12 +98,12 @@ func parseNeo4j(data []byte) (Neo4j, error) {
 	}
 	for _, condition := range raw.Status.Conditions {
 		if condition.Type == "Ready" {
-			n.Ready = condition.Status == "True" && raw.Status.ObservedGeneration >= raw.Metadata.Generation
+			n.Ready = condition.Status == "True" && raw.Status.Phase != "Failed" && raw.Status.ObservedGeneration >= raw.Metadata.Generation
 			if n.Message == "" {
 				n.Message = condition.Message
 			}
 		}
-		if condition.Type == "Error" && condition.Status == "True" {
+		if condition.Type == "Error" && condition.Status == "True" && condition.Message != "" {
 			n.Message = condition.Message
 		}
 	}
@@ -112,6 +112,9 @@ func parseNeo4j(data []byte) (Neo4j, error) {
 
 // GetNeo4j implements Client.
 func (c *execClient) GetNeo4j(ctx context.Context, name string) (Neo4j, error) {
+	if err := ValidateResourceName("Neo4j name", name); err != nil {
+		return Neo4j{}, err
+	}
 	path, err := resolveKubectl()
 	if err != nil {
 		return Neo4j{}, err
@@ -124,9 +127,8 @@ func (c *execClient) GetNeo4j(ctx context.Context, name string) (Neo4j, error) {
 	return parseNeo4j([]byte(res.stdout))
 }
 
-// ListNeo4j implements Client. It returns only resources carrying the CLI's
-// management label, so a pre-existing hand-written resource is not adopted by
-// a list operation.
+// ListNeo4j implements Client. It selects the management label so that
+// hand-written resources do not appear in the list.
 func (c *execClient) ListNeo4j(ctx context.Context) ([]Neo4j, error) {
 	path, err := resolveKubectl()
 	if err != nil {
@@ -154,9 +156,8 @@ func (c *execClient) ListNeo4j(ctx context.Context) ([]Neo4j, error) {
 	return instances, nil
 }
 
-// CreateNeo4j implements Client. kubectl create, rather than apply, keeps the
-// command from overwriting an existing resource. The manifest travels on
-// stdin, so no temporary file or secret-bearing argv is involved.
+// CreateNeo4j implements Client. It runs kubectl create so that it never
+// overwrites an existing resource, and pipes the manifest on stdin.
 func (c *execClient) CreateNeo4j(ctx context.Context, manifest []byte) (Neo4j, error) {
 	path, err := resolveKubectl()
 	if err != nil {
@@ -170,9 +171,12 @@ func (c *execClient) CreateNeo4j(ctx context.Context, manifest []byte) (Neo4j, e
 	return parseNeo4j([]byte(res.stdout))
 }
 
-// DeleteNeo4j implements Client. --wait=false leaves readiness polling to the
-// command, which can then use the same context and timeout as create --wait.
+// DeleteNeo4j implements Client. It passes --wait=false so that the caller
+// controls deletion polling and its timeout.
 func (c *execClient) DeleteNeo4j(ctx context.Context, name string) error {
+	if err := ValidateResourceName("Neo4j name", name); err != nil {
+		return err
+	}
 	path, err := resolveKubectl()
 	if err != nil {
 		return err

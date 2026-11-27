@@ -5,6 +5,7 @@ package k8s
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -31,9 +32,23 @@ const (
 	maxStorageSize     = uint64(16 << 40)
 )
 
-// Neo4jManifestOptions describes the dedicated instance create flags. The
-// FromFile escape hatch uses PrepareNeo4jManifestFromFile instead, which keeps
-// every unknown field and adds only the CLI's identity and management label.
+var dnsLabelPattern = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+
+// ValidateResourceName makes sure that a Kubernetes resource or namespace name
+// is a valid RFC 1123 DNS label. This rejects empty names, uppercase letters
+// and leading hyphens before any child process runs.
+func ValidateResourceName(label, name string) error {
+	if len(name) == 0 || len(name) > 63 || !dnsLabelPattern.MatchString(name) {
+		return clierr.NewUsageError(
+			"invalid %s %q: must be 1 to 63 lowercase letters, digits or hyphens, and start and end with a letter or digit",
+			label, name)
+	}
+	return nil
+}
+
+// Neo4jManifestOptions describes the dedicated instance create flags.
+// PrepareNeo4jManifestFromFile handles --from-file instead. It keeps unknown
+// fields and sets the resource name, namespace and management label.
 type Neo4jManifestOptions struct {
 	Name                     string
 	Namespace                string
@@ -156,31 +171,21 @@ type trustSpec struct {
 	Enabled                 bool           `yaml:"enabled,omitempty"`
 	InsecureAdminConnection bool           `yaml:"insecureAdminConnection,omitempty"`
 	Certificates            map[string]any `yaml:"certificates,omitempty"`
+	CertManager             map[string]any `yaml:"certManager,omitempty"`
 }
 
-// BuildNeo4jManifest validates the dedicated flags and renders one Neo4j
-// custom resource. All configuration and quantity values are YAML strings.
+// BuildNeo4jManifest makes sure that the dedicated flags are valid and renders
+// one Neo4j custom resource. All configuration and quantity values are YAML
+// strings.
 func BuildNeo4jManifest(opts Neo4jManifestOptions) ([]byte, error) {
 	mode, err := canonicalMode(opts.Mode)
 	if err != nil {
 		return nil, err
 	}
-	edition := strings.ToLower(opts.Edition)
-	if edition != "enterprise" && edition != "community" {
-		return nil, clierr.NewUsageError("--edition must be enterprise or community")
-	}
-	if opts.Version == "" {
-		return nil, clierr.NewUsageError("--version must not be empty")
-	}
 	if opts.StorageSize == "" {
 		return nil, clierr.NewUsageError("--storage-size must not be empty")
 	}
-	if opts.PrimariesSet && mode == "Standalone" {
-		return nil, clierr.NewUsageError("--primaries is valid only with --mode cluster")
-	}
-	if opts.InsecureAdminConnection && mode == "Standalone" {
-		return nil, clierr.NewUsageError("--insecure-admin-connection is valid only with --mode cluster")
-	}
+	edition := strings.ToLower(opts.Edition)
 
 	manifest := neo4jManifest{
 		APIVersion: "neo4j.com/v1",
@@ -205,10 +210,12 @@ func BuildNeo4jManifest(opts Neo4jManifestOptions) ([]byte, error) {
 		},
 	}
 	if edition == "enterprise" {
-		manifest.Spec.License = &licenseSpec{Accept: quotedString(opts.AcceptLicense)}
+		manifest.Spec.License = &licenseSpec{Accept: quotedString(strings.ToLower(opts.AcceptLicense))}
 	}
-	if mode == "Cluster" {
+	if mode == "Cluster" || opts.PrimariesSet {
 		manifest.Spec.Topology.Primaries = &poolSpec{Members: opts.Primaries}
+	}
+	if mode == "Cluster" || opts.InsecureAdminConnection {
 		manifest.Spec.Trust = &trustSpec{InsecureAdminConnection: opts.InsecureAdminConnection}
 	}
 	if opts.ServiceType != "" {
@@ -247,36 +254,36 @@ func BuildNeo4jManifest(opts Neo4jManifestOptions) ([]byte, error) {
 	return yaml.Marshal(manifest)
 }
 
-// Neo4jManifestSummary carries the admission choices that need a warning.
-type Neo4jManifestSummary struct {
-	Mode                    string
-	Primaries               int
-	InsecureAdminConnection bool
-}
-
-// InspectNeo4jManifest reads warning-related fields from a prepared manifest.
-func InspectNeo4jManifest(data []byte) (Neo4jManifestSummary, error) {
+// ManifestWarnings returns warnings for valid manifest choices that carry an
+// operational risk or a permanent topology limit.
+func ManifestWarnings(data []byte) []string {
 	var manifest neo4jManifest
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
-		return Neo4jManifestSummary{}, err
+		return nil
 	}
-	summary := Neo4jManifestSummary{Mode: manifest.Spec.Topology.Mode}
-	if manifest.Spec.Topology.Primaries != nil {
-		summary.Primaries = manifest.Spec.Topology.Primaries.Members
+	if manifest.Spec.Topology.Mode != "Cluster" {
+		return nil
 	}
-	if manifest.Spec.Trust != nil {
-		summary.InsecureAdminConnection = manifest.Spec.Trust.InsecureAdminConnection
+	var warnings []string
+	if manifest.Spec.Topology.Primaries != nil && manifest.Spec.Topology.Primaries.Members == 1 {
+		warnings = append(warnings, "a cluster created with one primary cannot grow its primary pool later.")
 	}
-	return summary, nil
+	if manifest.Spec.Trust != nil && manifest.Spec.Trust.InsecureAdminConnection {
+		warnings = append(warnings, "the operator will send its admin password over an unencrypted pod-network connection.")
+	}
+	return warnings
 }
 
-// PrepareNeo4jManifestFromFile validates a user-supplied Neo4j resource and
-// adds the command's name, namespace and management label. Unknown fields,
-// including the TLS trust block, survive unchanged.
+// PrepareNeo4jManifestFromFile makes sure that a user-supplied Neo4j resource
+// is valid. It sets the name, namespace and management label, and keeps all
+// other fields unchanged.
 func PrepareNeo4jManifestFromFile(data []byte, name, namespace string) ([]byte, error) {
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	var document yaml.Node
 	if err := decoder.Decode(&document); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, clierr.NewUsageError("--from-file must contain one Neo4j object")
+		}
 		return nil, clierr.NewUsageError("parse --from-file: %s", err)
 	}
 	var extra yaml.Node
@@ -291,59 +298,44 @@ func PrepareNeo4jManifestFromFile(data []byte, name, namespace string) ([]byte, 
 	}
 
 	root := document.Content[0]
-	if metadata := mappingValue(root, "metadata"); metadata != nil && metadata.Kind != yaml.MappingNode {
-		return nil, clierr.NewUsageError("--from-file metadata must be a mapping")
-	}
-
-	var manifest neo4jManifest
-	if err := document.Decode(&manifest); err != nil {
-		return nil, clierr.NewUsageError("parse --from-file: %s", err)
-	}
-	if manifest.APIVersion != "neo4j.com/v1" || manifest.Kind != "Neo4j" {
-		return nil, clierr.NewUsageError("--from-file must contain apiVersion neo4j.com/v1 and kind Neo4j")
-	}
-	manifest.Metadata.Name = name
-	manifest.Metadata.Namespace = namespace
-	if manifest.Metadata.Labels == nil {
-		manifest.Metadata.Labels = map[string]string{}
-	}
-	manifest.Metadata.Labels[ManagedByLabel] = ManagedByValue
-	if err := validateNeo4jManifest(manifest); err != nil {
-		return nil, err
-	}
-
 	metadata, err := ensureMapping(root, "metadata")
 	if err != nil {
 		return nil, clierr.NewUsageError("--from-file metadata must be a mapping")
 	}
 	setMappingScalar(metadata, "name", name)
-	setMappingScalar(metadata, "namespace", namespace)
+	if namespace != "" {
+		setMappingScalar(metadata, "namespace", namespace)
+	} else {
+		deleteMappingKey(metadata, "namespace")
+	}
 	labels, err := ensureMapping(metadata, "labels")
 	if err != nil {
 		return nil, clierr.NewUsageError("--from-file metadata.labels must be a mapping")
 	}
 	setMappingScalar(labels, ManagedByLabel, ManagedByValue)
-	var out bytes.Buffer
-	encoder := yaml.NewEncoder(&out)
-	encoder.SetIndent(2)
-	if err := encoder.Encode(&document); err != nil {
+
+	var manifest neo4jManifest
+	if err := root.Decode(&manifest); err != nil {
+		return nil, clierr.NewUsageError("parse --from-file: %s", err)
+	}
+	if manifest.APIVersion != "neo4j.com/v1" || manifest.Kind != "Neo4j" {
+		return nil, clierr.NewUsageError("--from-file must contain apiVersion neo4j.com/v1 and kind Neo4j")
+	}
+	if err := validateNeo4jManifest(manifest); err != nil {
 		return nil, err
 	}
-	if err := encoder.Close(); err != nil {
-		return nil, err
-	}
-	return out.Bytes(), nil
+	return yaml.Marshal(root)
 }
 
 func validateNeo4jManifest(manifest neo4jManifest) error {
-	if manifest.Metadata.Name == "" {
-		return clierr.NewUsageError("the Neo4j name must not be empty")
+	if err := ValidateResourceName("Neo4j name", manifest.Metadata.Name); err != nil {
+		return err
 	}
 	if manifest.Spec.Edition != "enterprise" && manifest.Spec.Edition != "community" {
-		return clierr.NewUsageError("spec.edition must be enterprise or community")
+		return clierr.NewUsageError("spec.edition (--edition) must be enterprise or community")
 	}
 	if manifest.Spec.Version == "" {
-		return clierr.NewUsageError("spec.version must not be empty")
+		return clierr.NewUsageError("spec.version (--version) must not be empty")
 	}
 	if manifest.Spec.Edition == "enterprise" {
 		if manifest.Spec.License == nil || (manifest.Spec.License.Accept != "yes" && manifest.Spec.License.Accept != "eval") {
@@ -358,7 +350,10 @@ func validateNeo4jManifest(manifest neo4jManifest) error {
 		return clierr.NewUsageError("community edition supports only standalone mode")
 	}
 	if mode == "Standalone" && manifest.Spec.Topology.Primaries != nil {
-		return clierr.NewUsageError("primaries are valid only in cluster mode")
+		return clierr.NewUsageError("primaries (--primaries) are valid only in cluster mode")
+	}
+	if mode == "Standalone" && manifest.Spec.Trust != nil && manifest.Spec.Trust.InsecureAdminConnection {
+		return clierr.NewUsageError("insecureAdminConnection (--insecure-admin-connection) is valid only in cluster mode")
 	}
 	if mode == "Cluster" {
 		if manifest.Spec.Topology.Primaries == nil {
@@ -369,7 +364,7 @@ func validateNeo4jManifest(manifest neo4jManifest) error {
 			return clierr.NewUsageError("the number of primaries must be odd, from 1 to 15")
 		}
 		trust := manifest.Spec.Trust
-		hasBoltTLS := trust != nil && trust.Enabled && trust.Certificates != nil && trust.Certificates["bolt"] != nil
+		hasBoltTLS := trust != nil && trust.Enabled && (trust.Certificates["bolt"] != nil || len(trust.CertManager) > 0)
 		if trust == nil || (!trust.InsecureAdminConnection && !hasBoltTLS) {
 			return clierr.NewUsageError("cluster mode requires --insecure-admin-connection, or Bolt TLS in a --from-file trust block")
 		}
@@ -404,7 +399,7 @@ func validateNeo4jManifest(manifest neo4jManifest) error {
 				return clierr.NewUsageError("invalid storage size %q: %s", size, err)
 			}
 			if bytes > maxStorageSize {
-				return clierr.NewUsageError("storage size %q exceeds the operator's 16Ti limit", size)
+				return clierr.NewUsageError("storage size %q exceeds the 16Ti operator limit", size)
 			}
 		}
 	}
@@ -421,8 +416,8 @@ func validateNeo4jManifest(manifest neo4jManifest) error {
 }
 
 // checkOperatorOwned rejects a neo4j.conf key that the operator sets itself.
-// The operator would otherwise refuse the resource at admission, or
-// silently overwrite the value.
+// Otherwise the operator will refuse the resource at admission or overwrite the
+// value.
 func checkOperatorOwned(key string) error {
 	if replacement, owned := operatorOwnedConfig[key]; owned {
 		return clierr.NewUsageError("configuration key %q is owned by the operator. Use %s", key, replacement)
@@ -433,10 +428,9 @@ func checkOperatorOwned(key string) error {
 	return nil
 }
 
-// validateMemory checks that heap and page cache, plus headroom for the JVM
-// and operating system, fit inside the container's memory limit. Without
-// the check, the pod is killed for running out of memory and restarts in a
-// loop.
+// validateMemory makes sure that heap, page cache and 1Gi of headroom fit
+// inside the container memory limit. Otherwise Kubernetes stops the pod when
+// memory runs out.
 func validateMemory(config map[string]quotedString, resources *resourcesSpec) error {
 	limit := quotedString(defaultMemoryLimit)
 	if resources != nil && resources.Limits.Memory != "" {
@@ -465,7 +459,7 @@ func validateMemory(config map[string]quotedString, resources *resourcesSpec) er
 	if heap == 0 && pageCache == 0 {
 		return nil
 	}
-	// scaleQuantity caps each value below 2^62, so the sum cannot overflow.
+	// scaleBytes caps each value below 2^62, so the sum cannot overflow.
 	if heap+pageCache+memoryHeadroom > limitBytes {
 		return clierr.NewUsageError(
 			"heap and page cache plus 1Gi of JVM and operating-system headroom exceed the %s memory limit. Raise --memory or reduce --heap and --pagecache",
@@ -497,8 +491,8 @@ var (
 	}
 )
 
-// Neo4j byte sizes are always binary, so 2g is 2GiB. The suffixes match
-// Neo4j's own parser, which is case-sensitive.
+// Neo4j byte sizes are always binary, so 2g is 2GiB. The suffixes match the
+// case-sensitive Neo4j parser.
 var (
 	neo4jSizePattern = regexp.MustCompile(`^([0-9]+(?:\.[0-9]*)?|\.[0-9]+)([a-zA-Z]*)$`)
 	neo4jSizeUnits   = map[string]float64{
@@ -514,7 +508,7 @@ var (
 // such as 4Gi or 500M.
 func parseKubeQuantity(value string) (uint64, error) {
 	matches := kubeQuantityPattern.FindStringSubmatch(value)
-	if matches == nil {
+	if matches == nil || (matches[2] != "" && matches[3] != "") {
 		return 0, fmt.Errorf("use a positive number with an optional unit such as 512Mi or 4Gi")
 	}
 	number, err := strconv.ParseFloat(matches[1], 64)
@@ -528,13 +522,14 @@ func parseKubeQuantity(value string) (uint64, error) {
 		}
 		number *= math.Pow10(exponent)
 	}
-	if _, ok := kubeQuantityUnits[matches[3]]; !ok {
+	multiplier, ok := kubeQuantityUnits[matches[3]]
+	if !ok {
 		return 0, fmt.Errorf("unsupported unit %q. Use a Kubernetes unit such as Mi or Gi", matches[3])
 	}
-	return scaleQuantity(number, matches[3], kubeQuantityUnits)
+	return scaleBytes(number * multiplier)
 }
 
-// parseNeo4jSize returns the number of bytes in a Neo4j size setting such as
+// parseNeo4jSize returns the number of bytes in a Neo4j size value such as
 // 2g or 512m.
 func parseNeo4jSize(value string) (uint64, error) {
 	matches := neo4jSizePattern.FindStringSubmatch(value)
@@ -545,28 +540,27 @@ func parseNeo4jSize(value string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return scaleQuantity(number, matches[2], neo4jSizeUnits)
+	multiplier, ok := neo4jSizeUnits[matches[2]]
+	if !ok {
+		return 0, fmt.Errorf("unsupported unit %q. Use a Neo4j unit such as m or g", matches[2])
+	}
+	return scaleBytes(number * multiplier)
 }
 
-func scaleQuantity(number float64, unit string, units map[string]float64) (uint64, error) {
-	multiplier, ok := units[unit]
-	if !ok {
-		return 0, fmt.Errorf("unsupported unit %q", unit)
-	}
-	result := number * multiplier
-	if result < 1 {
+func scaleBytes(bytes float64) (uint64, error) {
+	if math.IsNaN(bytes) || bytes < 1 {
 		return 0, fmt.Errorf("the size must be at least one byte")
 	}
-	if result >= 1<<62 {
+	if math.IsInf(bytes, 1) || bytes >= 1<<62 {
 		return 0, fmt.Errorf("the size is too large")
 	}
-	return uint64(math.Round(result)), nil
+	return uint64(math.Round(bytes)), nil
 }
 
 var operatorOwnedConfig = map[string]string{
 	"server.bolt.listen_address":                          "spec.connectivity.listeners.bolt",
 	"server.bolt.enabled":                                 "spec.connectivity.listeners.bolt",
-	"server.bolt.advertised_address":                      "the operator's advertised addresses",
+	"server.bolt.advertised_address":                      "the advertised addresses from the operator",
 	"server.bolt.tls_level":                               "spec.trust in --from-file",
 	"server.http.listen_address":                          "spec.connectivity.listeners.http",
 	"server.http.enabled":                                 "spec.connectivity.listeners.http",
@@ -580,16 +574,16 @@ var operatorOwnedConfig = map[string]string{
 	"dbms.cluster.minimum_initial_system_primaries_count": "spec.topology.minimumMembers in --from-file",
 	"initial.dbms.default_primaries_count":                "spec.topology.defaultPrimariesCount in --from-file",
 	"initial.dbms.default_secondaries_count":              "spec.topology.secondaries in --from-file",
-	"dbms.cluster.discovery.resolver_type":                "the operator's cluster discovery",
-	"dbms.kubernetes.discovery.service_port_name":         "the operator's cluster discovery",
-	"dbms.kubernetes.label_selector":                      "the operator's cluster discovery",
-	"dbms.cluster.raft.binding_timeout":                   "the operator's cluster discovery",
-	"dbms.routing.enabled":                                "the operator's routing configuration",
-	"dbms.routing.default_router":                         "the operator's routing configuration",
+	"dbms.cluster.discovery.resolver_type":                "cluster discovery in the operator",
+	"dbms.kubernetes.discovery.service_port_name":         "cluster discovery in the operator",
+	"dbms.kubernetes.label_selector":                      "cluster discovery in the operator",
+	"dbms.cluster.raft.binding_timeout":                   "cluster discovery in the operator",
+	"dbms.routing.enabled":                                "routing configuration in the operator",
+	"dbms.routing.default_router":                         "routing configuration in the operator",
 	"dbms.routing.client_side.enforce_for_domains":        "spec.connectivity.clusterDomain in --from-file",
-	"server.cluster.advertised_address":                   "the operator's advertised addresses",
-	"server.cluster.raft.advertised_address":              "the operator's advertised addresses",
-	"server.routing.advertised_address":                   "the operator's advertised addresses",
+	"server.cluster.advertised_address":                   "the advertised addresses from the operator",
+	"server.cluster.raft.advertised_address":              "the advertised addresses from the operator",
+	"server.routing.advertised_address":                   "the advertised addresses from the operator",
 	"server.cluster.system_database_mode":                 "spec.topology.secondaries in --from-file",
 	"initial.server.mode_constraint":                      "spec.topology.secondaries in --from-file",
 	"server.logs.config":                                  "spec.logging in --from-file",
@@ -676,6 +670,12 @@ func mappingValue(mapping *yaml.Node, key string) *yaml.Node {
 
 func ensureMapping(parent *yaml.Node, key string) (*yaml.Node, error) {
 	if existing := mappingValue(parent, key); existing != nil {
+		if existing.Kind == yaml.ScalarNode && existing.Tag == "!!null" {
+			existing.Kind = yaml.MappingNode
+			existing.Tag = "!!map"
+			existing.Value = ""
+			return existing, nil
+		}
 		if existing.Kind != yaml.MappingNode {
 			return nil, fmt.Errorf("%s is not a mapping", key)
 		}
@@ -699,4 +699,16 @@ func setMappingScalar(mapping *yaml.Node, key, value string) {
 	mapping.Content = append(mapping.Content,
 		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
 		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value})
+}
+
+func deleteMappingKey(mapping *yaml.Node, key string) {
+	if mapping == nil || mapping.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
+			return
+		}
+	}
 }

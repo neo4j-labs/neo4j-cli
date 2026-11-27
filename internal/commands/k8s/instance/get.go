@@ -4,6 +4,8 @@
 package instance
 
 import (
+	engine "github.com/neo4j/cli/internal/k8s"
+
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/spf13/cobra"
 )
@@ -12,7 +14,7 @@ func newGetCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <name>",
 		Short: "Get one Neo4j resource",
-		Long: "Get one Neo4j custom resource by name from the group's workload namespace, or from `default` when no namespace is set. " +
+		Long: "Get one Neo4j custom resource by name from the workload namespace in -n, or from `default` when no namespace is set. " +
 			"JSON and TOON output contain the full server object returned by Kubernetes. " +
 			"Table output summarises identity, topology, version, phase and readiness.",
 		Example: `# Inspect a Neo4j resource
@@ -23,6 +25,9 @@ neo4j-cli k8s instance get dev --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			if err := engine.ValidateResourceName("Neo4j name", args[0]); err != nil {
+				return err
+			}
 			settings, err := instanceSettings(cmd, cfg)
 			if err != nil {
 				return err

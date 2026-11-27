@@ -93,6 +93,11 @@ func TestInstall_RejectsBadInputBeforeAnyEngineCall(t *testing.T) {
 			wantErr: "--crd-file \"/tmp/nope.yaml\" does not exist",
 		},
 		{
+			name:    "watch namespace must be a DNS label",
+			args:    "operator install --watch-namespace 'default},image=evil' --rw",
+			wantErr: "invalid --watch-namespace",
+		},
+		{
 			// The chart creates a Role in each watched namespace. A missing
 			// namespace must fail before the CRDs are applied, not half way
 			// through the release.

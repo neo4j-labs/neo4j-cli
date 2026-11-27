@@ -49,7 +49,7 @@ func checkKubectlVersion(vi engine.VersionInfo, callErr error, present bool) Che
 			Label:  LabelKubectlVersion,
 			Status: StatusFail,
 			Detail: detail,
-			Hint:   "Check that kubectl runs outside neo4j-cli, then re-run `k8s doctor`.",
+			Hint:   "Make sure that kubectl runs outside neo4j-cli, then run `k8s doctor` again.",
 		}
 	}
 	if !engine.MajorMinorAtLeast(vi.ClientVersion, minKubectlMajor, minKubectlMinor) {
@@ -86,7 +86,7 @@ func checkHelmVersion(version string, callErr error, present bool) CheckResult {
 			Label:  LabelHelmVersion,
 			Status: StatusFail,
 			Detail: detail,
-			Hint:   "Check that `helm version` runs outside neo4j-cli, then re-run `k8s doctor`.",
+			Hint:   "Make sure that `helm version` runs outside neo4j-cli, then run `k8s doctor` again.",
 		}
 	}
 	if !engine.MajorMinorAtLeast(version, minHelmMajor, minHelmMinor) {
@@ -154,7 +154,7 @@ func checkClusterReachable(vi engine.VersionInfo, callErr error, present bool) C
 			Label:  LabelClusterReachable,
 			Status: StatusFail,
 			Detail: fmt.Sprintf("kubectl could not reach the API server: %s.", callErr.Error()),
-			Hint:   "Start the cluster, or point --kubeconfig / --context at the right cluster, then re-run `k8s doctor`.",
+			Hint:   "Start the cluster, or point --kubeconfig and --context at the right cluster, then run `k8s doctor` again.",
 		}
 	}
 	if vi.ServerVersion == "" {

@@ -21,18 +21,21 @@ func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "delete <name>",
 		Short:       "Delete a Neo4j resource",
 		Annotations: map[string]string{"write": "true"},
-		Long: "Delete one Neo4j custom resource from the group's workload namespace, or from `default` when no namespace is set. " +
-			"The operator's volume claim retention policy decides whether persistent volume claims remain. " +
+		Long: "Delete one Neo4j custom resource from the workload namespace in -n, or from `default` when no namespace is set. " +
+			"The volume claim retention policy on the resource decides whether persistent volume claims remain. " +
 			"This command never deletes a volume claim directly. " +
 			"Pass --wait to poll until the resource is absent, with a 10 minute timeout. Requires --rw.",
-		Example: `# Start deletion and leave volume handling to the resource's retention policy
+		Example: `# Start deletion and leave volume handling to the retention policy on the resource
 neo4j-cli k8s instance delete dev --rw
 
-# Wait until the Neo4j resource has gone
+# Wait until Kubernetes deletes the Neo4j resource
 neo4j-cli k8s instance delete dev --wait --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			if err := engine.ValidateResourceName("Neo4j name", args[0]); err != nil {
+				return err
+			}
 			settings, err := instanceSettings(cmd, cfg)
 			if err != nil {
 				return err
@@ -46,12 +49,13 @@ neo4j-cli k8s instance delete dev --wait --rw`,
 			}
 			status := "deletion_started"
 			if wait {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Waiting for Neo4j %q to be deleted (timeout %s)...\n", args[0], waitTimeout)
 				if err := engine.WaitForDelete(cmd.Context(), client, args[0], waitTimeout); err != nil {
 					return err
 				}
 				status = "deleted"
 			}
-			fmt.Fprintln(cmd.ErrOrStderr(), "Persistent volume claims follow the Neo4j resource's retention policy. This command does not remove them directly.") //nolint:errcheck // Retention guidance is best effort.
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Persistent volume claims follow the retention policy on the Neo4j resource. This command does not remove them directly.")
 			commonoutput.PrintBodyMap(cmd, cfg, deleteResult{
 				"name": args[0], "namespace": settings.Namespace, "status": status, "pvc_retention": "follows_spec",
 			}, []string{"name", "namespace", "status", "pvc_retention"})

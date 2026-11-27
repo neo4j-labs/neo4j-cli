@@ -108,6 +108,8 @@ func TestBuildNeo4jManifest_LocalAdmissionRules(t *testing.T) {
 			o.Memory, o.Heap = "8g", "2g"
 		}, wantErr: "invalid memory limit"},
 		{name: "storage ceiling matches the CRD", mutate: func(o *Neo4jManifestOptions) { o.StorageSize = "17Ti" }, wantErr: "16Ti"},
+		{name: "resource name must be a DNS label", mutate: func(o *Neo4jManifestOptions) { o.Name = "My_DB" }, wantErr: "invalid Neo4j name"},
+		{name: "resource name rejects leading hyphen", mutate: func(o *Neo4jManifestOptions) { o.Name = "-dev" }, wantErr: "invalid Neo4j name"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			opts := validManifestOptions()
@@ -163,6 +165,30 @@ spec:
 	assert.Contains(t, text, "secretName: bolt-tls")
 	assert.Contains(t, text, "secretName: cluster-tls")
 	assert.NotContains(t, text, "old-name")
+
+	certManagerInput := `apiVersion: neo4j.com/v1
+kind: Neo4j
+metadata:
+spec:
+  edition: enterprise
+  version: "2026.05.0"
+  license:
+    accept: "eval"
+  topology:
+    mode: Cluster
+    primaries:
+      members: 3
+  trust:
+    enabled: true
+    certManager:
+      issuerRef:
+        name: neo4j-ca
+        kind: ClusterIssuer
+`
+	certManagerManifest, err := PrepareNeo4jManifestFromFile([]byte(certManagerInput), "dev", "")
+	require.NoError(t, err)
+	assert.Contains(t, string(certManagerManifest), "issuerRef:")
+	assert.NotContains(t, string(certManagerManifest), "namespace:")
 }
 
 func TestPrepareNeo4jManifestFromFile_RejectsInvalidInput(t *testing.T) {
@@ -179,6 +205,7 @@ spec:
 		input   string
 		wantErr string
 	}{
+		{name: "empty file", input: "", wantErr: "one Neo4j object"},
 		{name: "wrong kind", input: strings.Replace(valid, "kind: Neo4j", "kind: Pod", 1), wantErr: "kind Neo4j"},
 		{name: "multiple documents", input: valid + "---\n" + valid, wantErr: "exactly one"},
 		{name: "missing enterprise licence", input: strings.Replace(valid, "  license: {accept: \"eval\"}\n", "", 1), wantErr: "licence acceptance"},
@@ -211,7 +238,7 @@ func TestParseKubeQuantity(t *testing.T) {
 	}
 	// Kubernetes has no lowercase g, so a Neo4j-style size is refused here
 	// rather than by the API server.
-	for _, input := range []string{"", "0", "-1Gi", "2 GB", "2XB", "8g", "1m"} {
+	for _, input := range []string{"", "0", "0e500", "1e3Gi", "-1Gi", "2 GB", "2XB", "8g", "1m"} {
 		t.Run("invalid "+input, func(t *testing.T) {
 			_, err := parseKubeQuantity(input)
 			require.Error(t, err)

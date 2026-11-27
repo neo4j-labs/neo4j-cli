@@ -48,10 +48,10 @@ type Client interface {
 	// --short works on every helm 3 and 4 release.
 	HelmVersion(ctx context.Context) (string, error)
 
-	// ApplyCRDs verifies a remote release asset before applying it. It then
-	// server-side applies the manifest at source, which can also be a local
-	// path, with the neo4j-cli field manager. It returns the CRD names kubectl
-	// reported.
+	// ApplyCRDs makes sure that a remote release asset matches its published
+	// digest before applying it. It then server-side applies the manifest at
+	// source, which can also be a local path, with the neo4j-cli field manager.
+	// It returns the CRD names that kubectl reported.
 	ApplyCRDs(ctx context.Context, source string) ([]string, error)
 	// DeleteCRDs deletes the four operator CRDs by name and returns the ones
 	// kubectl reported deleting. Already-absent CRDs are not an error.

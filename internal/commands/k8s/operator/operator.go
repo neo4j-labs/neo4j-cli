@@ -34,7 +34,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"The operator watches the workload namespaces you pass as --watch-namespace. It never watches its own namespace. " +
 			"The four CRDs ship outside the chart (the Neo4j schema is close to the etcd object limit), so every install and " +
 			"upgrade applies them first with `kubectl apply --server-side --field-manager=" + engine.OperatorFieldManager + "`. " +
-			"Run `k8s doctor` first to check kubectl, helm and the cluster.",
+			"Run `k8s doctor` first to test kubectl, helm and the cluster.",
 	}
 
 	cmd.AddCommand(newInstallCmd(cfg))
@@ -84,7 +84,7 @@ func validateCRDFile(cfg *clicfg.Config, path string) error {
 // `operator upgrade` relies on.
 const minResetThenReuseHelmMajor, minResetThenReuseHelmMinor = 3, 14
 
-// normaliseVersion checks a --version value and strips a leading "v", so the
+// normaliseVersion parses a --version value and strips a leading "v", so the
 // asset URL and the chart version are built from the same bare version.
 func normaliseVersion(version string) (string, error) {
 	normalised, ok := engine.NormaliseReleaseVersion(version)
@@ -125,7 +125,7 @@ func requireReadyController(ctx context.Context, client engine.Client) error {
 	}
 	if !deployment.Available {
 		return clierr.NewConflictError(
-			"the operator controller is not ready, so the finalisers on the Neo4j resources will not clear and the CRD delete will not finish: check `neo4j-cli k8s operator status`, then retry")
+			"the operator controller is not ready, so the finalisers on the Neo4j resources will not clear and the CRD delete will not finish: run `neo4j-cli k8s operator status`, then retry")
 	}
 	return nil
 }
@@ -169,6 +169,9 @@ func validateWatchNamespaces(namespaces []string, operatorNamespace string, requ
 		return nil
 	}
 	for _, namespace := range namespaces {
+		if err := engine.ValidateResourceName("--watch-namespace", namespace); err != nil {
+			return err
+		}
 		if namespace == operatorNamespace {
 			return clierr.NewUsageError(
 				"--watch-namespace must not include the operator namespace %q: the operator never watches its own namespace",
