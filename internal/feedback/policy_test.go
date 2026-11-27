@@ -130,7 +130,7 @@ func TestValidate_LongFieldIsTooLongNotTruncated(t *testing.T) {
 	in := baseInput()
 	in.Observed = strings.Repeat("The output was unclear. ", 400) // ~9.6 KB, no detector hits
 	p, vs, _ := Validate(in, testRoot())
-	assert.Equal(t, []Violation{{Field: fieldObserved, Detector: detTooLong}}, vs)
+	assert.Equal(t, []Violation{{Field: fieldObserved, Detector: DetTooLong}}, vs)
 	assert.Equal(t, in.Observed, p.Observed, "the validator never truncates")
 }
 
@@ -282,13 +282,13 @@ func TestValidate_FieldByteCap(t *testing.T) {
 				_, vs, _ := Validate(in, testRoot())
 				got := false
 				for _, v := range vs {
-					if v.Field == field && v.Detector == detTooLong {
+					if v.Field == field && v.Detector == DetTooLong {
 						got = true
 					}
 				}
 				assert.Equal(t, tc.tooLong, got)
 				if tc.tooLong {
-					assert.Equal(t, reasonInvalidInput, rejectionReason(vs), "too_long alone is invalid_input")
+					assert.Equal(t, ReasonInvalidInput, RejectionReason(vs), "too_long alone is invalid_input")
 				}
 			})
 		}

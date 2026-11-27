@@ -5,6 +5,7 @@ package feedback
 
 import (
 	"context"
+	engine "github.com/neo4j/cli/internal/feedback"
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
@@ -13,24 +14,24 @@ import (
 
 // outcomeObj is the single JSON document `submit` prints on stdout.
 type outcomeObj struct {
-	Outcome       string      `json:"outcome"`
-	Reason        string      `json:"reason"`
-	RequestID     string      `json:"request_id"`
-	ReportID      string      `json:"report_id"`
-	ElapsedMS     int64       `json:"elapsed_ms"`
-	Violations    []Violation `json:"violations"`
-	DroppedFields []string    `json:"dropped_fields"`
-	Payload       *Payload    `json:"payload"`
-	ReceiptPath   string      `json:"receipt_path"`
-	Hint          string      `json:"hint,omitempty"`
+	Outcome       string             `json:"outcome"`
+	Reason        string             `json:"reason"`
+	RequestID     string             `json:"request_id"`
+	ReportID      string             `json:"report_id"`
+	ElapsedMS     int64              `json:"elapsed_ms"`
+	Violations    []engine.Violation `json:"violations"`
+	DroppedFields []string           `json:"dropped_fields"`
+	Payload       *engine.Payload    `json:"payload"`
+	ReceiptPath   string             `json:"receipt_path"`
+	Hint          string             `json:"hint,omitempty"`
 }
 
 func newOutcome() outcomeObj {
-	return outcomeObj{Violations: []Violation{}, DroppedFields: []string{}}
+	return outcomeObj{Violations: []engine.Violation{}, DroppedFields: []string{}}
 }
 
 func newSubmitCmd(cfg *clicfg.Config) *cobra.Command {
-	var in Input
+	var in engine.Input
 
 	long := "Send one structured feedback report about neo4j-cli: a category, what you expected, and what you observed." +
 		"\n\n" + dataPolicyBlock
@@ -63,29 +64,29 @@ neo4j-cli feedback submit --category unclear_error --expected "The error should 
 }
 
 // runSubmit prints the outcome of submitReport and maps it to an exit code.
-func runSubmit(cmd *cobra.Command, cfg *clicfg.Config, in Input) error {
+func runSubmit(cmd *cobra.Command, cfg *clicfg.Config, in engine.Input) error {
 	return finish(cmd, submitReport(cmd.Context(), cfg, cmd.Root(), in))
 }
 
 // submitReport runs in this order: authorization, endpoint, validation,
 // send, receipt. Nothing touches the network before validation passes. It is
 // used by `feedback submit`.
-func submitReport(ctx context.Context, cfg *clicfg.Config, tree *cobra.Command, in Input) outcomeObj {
+func submitReport(ctx context.Context, cfg *clicfg.Config, tree *cobra.Command, in engine.Input) outcomeObj {
 	fs := cfg.Fs()
 	out := newOutcome()
 
 	switch optOut(cfg) {
 	case reasonDoNotTrack:
-		out.Outcome, out.Reason, out.Hint = outcomeSkipped, reasonDoNotTrack, hintDoNotTrack
+		out.Outcome, out.Reason, out.Hint = engine.OutcomeSkipped, reasonDoNotTrack, hintDoNotTrack
 		return out
 	case reasonTelemetryOff:
-		out.Outcome, out.Reason, out.Hint = outcomeSkipped, reasonTelemetryOff, hintTelemetryOff
+		out.Outcome, out.Reason, out.Hint = engine.OutcomeSkipped, reasonTelemetryOff, hintTelemetryOff
 		return out
 	}
 
 	authReason := authState(cfg, now())
 	if authReason != "" {
-		out.Outcome, out.Reason = outcomeSkipped, authReason
+		out.Outcome, out.Reason = engine.OutcomeSkipped, authReason
 		return out
 	}
 
@@ -94,50 +95,39 @@ func submitReport(ctx context.Context, cfg *clicfg.Config, tree *cobra.Command, 
 	in.Harness = harnessLabel()
 	in.OS, in.OSArch, in.Invoker = goos, goarch, invokerLabel()
 
-	if !endpointAllowed(ep) {
-		out.RequestID, _ = resolveRequestID(in.RequestID)
-		out.Outcome, out.Reason = outcomeRejected, reasonEndpointDenied
-		out.ReceiptPath = appendReceipt(fs, receiptsPath(), Receipt{
+	if !engine.EndpointAllowed(ep) {
+		out.RequestID, _ = engine.ResolveRequestID(in.RequestID)
+		out.Outcome, out.Reason = engine.OutcomeRejected, engine.ReasonEndpointDenied
+		out.ReceiptPath = engine.AppendReceipt(fs, receiptsPath(), engine.Receipt{
 			Outcome: out.Outcome, Reason: out.Reason, RequestID: out.RequestID, Destination: ep,
 		})
 		return out
 	}
 
-	payload, violations, dropped := Validate(in, tree)
+	payload, violations, dropped := engine.Validate(in, tree)
 	out.RequestID = payload.RequestID
 	if dropped != nil {
 		out.DroppedFields = dropped
 	}
 	if len(violations) > 0 {
 		out.Violations = violations
-		out.Outcome, out.Reason = outcomeRejected, rejectionReason(violations)
-		out.ReceiptPath = appendReceipt(fs, receiptsPath(), Receipt{
+		out.Outcome, out.Reason = engine.OutcomeRejected, engine.RejectionReason(violations)
+		out.ReceiptPath = engine.AppendReceipt(fs, receiptsPath(), engine.Receipt{
 			Outcome: out.Outcome, Reason: out.Reason, RequestID: out.RequestID, Destination: ep,
 		})
 		return out
 	}
 
-	res := Send(ctx, ep, payload)
+	res := engine.Send(ctx, ep, payload)
 	out.Outcome, out.Reason, out.ReportID, out.ElapsedMS = res.Outcome, res.Reason, res.ReportID, res.ElapsedMS
-	if res.Outcome == outcomeSent {
+	if res.Outcome == engine.OutcomeSent {
 		out.Payload = &payload
 	}
-	out.ReceiptPath = appendReceipt(fs, receiptsPath(), Receipt{
+	out.ReceiptPath = engine.AppendReceipt(fs, receiptsPath(), engine.Receipt{
 		Outcome: out.Outcome, Reason: out.Reason, RequestID: out.RequestID, ReportID: out.ReportID,
 		Destination: ep, ElapsedMS: out.ElapsedMS, Payload: &payload,
 	})
 	return out
-}
-
-// rejectionReason is policy_violation when any detector fired, otherwise
-// invalid_input (field rules and the size cap).
-func rejectionReason(vs []Violation) string {
-	for _, v := range vs {
-		if v.Detector != detInvalidInput && v.Detector != detTooLarge && v.Detector != detTooLong {
-			return reasonPolicyViolation
-		}
-	}
-	return reasonInvalidInput
 }
 
 // finish prints the outcome document, then maps non-zero outcomes to a typed
@@ -147,9 +137,9 @@ func finish(cmd *cobra.Command, out outcomeObj) error {
 		return err
 	}
 	switch out.Outcome {
-	case outcomeSent, outcomeSkipped:
+	case engine.OutcomeSent, engine.OutcomeSkipped:
 		return nil
-	case outcomeRejected:
+	case engine.OutcomeRejected:
 		return clierr.NewValidationError("feedback %s: %s", out.Outcome, out.Reason)
 	default:
 		return clierr.NewUpstreamError("feedback %s: %s", out.Outcome, out.Reason)

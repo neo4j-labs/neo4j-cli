@@ -33,12 +33,12 @@ func TestAppendReceipt(t *testing.T) {
 	path := "/cfg/neo4j/cli/feedback-receipts.jsonl"
 	p := testPayload()
 
-	got := appendReceipt(fs, path, Receipt{
+	got := AppendReceipt(fs, path, Receipt{
 		Outcome: "sent", RequestID: p.RequestID, ReportID: "rpt_1", Destination: "http://127.0.0.1:8765/v1/feedback",
 		ElapsedMS: 12, Payload: &p,
 	})
 	require.Equal(t, path, got)
-	got = appendReceipt(fs, path, Receipt{
+	got = AppendReceipt(fs, path, Receipt{
 		Outcome: "rejected", Reason: "policy_violation", RequestID: p.RequestID, Destination: "http://127.0.0.1:8765/v1/feedback",
 	})
 	require.Equal(t, path, got)
@@ -60,5 +60,5 @@ func TestAppendReceipt(t *testing.T) {
 }
 
 func TestAppendReceipt_NilFs(t *testing.T) {
-	assert.Equal(t, "", appendReceipt(nil, "/x", Receipt{}))
+	assert.Equal(t, "", AppendReceipt(nil, "/x", Receipt{}))
 }

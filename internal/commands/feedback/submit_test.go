@@ -5,6 +5,7 @@ package feedback
 
 import (
 	"encoding/json"
+	engine "github.com/neo4j/cli/internal/feedback"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -44,9 +45,6 @@ func counting(t *testing.T, status int, body string) (*httptest.Server, *atomic.
 
 func TestSubmit_OutcomeTable(t *testing.T) {
 	withSeams(t, false, "")
-	old := sendTimeout
-	t.Cleanup(func() { sendTimeout = old })
-
 	for _, tc := range []struct {
 		name       string
 		setup      func(t *testing.T) (endpoint string, hits *atomic.Int32) // nil: not enabled
@@ -129,7 +127,7 @@ func TestSubmit_OutcomeTable(t *testing.T) {
 		{
 			name: "unknown timeout",
 			setup: func(t *testing.T) (string, *atomic.Int32) {
-				sendTimeout = 100 * time.Millisecond
+				engine.SetSendTimeoutForTest(t, 100*time.Millisecond)
 				done := make(chan struct{})
 				var hits atomic.Int32
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +152,6 @@ func TestSubmit_OutcomeTable(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			sendTimeout = old
 			cfg := newTestConfig(t)
 			var hits *atomic.Int32
 			if tc.setup != nil {

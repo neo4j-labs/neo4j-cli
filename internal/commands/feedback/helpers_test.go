@@ -4,6 +4,7 @@
 package feedback
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -12,8 +13,10 @@ import (
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	engine "github.com/neo4j/cli/internal/feedback"
 	"github.com/neo4j/cli/internal/flags"
 	"github.com/neo4j/cli/internal/testutil/testfs"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,23 +43,6 @@ func runCmd(t *testing.T, cmd *cobra.Command, args ...string) (stdout, stderr st
 	cmd.SetArgs(args)
 	err = cmd.Execute()
 	return out.String(), errb.String(), err
-}
-
-// testRoot builds a tiny command tree used by the policy tests.
-func testRoot() *cobra.Command {
-	root := &cobra.Command{Use: "neo4j-cli"}
-	query := &cobra.Command{Use: "query", Run: func(*cobra.Command, []string) {}}
-	cred := &cobra.Command{Use: "credential"}
-	dbms := &cobra.Command{Use: "dbms"}
-	add := &cobra.Command{Use: "add", Run: func(*cobra.Command, []string) {}}
-	hidden := &cobra.Command{Use: "secret-thing", Hidden: true, Run: func(*cobra.Command, []string) {}}
-	fb := &cobra.Command{Use: "feedback"}
-	submit := &cobra.Command{Use: "submit", Run: func(*cobra.Command, []string) {}}
-	dbms.AddCommand(add)
-	cred.AddCommand(dbms)
-	fb.AddCommand(submit)
-	root.AddCommand(query, cred, hidden, fb)
-	return root
 }
 
 // newTestApp mounts the real feedback tree under a stub root with a `query`
@@ -131,10 +117,14 @@ func lastProps(t *testing.T, body []byte) map[string]any {
 // talk to a non-loopback destination (a test proxy stands in for it).
 func withToken(t *testing.T, token string) {
 	t.Helper()
-	old := mixpanelToken
-	mixpanelToken = token
-	t.Cleanup(func() { mixpanelToken = old })
+	engine.SetMixpanelTokenForTest(t, token)
 }
+
+// Report text that passes the policy, shared by the submit tests.
+const (
+	baseExpected = "The command should explain what went wrong and how to fix it."
+	baseObserved = "The command failed with a message that did not name a next step."
+)
 
 // asScript makes the caller a script: no agent, and stdin is not a terminal.
 func asScript(t *testing.T) {
@@ -142,4 +132,20 @@ func asScript(t *testing.T) {
 	oi := invokerLabel
 	invokerLabel = func() string { return "script" }
 	t.Cleanup(func() { invokerLabel = oi })
+}
+
+// readReceipts returns the JSON lines of the receipts file at path.
+func readReceipts(t *testing.T, fs afero.Fs, path string) []map[string]any {
+	t.Helper()
+	f, err := fs.Open(path)
+	require.NoError(t, err)
+	defer func() { _ = f.Close() }()
+	var out []map[string]any
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		var m map[string]any
+		require.NoError(t, json.Unmarshal(sc.Bytes(), &m))
+		out = append(out, m)
+	}
+	return out
 }

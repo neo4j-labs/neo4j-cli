@@ -4,6 +4,7 @@
 package feedback
 
 import (
+	engine "github.com/neo4j/cli/internal/feedback"
 	"testing"
 	"time"
 
@@ -75,8 +76,8 @@ func TestEnable_UsesTheBuildDestinationWhenNoEndpointIsGiven(t *testing.T) {
 	cfg := newTestConfig(t)
 	stdout, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept")
 	require.NoError(t, err)
-	assert.Equal(t, mixpanelBase, parseJSON(t, stdout)["endpoint"])
-	assert.Equal(t, mixpanelBase, endpoint(cfg))
+	assert.Equal(t, engine.MixpanelBase(), parseJSON(t, stdout)["endpoint"])
+	assert.Equal(t, engine.MixpanelBase(), endpoint(cfg))
 }
 
 func TestEnable_BuildWithoutADestinationNeedsAnEndpoint(t *testing.T) {

@@ -40,9 +40,9 @@ const (
 	detParameter     = "parameter"
 	detPastedOutput  = "pasted_output"
 	detControlChars  = "control_chars"
-	detInvalidInput  = "invalid_input"
-	detTooLarge      = "too_large"
-	detTooLong       = "too_long"
+	DetInvalidInput  = "invalid_input"
+	DetTooLarge      = "too_large"
+	DetTooLong       = "too_long"
 	fieldPayload     = "payload"
 	fieldCategory    = "category"
 	fieldExpected    = "expected"
@@ -117,9 +117,9 @@ func Validate(in Input, tree *cobra.Command) (Payload, []Violation, []string) {
 		violations = append(violations, Violation{Field: field, Detector: det})
 	}
 
-	rid, ridOK := resolveRequestID(in.RequestID)
+	rid, ridOK := ResolveRequestID(in.RequestID)
 	if !ridOK {
-		add(fieldRequestID, detInvalidInput)
+		add(fieldRequestID, DetInvalidInput)
 	}
 
 	p := Payload{
@@ -142,16 +142,16 @@ func Validate(in Input, tree *cobra.Command) (Payload, []Violation, []string) {
 		}
 	}
 	if !valid {
-		add(fieldCategory, detInvalidInput)
+		add(fieldCategory, DetInvalidInput)
 	}
 
 	for _, f := range []struct{ name, text string }{{fieldExpected, in.Expected}, {fieldObserved, in.Observed}} {
 		if strings.TrimSpace(f.text) == "" {
-			add(f.name, detInvalidInput)
+			add(f.name, DetInvalidInput)
 			continue
 		}
 		if len(f.text) > maxFieldBytes {
-			add(f.name, detTooLong)
+			add(f.name, DetTooLong)
 		}
 		for _, d := range detect(f.text) {
 			add(f.name, d)
@@ -186,14 +186,14 @@ func Validate(in Input, tree *cobra.Command) (Payload, []Violation, []string) {
 	}
 
 	if b, err := json.Marshal(p); err != nil || len(b) > maxPayloadBytes {
-		add(fieldPayload, detTooLarge)
+		add(fieldPayload, DetTooLarge)
 	}
 	return p, violations, dropped
 }
 
-// resolveRequestID returns the caller's UUIDv4 when valid, otherwise a fresh
+// ResolveRequestID returns the caller's UUIDv4 when valid, otherwise a fresh
 // one. ok is false only when the caller supplied an invalid value.
-func resolveRequestID(s string) (id string, ok bool) {
+func ResolveRequestID(s string) (id string, ok bool) {
 	if s == "" {
 		return newUUIDv4(), true
 	}
@@ -536,4 +536,15 @@ func hasCypher(s string) bool {
 		distinct[m] = true
 	}
 	return len(distinct) >= 2
+}
+
+// RejectionReason is policy_violation when any detector fired, otherwise
+// invalid_input (field rules and the size cap).
+func RejectionReason(vs []Violation) string {
+	for _, v := range vs {
+		if v.Detector != DetInvalidInput && v.Detector != DetTooLarge && v.Detector != DetTooLong {
+			return ReasonPolicyViolation
+		}
+	}
+	return ReasonInvalidInput
 }

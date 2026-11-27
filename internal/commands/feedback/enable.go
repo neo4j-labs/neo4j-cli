@@ -5,6 +5,7 @@ package feedback
 
 import (
 	"fmt"
+	engine "github.com/neo4j/cli/internal/feedback"
 	"strings"
 	"time"
 
@@ -59,7 +60,7 @@ neo4j-cli feedback enable --accept --rw --format json`,
 			if ep == "" {
 				return clierr.NewUsageError("this build has no feedback destination; pass --endpoint (http on 127.0.0.1, localhost or ::1 only)")
 			}
-			if !endpointAllowed(ep) {
+			if !engine.EndpointAllowed(ep) {
 				return clierr.NewUsageError("endpoint not allowed: only https to Mixpanel's ingestion hosts, or http on 127.0.0.1, localhost or ::1, is accepted")
 			}
 			if days < 1 || days > maxDays {
