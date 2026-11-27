@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package query
+package params
 
 import (
 	"testing"
@@ -132,7 +132,7 @@ func TestParseParams(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gotParams, gotEmbeds, err := parseParams(tc.in)
+			gotParams, gotEmbeds, err := ParseParams(tc.in)
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantParams, gotParams)
 			assert.Equal(t, tc.wantEmbeds, gotEmbeds)
@@ -190,7 +190,7 @@ func TestParseParams_Errors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := parseParams(tc.in)
+			_, _, err := ParseParams(tc.in)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.errSubstr)
 		})

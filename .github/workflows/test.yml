@@ -76,7 +76,15 @@ jobs:
 
             - name: Install gnome-keyring
               if: matrix.os == 'ubuntu-latest'
-              run: sudo apt-get install -y gnome-keyring libsecret-tools
+              # apt index refresh + retries: security.ubuntu.com 404s happen
+              # when the runner image's package index is stale against the
+              # archive (mirrors rotate .deb versions out); a plain
+              # `apt-get install` fails the whole job on one 404.
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y gnome-keyring libsecret-tools ||
+                      (sleep 10 && sudo apt-get update &&
+                       sudo apt-get install -y gnome-keyring libsecret-tools)
 
             - name: Keyring smoke (with daemon)
               if: matrix.os == 'ubuntu-latest'
