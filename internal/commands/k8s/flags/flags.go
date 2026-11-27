@@ -61,12 +61,13 @@ func SettingsFrom(cmd *cobra.Command, cfg *clicfg.Config) (engine.Settings, erro
 
 // PrintWriteTarget names the kube context and namespace on stderr before a
 // write. Kubeconfigs often hold production contexts, so a write against the
-// wrong cluster is then visible at once.
-func PrintWriteTarget(cmd *cobra.Command, client engine.Client, namespace string) error {
+// wrong cluster is then visible at once. It returns the context, so a caller
+// that needs it does not have to ask kubectl a second time.
+func PrintWriteTarget(cmd *cobra.Command, client engine.Client, namespace string) (string, error) {
 	kubeContext, err := client.CurrentContext(cmd.Context())
 	if err != nil {
-		return err
+		return "", err
 	}
 	_, err = fmt.Fprintf(cmd.ErrOrStderr(), "Targeting Kubernetes context %q in namespace %q.\n", kubeContext, namespace)
-	return err
+	return kubeContext, err
 }

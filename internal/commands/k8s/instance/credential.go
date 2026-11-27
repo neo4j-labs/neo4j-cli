@@ -18,7 +18,7 @@ func newCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:       "Store a connection credential for a standalone Neo4j server",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Read NEO4J_AUTH from Secret `<name>-auth` and save a DBMS credential for a standalone server. " +
-			"The name `k8s-<context>-<namespace>-<name>` includes the Kubernetes context and namespace. " +
+			"The credential is named `k8s-<namespace>/<name>@<context>`, so the same instance name on two clusters keeps two credentials. " +
 			"Another run replaces the connection and password without changing the default credential. " +
 			"The URI points to 127.0.0.1 on --port. Use the same port with `instance connect`, and keep connect running during a query. " +
 			"Bolt TLS uses `bolt+ssc`, which encrypts traffic without certificate verification. This command requires --rw.",
@@ -44,10 +44,11 @@ neo4j-cli k8s instance credential dev --port 7688 --format json --rw`,
 				return err
 			}
 			client := clientFactory(settings)
-			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
+			kubeContext, err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace)
+			if err != nil {
 				return err
 			}
-			credential, err := engine.ReadCredential(cmd.Context(), client, args[0], port)
+			credential, err := engine.ReadCredential(cmd.Context(), client, kubeContext, args[0], port)
 			if err != nil {
 				return err
 			}

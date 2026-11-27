@@ -30,14 +30,14 @@ func TestCredential_StoresScopedConnection(t *testing.T) {
 	assert.Contains(t, stderr, `Targeting Kubernetes context "kind-kind" in namespace "default"`)
 	var report map[string]any
 	require.NoError(t, json.Unmarshal([]byte(stdout), &report))
-	assert.Equal(t, "k8s-kind-kind-default-dev", report["name"])
+	assert.Equal(t, "k8s-default/dev@kind-kind", report["name"])
 	assert.Equal(t, "bolt://127.0.0.1:7688", report["uri"])
 	assert.NotContains(t, stdout, "rotated/secret")
-	stored, err := env.cfg.DbmsCredentials().Get("k8s-kind-kind-default-dev")
+	stored, err := env.cfg.DbmsCredentials().Get("k8s-default/dev@kind-kind")
 	require.NoError(t, err)
 	assert.Equal(t, "rotated/secret", stored.Password)
 	assert.Equal(t, "neo4j", stored.DatabaseName)
-	assert.Equal(t, "k8s-kind-kind-default-dev", env.cfg.DbmsCredentials().DefaultCredential)
+	assert.Equal(t, "k8s-default/dev@kind-kind", env.cfg.DbmsCredentials().DefaultCredential)
 	assert.Equal(t, []string{"dev-auth"}, env.fake.GetSecretNames)
 	assert.Zero(t, env.fake.ListPodsCalls)
 }
@@ -45,13 +45,13 @@ func TestCredential_StoresScopedConnection(t *testing.T) {
 func TestCredential_RestoreKeepsDefaultAndEmbedLink(t *testing.T) {
 	env := credentialEnv(t, `{"dbms":{"default-credential":"other","credentials":[
 		{"name":"other","username":"neo4j","password":"old","database-name":"neo4j","uri":"bolt://localhost:7687"},
-		{"name":"k8s-kind-kind-default-dev","username":"neo4j","password":"stale","database-name":"neo4j","uri":"bolt://127.0.0.1:7687","embed-credential":"openai-default"}]}}`)
+		{"name":"k8s-default/dev@kind-kind","username":"neo4j","password":"stale","database-name":"neo4j","uri":"bolt://127.0.0.1:7687","embed-credential":"openai-default"}]}}`)
 	_, _, err := runInstance(t, env, "credential dev --port 7688 --rw")
 	require.NoError(t, err)
 	dbms := env.cfg.DbmsCredentials()
 	assert.Len(t, dbms.List(), 2)
 	assert.Equal(t, "other", dbms.DefaultCredential)
-	stored, err := dbms.Get("k8s-kind-kind-default-dev")
+	stored, err := dbms.Get("k8s-default/dev@kind-kind")
 	require.NoError(t, err)
 	assert.Equal(t, "rotated/secret", stored.Password)
 	assert.Equal(t, "bolt://127.0.0.1:7688", stored.URI)
@@ -73,7 +73,7 @@ func TestCredential_BoltTLSStoresSelfSignedURIAndWarns(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(stdout), &report))
 	assert.Equal(t, "bolt+ssc://127.0.0.1:7687", report["uri"])
 	assert.Equal(t, true, report["bolt_tls"])
-	stored, err := env.cfg.DbmsCredentials().Get("k8s-kind-kind-default-dev")
+	stored, err := env.cfg.DbmsCredentials().Get("k8s-default/dev@kind-kind")
 	require.NoError(t, err)
 	assert.Equal(t, "bolt+ssc://127.0.0.1:7687", stored.URI)
 }

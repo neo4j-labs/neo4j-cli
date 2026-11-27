@@ -80,7 +80,7 @@ neo4j-cli k8s operator upgrade --crd-file ./neo4j-crd-1.0.0.yaml --rw`,
 			if err := requireWatchNamespacesExist(cmd.Context(), client, watchNamespaces); err != nil {
 				return err
 			}
-			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
+			if _, err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
 			target := upgradeVersion(requested, cmd.Flags().Changed(versionFlag), release)

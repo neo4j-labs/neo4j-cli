@@ -174,11 +174,12 @@ type trustSpec struct {
 	CertManager             map[string]any `yaml:"certManager,omitempty" json:"certManager,omitempty"`
 }
 
-// hasBoltTLS reports whether the trust block secures the Bolt connector, as
-// opposed to cluster or HTTPS traffic only. Detection and cluster admission
-// share it so that the two cannot disagree.
+// hasBoltTLS reports whether the trust block secures the Bolt connector. It
+// follows the operator's admission rule: TLS must be enabled and a `bolt`
+// policy must be listed under certificates. A certManager block only issues
+// the listed policies, so on its own it does not secure Bolt.
 func (t *trustSpec) hasBoltTLS() bool {
-	return t != nil && t.Enabled && (t.Certificates["bolt"] != nil || len(t.CertManager) > 0)
+	return t != nil && t.Enabled && t.Certificates["bolt"] != nil
 }
 
 // BuildNeo4jManifest makes sure that the dedicated flags are valid and renders

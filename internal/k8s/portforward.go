@@ -15,13 +15,14 @@ import (
 	"github.com/neo4j/cli/internal/tee"
 )
 
-// PortForwardOptions describes a foreground Bolt connection. OnReady must
-// return when its context ends. If it fails, the client stops the child.
+// PortForwardOptions describes a foreground Bolt connection. OnReady runs
+// once the child has started and must return when its context ends. If it
+// returns an error, the client stops the child.
 type PortForwardOptions struct {
 	Pod        string
 	RemotePort int32
 	LocalPort  int
-	OnReady    func(context.Context, int) error
+	OnReady    func(context.Context) error
 }
 
 type process interface {
@@ -39,9 +40,10 @@ func startProcess(ctx context.Context, path string, args []string, stderr io.Wri
 	return cmd, cmd.Start()
 }
 
-// PortForward implements Client. The child receives its own context so a
-// failed readiness probe also stops it. Stdin stays unattached and child
-// stderr goes through the redacted debug trace, never directly to the user.
+// PortForward implements Client. The child gets its own context, so a failed
+// readiness check can stop it without cancelling the whole command. Stdin
+// stays unattached, and the child's stderr goes only to the redacted debug
+// trace, never straight to the user.
 func (c *execClient) PortForward(ctx context.Context, opts PortForwardOptions) error {
 	path, err := resolveKubectl()
 	if err != nil {
@@ -56,17 +58,23 @@ func (c *execClient) PortForward(ctx context.Context, opts PortForwardOptions) e
 	// Keep the failure reason even without --debug, but bound a long-lived
 	// child's diagnostics. Only the redacted debug trace displays this data.
 	var stderr tee.LimitedBuffer
-	childCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	child, err := startProcessFn(childCtx, path, args, &stderr)
-	if err != nil {
+	trace := func(err error) runResult {
 		res := runResult{err: err, stderr: string(stderr.Bytes())}
 		if c.settings.Debug {
 			debugResult("kubectl", res, time.Since(start))
 		}
-		return classifyRunError(ctx, "kubectl", args, res)
+		return res
+	}
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	child, err := startProcessFn(childCtx, path, args, &stderr)
+	if err != nil {
+		return classifyRunError(ctx, "kubectl", args, trace(err))
 	}
 
+	// The child is killed when childCtx ends, so a cancelled command always
+	// reaches exited. A child that exits on its own cancels childCtx, which
+	// stops the readiness check.
 	exited := make(chan error, 1)
 	go func() {
 		exited <- child.Wait()
@@ -74,13 +82,10 @@ func (c *execClient) PortForward(ctx context.Context, opts PortForwardOptions) e
 	}()
 	ready := make(chan error, 1)
 	go func() {
-		ready <- opts.OnReady(childCtx, opts.LocalPort)
+		ready <- opts.OnReady(childCtx)
 	}()
 	finish := func(err error) error {
-		res := runResult{err: err, stderr: string(stderr.Bytes())}
-		if c.settings.Debug {
-			debugResult("kubectl", res, time.Since(start))
-		}
+		res := trace(err)
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
@@ -91,38 +96,25 @@ func (c *execClient) PortForward(ctx context.Context, opts PortForwardOptions) e
 	}
 
 	select {
-	case err := <-ready:
-		if err != nil {
-			cancel()
-			waitErr := <-exited
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
-			}
-			// The child can cancel the probe before its failure reaches the
-			// select below. Keep that failure rather than the cancelled probe.
-			if errors.Is(err, context.Canceled) {
-				return finish(waitErr)
-			}
-			if c.settings.Debug {
-				debugResult("kubectl", runResult{err: waitErr, stderr: string(stderr.Bytes())}, time.Since(start))
-			}
-			return err
-		}
 	case err := <-exited:
-		cancel()
 		<-ready
 		return finish(err)
-	case <-childCtx.Done():
-		err := <-exited
-		<-ready
-		return finish(err)
-	}
-
-	select {
-	case err = <-exited:
-	case <-ctx.Done():
+	case readyErr := <-ready:
+		if readyErr == nil {
+			// Connected. Keep forwarding until Ctrl-C or the child fails.
+			return finish(<-exited)
+		}
 		cancel()
-		err = <-exited
+		waitErr := <-exited
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		// When the child exits first, the readiness check sees a cancelled
+		// context. The child's own failure is the one worth reporting.
+		if errors.Is(readyErr, context.Canceled) {
+			return finish(waitErr)
+		}
+		trace(waitErr)
+		return readyErr
 	}
-	return finish(err)
 }

@@ -185,9 +185,9 @@ func TestDbmsCredentials_UpdateReplacesKeyringPassword(t *testing.T) {
 }
 
 func TestDbmsCredentials_ScopedNameRoundTripsThroughKeyring(t *testing.T) {
-	// An EKS ARN context puts colons and slashes in the credential name, and
+	// An EKS ARN context puts colons, slashes and an @ in the credential name, and
 	// that name also becomes the keyring account key.
-	name := "k8s-arn:aws:eks:eu-west-1:123456789012:cluster/dev-default-dev"
+	name := "k8s-default/dev@arn:aws:eks:eu-west-1:123456789012:cluster/dev"
 	creds, fs := newKeyringTestCredentials(t, newMockKeyringProvider(), `{"dbms":{"credentials":[]}}`)
 	require.NoError(t, creds.Dbms.Add(name, "neo4j", "first-password", "neo4j", "bolt://127.0.0.1:7687"))
 	assert.NotContains(t, string(readCredentialsJSON(t, fs)), "first-password")

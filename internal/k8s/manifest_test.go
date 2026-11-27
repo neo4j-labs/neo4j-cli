@@ -180,6 +180,9 @@ spec:
       members: 3
   trust:
     enabled: true
+    certificates:
+      bolt:
+        secretName: bolt-tls
     certManager:
       issuerRef:
         name: neo4j-ca
@@ -191,7 +194,7 @@ spec:
 	assert.NotContains(t, string(certManagerManifest), "namespace:")
 }
 
-func TestPrepareNeo4jManifestFromFile_CertManagerCountsAsBoltTLS(t *testing.T) {
+func TestPrepareNeo4jManifestFromFile_CertManagerNeedsABoltPolicy(t *testing.T) {
 	input := `apiVersion: neo4j.com/v1
 kind: Neo4j
 spec:
@@ -208,7 +211,15 @@ spec:
       issuerRef:
         name: neo4j-ca
 `
-	manifest, err := PrepareNeo4jManifestFromFile([]byte(input), "dev", "default")
+	// The operator rejects a cluster whose only trust setting is certManager,
+	// because cert-manager issues just the policies listed under certificates.
+	_, err := PrepareNeo4jManifestFromFile([]byte(input), "dev", "default")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cluster mode requires")
+
+	withBolt := strings.Replace(input, "    certManager:\n",
+		"    certificates:\n      bolt:\n        secretName: bolt-tls\n    certManager:\n", 1)
+	manifest, err := PrepareNeo4jManifestFromFile([]byte(withBolt), "dev", "default")
 	require.NoError(t, err)
 	assert.Contains(t, string(manifest), "name: neo4j-ca")
 

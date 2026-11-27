@@ -67,7 +67,7 @@ neo4j-cli k8s instance create dev-tls --from-file ./neo4j.yaml --wait --rw`,
 			}
 
 			client := clientFactory(settings)
-			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
+			if _, err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
 			operatorSettings := settings

@@ -66,3 +66,33 @@ func TestWriteLeaves_RequireRw(t *testing.T) {
 		})
 	}
 }
+
+func TestDelete_RemovesTheStoredCredential(t *testing.T) {
+	env := credentialEnv(t, `{"dbms":{"credentials":[
+		{"name":"k8s-default/dev@kind-kind","username":"neo4j","password":"secret","database-name":"neo4j","uri":"bolt://127.0.0.1:7687"},
+		{"name":"k8s-default/other@kind-kind","username":"neo4j","password":"secret","database-name":"neo4j","uri":"bolt://127.0.0.1:7688"}]}}`)
+	_, stderr, err := runInstance(t, env, "delete dev --rw")
+	require.NoError(t, err)
+	assert.Contains(t, stderr, `Removed stored credential "k8s-default/dev@kind-kind"`)
+	_, err = env.cfg.DbmsCredentials().Get("k8s-default/dev@kind-kind")
+	require.Error(t, err)
+	_, err = env.cfg.DbmsCredentials().Get("k8s-default/other@kind-kind")
+	require.NoError(t, err, "delete must leave other instances' credentials alone")
+}
+
+func TestDelete_WithoutAStoredCredentialSaysNothingAboutIt(t *testing.T) {
+	env := credentialEnv(t, `{"dbms":{"credentials":[]}}`)
+	_, stderr, err := runInstance(t, env, "delete dev --rw")
+	require.NoError(t, err)
+	assert.NotContains(t, stderr, "credential")
+}
+
+func TestDelete_KeepsTheCredentialWhenDeletionFails(t *testing.T) {
+	env := credentialEnv(t, `{"dbms":{"credentials":[
+		{"name":"k8s-default/dev@kind-kind","username":"neo4j","password":"secret","database-name":"neo4j","uri":"bolt://127.0.0.1:7687"}]}}`)
+	env.fake.DeleteNeo4jErr = clierr.NewAuthError("forbidden")
+	_, _, err := runInstance(t, env, "delete dev --rw")
+	require.Error(t, err)
+	_, err = env.cfg.DbmsCredentials().Get("k8s-default/dev@kind-kind")
+	require.NoError(t, err)
+}

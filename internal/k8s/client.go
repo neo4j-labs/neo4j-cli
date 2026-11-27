@@ -38,10 +38,10 @@ type Settings struct {
 // Methods grow per PR as the operator and instance leaves land.
 type Client interface {
 	// KubectlVersion runs `kubectl version -o json` with a 10s request
-	// timeout and returns the parsed
-	// client and server git versions. When the API server is unreachable the
-	// call returns an error. Any stdout the child still produced is parsed
-	// first, so ClientVersion can carry a value alongside the error.
+	// timeout and returns the parsed client and server git versions. When
+	// the API server is unreachable the call returns an error. Any stdout
+	// the child still produced is parsed first, so ClientVersion can carry
+	// a value alongside the error.
 	KubectlVersion(ctx context.Context) (VersionInfo, error)
 	// HelmVersion runs `helm version --short` and returns the helm version,
 	// for example "v4.1.1+g5caf004". Helm 4 removed the -o json flag, and
@@ -87,9 +87,8 @@ type Client interface {
 	GetSecret(ctx context.Context, name string) (map[string][]byte, error)
 	// ListPods returns pods that match a Kubernetes label selector.
 	ListPods(ctx context.Context, selector string) ([]Pod, error)
-	// PortForward keeps a foreground connection to a pod. After the callback
-	// confirms readiness, it waits for context cancellation or child failure.
-	// The callback receives the process context and the allocated local port.
+	// PortForward keeps a foreground connection to a pod. Once the OnReady
+	// callback succeeds, it runs until the context ends or kubectl fails.
 	PortForward(ctx context.Context, opts PortForwardOptions) error
 }
 

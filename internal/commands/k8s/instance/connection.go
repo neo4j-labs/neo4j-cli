@@ -36,14 +36,33 @@ func storeCredential(cfg *clicfg.Config, credential engine.InstanceCredential) e
 	return dbms.Add(credential.Name, credential.Username, credential.Password, dbconn.DefaultDatabase, credential.URI)
 }
 
+// removeStoredCredential deletes the credential that `instance credential`
+// stored for a resource, if there is one. A failure is only a warning,
+// because the Neo4j resource itself is already being deleted.
+func removeStoredCredential(cmd *cobra.Command, cfg *clicfg.Config, name string) {
+	dbms := cfg.DbmsCredentials()
+	if dbms == nil {
+		return
+	}
+	if _, err := dbms.Get(name); err != nil {
+		return
+	}
+	stderr := cmd.ErrOrStderr()
+	if err := cfg.Credentials.RemoveDbms(name, stderr); err != nil {
+		fmt.Fprintf(stderr, "Warning: could not remove stored credential %q: %s\n", name, err) //nolint:errcheck // Warning output is best effort.
+		return
+	}
+	fmt.Fprintf(stderr, "Removed stored credential %q.\n", name) //nolint:errcheck // Diagnostic output is best effort.
+}
+
 func warnUnverifiedTLS(cmd *cobra.Command, credential engine.InstanceCredential) {
 	if credential.BoltTLS {
 		fmt.Fprintln(cmd.ErrOrStderr(), "Warning: bolt+ssc encrypts traffic but accepts any server certificate.") //nolint:errcheck // Warning output is best effort.
 	}
 }
 
-func connectionReady(cmd *cobra.Command, cfg *clicfg.Config, credential engine.InstanceCredential, pod, envOutFile string) func(context.Context, int) error {
-	return func(ctx context.Context, _ int) error {
+func connectionReady(cmd *cobra.Command, cfg *clicfg.Config, credential engine.InstanceCredential, pod, envOutFile string) func(context.Context) error {
+	return func(ctx context.Context) error {
 		if err := waitForBoltFn(ctx, credential.URI, credential.Username, credential.Password, dbconn.DefaultWaitTimeout); err != nil {
 			var timeout *dbconn.BoltTimeoutError
 			if errors.As(err, &timeout) {
@@ -69,29 +88,6 @@ func connectionReady(cmd *cobra.Command, cfg *clicfg.Config, credential engine.I
 	}
 }
 
-// envQuote escapes the characters that the dotenv reader treats as special
-// inside double quotes.
-var envQuote = strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`, "\n", `\n`, "\r", `\r`)
-
-// envValue quotes one value for the dotenv reader in envfile.Parse. A
-// single-quoted value is literal, so it keeps dollar signs, double quotes and
-// backslashes unchanged. The reader decodes line-ending escapes only inside
-// double quotes, and there it rewrites a backslash before n or r. It also reads
-// a closing quote after a backslash as escaped, in either quoting form. A value
-// that breaks these rules has no faithful spelling.
-func envValue(value string) (string, error) {
-	if strings.HasSuffix(value, `\`) {
-		return "", errors.New("a trailing backslash has no faithful dotenv spelling")
-	}
-	if !strings.ContainsAny(value, "'\n\r") {
-		return "'" + value + "'", nil
-	}
-	if strings.Contains(value, `\n`) || strings.Contains(value, `\r`) {
-		return "", errors.New(`a single quote or line ending cannot be combined with a literal \n or \r`)
-	}
-	return `"` + envQuote.Replace(value) + `"`, nil
-}
-
 // renderCredentialEnv writes the connection as a dotenv file for `query --env`.
 func renderCredentialEnv(credential engine.InstanceCredential) (string, error) {
 	var b strings.Builder
@@ -102,7 +98,7 @@ func renderCredentialEnv(credential engine.InstanceCredential) (string, error) {
 		{credentials.EnvPassword, credential.Password},
 		{credentials.EnvDatabase, dbconn.DefaultDatabase},
 	} {
-		value, err := envValue(entry.value)
+		value, err := envfile.Quote(entry.value)
 		if err != nil {
 			return "", clierr.NewUsageError("cannot write %s for Neo4j %q to a dotenv file: %s", entry.name, credential.InstanceName, err).
 				WithSuggestion("Store the connection with `neo4j-cli k8s instance credential " + credential.InstanceName +

@@ -330,7 +330,7 @@ func (f *FakeClient) PortForward(ctx context.Context, opts PortForwardOptions) e
 	if f.PortForwardErr != nil {
 		return f.PortForwardErr
 	}
-	if err := opts.OnReady(ctx, opts.LocalPort); err != nil {
+	if err := opts.OnReady(ctx); err != nil {
 		return err
 	}
 	<-ctx.Done()

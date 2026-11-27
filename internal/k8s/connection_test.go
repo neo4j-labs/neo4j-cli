@@ -4,7 +4,6 @@
 package k8s
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -22,7 +21,8 @@ func TestParseNeo4j_DetectsBoltTLS(t *testing.T) {
 	}{
 		{name: "absent", trust: `null`},
 		{name: "certificates", trust: `{"enabled":true,"certificates":{"bolt":{"secretName":"bolt-tls"}}}`, want: true},
-		{name: "cert-manager", trust: `{"enabled":true,"certManager":{"issuerRef":{"name":"neo4j-ca"}}}`, want: true},
+		{name: "cert-manager bolt policy", trust: `{"enabled":true,"certificates":{"bolt":{"secretName":"bolt-tls"}},"certManager":{"issuerRef":{"name":"neo4j-ca"}}}`, want: true},
+		{name: "cert-manager without bolt policy", trust: `{"enabled":true,"certificates":{"https":{"secretName":"https-tls"}},"certManager":{"issuerRef":{"name":"neo4j-ca"}}}`},
 		{name: "cluster only", trust: `{"enabled":true,"certificates":{"cluster":{"secretName":"cluster-tls"}}}`},
 		{name: "HTTPS only", trust: `{"enabled":true,"certificates":{"https":{"secretName":"https-tls"}}}`},
 		{name: "disabled", trust: `{"enabled":false,"certificates":{"bolt":{"secretName":"bolt-tls"}}}`},
@@ -48,16 +48,15 @@ func TestReadCredential_ScopesNameAndPreservesPassword(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := NewFakeClient()
-			fake.CurrentContextResult = "arn:aws:eks:eu-west-1:123456789012:cluster/dev"
 			instance := defaultFakeNeo4j()
 			instance.Namespace = "team-a"
 			instance.Record["metadata"].(map[string]any)["namespace"] = "team-a"
 			instance.BoltTLS = tc.tls
 			fake.GetNeo4jResult = instance
 			fake.GetSecretResult = map[string][]byte{"NEO4J_AUTH": []byte("neo4j/password/with/slashes")}
-			credential, err := ReadCredential(t.Context(), fake, "dev", 7688)
+			credential, err := ReadCredential(t.Context(), fake, "arn:aws:eks:eu-west-1:123456789012:cluster/dev", "dev", 7688)
 			require.NoError(t, err)
-			assert.Equal(t, "k8s-arn:aws:eks:eu-west-1:123456789012:cluster/dev-team-a-dev", credential.Name)
+			assert.Equal(t, "k8s-team-a/dev@arn:aws:eks:eu-west-1:123456789012:cluster/dev", credential.Name)
 			assert.Equal(t, "team-a", credential.Namespace)
 			assert.Equal(t, tc.uri, credential.URI)
 			assert.Equal(t, "neo4j", credential.Username)
@@ -85,7 +84,7 @@ func TestReadCredential_RejectsInvalidAuth(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := NewFakeClient()
 			fake.GetSecretResult = tc.data
-			_, err := ReadCredential(t.Context(), fake, "dev", DefaultBoltPort)
+			_, err := ReadCredential(t.Context(), fake, "kind-kind", "dev", DefaultBoltPort)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.want)
 			for _, value := range tc.data {
@@ -101,7 +100,7 @@ func TestReadCredential_DoesNotReadClusterOrMissingSecret(t *testing.T) {
 		instance := defaultFakeNeo4j()
 		instance.Mode = "Cluster"
 		fake.GetNeo4jResult = instance
-		_, err := ReadCredential(t.Context(), fake, "dev", DefaultBoltPort)
+		_, err := ReadCredential(t.Context(), fake, "kind-kind", "dev", DefaultBoltPort)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "clusters are not supported")
 		assert.Zero(t, fake.GetSecretCalls)
@@ -109,16 +108,9 @@ func TestReadCredential_DoesNotReadClusterOrMissingSecret(t *testing.T) {
 	t.Run("missing Secret", func(t *testing.T) {
 		fake := NewFakeClient()
 		fake.GetSecretErr = clierr.NewNotFoundError("missing")
-		_, err := ReadCredential(t.Context(), fake, "dev", DefaultBoltPort)
+		_, err := ReadCredential(t.Context(), fake, "kind-kind", "dev", DefaultBoltPort)
 		assert.True(t, IsNotFound(err))
 		assert.Contains(t, err.Error(), "dev-auth")
-	})
-	t.Run("context failure", func(t *testing.T) {
-		fake := NewFakeClient()
-		fake.CurrentContextErr = context.Canceled
-		_, err := ReadCredential(t.Context(), fake, "dev", DefaultBoltPort)
-		assert.ErrorIs(t, err, context.Canceled)
-		assert.Zero(t, fake.GetNeo4jCalls)
 	})
 }
 
@@ -144,4 +136,12 @@ func TestStandalonePod_SelectsReadyServerByLabels(t *testing.T) {
 	_, err = StandalonePod(t.Context(), fake, "dev")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no ready standalone pod")
+}
+
+func TestCredentialName_KeepsScopesApart(t *testing.T) {
+	// Joining the parts with hyphens alone would give these two the same name.
+	assert.NotEqual(t,
+		CredentialName("kind-dev", "team-a", "graph"),
+		CredentialName("kind", "dev-team-a", "graph"))
+	assert.Equal(t, "k8s-default/dev@kind-kind", CredentialName("kind-kind", "default", "dev"))
 }

@@ -24,6 +24,7 @@ func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Delete one Neo4j custom resource from the workload namespace in -n, or from `default` when no namespace is set. " +
 			"The volume claim retention policy on the resource decides whether persistent volume claims remain. " +
 			"This command never deletes a volume claim directly. " +
+			"It also removes the credential that `instance credential` stored for the resource, if there is one. " +
 			"Pass --wait to poll until the resource is absent, with a 10 minute timeout. Requires --rw.",
 		Example: `# Start deletion and leave volume handling to the retention policy on the resource
 neo4j-cli k8s instance delete dev --rw
@@ -41,12 +42,14 @@ neo4j-cli k8s instance delete dev --wait --rw`,
 				return err
 			}
 			client := clientFactory(settings)
-			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
+			kubeContext, err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace)
+			if err != nil {
 				return err
 			}
 			if err := client.DeleteNeo4j(cmd.Context(), args[0]); err != nil {
 				return err
 			}
+			removeStoredCredential(cmd, cfg, engine.CredentialName(kubeContext, settings.Namespace, args[0]))
 			status := "deletion_started"
 			if wait {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Waiting for Neo4j %q to be deleted (timeout %s)...\n", args[0], waitTimeout)

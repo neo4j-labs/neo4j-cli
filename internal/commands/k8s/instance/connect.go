@@ -44,10 +44,11 @@ neo4j-cli k8s instance connect dev --port 7688 --rw`,
 				return err
 			}
 			client := clientFactory(settings)
-			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
+			kubeContext, err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace)
+			if err != nil {
 				return err
 			}
-			credential, err := engine.ReadCredential(cmd.Context(), client, args[0], port)
+			credential, err := engine.ReadCredential(cmd.Context(), client, kubeContext, args[0], port)
 			if err != nil {
 				return err
 			}

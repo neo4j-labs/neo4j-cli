@@ -16,12 +16,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// fakeProcess behaves like a child started with exec.CommandContext: it
+// exits when the test sends a result or when its context ends.
 type fakeProcess struct {
+	ctx    context.Context
 	exited <-chan error
 }
 
 func (p fakeProcess) Wait() error {
-	return <-p.exited
+	select {
+	case err := <-p.exited:
+		return err
+	case <-p.ctx.Done():
+		return p.ctx.Err()
+	}
 }
 
 func captureProcess(t *testing.T, exited <-chan error) (<-chan context.Context, *[]string) {
@@ -33,7 +41,7 @@ func captureProcess(t *testing.T, exited <-chan error) (<-chan context.Context, 
 		contexts <- ctx
 		*arguments = append(*arguments, args...)
 		_, _ = io.WriteString(stderr, "Error from server (NotFound): pod not found\n")
-		return fakeProcess{exited: exited}, nil
+		return fakeProcess{ctx: ctx, exited: exited}, nil
 	}
 	t.Cleanup(func() { startProcessFn = previous })
 	return contexts, arguments
@@ -45,16 +53,16 @@ func TestPortForward_ArgvAndCancellation(t *testing.T) {
 	contexts, arguments := captureProcess(t, exited)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ready := make(chan int, 1)
+	ready := make(chan struct{}, 1)
 	done := make(chan error, 1)
 	go func() {
 		done <- NewClient(Settings{Kubeconfig: "/tmp/kube", Context: "kind-kind", Namespace: "team-a"}).
 			PortForward(ctx, PortForwardOptions{
 				Pod: "dev-server-0", RemotePort: 17687, LocalPort: 7688,
-				OnReady: func(_ context.Context, port int) error { ready <- port; return nil },
+				OnReady: func(context.Context) error { ready <- struct{}{}; return nil },
 			})
 	}()
-	assert.Equal(t, 7688, <-ready)
+	<-ready
 	childCtx := <-contexts
 	cancel()
 	select {
@@ -77,7 +85,7 @@ func TestPortForward_ReadinessFailureStopsChild(t *testing.T) {
 	wantErr := errors.New("cannot write the environment file")
 	err := NewClient(Settings{}).PortForward(t.Context(), PortForwardOptions{
 		Pod: "dev-server-0", RemotePort: 7687, LocalPort: 7687,
-		OnReady: func(ctx context.Context, _ int) error {
+		OnReady: func(ctx context.Context) error {
 			go func() { <-ctx.Done(); exited <- ctx.Err() }()
 			return wantErr
 		},
@@ -93,7 +101,7 @@ func TestPortForward_ChildFailureCancelsReadiness(t *testing.T) {
 	exited <- &exec.ExitError{}
 	err := NewClient(Settings{}).PortForward(t.Context(), PortForwardOptions{
 		Pod: "dev-server-0", RemotePort: 7687, LocalPort: 7687,
-		OnReady: func(ctx context.Context, _ int) error { <-ctx.Done(); return ctx.Err() },
+		OnReady: func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() },
 	})
 	assert.Truef(t, IsNotFound(err), "the child failure must survive cancellation of the readiness context, got: %v", err)
 	assert.ErrorIs(t, (<-contexts).Err(), context.Canceled)
@@ -106,7 +114,7 @@ func TestPortForward_UnexpectedExitIsAnError(t *testing.T) {
 	exited <- nil
 	err := NewClient(Settings{}).PortForward(t.Context(), PortForwardOptions{
 		Pod: "dev-server-0", RemotePort: 7687, LocalPort: 7687,
-		OnReady: func(ctx context.Context, _ int) error { <-ctx.Done(); return ctx.Err() },
+		OnReady: func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() },
 	})
 	var cliErr *clierr.CLIError
 	require.ErrorAs(t, err, &cliErr)
@@ -123,7 +131,7 @@ func TestPortForward_DebugCapturesChildStderr(t *testing.T) {
 	exited <- &exec.ExitError{}
 	_ = NewClient(Settings{Debug: true}).PortForward(t.Context(), PortForwardOptions{
 		Pod: "dev-server-0", RemotePort: 7687, LocalPort: 7687,
-		OnReady: func(ctx context.Context, _ int) error { <-ctx.Done(); return ctx.Err() },
+		OnReady: func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() },
 	})
 	assert.Contains(t, debug.String(), DebugReqPrefix+"kubectl port-forward")
 	assert.Contains(t, debug.String(), "pod not found")

@@ -47,7 +47,7 @@ func connectEnv(t *testing.T) (*instanceEnv, *boltProbe) {
 	}
 	t.Cleanup(func() { waitForBoltFn = original })
 	env.fake.PortForwardFn = func(ctx context.Context, opts engine.PortForwardOptions) error {
-		return opts.OnReady(ctx, opts.LocalPort)
+		return opts.OnReady(ctx)
 	}
 	return env, probe
 }
@@ -107,23 +107,14 @@ func TestConnect_WritesEnvFileWithOwnerOnlyPermissions(t *testing.T) {
 }
 
 func TestConnect_QuotesPasswordForDotenv(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
-		password string
-	}{
-		{name: "dollar and backslash", password: `pa$$"wo\rd` + "\tkey"},
-		{name: "apostrophe", password: "it's a password"},
-		{name: "apostrophe and variable", password: `it's $HOME`},
-		{name: "line endings", password: "first\nsecond\rthird"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			env, _ := connectEnv(t)
-			env.fake.GetSecretResult = map[string][]byte{"NEO4J_AUTH": []byte("neo4j/" + tc.password)}
-			stdout, _, err := runInstance(t, env, "connect dev --rw")
-			require.NoError(t, err)
-			assert.Equal(t, tc.password, parseEnvOutput(t, env, stdout)[credentials.EnvPassword])
-		})
-	}
+	// envfile's own tests cover the quoting rules. This checks that connect
+	// applies them to the value it prints.
+	password := `it's $HOME`
+	env, _ := connectEnv(t)
+	env.fake.GetSecretResult = map[string][]byte{"NEO4J_AUTH": []byte("neo4j/" + password)}
+	stdout, _, err := runInstance(t, env, "connect dev --rw")
+	require.NoError(t, err)
+	assert.Equal(t, password, parseEnvOutput(t, env, stdout)[credentials.EnvPassword])
 }
 
 func TestConnect_RefusesPasswordDotenvCannotCarry(t *testing.T) {

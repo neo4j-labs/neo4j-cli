@@ -32,15 +32,10 @@ type InstanceCredential struct {
 }
 
 // ReadCredential reads the generated auth Secret and builds a local URI.
-// It leaves password storage to the command layer.
-func ReadCredential(ctx context.Context, client Client, name string, port int) (InstanceCredential, error) {
-	kubeContext, err := client.CurrentContext(ctx)
-	if err != nil {
-		return InstanceCredential{}, err
-	}
-	if kubeContext == "" || name == "" {
-		return InstanceCredential{}, clierr.NewUsageError("a Kubernetes context and Neo4j name are required for a credential")
-	}
+// kubeContext is the context the client targets, which the caller has
+// already resolved to print the write target. Storing the password is left
+// to the command layer.
+func ReadCredential(ctx context.Context, client Client, kubeContext, name string, port int) (InstanceCredential, error) {
 	instance, err := client.GetNeo4j(ctx, name)
 	if err != nil {
 		return InstanceCredential{}, err
@@ -49,9 +44,10 @@ func ReadCredential(ctx context.Context, client Client, name string, port int) (
 		return InstanceCredential{}, clierr.NewUsageError(
 			"Neo4j %q is not standalone. Credentials and connections for clusters are not supported yet", name)
 	}
-	data, err := client.GetSecret(ctx, name+"-auth")
+	secretName := name + "-auth"
+	data, err := client.GetSecret(ctx, secretName)
 	if IsNotFound(err) {
-		return InstanceCredential{}, clierr.NewNotFoundError("auth Secret %q does not exist yet", name+"-auth").
+		return InstanceCredential{}, clierr.NewNotFoundError("auth Secret %q does not exist yet", secretName).
 			WithSuggestion("Run `neo4j-cli k8s instance get " + name + "` to inspect readiness")
 	}
 	if err != nil {
@@ -61,17 +57,17 @@ func ReadCredential(ctx context.Context, client Client, name string, port int) (
 	if auth == "none" {
 		return InstanceCredential{}, clierr.NewUsageError("authentication is disabled for Neo4j %q, so there is no credential to read", name)
 	}
-	// Register the received value before parsing it, including a malformed
-	// value that an error or debug trace must never expose.
+	// Register the whole value before checking it, so that even a malformed
+	// value never appears in an error message or debug trace.
 	clievents.RegisterSecretValue(auth)
-	// dotenv output can encode tabs and line endings, but not terminal
-	// control sequences. Reject those before any credential output.
+	// A dotenv file can carry tabs and line endings, but terminal control
+	// characters would reach the user's screen. Reject them before any output.
 	if output.StripControl(auth) != auth {
-		return InstanceCredential{}, clierr.NewUsageError("NEO4J_AUTH in Secret %q contains unsupported control characters", name+"-auth")
+		return InstanceCredential{}, clierr.NewUsageError("NEO4J_AUTH in Secret %q contains unsupported control characters", secretName)
 	}
 	username, password, ok := strings.Cut(auth, "/")
 	if !ok || username == "" || password == "" {
-		return InstanceCredential{}, clierr.NewUsageError("Secret %q must contain NEO4J_AUTH in username/password form", name+"-auth")
+		return InstanceCredential{}, clierr.NewUsageError("Secret %q must contain NEO4J_AUTH in username/password form", secretName)
 	}
 	clievents.RegisterSecretValue(password)
 	scheme := "bolt"
@@ -90,10 +86,13 @@ func ReadCredential(ctx context.Context, client Client, name string, port int) (
 	}, nil
 }
 
-// CredentialName preserves each scope component. Kubernetes contexts can
-// contain colons and slashes, as EKS ARNs do. The credential store accepts them.
+// CredentialName returns the stored credential name for one Neo4j resource,
+// in the form k8s-<namespace>/<name>@<context>. Namespaces and Neo4j names are
+// DNS labels, so they never contain "/" or "@". That keeps the name unique
+// even when the context itself contains hyphens, colons or slashes, as EKS
+// ARN contexts do.
 func CredentialName(kubeContext, namespace, name string) string {
-	return "k8s-" + kubeContext + "-" + namespace + "-" + name
+	return "k8s-" + namespace + "/" + name + "@" + kubeContext
 }
 
 // StandalonePod returns a ready server pod and its named Bolt port. Select

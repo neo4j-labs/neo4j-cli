@@ -69,7 +69,7 @@ neo4j-cli k8s operator install --watch-namespace default --crd-file ./neo4j-crd-
 			if err := requireWatchNamespacesExist(cmd.Context(), client, watchNamespaces); err != nil {
 				return err
 			}
-			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
+			if _, err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
 			crds, err := client.ApplyCRDs(cmd.Context(), crdSource(crdFile, version))
