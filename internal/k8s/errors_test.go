@@ -40,6 +40,8 @@ func TestClassifyRunError(t *testing.T) {
 		{name: "connection refused", stderr: "The connection to the server localhost:8080 was refused", err: exitErr(), code: 8},
 		{name: "no such host", stderr: "dial tcp: lookup example.invalid: no such host", err: exitErr(), code: 8},
 		{name: "unable to connect", stderr: "Unable to connect to the server: getting credentials: exec plugin", err: exitErr(), code: 8},
+		{name: "helm uninstall of a missing release", stderr: `Error: uninstall: Release not loaded: neo4j-operator: release: not found`, err: exitErr(), code: 3},
+		{name: "helm upgrade of a missing release", stderr: `Error: UPGRADE FAILED: "neo4j-operator" has no deployed releases`, err: exitErr(), code: 3},
 		{name: "unknown shape stays fatal", stderr: "some future error nobody predicted", err: exitErr(), code: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -66,6 +68,12 @@ func TestClassifyRunError_ContextCancellationReturnsContextError(t *testing.T) {
 
 func TestClassifyRunError_NilErrIsNil(t *testing.T) {
 	assert.NoError(t, classifyRunError(context.Background(), "kubectl", nil, runResult{}))
+}
+
+func TestIsNotFound(t *testing.T) {
+	assert.True(t, IsNotFound(clierr.NewNotFoundError("gone")))
+	assert.False(t, IsNotFound(clierr.NewUsageError("bad input")))
+	assert.False(t, IsNotFound(fmt.Errorf("plain error")))
 }
 
 func TestClassifyRunError_ProcessNeverRanIsUpstream(t *testing.T) {
