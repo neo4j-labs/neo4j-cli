@@ -95,7 +95,17 @@ func runRelateBatch(c *conn, statements []string, params map[string]any) ([]*que
 			Counters:  relateCounters{stats: r.Stats},
 		}
 		resp.Data.Fields = r.Columns
-		resp.Data.Values = r.Rows
+		// Same normalisation the Bolt path applies per record: the engine's
+		// values arrive as the driver's dbtype shapes, which marshal as {} (or
+		// a raw struct) until coerceDriverValue renders them as ISO strings.
+		resp.Data.Values = make([][]any, len(r.Rows))
+		for ri, row := range r.Rows {
+			out := make([]any, len(row))
+			for ci, v := range row {
+				out[ci] = coerceDriverValue(v)
+			}
+			resp.Data.Values[ri] = out
+		}
 		if r.Bookmark != "" {
 			resp.Bookmarks = []string{r.Bookmark}
 		}

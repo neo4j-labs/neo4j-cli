@@ -8,8 +8,10 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -442,4 +444,38 @@ func TestRunQueryRelate_BadOpenOptFailsBeforeOpen(t *testing.T) {
 	assert.Equal(t, 2, ce.Code)
 	assert.Contains(t, err.Error(), `unknown key "preview"`)
 	assert.Empty(t, f.openedPath, "a rejected option must not open the store")
+}
+
+// The embedded path must render temporal values exactly as the Bolt path does:
+// the engine's values arrive as the driver's dbtype shapes, and only
+// coerceDriverValue turns those into their ISO-8601 strings. Without it a date
+// marshals as {} and a duration as its raw struct.
+func TestRunQueryRelate_TemporalsRenderAsISOStrings(t *testing.T) {
+	day := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	f := &fakeRelateStore{respond: func(stmt string) (relate.StatementResult, error) {
+		if stmt == "EXPLAIN RETURN 1" {
+			return explainOf(relate.QueryTypeRead), nil
+		}
+		return resultOf([]string{"d", "lt", "ldt", "du", "nested"}, [][]any{{
+			dbtype.Date(day),
+			dbtype.LocalTime(time.Date(2000, 1, 1, 10, 30, 0, 0, time.UTC)),
+			dbtype.LocalDateTime(time.Date(2020, 1, 1, 10, 30, 0, 0, time.UTC)),
+			dbtype.Duration{Days: 1},
+			map[string]any{"born": dbtype.Date(day)},
+		}}), nil
+	}}
+	installFakeStore(t, f)
+
+	h := newRunHarness(t, "json")
+	require.NoError(t, h.execute(t, "--relate=movies", "RETURN 1"))
+
+	var got decodedResult
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
+	require.Len(t, got.Rows, 1)
+	row := got.Rows[0]
+	assert.Equal(t, "2020-01-01", row["d"])
+	assert.Equal(t, "10:30:00", row["lt"])
+	assert.Equal(t, "2020-01-01T10:30:00", row["ldt"])
+	assert.Equal(t, "P1D", row["du"])
+	assert.Equal(t, map[string]any{"born": "2020-01-01"}, row["nested"])
 }
