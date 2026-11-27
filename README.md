@@ -565,7 +565,7 @@ neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
 
 When `neo4j-cli` runs in an interactive terminal, `--rw` is auto-applied for write commands — humans typing at a prompt don't need the flag. Two cases still require `--rw` explicitly:
 
-- **Agent harnesses** (Claude Code, Codex, Cursor, Gemini CLI, Replit, OpenCode, Auggie, Goose, Devin, Kiro, pi, …). Detection is by env var; the authoritative list lives at [`unjs/std-env`](https://github.com/unjs/std-env/blob/main/src/agents.ts).
+- **Agent harnesses** (Claude Code, Codex, Cursor, Gemini CLI, Junie, GitHub Copilot, Cline, Antigravity, Replit, OpenCode, Auggie, Goose, Devin, Kiro, pi, …). Detection is by env var, with `AI_AGENT` taking precedence when set. The signals mirror [`unjs/std-env`](https://github.com/unjs/std-env/blob/main/src/agents.ts) and [`vercel/detect-agent`](https://github.com/vercel/detect-agent/blob/main/agents.json); Kiro is detected only when stdout is not a terminal, so a person in the Kiro IDE terminal is not treated as an agent.
 - **Non-interactive scripts** (CI, piped invocations, `nohup`, redirected stdout).
 
 Precedence: `--rw` set → allow; agent detected → require `--rw`; stdout is a TTY → allow; otherwise → require `--rw`.
