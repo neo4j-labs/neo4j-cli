@@ -39,7 +39,9 @@ func TestClassifyRunError(t *testing.T) {
 		{name: "unauthorized", stderr: `Error from server (Unauthorized): the server has asked for the client to provide credentials`, err: exitErr(), code: 4},
 		{name: "connection refused", stderr: "The connection to the server localhost:8080 was refused", err: exitErr(), code: 8},
 		{name: "no such host", stderr: "dial tcp: lookup example.invalid: no such host", err: exitErr(), code: 8},
-		{name: "unable to connect", stderr: "Unable to connect to the server: getting credentials: exec plugin", err: exitErr(), code: 8},
+		{name: "exec credential plugin failure", stderr: "Unable to connect to the server: getting credentials: exec: executable gke-gcloud-auth-plugin failed with exit code 1", err: exitErr(), code: 4},
+		{name: "expired GKE session cannot prompt", stderr: "Unable to connect to the server: getting credentials: exec plugin\nReauthentication failed. cannot prompt during non-interactive execution", err: exitErr(), code: 4},
+		{name: "unreachable server stays upstream", stderr: "Unable to connect to the server: dial tcp 10.0.0.1:443: i/o timeout", err: exitErr(), code: 8},
 		{name: "helm uninstall of a missing release", stderr: `Error: uninstall: Release not loaded: neo4j-operator: release: not found`, err: exitErr(), code: 3},
 		{name: "helm upgrade of a missing release", stderr: `Error: UPGRADE FAILED: "neo4j-operator" has no deployed releases`, err: exitErr(), code: 3},
 		{name: "unknown shape stays fatal", stderr: "some future error nobody predicted", err: exitErr(), code: 1},
@@ -85,11 +87,34 @@ func TestClassifyRunError_ProcessNeverRanIsUpstream(t *testing.T) {
 
 func TestClassifyRunError_RedactsStderrOnEveryBranch(t *testing.T) {
 	// An exec credential plugin can echo a token into kubectl's error. This
-	// lands on the upstream branch, not the fatal fallback.
+	// one lands on the cloud-login branch. The upstream branch below carries
+	// the same hazard.
 	stderr := "Unable to connect to the server: getting credentials: exec plugin failed, token: abc123"
 	err := classifyRunError(context.Background(), "kubectl", nil, runResult{stderr: stderr, err: exitErr()})
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 4, ce.Code)
+	assert.NotContains(t, err.Error(), "abc123")
+
+	stderr = "Unable to connect to the server: connection refused, token: abc123"
+	err = classifyRunError(context.Background(), "kubectl", nil, runResult{stderr: stderr, err: exitErr()})
+	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 8, ce.Code)
 	assert.NotContains(t, err.Error(), "abc123")
+}
+
+func TestIsCloudLoginFailure(t *testing.T) {
+	cloudLogin := classifyRunError(context.Background(), "kubectl", nil, runResult{
+		stderr: "Unable to connect to the server: getting credentials: exec: executable aws failed with exit code 1",
+		err:    exitErr(),
+	})
+	assert.True(t, IsCloudLoginFailure(cloudLogin))
+	var ce *clierr.CLIError
+	require.ErrorAs(t, cloudLogin, &ce)
+	assert.Contains(t, ce.Suggestion, "cloud provider")
+
+	// The API server's own 401 is an auth failure, but not a cloud login.
+	assert.False(t, IsCloudLoginFailure(clierr.NewAuthError("kubectl: Error from server (Unauthorized)")))
+	assert.False(t, IsCloudLoginFailure(clierr.NewUpstreamError("kubectl: connection refused")))
+	assert.False(t, IsCloudLoginFailure(nil))
 }

@@ -108,12 +108,45 @@ func checkHelmVersion(version string, callErr error, present bool) CheckResult {
 	}
 }
 
+// checkCloudLogin reports whether the kubeconfig's exec credential plugin
+// minted a token. A child process has no stdin, so an expired cloud session
+// cannot prompt and the probe fails even when the cluster is healthy. The
+// failure gets its own row because the fix is to sign in again.
+func checkCloudLogin(callErr error, present bool) CheckResult {
+	if !present {
+		return skipResult(CheckCloudLogin, LabelCloudLogin, CheckKubectlPresent)
+	}
+	if engine.IsCloudLoginFailure(callErr) {
+		return CheckResult{
+			Name:   CheckCloudLogin,
+			Label:  LabelCloudLogin,
+			Status: StatusFail,
+			Detail: fmt.Sprintf("kubectl could not authenticate to the cluster: %s.", callErr.Error()),
+			Hint:   "Sign in to your cloud provider again (for example `gcloud auth login`, `aws sso login` or `az login`), then re-run `k8s doctor`.",
+		}
+	}
+	if callErr != nil {
+		return skipResult(CheckCloudLogin, LabelCloudLogin, CheckClusterReachable)
+	}
+	return CheckResult{
+		Name:   CheckCloudLogin,
+		Label:  LabelCloudLogin,
+		Status: StatusPass,
+		Detail: "kubectl authenticated to the cluster.",
+	}
+}
+
 // checkClusterReachable reports whether the API server answered the version
 // probe. The detail carries the child's own error text, which the engine
 // has already redacted, so the operator sees the real cause.
 func checkClusterReachable(vi engine.VersionInfo, callErr error, present bool) CheckResult {
 	if !present {
 		return skipResult(CheckClusterReachable, LabelClusterReachable, CheckKubectlPresent)
+	}
+	// A failed login has its own check and its own fix. Skip here so the
+	// summary's first hint is the sign-in step, not "start the cluster".
+	if engine.IsCloudLoginFailure(callErr) {
+		return skipResult(CheckClusterReachable, LabelClusterReachable, CheckCloudLogin)
 	}
 	if callErr != nil {
 		return CheckResult{

@@ -9,10 +9,10 @@ import (
 	engine "github.com/neo4j/cli/internal/k8s"
 )
 
-// runChecks executes the seven health checks in order:
+// runChecks executes the eight health checks in order:
 //
 //	kubectl_present → kubectl_version → helm_present → helm_version
-//	  → cluster_reachable → kubernetes_version → version_skew
+//	  → cloud_login → cluster_reachable → kubernetes_version → version_skew
 //
 // The cluster checks read one `kubectl version -o json` call, made only
 // when kubectl is present. The helm checks read one `helm version --short`
@@ -20,7 +20,7 @@ import (
 // gate the cluster checks: an older kubectl can still reach a healthy
 // cluster, and the reachability detail is the more useful diagnostic.
 func runChecks(ctx context.Context, client engine.Client) DoctorReport {
-	checks := make([]CheckResult, 0, 7)
+	checks := make([]CheckResult, 0, 8)
 
 	kubectlPresent := engine.KubectlPresent()
 	checks = append(checks, checkBinaryPresent(CheckKubectlPresent, "kubectl", LabelKubectlPresent, kubectlPresent))
@@ -46,6 +46,7 @@ func runChecks(ctx context.Context, client engine.Client) DoctorReport {
 	}
 	checks = append(checks, checkHelmVersion(helmVersion, helmErr, helmPresent))
 
+	checks = append(checks, checkCloudLogin(kubectlErr, kubectlPresent))
 	reachable := kubectlPresent && kubectlErr == nil && vi.ServerVersion != ""
 	checks = append(checks, checkClusterReachable(vi, kubectlErr, kubectlPresent))
 	checks = append(checks, checkKubernetesVersion(vi, reachable))
