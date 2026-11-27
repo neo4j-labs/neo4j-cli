@@ -9,6 +9,14 @@ import (
 	"fmt"
 )
 
+// neo4jResource is the fully qualified kubectl resource for the operator's
+// Neo4j kind. The bare short name `neo4j` is ambiguous on clusters that also
+// carry the legacy Neo4j CRD families (neo4j.io/v1 and friends): kubectl then
+// resolves `get neo4j <name>` to more than one resource and fails, while
+// `get neo4j` without a name silently lists the wrong resource. The
+// resource.group form is unambiguous on every cluster.
+const neo4jResource = "neo4js.neo4j.com"
+
 // Neo4j is one Neo4j custom resource. Record is the complete server object
 // used for JSON and TOON output. The typed fields support readiness polling
 // and table rendering without remodelling the wire response.
@@ -122,7 +130,7 @@ func (c *execClient) GetNeo4j(ctx context.Context, name string) (Neo4j, error) {
 	if err != nil {
 		return Neo4j{}, err
 	}
-	args := kubectlGetArgs(c.settings, "neo4j", name)
+	args := kubectlGetArgs(c.settings, neo4jResource, name)
 	res := c.exec(ctx, "kubectl", path, args)
 	if res.err != nil {
 		return Neo4j{}, classifyRunError(ctx, "kubectl", args, res)
@@ -137,7 +145,7 @@ func (c *execClient) ListNeo4j(ctx context.Context) ([]Neo4j, error) {
 	if err != nil {
 		return nil, err
 	}
-	args := kubectlArgs(c.settings, "get", "neo4j", "-l", ManagedByLabel+"="+ManagedByValue, "-o", "json")
+	args := kubectlArgs(c.settings, "get", neo4jResource, "-l", ManagedByLabel+"="+ManagedByValue, "-o", "json")
 	res := c.exec(ctx, "kubectl", path, args)
 	if res.err != nil {
 		return nil, classifyRunError(ctx, "kubectl", args, res)
@@ -184,7 +192,7 @@ func (c *execClient) DeleteNeo4j(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	args := kubectlArgs(c.settings, "delete", "neo4j", name, "--wait=false")
+	args := kubectlArgs(c.settings, "delete", neo4jResource, name, "--wait=false")
 	res := c.exec(ctx, "kubectl", path, args)
 	if res.err != nil {
 		return classifyRunError(ctx, "kubectl", args, res)

@@ -48,14 +48,14 @@ func TestNeo4jReads_ArgvAndParsing(t *testing.T) {
 
 	require.Len(t, *calls, 3)
 	assert.Equal(t, []string{
-		"get", "neo4j", "dev", "-o", "json", "--kubeconfig", "/tmp/kube", "--context", "kind-kind", "-n", "team-a",
+		"get", "neo4js.neo4j.com", "dev", "-o", "json", "--kubeconfig", "/tmp/kube", "--context", "kind-kind", "-n", "team-a",
 	}, (*calls)[0].args)
 	assert.Equal(t, []string{
-		"get", "neo4j", "-l", "app.kubernetes.io/managed-by=neo4j-cli", "-o", "json",
+		"get", "neo4js.neo4j.com", "-l", "app.kubernetes.io/managed-by=neo4j-cli", "-o", "json",
 		"--kubeconfig", "/tmp/kube", "--context", "kind-kind", "-n", "team-a",
 	}, (*calls)[1].args)
 	assert.Equal(t, []string{
-		"delete", "neo4j", "dev", "--wait=false", "--kubeconfig", "/tmp/kube", "--context", "kind-kind", "-n", "team-a",
+		"delete", "neo4js.neo4j.com", "dev", "--wait=false", "--kubeconfig", "/tmp/kube", "--context", "kind-kind", "-n", "team-a",
 	}, (*calls)[2].args)
 }
 
