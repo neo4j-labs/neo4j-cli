@@ -54,6 +54,7 @@ type Client interface {
 	CustomerManagedKeys() CustomerManagedKeyService
 	EvaluationRuns() EvaluationRunService
 	Snapshots() SnapshotService
+	Deployments() DeploymentService
 }
 
 // New returns a Client backed by the Aura HTTP API using cfg's credentials and
@@ -120,6 +121,10 @@ type InstanceService interface {
 
 type httpClient struct {
 	cfg *clicfg.Config
+}
+
+func (c *httpClient) Deployments() DeploymentService {
+	return deploymentService{cfg: c.cfg}
 }
 
 func (c *httpClient) Instances() InstanceService {

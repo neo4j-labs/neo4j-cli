@@ -14,6 +14,7 @@ import (
 	"github.com/neo4j/cli/internal/commands/aura/agent"
 	apicmd "github.com/neo4j/cli/internal/commands/aura/api"
 	"github.com/neo4j/cli/internal/commands/aura/customermanagedkey"
+	"github.com/neo4j/cli/internal/commands/aura/deployment"
 	"github.com/neo4j/cli/internal/commands/aura/graphql"
 	"github.com/neo4j/cli/internal/commands/aura/instance"
 	"github.com/neo4j/cli/internal/commands/aura/organization"
@@ -63,6 +64,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(virtualgraph.NewCmd(cfg))
 	cmd.AddCommand(agent.NewCmd(cfg))
 	cmd.AddCommand(graphql.NewCmd(cfg))
+	cmd.AddCommand(deployment.NewCmd(cfg))
 
 	return cmd
 }
