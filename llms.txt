@@ -23,9 +23,10 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli credential embed add` — store embedding-provider credentials (openai, ollama, huggingface, gemini, vertex)
 - `neo4j-cli aura organization list` / `aura project list --organization-id <org-id>` — discover the org/project IDs that scope every other Aura command
 - `neo4j-cli aura workspace use <org-id>/<project-id> --rw` — pin a default org+project pair so `--organization-id` / `--project-id` can be omitted
-- `neo4j-cli aura instance list` — list Aura instances (table or JSON; needs an explicit `--organization-id` + `--project-id` unless a workspace is pinned)
+- `neo4j-cli aura instance list` — list Aura instances (table or JSON; needs an explicit `--organization-id` + `--project-id` unless a workspace is pinned; `--limit N` returns at most N, with a note on stderr when more exist)
 - `neo4j-cli aura instance create` — provision a new Aura instance (`--name` optional; auto-generates `InstanceNN` if omitted)
 - `neo4j-cli aura instance get <id>` — get instance details
+- `neo4j-cli aura instance delete <id> --rw` — delete an instance; `--dry-run` looks it up and prints what would be deleted (no `--yes --force` needed)
 - `neo4j-cli aura agent list|get|create|update|replace|delete|invoke` — manage Aura Agents (LLM assistants bound to a database); `--tools` accepts a JSON array of `{type, name, description, config}` with camelCase types (`text2cypher`, `cypherTemplate`, `similaritySearch`)
 - `neo4j-cli aura agent evaluation-dataset list|get|create|update|delete` / `aura agent evaluation-run list|get|create|cancel|delete` — evaluate an Aura Agent against a dataset of 1-50 questions (`--questions-file` JSON of `{query_number, query_text, expected_answer}`); `evaluation-run create --agent-id <id> --dataset-id <id> --metric accuracy|tool_trajectory|groundedness|relevance` (repeatable `--metric`, `--wait` blocks until a terminal status)
 - `neo4j-cli docker create|list|get|start|stop|delete` — run a local Neo4j container by shelling out to `docker` (or `podman` aliased to `docker`); persistent flow stores a `dbms` credential, ephemeral flow emits an env-file consumable by `query --env`; `create --plugin <name>` (repeatable) installs plugins such as `apoc` / `graph-data-science` via `NEO4J_PLUGINS`; `delete --remove-volume` also removes the `neo4j-cli-<name>-data` volume a `docker load` container leaves behind
@@ -46,7 +47,7 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli skill print` — preview a skill's SKILL.md before installing
 - `neo4j-cli skill remove` — remove a skill by name (`--agent <name>` to scope, `--all` for every catalog skill; self-skill preserved; idempotent)
 - `neo4j-cli skill refresh` — force a fresh download of the curated skill catalog
-- `neo4j-cli agent-context` — emit a stable JSON envelope (schema_version 2) for AI-agent discovery: by default a compact flat index of every command (path + short) plus exit codes and output formats; pass a command path (e.g. `agent-context aura instance list`) for that command's flags and examples, or `--full` for the complete recursive tree; `--format` toon/table/json supported
+- `neo4j-cli agent-context` — emit a stable JSON envelope (schema_version 2) for AI-agent discovery (every command entry carries a `read_only` boolean; false for commands that require `--rw`): by default a compact flat index of every command (path + short) plus exit codes and output formats; pass a command path (e.g. `agent-context aura instance list`) for that command's flags and examples, or `--full` for the complete recursive tree; `--format` toon/table/json supported
 - `neo4j-cli update` — self-update the binary to the latest GitHub release (`update check` subcommand to report availability without downloading, `--pre-releases` for alpha/beta/rc, `--version <tag>` to pin)
 
 ## Connection
@@ -59,7 +60,7 @@ Default URI: `neo4j://localhost:7687`, username: `neo4j`, database: `neo4j`.
 
 ## Output formats
 
-All read commands support `--format json|table|toon`. Default is `table` on a TTY, `json` when piped, and `toon` under an agent harness. `toon` is a compact agent-friendly format. (`-f` is the shorthand for `neo4j-cli update --force`, not `--format`.)
+All read commands support `--format json|jsonl|table|toon`. `jsonl` prints list output as one compact JSON object per line, with no envelope. Default is `table` on a TTY, `json` when piped, and `toon` under an agent harness. `toon` is a compact agent-friendly format. (`-f` is the shorthand for `neo4j-cli update --force`, not `--format`.)
 
 JSON envelope: `{"columns": [...], "rows": [{"<col>": <value>, ...}, ...], "truncated": false, "arrays_truncated": 0}` — `rows` are column-keyed objects; `arrays_truncated` is the count of cell arrays elided by `--truncate-arrays-over`.
 
@@ -75,7 +76,7 @@ Or auto-install at CLI install time by prefixing any installer (curl, PowerShell
 
 Installed skill bundles are auto-refreshed in the background whenever the binary version changes, but only in an interactive terminal — never during non-interactive runs (agent harnesses, scripts, piped output), so the CLI's behaviour cannot change mid-task under an agent. Refresh explicitly with `neo4j-cli skill install --rw` or `neo4j-cli update`. Disable with `neo4j-cli config set skill-auto-refresh false --rw`.
 
-`--rw` is required for any command that mutates state (Aura API, local config, credentials, skills, write Cypher) when running under an agent harness or non-interactive script. In an interactive terminal `--rw` is auto-applied — humans typing at a prompt don't need the flag. Read-only commands (`skill list`, `skill check`, `skill print`, `query <read>`, `aura instance list`) never need it.
+`--rw` is required for any command that mutates state (Aura API, local config, credentials, skills, write Cypher) when running under an agent harness or non-interactive script. Agent harnesses are detected by env var, with `AI_AGENT` taking precedence when set (Junie, GitHub Copilot, Cline and Antigravity are recognised; Kiro only when stdout is not a terminal). In an interactive terminal `--rw` is auto-applied — humans typing at a prompt don't need the flag. Read-only commands (`skill list`, `skill check`, `skill print`, `query <read>`, `aura instance list`) never need it.
 
 Destructive leaves (any `… delete` / `… remove` — Aura instance/agent/agent evaluation-dataset/evaluation-run/CMK/data-api/graph-analytics/auth-provider/CORS allowed-origin, `docker delete`, `desktop dbms/connection/project/tag delete`, `credential aura-client/dbms/embed remove`) gate on both `--yes` and `--force` in addition to `--rw`. On a TTY either missing flag prompts y/N; in non-TTY contexts both must be passed or the command exits 2.
 
