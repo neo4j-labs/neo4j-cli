@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add `aura deployment` commands for Aura Fleet Manager: `list`, `get`, `create` and `delete` deployments, `token create`/`update`/`delete`, and `database list`, `server list` and `server database list` for a deployment.'
+time: 2026-11-28T10:00:00Z

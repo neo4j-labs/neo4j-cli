@@ -28,6 +28,21 @@
 - [neo4j-cli aura customer-managed-key delete](#neo4j-cli-aura-customer-managed-key-delete)
 - [neo4j-cli aura customer-managed-key get](#neo4j-cli-aura-customer-managed-key-get)
 - [neo4j-cli aura customer-managed-key list](#neo4j-cli-aura-customer-managed-key-list)
+- [neo4j-cli aura deployment](#neo4j-cli-aura-deployment)
+- [neo4j-cli aura deployment create](#neo4j-cli-aura-deployment-create)
+- [neo4j-cli aura deployment database](#neo4j-cli-aura-deployment-database)
+- [neo4j-cli aura deployment database list](#neo4j-cli-aura-deployment-database-list)
+- [neo4j-cli aura deployment delete](#neo4j-cli-aura-deployment-delete)
+- [neo4j-cli aura deployment get](#neo4j-cli-aura-deployment-get)
+- [neo4j-cli aura deployment list](#neo4j-cli-aura-deployment-list)
+- [neo4j-cli aura deployment server](#neo4j-cli-aura-deployment-server)
+- [neo4j-cli aura deployment server database](#neo4j-cli-aura-deployment-server-database)
+- [neo4j-cli aura deployment server database list](#neo4j-cli-aura-deployment-server-database-list)
+- [neo4j-cli aura deployment server list](#neo4j-cli-aura-deployment-server-list)
+- [neo4j-cli aura deployment token](#neo4j-cli-aura-deployment-token)
+- [neo4j-cli aura deployment token create](#neo4j-cli-aura-deployment-token-create)
+- [neo4j-cli aura deployment token delete](#neo4j-cli-aura-deployment-token-delete)
+- [neo4j-cli aura deployment token update](#neo4j-cli-aura-deployment-token-update)
 - [neo4j-cli aura graph-analytics](#neo4j-cli-aura-graph-analytics)
 - [neo4j-cli aura graph-analytics session](#neo4j-cli-aura-graph-analytics-session)
 - [neo4j-cli aura graph-analytics session create](#neo4j-cli-aura-graph-analytics-session-create)
@@ -791,6 +806,288 @@ neo4j-cli aura customer-managed-key list
 
 # Emit JSON for scripting (e.g. piping into jq)
 neo4j-cli aura customer-managed-key list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
+```
+
+## neo4j-cli aura deployment
+
+Relates to Fleet Manager deployments
+
+Relates to Fleet Manager deployments: Neo4j DBMSs (self-managed or otherwise unmonitored) that report to Aura Fleet Manager. Scoped to a project.
+
+Usage: `neo4j-cli aura deployment`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+| `--organization-id` | string | - | ID of the Aura organization |
+| `--project-id` | string | - | ID of the Aura project |
+
+### neo4j-cli aura deployment create
+
+Create a new deployment
+
+Creates a new unmonitored Fleet Manager deployment and returns its ID.
+
+Next, create a token with 'aura deployment token create' and register it in the database with `call fleetManagement.registerToken('$token');`.
+
+Usage: `neo4j-cli aura deployment create [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--connection-url` | string | - | An optional connection URL for the deployment |
+| `--name` | string | - | (required) Deployment name |
+
+Examples:
+
+```
+# Create a deployment in the default project
+neo4j-cli aura deployment create --name my-deployment --rw
+
+# Create a deployment with a connection URL in a specific project
+neo4j-cli aura deployment create --name my-deployment --connection-url neo4j+s://db.example.com:7687 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Create a deployment and emit JSON for scripting
+neo4j-cli aura deployment create --name my-deployment --rw --format json
+```
+
+### neo4j-cli aura deployment database
+
+Relates to deployment databases
+
+Usage: `neo4j-cli aura deployment database`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--deployment-id` | string | - | (required) Fleet Manager deployment ID |
+
+#### neo4j-cli aura deployment database list
+
+Returns deployment databases
+
+Returns the databases of the given Fleet Manager deployment.
+
+Usage: `neo4j-cli aura deployment database list`
+
+Examples:
+
+```
+# List the databases of a deployment in the default project
+neo4j-cli aura deployment database list --deployment-id 22222222-2222-2222-2222-222222222222
+
+# List them as JSON for scripting
+neo4j-cli aura deployment database list --deployment-id 22222222-2222-2222-2222-222222222222 --format json
+```
+
+### neo4j-cli aura deployment delete
+
+Delete the given deployment
+
+Deletes the given Fleet Manager deployment. This only removes the deployment from Fleet Manager; the running database is not affected. Disable Fleet Management in the database afterwards with `call fleetManagement.disable()`.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura deployment delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete a deployment in the default project
+neo4j-cli aura deployment delete 22222222-2222-2222-2222-222222222222 --rw --yes --force
+
+# Delete a deployment in a specific project
+neo4j-cli aura deployment delete 22222222-2222-2222-2222-222222222222 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+```
+
+### neo4j-cli aura deployment get
+
+Returns deployment details
+
+Returns details about a specific Fleet Manager deployment, including its DBMS edition and packaging and the state of its token.
+
+Usage: `neo4j-cli aura deployment get <id>`
+
+Examples:
+
+```
+# Get a deployment in the default project
+neo4j-cli aura deployment get 22222222-2222-2222-2222-222222222222
+
+# Get a deployment in a specific project
+neo4j-cli aura deployment get 22222222-2222-2222-2222-222222222222 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Get a deployment as JSON for scripting
+neo4j-cli aura deployment get 22222222-2222-2222-2222-222222222222 --format json
+```
+
+### neo4j-cli aura deployment list
+
+Returns all deployments
+
+Returns all Fleet Manager deployments for the given project.
+
+Usage: `neo4j-cli aura deployment list`
+
+Examples:
+
+```
+# List deployments in the default project
+neo4j-cli aura deployment list
+
+# List deployments in a specific project
+neo4j-cli aura deployment list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List deployments as JSON for scripting
+neo4j-cli aura deployment list --format json
+```
+
+### neo4j-cli aura deployment server
+
+Relates to deployment servers
+
+Usage: `neo4j-cli aura deployment server`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--deployment-id` | string | - | (required) Fleet Manager deployment ID |
+
+#### neo4j-cli aura deployment server database
+
+Relates to the databases of a deployment server
+
+Usage: `neo4j-cli aura deployment server database`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--server-id` | string | - | (required) Fleet Manager deployment server ID |
+
+##### neo4j-cli aura deployment server database list
+
+Returns deployment server databases
+
+Returns the databases of the given Fleet Manager deployment server.
+
+Usage: `neo4j-cli aura deployment server database list`
+
+Examples:
+
+```
+# List the databases of a deployment server in the default project
+neo4j-cli aura deployment server database list --deployment-id 22222222-2222-2222-2222-222222222222 --server-id SERVER_ID
+
+# List them as JSON for scripting
+neo4j-cli aura deployment server database list --deployment-id 22222222-2222-2222-2222-222222222222 --server-id SERVER_ID --format json
+```
+
+#### neo4j-cli aura deployment server list
+
+Returns deployment servers
+
+Returns the servers of the given Fleet Manager deployment.
+
+Usage: `neo4j-cli aura deployment server list`
+
+Examples:
+
+```
+# List the servers of a deployment in the default project
+neo4j-cli aura deployment server list --deployment-id 22222222-2222-2222-2222-222222222222
+
+# List them as JSON for scripting
+neo4j-cli aura deployment server list --deployment-id 22222222-2222-2222-2222-222222222222 --format json
+```
+
+### neo4j-cli aura deployment token
+
+Relates to deployment tokens
+
+Usage: `neo4j-cli aura deployment token`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--deployment-id` | string | - | (required) Fleet Manager deployment ID |
+
+#### neo4j-cli aura deployment token create
+
+Create a deployment token
+
+Creates a new auto-rotating Fleet Manager deployment token with a three month rotation interval. Register the deployment with Fleet Manager using the `call fleetManagement.registerToken('$token');` database procedure.
+
+Usage: `neo4j-cli aura deployment token create`
+
+Examples:
+
+```
+# Create a token for a deployment in the default project
+neo4j-cli aura deployment token create --deployment-id 22222222-2222-2222-2222-222222222222 --rw
+
+# Create a token in a specific project and emit JSON
+neo4j-cli aura deployment token create --deployment-id 22222222-2222-2222-2222-222222222222 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
+```
+
+#### neo4j-cli aura deployment token delete
+
+Delete the deployment token
+
+Deletes the token of the given Fleet Manager deployment. Afterwards, also disable Fleet Management in the database using `call fleetManagement.disable();`.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura deployment token delete [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete the token of a deployment in the default project
+neo4j-cli aura deployment token delete --deployment-id 22222222-2222-2222-2222-222222222222 --rw --yes --force
+
+# Delete the token in a specific project
+neo4j-cli aura deployment token delete --deployment-id 22222222-2222-2222-2222-222222222222 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+```
+
+#### neo4j-cli aura deployment token update
+
+Rotate the deployment token
+
+Creates a new auto-rotating Fleet Manager deployment token with a three month rotation interval, for when the token needs to be rotated manually. Register the new token in the database again using `call fleetManagement.registerToken('$token');`.
+
+Usage: `neo4j-cli aura deployment token update`
+
+Examples:
+
+```
+# Rotate the token of a deployment in the default project
+neo4j-cli aura deployment token update --deployment-id 22222222-2222-2222-2222-222222222222 --rw
+
+# Rotate the token in a specific project and emit JSON
+neo4j-cli aura deployment token update --deployment-id 22222222-2222-2222-2222-222222222222 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 ```
 
 ## neo4j-cli aura graph-analytics
