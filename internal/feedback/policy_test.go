@@ -102,7 +102,7 @@ func TestValidate_BaseInputPasses(t *testing.T) {
 
 func TestValidate_ProhibitedCorpus(t *testing.T) {
 	cases := loadCorpus(t, "prohibited_corpus.jsonl")
-	require.Len(t, cases, 38)
+	require.Len(t, cases, 44)
 	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			_, vs, _ := Validate(inputFor(c), testRoot())
@@ -117,7 +117,7 @@ func TestValidate_ProhibitedCorpus(t *testing.T) {
 
 func TestValidate_AllowedCorpus(t *testing.T) {
 	cases := loadCorpus(t, "allowed_corpus.jsonl")
-	require.Len(t, cases, 29)
+	require.Len(t, cases, 33)
 	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			_, vs, _ := Validate(inputFor(c), testRoot())

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -280,7 +281,6 @@ func commandAllowed(root *cobra.Command, s string) bool {
 var (
 	reEmail    = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}`)
 	reURL      = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://\S+`)
-	reHostPort = regexp.MustCompile(`\b[A-Za-z0-9][A-Za-z0-9.\-]*:([0-9]{2,5})\b`)
 	reIPv4     = regexp.MustCompile(`\b[0-9]{1,3}(?:\.[0-9]{1,3}){3}\b`)
 	reIPv6Cand = regexp.MustCompile(`[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*`)
 	// A POSIX path needs two segments or a file extension, so an agent's own
@@ -289,7 +289,9 @@ var (
 	reHomePath  = regexp.MustCompile(`(?:^|[\s"'(=,])~[A-Za-z0-9._\-]*/`)
 	reRelPath   = regexp.MustCompile(`(?:^|[\s"'(=,])\.{1,2}/`)
 	reWinPath   = regexp.MustCompile(`\b[A-Za-z]:[\\/]`)
-	reDataFile  = regexp.MustCompile(`(?i)\b[\w\-]+\.(?:csv|tsv|json|jsonl|ndjson|cypher|cql|txt|xlsx?|xml|ya?ml|parquet|sql|log|py|js|ts|go|java|sh|md|zip|gz|tar|pdf|db|dump|backup|toml|ini|conf|properties)\b`)
+	// reDataFile matches a whole dotted name; only its LAST label decides whether it
+	// is a data file, so apoc.export.json.all is a procedure, not a .json file.
+	reDataFile  = regexp.MustCompile(`[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.([A-Za-z0-9]{1,10})`)
 	reSecretKV  = regexp.MustCompile(`(?i)\b(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|auth|credential)s?(\s*=\s*|\s*:\s*)(\S+)`)
 	reSecretKey = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_\-]{8,}|ghp_[A-Za-z0-9]{8,}|xox[a-z]-[A-Za-z0-9\-]{6,}|AKIA[0-9A-Z]{8,}|nams_[A-Za-z0-9_\-]{6,})`)
 	reLongToken = regexp.MustCompile(`[A-Za-z0-9+/]{20,}`)
@@ -423,17 +425,166 @@ func hasDigit(s string) bool {
 	return false
 }
 
-// hasHostPort matches host:port where the host contains a letter, so that
-// clock times like 10:30 are not flagged (numeric hosts are caught as IPs),
-// and where the host has a dot, is localhost, or the port has 4 or 5 digits,
-// so that "retry:10" is not flagged either.
-func hasHostPort(s string) bool {
-	for _, m := range reHostPort.FindAllStringSubmatch(s, -1) {
-		host := m[0][:strings.LastIndex(m[0], ":")]
-		if !hasLetter(host) {
-			continue
+// dataExtensions are the file extensions that make a dotted name a data file
+// (the data-filename detector) and keep it from reading as a host name. One
+// list, so the two detectors cannot drift apart.
+var dataExtensions = []string{
+	"csv", "tsv", "json", "jsonl", "ndjson", "cypher", "cql", "txt", "xls", "xlsx", "xml", "yaml", "yml",
+	"parquet", "sql", "log", "go", "java", "sh", "md", "zip", "gz", "tar", "pdf", "db", "dump", "backup",
+	"toml", "ini", "conf", "properties", "rs", "py", "js", "ts", "html", "htm", "rl", "lock", "env", "bak",
+}
+
+func isDataExtension(ext string) bool {
+	for _, e := range dataExtensions {
+		if strings.EqualFold(e, ext) {
+			return true
 		}
-		if strings.Contains(host, ".") || strings.EqualFold(host, "localhost") || len(m[1]) >= 4 {
+	}
+	return false
+}
+
+// procedurePrefixes are the namespaces a report may name without the token
+// reading as a host: whole-prefix matches with the trailing dot, never a
+// first-label match, so db.prod.internal and gds.prod.internal stay host hits.
+var procedurePrefixes = []string{"apoc.", "gds.", "db.ontology."}
+
+// procedureWords end a procedure reference (apoc.export.json.all,
+// gds.pageRank.stream). A host rarely ends in one, so the exemption cannot
+// swallow an internal host: the shape of the last label separates the two.
+var procedureWords = []string{
+	"all", "stream", "write", "stats", "mutate", "project", "validate", "get", "set", "list", "create",
+	"drop", "delete", "submit", "apply",
+}
+
+// isProcedureName reports whether token names a procedure in an exempted
+// namespace. Only a port-less token is exempt: an explicit port is the
+// strongest host signal a token carries.
+func isProcedureName(token string) bool {
+	if strings.Contains(token, ":") {
+		return false
+	}
+	last := token
+	if i := strings.LastIndex(token, "."); i >= 0 {
+		last = token[i+1:]
+	}
+	if !slices.Contains(procedureWords, last) {
+		return false
+	}
+	for _, p := range procedurePrefixes {
+		if strings.HasPrefix(token, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// isTokenBoundary ends a token: whitespace, or one of "'()[]{}<>,;
+func isTokenBoundary(r rune) bool {
+	return unicode.IsSpace(r) || strings.ContainsRune("\"'()[]{}<>,;", r)
+}
+
+func trimTokenPunct(s string) string { return strings.TrimRight(s, ".,;:!?)]}") }
+
+// authority is the part of a token before the first '/', '?' or '#', so a
+// host with a path attached (grafana.internal/d/abc) is still classified.
+func authority(token string) string {
+	if i := strings.IndexAny(token, "/?#"); i >= 0 {
+		return token[:i]
+	}
+	return token
+}
+
+// hostLabel is one DNS label: 1-63 ASCII alphanumerics or hyphens, no leading
+// or trailing hyphen.
+func hostLabel(l string) bool {
+	if l == "" || len(l) > 63 || l[0] == '-' || l[len(l)-1] == '-' {
+		return false
+	}
+	for i := 0; i < len(l); i++ {
+		c := l[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && c != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func isASCIILetters(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') {
+			return false
+		}
+	}
+	return s != ""
+}
+
+func isDigits(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return s != ""
+}
+
+// hostToken is a bare host name: two or more dotted labels whose last label is
+// only letters (so 1.2.3 and times do not match) and not a data extension.
+func hostToken(token string) bool {
+	token = trimTokenPunct(token)
+	i := strings.LastIndex(token, ".")
+	if i < 0 {
+		return false
+	}
+	tld := token[i+1:]
+	if len(tld) < 2 || !isASCIILetters(tld) || isDataExtension(tld) {
+		return false
+	}
+	for _, l := range strings.Split(token, ".") {
+		if !hostLabel(l) {
+			return false
+		}
+	}
+	return true
+}
+
+// reNeoStatusCode is a Neo4j status code (Neo.ClientError.Security.Unauthorized):
+// an identifier agents cite constantly, never a host. neo4j-cli-specific; the
+// shape is exact (known class, category, title) so a host cannot hide in it.
+var reNeoStatusCode = regexp.MustCompile(`^(?i)neo\.(?:clienterror|transienterror|databaseerror|clientnotification|databasenotification)\.[a-z]+\.[a-z0-9]+$`)
+
+func hostPortToken(token string) bool {
+	token = trimTokenPunct(authority(token))
+	if isProcedureName(strings.ToLower(token)) || reNeoStatusCode.MatchString(token) {
+		return false
+	}
+	host, port := token, ""
+	if i := strings.LastIndex(token, ":"); i >= 0 && isDigits(token[i+1:]) {
+		host, port = token[:i], token[i+1:]
+	}
+	if hostToken(host) || strings.EqualFold(host, "localhost") {
+		return true
+	}
+	// A single label is a host only with an explicit port and a letter: the 10
+	// in 10:30 is a time. neo4j-cli additionally needs a 4+ digit port, so prose
+	// such as retry:10 or timeout:30 is not read as a host (Relate flags any
+	// port; an intentional difference, pinned by the allowed corpus).
+	if len(port) < 4 || !hostLabel(host) {
+		return false
+	}
+	for i := 0; i < len(host); i++ {
+		c := host[i]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' {
+			return true
+		}
+	}
+	return false
+}
+
+// hasHostPort reports a host name in the text, with or without a port.
+func hasHostPort(s string) bool {
+	for _, tok := range strings.FieldsFunc(s, isTokenBoundary) {
+		if hostPortToken(tok) {
 			return true
 		}
 	}
@@ -460,8 +611,8 @@ func hasIP(s string) bool {
 }
 
 func hasDataFilename(s string) bool {
-	for _, m := range reDataFile.FindAllString(s, -1) {
-		if !allowedFilenames[strings.ToLower(m)] {
+	for _, m := range reDataFile.FindAllStringSubmatch(s, -1) {
+		if isDataExtension(m[1]) && !allowedFilenames[strings.ToLower(m[0])] {
 			return true
 		}
 	}
