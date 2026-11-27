@@ -5,6 +5,7 @@ package credentials_test
 
 import (
 	"encoding/json"
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zalando/go-keyring"
 )
 
 func newTestDbmsCredentials(t *testing.T, credentialsJSON string) (*credentials.Credentials, afero.Fs) {
@@ -125,6 +127,85 @@ func TestDbmsCredentials_Add(t *testing.T) {
 			assert.Len(t, creds.Dbms.Credentials, tc.wantCredCount)
 		})
 	}
+}
+
+func TestDbmsCredentials_Update(t *testing.T) {
+	for _, target := range []struct{ name, old string }{
+		{name: "first", old: "first-password"},
+		{name: "second", old: "second-password"},
+	} {
+		t.Run(target.name, func(t *testing.T) {
+			creds, fs := newTestDbmsCredentials(t, `{"dbms":{"default-credential":"first","credentials":[
+				{"name":"first","username":"old","password":"first-password","database-name":"neo4j","uri":"bolt://localhost:7687","embed-credential":"embed-a"},
+				{"name":"second","username":"other","password":"second-password","database-name":"neo4j","uri":"bolt://localhost:7688"}
+			]}}`)
+			require.NoError(t, creds.Dbms.Update(target.name, "neo4j", "new-password", "neo4j", "bolt+ssc://localhost:7689"))
+			assert.Equal(t, "first", creds.Dbms.DefaultCredential)
+			assert.Len(t, creds.Dbms.Credentials, 2)
+			stored, err := creds.Dbms.Get(target.name)
+			require.NoError(t, err)
+			assert.Equal(t, "neo4j", stored.Username)
+			assert.Equal(t, "new-password", stored.Password)
+			assert.Equal(t, "bolt+ssc://localhost:7689", stored.URI)
+			if target.name == "first" {
+				assert.Equal(t, "embed-a", stored.EmbedCredential)
+			}
+			persisted, err := afero.ReadFile(fs, filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
+			require.NoError(t, err)
+			assert.Contains(t, string(persisted), "new-password")
+			assert.NotContains(t, string(persisted), target.old)
+		})
+	}
+}
+
+func TestDbmsCredentials_UpdateMissingDoesNotAdd(t *testing.T) {
+	creds, _ := newTestDbmsCredentials(t, `{"dbms":{"credentials":[]}}`)
+	err := creds.Dbms.Update("missing", "neo4j", "new-password", "neo4j", "bolt://localhost:7687")
+	require.Error(t, err)
+	assert.Empty(t, creds.Dbms.Credentials)
+	assert.Empty(t, creds.Dbms.DefaultCredential)
+}
+
+func TestDbmsCredentials_UpdateReplacesKeyringPassword(t *testing.T) {
+	keyring.MockInit()
+	creds, fs := newTestDbmsCredentials(t, `{"dbms":{"default-credential":"local","credentials":[
+		{"name":"local","username":"neo4j","password":"old-password","database-name":"neo4j","uri":"bolt://localhost:7687"}
+	]}}`)
+	require.NoError(t, creds.MigrateToKeyring())
+	require.NoError(t, creds.Dbms.Update("local", "neo4j", "new-password", "neo4j", "bolt://localhost:7688"))
+	password, err := keyring.Get(credentials.ServiceName, credentials.KeyringKey("dbms", "local", "password"))
+	require.NoError(t, err)
+	assert.Equal(t, "new-password", password)
+	// The save path restores the value in memory, so this process keeps using it.
+	assert.Equal(t, "new-password", creds.Dbms.Credentials[0].Password)
+	persisted, err := afero.ReadFile(fs, filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(persisted), "old-password")
+	assert.NotContains(t, string(persisted), "new-password")
+}
+
+func TestDbmsCredentials_ScopedNameRoundTripsThroughKeyring(t *testing.T) {
+	// An EKS ARN context puts colons and slashes in the credential name, and
+	// that name also becomes the keyring account key.
+	name := "k8s-arn:aws:eks:eu-west-1:123456789012:cluster/dev-default-dev"
+	creds, fs := newKeyringTestCredentials(t, newMockKeyringProvider(), `{"dbms":{"credentials":[]}}`)
+	require.NoError(t, creds.Dbms.Add(name, "neo4j", "first-password", "neo4j", "bolt://127.0.0.1:7687"))
+	assert.NotContains(t, string(readCredentialsJSON(t, fs)), "first-password")
+
+	reloaded := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	reloaded.SetStorageMode(credentials.StorageModeKeyring, io.Discard)
+	stored, err := reloaded.Dbms.Get(name)
+	require.NoError(t, err)
+	assert.Equal(t, "first-password", stored.Password)
+
+	require.NoError(t, reloaded.Dbms.Update(name, "neo4j", "rotated-password", "neo4j", "bolt+ssc://127.0.0.1:7688"))
+	again := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	again.SetStorageMode(credentials.StorageModeKeyring, io.Discard)
+	stored, err = again.Dbms.Get(name)
+	require.NoError(t, err)
+	assert.Equal(t, "rotated-password", stored.Password)
+	assert.Equal(t, "bolt+ssc://127.0.0.1:7688", stored.URI)
+	assert.Equal(t, name, again.Dbms.DefaultCredential)
 }
 
 func TestDbmsCredentials_Remove(t *testing.T) {
