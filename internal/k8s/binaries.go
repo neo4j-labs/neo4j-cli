@@ -34,7 +34,7 @@ func HelmPresent() bool {
 // kubectlMissingErr is the shared install hint for a missing kubectl.
 func kubectlMissingErr() error {
 	return clierr.NewUsageError(
-		"kubectl not found in PATH — install kubectl (https://kubernetes.io/docs/tasks/tools/install-kubectl/) " +
+		"kubectl not found in PATH. Install kubectl (https://kubernetes.io/docs/tasks/tools/install-kubectl/)" +
 			"or a bundled distribution such as kind, minikube or Docker Desktop with its CLI on PATH",
 	)
 }
@@ -42,7 +42,7 @@ func kubectlMissingErr() error {
 // helmMissingErr is the shared install hint for a missing helm.
 func helmMissingErr() error {
 	return clierr.NewUsageError(
-		"helm not found in PATH — install Helm 3.8 or newer (https://helm.sh/docs/intro/install/)",
+		"helm not found in PATH. Install Helm 3.8 or newer (https://helm.sh/docs/intro/install/)",
 	)
 }
 

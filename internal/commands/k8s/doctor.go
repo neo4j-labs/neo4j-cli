@@ -88,7 +88,7 @@ func newDoctorCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Check the local Kubernetes setup for the Neo4j operator",
 		Long: "Run an ordered sequence of seven checks against the local Kubernetes setup: " +
 			"(1) kubectl present, (2) kubectl version, (3) helm present, (4) helm version, " +
-			"(5) cluster reachable, (6) Kubernetes version, (7) client/server version skew. " +
+			"(5) cluster reachable, (6) Kubernetes version, (7) client and server version skew." +
 			"Each check produces a `{name, status, detail, hint?}` record. " +
 			"When a check fails, the checks that depend on it render as `skip` with a `(depends on …)` detail. " +
 			"The version checks enforce kubectl 1.22 or newer (for `--server-side`), helm 3.8 or newer (for OCI) " +
@@ -96,7 +96,7 @@ func newDoctorCmd(cfg *clicfg.Config) *cobra.Command {
 			"The skew check warns when kubectl and the API server differ by more than one minor version. " +
 			"Kubernetes supports a skew of one minor version in either direction. A warning does not fail the report. " +
 			"`--format json` (or `toon`) emits a single `{checks: [...], summary: {ready, kubectl_version?, helm_version?, server_version?, next_step?}}` document. " +
-			"The default table format renders aligned check / status / detail columns and a trailing summary line. " +
+			"The default table format renders aligned check, status and detail columns and a trailing summary line." +
 			"The leaf is read-only and exits 0 whatever the checks find (an interrupt still exits 130). Parse `summary.ready` to gate downstream actions.",
 		Example: `# Run all seven checks against the current Kubernetes context
 neo4j-cli k8s doctor

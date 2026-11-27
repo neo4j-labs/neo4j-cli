@@ -33,7 +33,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"The group drives the host `kubectl` and `helm` binaries, so both must be on PATH. " +
 			"Pass --kubeconfig, --context and -n/--namespace on this group to scope every call. " +
 			"This group is a preview behind the flag.k8s-commands feature flag. " +
-			"Write commands will require --rw. Start with `k8s doctor` to check the local setup.",
+			"Write commands require --rw. Start with `k8s doctor` to check the local setup.",
 	}
 
 	k8sflags.RegisterPersistentFlags(cmd)
