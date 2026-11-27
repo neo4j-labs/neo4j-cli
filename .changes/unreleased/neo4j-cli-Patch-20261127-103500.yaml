@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'The `k8s operator install` and `k8s operator upgrade` commands now check the SHA256 digest of a downloaded CRD manifest against the GitHub release metadata before applying it. They refuse manifests with a missing or mismatched digest.'
+time: 2026-11-27T10:35:00+00:00

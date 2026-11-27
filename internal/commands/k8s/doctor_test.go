@@ -124,7 +124,7 @@ func TestDoctor_HealthyCluster_AllPass(t *testing.T) {
 	report := decodeReport(t, stdout)
 	for _, name := range []string{
 		CheckKubectlPresent, CheckKubectlVersion, CheckHelmPresent, CheckHelmVersion,
-		CheckClusterReachable, CheckKubernetesVersion, CheckVersionSkew,
+		CheckCloudLogin, CheckClusterReachable, CheckKubernetesVersion, CheckVersionSkew,
 	} {
 		assert.Equal(t, StatusPass, statusOf(t, report, name), "check %s", name)
 	}
@@ -136,6 +136,45 @@ func TestDoctor_HealthyCluster_AllPass(t *testing.T) {
 	// The version call runs exactly once, not once per dependent check.
 	assert.Equal(t, 1, env.fake.KubectlVersionCalls)
 	assert.Equal(t, 1, env.fake.HelmVersionCalls)
+}
+
+func TestDoctor_ExpiredCloudLogin_IsItsOwnCheck(t *testing.T) {
+	stubPresentBinaries(t)
+	fake := engine.NewFakeClient()
+	// The probe still reports the client half, so the kubectl floor passes.
+	fake.KubectlVersionResult = engine.VersionInfo{ClientVersion: "v1.36.0"}
+	fake.KubectlVersionErr = clierr.NewAuthError(
+		"kubectl: Unable to connect to the server: getting credentials: exec: executable gke-gcloud-auth-plugin failed with exit code 1")
+
+	stdout, _, err := runDoctor(t, "--format json", &doctorEnv{fake: fake})
+	require.NoError(t, err)
+
+	report := decodeReport(t, stdout)
+	assert.Equal(t, StatusPass, statusOf(t, report, CheckKubectlVersion))
+	assert.Equal(t, StatusFail, statusOf(t, report, CheckCloudLogin))
+	assert.Contains(t, hintOf(t, report, CheckCloudLogin), "Sign in to your cloud provider again")
+	// The login failure owns the report, so the cluster checks wait on it.
+	assert.Equal(t, StatusSkip, statusOf(t, report, CheckClusterReachable))
+	assert.Equal(t, StatusSkip, statusOf(t, report, CheckKubernetesVersion))
+	assert.Equal(t, StatusSkip, statusOf(t, report, CheckVersionSkew))
+	assert.False(t, report.Summary.Ready)
+	assert.Contains(t, report.Summary.NextStep, "Sign in to your cloud provider again")
+}
+
+func TestDoctor_APIUnauthorizedStillFailsReachability(t *testing.T) {
+	stubPresentBinaries(t)
+	fake := engine.NewFakeClient()
+	fake.KubectlVersionResult = engine.VersionInfo{ClientVersion: "v1.36.0"}
+	// The API server's own 401 is not an exec credential plugin failure.
+	fake.KubectlVersionErr = clierr.NewAuthError("kubectl: Error from server (Unauthorized)")
+
+	stdout, _, err := runDoctor(t, "--format json", &doctorEnv{fake: fake})
+	require.NoError(t, err)
+
+	report := decodeReport(t, stdout)
+	assert.Equal(t, StatusSkip, statusOf(t, report, CheckCloudLogin))
+	assert.Equal(t, StatusFail, statusOf(t, report, CheckClusterReachable))
+	assert.False(t, report.Summary.Ready)
 }
 
 func TestDoctor_KubectlMissing_SkipsDependentChecks(t *testing.T) {
@@ -254,7 +293,7 @@ func TestDoctor_InterruptReturnsContextError(t *testing.T) {
 	stubPresentBinaries(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	fake := engine.NewFakeClient()
-	// The signal arrives while kubectl runs, as cli.Run's handler would.
+	// The signal arrives while kubectl runs, as cli.Run's handler does.
 	fake.KubectlVersionFn = func(context.Context) (engine.VersionInfo, error) {
 		cancel()
 		return engine.VersionInfo{}, context.Canceled
@@ -339,7 +378,7 @@ func TestDoctor_Help_ListsUnderGroup(t *testing.T) {
 	cmd.SetArgs([]string{"doctor", "--help"})
 	require.NoError(t, cmd.Execute())
 	got := out.String()
-	for _, want := range []string{"doctor", "seven checks", "neo4j-cli k8s doctor", "--kubeconfig"} {
+	for _, want := range []string{"doctor", "eight checks", "neo4j-cli k8s doctor", "--kubeconfig"} {
 		assert.Contains(t, got, want)
 	}
 }
@@ -358,6 +397,18 @@ func detailOf(t *testing.T, report DoctorReport, name string) string {
 	for _, c := range report.Checks {
 		if c.Name == name {
 			return c.Detail
+		}
+	}
+	t.Fatalf("check %q missing from report", name)
+	return ""
+}
+
+// hintOf returns the hint of one check row by name.
+func hintOf(t *testing.T, report DoctorReport, name string) string {
+	t.Helper()
+	for _, c := range report.Checks {
+		if c.Name == name {
+			return c.Hint
 		}
 	}
 	t.Fatalf("check %q missing from report", name)
