@@ -38,6 +38,10 @@ internal/testutil/testfs/
 
 Tests run on `ubuntu-latest`, `windows-latest`, and `macos-latest` on every push/PR to `main`.
 
+## Relate engine tests
+
+Real-engine tests carry `//go:build cgo && relate` and run only with `CGO_ENABLED=1 go test -tags relate ./...` plus the cgo env from `scripts/relate-ffi.sh` (CI `relate` lane). `make test` runs the fake-store tests only. See [`relate.md`](relate.md).
+
 ## internal/output Testing Notes
 
 - Use `testfs.GetTestFs(`{"format":"toon"}`, "{}")` + `clicfg.NewConfig(fs, "test", clicfg.GlobalScope)` to build a config that returns "toon" from `cfg.Global.Format()`.

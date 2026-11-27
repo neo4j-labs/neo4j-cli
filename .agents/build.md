@@ -87,3 +87,7 @@ Releases are triggered automatically in CI when `CHANGELOG.md` is updated on `ma
 - `darwin/amd64`, `darwin/arm64`
 
 macOS binaries are code-signed and notarized using App Store Connect keys stored in GitHub secrets.
+
+## Relate engine build
+
+`go build -tags relate` with `CGO_ENABLED=1` links the pinned Relate FFI statically (`scripts/relate-ffi.sh <triple> <dir>` provides it). Untagged builds omit it. See [`relate.md`](relate.md).

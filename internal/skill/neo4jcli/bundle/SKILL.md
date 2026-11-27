@@ -1,6 +1,6 @@
 ---
 name: neo4j-cli
-description: Neo4j CLI. Runs and pipes Cypher, introspects the schema, generates a data model, and embeds text inline as a query parameter. Discovers and loads example datasets from GitHub repos into local Docker, Neo4j Desktop, or a new Aura instance. Manages local Neo4j Docker containers and Neo4j Desktop DBMSs; Aura instances, projects, and Agents; and Aura, Neo4j connection (dbms), and embedding-provider credentials. Installs, removes, and refreshes agent skills, and self-updates the binary. Skip for Cypher syntax help, Neo4j drivers, Kubernetes, Neo4j Browser, or other databases.
+description: Neo4j CLI. Runs and pipes Cypher, introspects the schema, generates a data model, and embeds text inline as a query parameter. Discovers and loads example datasets from GitHub repos into local Docker, Neo4j Desktop, or a new Aura instance. Runs Cypher against and manages local embedded Relate graph stores (query --relate; relate create, list, info, delete, pull, push). Manages local Neo4j Docker containers and Neo4j Desktop DBMSs; Aura instances, projects, and Agents; and Aura, Neo4j connection (dbms), and embedding-provider credentials. Installs, removes, and refreshes agent skills, and self-updates the binary. Skip for Cypher syntax help, Neo4j drivers, Kubernetes, Neo4j Browser, or other databases.
 version: {{VERSION}}
 ---
 
@@ -85,6 +85,17 @@ neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw  # reuses th
 neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --wait --rw
 neo4j-cli query --env /tmp/n.env 'RETURN 1 AS n'
 neo4j-cli docker stop tmp --rw
+```
+
+- Local embedded Relate store (no server, ports or credentials): `neo4j-cli query --relate <name-or-path> '<cypher>'` runs the whole query surface — `--param`, multiple statements, `--atomic`, `:schema`, `--format` — against a local store directory (a bare name lives under the CLI's managed store directory; a path is used verbatim). The store is created when missing and is mutually exclusive with `--uri`/`--username`/`--password`/`--database`/`--credential`. Output matches the Bolt path, including ISO-8601 strings for temporals. Manage stores with `neo4j-cli relate create|list|info|delete`. `relate pull <store> --query '<cypher returning nodes/rels/paths>'` copies a subgraph from a remote Neo4j (same connection flags as `query`) into the store, upserting by source identity so a re-pull updates instead of duplicating; `relate push <store>` MERGEs the store's subgraph into a remote (keys from the remote's uniqueness constraints, or `--merge-key Label.property`; `--dry-run` prints the plan but still reads the remote's constraints). Writes (`query` writes, `create`, `delete`, `pull`, `push`) need `--rw` under an agent. The engine is only in builds compiled with `-tags relate`; if a command fails with "not compiled into this build", tell the user rather than retrying. Engine open options go in repeatable `--relate-opt key=value` flags on `query --relate`, `relate create`, `pull` and `push` (keys: `snapshot-format`=parquet|json|markdown for a NEW store only, `markdown-body-properties`, `checkpoint-interval-secs`, `durability-mode`, `logical-graph-size-limit`, `expression-memory-limit`); `snapshot-format=markdown` makes a vault with one note per node.
+
+```sh
+# Create a store, write, then read it back — no server involved
+neo4j-cli relate create movies --rw
+neo4j-cli query "CREATE (:Movie {title: 'The Matrix'})" --relate movies --rw
+neo4j-cli query "MATCH (m:Movie) RETURN m.title AS title" --relate movies --format toon
+# Copy a remote subgraph into a Markdown vault
+neo4j-cli relate pull notes --rw --relate-opt snapshot-format=markdown --uri neo4j://localhost:7687 -u neo4j -p '<pw>' --query "MATCH (n:Person) RETURN n"
 ```
 
 - Aura Agents: `neo4j-cli aura agent` (`list` / `get` / `create` / `update` / `replace` / `delete` / `invoke`) manages Aura Agents — LLM-backed assistants bound to an Aura database. `--organization-id` / `--project-id` honour the default workspace, identical to every other aura command. `invoke` is dual-mode: `--format json` returns the full server response verbatim (content blocks, usage, end_reason, errors), while the default table output joins the text content blocks and prints a single stats line `Status: <S> | End reason: <ER> | Tool calls: <N> | Tokens: <req> req / <res> res / <total> total`. HTTP 403 on `invoke` surfaces as `agent invocation forbidden: agent may be disabled or private`; an HTTP 200 body with `type: "error"` surfaces as `agent invocation failed: <message>`.
