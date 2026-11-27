@@ -168,10 +168,17 @@ type serviceSpec struct {
 }
 
 type trustSpec struct {
-	Enabled                 bool           `yaml:"enabled,omitempty"`
-	InsecureAdminConnection bool           `yaml:"insecureAdminConnection,omitempty"`
-	Certificates            map[string]any `yaml:"certificates,omitempty"`
-	CertManager             map[string]any `yaml:"certManager,omitempty"`
+	Enabled                 bool           `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	InsecureAdminConnection bool           `yaml:"insecureAdminConnection,omitempty" json:"insecureAdminConnection,omitempty"`
+	Certificates            map[string]any `yaml:"certificates,omitempty" json:"certificates,omitempty"`
+	CertManager             map[string]any `yaml:"certManager,omitempty" json:"certManager,omitempty"`
+}
+
+// hasBoltTLS reports whether the trust block secures the Bolt connector, as
+// opposed to cluster or HTTPS traffic only. Detection and cluster admission
+// share it so that the two cannot disagree.
+func (t *trustSpec) hasBoltTLS() bool {
+	return t != nil && t.Enabled && (t.Certificates["bolt"] != nil || len(t.CertManager) > 0)
 }
 
 // BuildNeo4jManifest makes sure that the dedicated flags are valid and renders
@@ -364,8 +371,7 @@ func validateNeo4jManifest(manifest neo4jManifest) error {
 			return clierr.NewUsageError("the number of primaries must be odd, from 1 to 15")
 		}
 		trust := manifest.Spec.Trust
-		hasBoltTLS := trust != nil && trust.Enabled && (trust.Certificates["bolt"] != nil || len(trust.CertManager) > 0)
-		if trust == nil || (!trust.InsecureAdminConnection && !hasBoltTLS) {
+		if trust == nil || (!trust.InsecureAdminConnection && !trust.hasBoltTLS()) {
 			return clierr.NewUsageError("cluster mode requires --insecure-admin-connection, or Bolt TLS in a --from-file trust block")
 		}
 		if len(manifest.Spec.Plugins) > 0 {

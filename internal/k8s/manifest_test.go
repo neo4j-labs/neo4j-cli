@@ -191,6 +191,35 @@ spec:
 	assert.NotContains(t, string(certManagerManifest), "namespace:")
 }
 
+func TestPrepareNeo4jManifestFromFile_CertManagerCountsAsBoltTLS(t *testing.T) {
+	input := `apiVersion: neo4j.com/v1
+kind: Neo4j
+spec:
+  edition: enterprise
+  version: "2026.05.0"
+  license: {accept: "eval"}
+  topology:
+    mode: Cluster
+    primaries:
+      members: 3
+  trust:
+    enabled: true
+    certManager:
+      issuerRef:
+        name: neo4j-ca
+`
+	manifest, err := PrepareNeo4jManifestFromFile([]byte(input), "dev", "default")
+	require.NoError(t, err)
+	assert.Contains(t, string(manifest), "name: neo4j-ca")
+
+	clusterOnly := strings.Replace(input,
+		"    certManager:\n      issuerRef:\n        name: neo4j-ca\n",
+		"    certificates:\n      cluster:\n        secretName: cluster-tls\n", 1)
+	_, err = PrepareNeo4jManifestFromFile([]byte(clusterOnly), "dev", "default")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cluster mode requires")
+}
+
 func TestPrepareNeo4jManifestFromFile_RejectsInvalidInput(t *testing.T) {
 	valid := `apiVersion: neo4j.com/v1
 kind: Neo4j

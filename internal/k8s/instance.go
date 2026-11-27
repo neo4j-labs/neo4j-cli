@@ -19,6 +19,7 @@ type Neo4j struct {
 	Edition            string
 	Version            string
 	Mode               string
+	BoltTLS            bool
 	Phase              string
 	Generation         int64
 	ObservedGeneration int64
@@ -56,6 +57,7 @@ type neo4jJSON struct {
 		Topology struct {
 			Mode string `json:"mode"`
 		} `json:"topology"`
+		Trust *trustSpec `json:"trust"`
 	} `json:"spec"`
 	Status struct {
 		Phase              string `json:"phase"`
@@ -90,6 +92,7 @@ func parseNeo4j(data []byte) (Neo4j, error) {
 		Edition:            raw.Spec.Edition,
 		Version:            raw.Spec.Version,
 		Mode:               raw.Spec.Topology.Mode,
+		BoltTLS:            raw.Spec.Trust.hasBoltTLS(),
 		Phase:              raw.Status.Phase,
 		Generation:         raw.Metadata.Generation,
 		ObservedGeneration: raw.Status.ObservedGeneration,
