@@ -102,7 +102,7 @@ func TestValidate_BaseInputPasses(t *testing.T) {
 
 func TestValidate_ProhibitedCorpus(t *testing.T) {
 	cases := loadCorpus(t, "prohibited_corpus.jsonl")
-	require.Len(t, cases, 44)
+	require.Len(t, cases, 49)
 	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			_, vs, _ := Validate(inputFor(c), testRoot())
@@ -115,9 +115,25 @@ func TestValidate_ProhibitedCorpus(t *testing.T) {
 	}
 }
 
+// A detector without a rejecting corpus case could silently stop firing, so
+// every content detector must appear in the prohibited corpus: adding a
+// detector to this list without a corpus entry fails here.
+func TestProhibitedCorpus_CoversEveryDetector(t *testing.T) {
+	covered := map[string]bool{}
+	for _, c := range loadCorpus(t, "prohibited_corpus.jsonl") {
+		covered[c.Detector] = true
+	}
+	for _, d := range []string{
+		detEmail, detURL, detHostPort, detIPAddress, detFilePath, detDataFilename,
+		detSecret, detIdentifier, detCypher, detParameter, detPastedOutput, detControlChars,
+	} {
+		assert.True(t, covered[d], "no prohibited corpus case exercises detector %q", d)
+	}
+}
+
 func TestValidate_AllowedCorpus(t *testing.T) {
 	cases := loadCorpus(t, "allowed_corpus.jsonl")
-	require.Len(t, cases, 33)
+	require.Len(t, cases, 35)
 	for _, c := range cases {
 		t.Run(c.ID, func(t *testing.T) {
 			_, vs, _ := Validate(inputFor(c), testRoot())
@@ -222,6 +238,10 @@ func TestValidate_OptionalFields(t *testing.T) {
 		{"model not in family", func(in *Input) { in.AgentModel = "MyCustomBot" }, "", "", "", "", []string{"agent.model"}},
 		{"model with spaces", func(in *Input) { in.AgentModel = "claude zephyrine" }, "", "", "", "", []string{"agent.model"}},
 		{"model too long", func(in *Input) { in.AgentModel = "claude-" + strings.Repeat("x", 40) }, "", "", "", "", []string{"agent.model"}},
+		{"harness with spaces", func(in *Input) { in.Harness = "my harness" }, "", "", "", "", []string{"agent.harness"}},
+		{"harness uppercase", func(in *Input) { in.Harness = "Claude-Code" }, "", "", "", "", []string{"agent.harness"}},
+		{"harness too long", func(in *Input) { in.Harness = strings.Repeat("x", 41) }, "", "", "", "", []string{"agent.harness"}},
+		{"harness is an arbitrary env value", func(in *Input) { in.Harness = "/Users/me/secret-project" }, "", "", "", "", []string{"agent.harness"}},
 		{"o-series model", func(in *Input) { in.AgentModel = "o3-mini" }, "", "", "o3-mini", "", nil},
 		{"harness only", func(in *Input) { in.Harness = "codex" }, "", "", "", "codex", nil},
 	} {

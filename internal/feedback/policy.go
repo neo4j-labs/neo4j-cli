@@ -52,6 +52,7 @@ const (
 	droppedCommandID = "command_id"
 	droppedErrorCode = "error_code"
 	droppedModel     = "agent.model"
+	droppedHarness   = "agent.harness"
 )
 
 // validCategories is the closed category vocabulary shared with Relate
@@ -176,7 +177,14 @@ func Validate(in Input, tree *cobra.Command) (Payload, []Violation, []string) {
 		}
 	}
 
-	agent := Agent{Harness: in.Harness}
+	agent := Agent{}
+	if in.Harness != "" {
+		if slugValid(in.Harness) {
+			agent.Harness = in.Harness
+		} else {
+			dropped = append(dropped, droppedHarness)
+		}
+	}
 	if in.AgentModel != "" {
 		if modelValid(in.AgentModel) {
 			agent.Model = in.AgentModel
@@ -233,8 +241,16 @@ var (
 	modelChars    = regexp.MustCompile(`^[a-z0-9][a-z0-9._:\-]*$`)
 )
 
+// slugValid is the label gate the agent model and the harness label share:
+// non-empty, at most 40 characters, lowercase, and only [a-z0-9._:-] starting
+// with a letter or digit. The harness label comes straight from the
+// environment, so an unvalidated value would otherwise be sent as given.
+func slugValid(s string) bool {
+	return s != "" && len(s) <= 40 && s == strings.ToLower(s) && modelChars.MatchString(s)
+}
+
 func modelValid(s string) bool {
-	if len(s) > 40 || s != strings.ToLower(s) || !modelChars.MatchString(s) {
+	if !slugValid(s) {
 		return false
 	}
 	if modelO.MatchString(s) {
@@ -291,13 +307,22 @@ var (
 	reWinPath   = regexp.MustCompile(`\b[A-Za-z]:[\\/]`)
 	// reDataFile matches a whole dotted name; only its LAST label decides whether it
 	// is a data file, so apoc.export.json.all is a procedure, not a .json file.
-	reDataFile  = regexp.MustCompile(`[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.([A-Za-z0-9]{1,10})`)
-	reSecretKV  = regexp.MustCompile(`(?i)\b(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|auth|credential)s?(\s*=\s*|\s*:\s*)(\S+)`)
-	reSecretKey = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_\-]{8,}|ghp_[A-Za-z0-9]{8,}|xox[a-z]-[A-Za-z0-9\-]{6,}|AKIA[0-9A-Z]{8,}|nams_[A-Za-z0-9_\-]{6,})`)
-	reLongToken = regexp.MustCompile(`[A-Za-z0-9+/]{20,}`)
-	reUUID      = regexp.MustCompile(`\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b`)
-	reHexRun    = regexp.MustCompile(`\b[0-9a-fA-F]{8,}\b`)
-	reParameter = regexp.MustCompile(`--param(?:\s+|=)[^\s=]+=\S*`)
+	reDataFile = regexp.MustCompile(`[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.([A-Za-z0-9]{1,10})`)
+	// secretKeywords is spelled once for both arms below.
+	secretKeywords = `(?:pass(?:word|wd)?|pwd|secret|token|api[ _-]?key|access[ _-]?key|private[ _-]?key|auth|credential)s?`
+	// reSecretKV is the assignment arm: `token=abc`, `token: abc`. It has no
+	// leading boundary, so an environment-style name whose keyword is a suffix
+	// is caught too (DATABASE_PASSWORD=x, MY_API_KEY=x, PGPASSWORD=x).
+	reSecretKV = regexp.MustCompile(`(?i)` + secretKeywords + `(\s*=\s*|\s*:\s*)(\S+)`)
+	// reSecretProse is the prose arm: `the password hunter2`. It keeps its
+	// leading boundary so words that merely contain a keyword (compass) stay
+	// prose, and it only fires when the next word looks like a credential.
+	reSecretProse = regexp.MustCompile(`(?i)\b` + secretKeywords + `\b\s+(\S+)`)
+	reSecretKey   = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_\-]{8,}|ghp_[A-Za-z0-9]{8,}|xox[a-z]-[A-Za-z0-9\-]{6,}|AKIA[0-9A-Z]{8,}|nams_[A-Za-z0-9_\-]{6,})`)
+	reLongToken   = regexp.MustCompile(`[A-Za-z0-9+/]{20,}`)
+	reUUID        = regexp.MustCompile(`\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b`)
+	reHexRun      = regexp.MustCompile(`\b[0-9a-fA-F]{8,}\b`)
+	reParameter   = regexp.MustCompile(`--param(?:\s+|=)[^\s=]+=\S*`)
 	// Node and relationship patterns: the label follows the colon directly, as
 	// in (p:Person) or [:KNOWS], unlike prose such as "(default: false)".
 	reCypherNode = regexp.MustCompile(`\(\s*\w*\s*:[A-Za-z_]\w*`)
@@ -636,6 +661,11 @@ func hasSecret(s string) bool {
 			return true
 		}
 	}
+	for _, m := range reSecretProse.FindAllStringSubmatch(s, -1) {
+		if credentialShaped(m[1]) {
+			return true
+		}
+	}
 	// A run of 20 or more letters and digits with no separator; hyphenated or
 	// underscored names (x86_64-unknown-linux-gnu) are words, not tokens.
 	for _, m := range reLongToken.FindAllString(s, -1) {
@@ -648,6 +678,19 @@ func hasSecret(s string) bool {
 
 // valueLike reports whether v looks like a credential rather than a word: it
 // has a digit, a symbol, or a capital letter after the first character.
+// credentialShaped reports whether a word following a credential keyword in
+// prose looks like the credential itself: it holds a digit or a symbol, so
+// "the password hunter2" is caught while "the auth error", "password prompt"
+// and "the token isn't refreshed" stay prose. Relate rejects any word here;
+// neo4j-cli feedback is often about authentication, so it needs the narrower
+// rule (an intentional difference).
+func credentialShaped(v string) bool {
+	v = strings.TrimRight(v, ".,;:!?)'\"")
+	return strings.ContainsFunc(v, func(r rune) bool {
+		return unicode.IsDigit(r) || strings.ContainsRune("!@#$%^&*+=/\\|~", r)
+	})
+}
+
 func valueLike(v string) bool {
 	v = strings.TrimRight(v, ".,;:!?)'\"")
 	for i, r := range v {

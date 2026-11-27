@@ -31,3 +31,5 @@
 {"id": "a31", "field": "observed", "text": "gds.pageRank.stream was listed but db.ontology.get was not.", "expect": "accept", "detector": ""}
 {"id": "a32", "field": "observed", "text": "Version 1.2.3 printed the build twice and the check ran at 10:30 without a result.", "expect": "accept", "detector": ""}
 {"id": "a33", "field": "observed", "text": "Neo.TransientError.General.OutOfMemoryError was shown without a hint what to change.", "expect": "accept", "detector": ""}
+{"id": "a34", "field": "observed", "text": "The auth error did not name the missing setting.", "expect": "accept", "detector": ""}
+{"id": "a35", "field": "observed", "text": "The password prompt appeared twice and the token isn't refreshed after login.", "expect": "accept", "detector": ""}

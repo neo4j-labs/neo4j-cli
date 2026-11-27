@@ -42,3 +42,8 @@
 {"id": "p42", "field": "observed", "text": "A procedure call to gds.prod.internal was refused.", "expect": "reject", "detector": "host_port"}
 {"id": "p43", "field": "observed", "text": "The proxy box:7687 dropped the connection.", "expect": "reject", "detector": "host_port"}
 {"id": "p44", "field": "expected", "text": "It should have reached localhost without a prompt.", "expect": "reject", "detector": "host_port"}
+{"id": "p45", "field": "observed", "text": "The DATABASE_PASSWORD=x variable was ignored by the command.", "expect": "reject", "detector": "secret"}
+{"id": "p46", "field": "observed", "text": "Setting PGPASSWORD=s3cr3t had no effect on the connection.", "expect": "reject", "detector": "secret"}
+{"id": "p47", "field": "observed", "text": "The password hunter2 did not work and the message did not say why.", "expect": "reject", "detector": "secret"}
+{"id": "p48", "field": "observed", "text": "Our API key abc123 was refused without a reason.", "expect": "reject", "detector": "secret"}
+{"id": "p49", "field": "observed", "text": "The private key a1b2c3 was shown in the failure message.", "expect": "reject", "detector": "secret"}
