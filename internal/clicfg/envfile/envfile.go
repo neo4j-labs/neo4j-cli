@@ -1,10 +1,10 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-// Package envfile parses dotenv-style credential files for CLI commands that
-// accept a `--env` flag. The helper is intentionally domain-neutral: it
-// returns the raw key/value map and a per-key presence map; key filtering
-// (recognised keys, required keys) is left to the caller.
+// Package envfile reads and writes dotenv-style credential files. CLI commands
+// use its reader for `--env` and its writer for `--env-out-file`. The reader is
+// intentionally domain-neutral: it returns the raw key/value map and a per-key
+// presence map. The caller filters keys (recognised keys, required keys).
 //
 // The presence map exists so callers can distinguish `KEY=` (present, empty)
 // from a missing key — both surface as `""` in the values map, but they have
