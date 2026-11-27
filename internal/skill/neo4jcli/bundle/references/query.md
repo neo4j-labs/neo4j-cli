@@ -30,6 +30,9 @@ Flags:
 | `--max-rows` | int | 100 | Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON |
 | `--param` | stringArray | [] | Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string. Use `key:embed=<text>` to embed text via the configured provider and bind the resulting vector to $key (see `query :embed`). |
 | `-p, --password` | string | - | Neo4j password; prompted on TTY if unset |
+| `--relate` | string | - | Run against a local embedded Relate graph store instead of a server (no Bolt connection). PATH is a store directory or .rl bundle, created when missing; a bare name resolves under the CLI's managed store directory (see `neo4j-cli relate`). Mutually exclusive with --uri, --username, --password, --database and --credential; connection env vars and .env files are not consulted with --relate. Requires a build that includes the Relate engine (-tags relate) |
+| `--relate-namespace` | string | neo4j | Relate session namespace to use with --relate: neo4j (the user database), system, or system_ontologies |
+| `--relate-opt` | stringArray | [] | Relate engine open option as key=value (repeatable; the first '=' splits key from value, so values may contain ';' and '='). Keys: snapshot-format (parquet\|json\|markdown; a new store only), markdown-body-properties, checkpoint-interval-secs, durability-mode (full\|everysecond\|snapshot), logical-graph-size-limit, expression-memory-limit. Same names and values as the standalone `relate` CLI flags; overrides the matching RELATE_* environment variable. Only with --relate |
 | `--truncate-arrays-over` | int | 100 | Recursively truncate any array longer than N inside row values (0 = off); rendered as ["<truncated: K items>"] |
 | `--uri` | string | - | Neo4j Bolt URI. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default "neo4j://localhost:7687") |
 | `-u, --username` | string | - | Neo4j username (default "neo4j") |
@@ -66,6 +69,9 @@ neo4j-cli query "MATCH (n) RETURN count(n)" --credential local --format json
 
 # Write Cypher requires --rw (opt-in)
 neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json
+
+# Run against a local embedded Relate store instead of a server (created when missing; still needs --rw to write)
+neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --relate ./mydb --rw --format json
 
 # Run multiple read statements in one call (split on ; at end of line); results render as a JSON array
 neo4j-cli query "MATCH (n:Person) RETURN count(n) AS people; MATCH (m:Movie) RETURN count(m) AS movies" --format json

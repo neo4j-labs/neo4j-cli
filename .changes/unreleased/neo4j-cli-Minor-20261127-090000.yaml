@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: '`relate pull` now writes temporal, point and vector property values into the local store with their types intact, so vector properties can be pulled (they previously aborted the pull), and the default `--batch-size` rises from 500 to 5000. `query --relate --param key:embed=...` now binds the embedding as a vector instead of a list of floats'
+time: 2026-11-27T09:00:00+00:00

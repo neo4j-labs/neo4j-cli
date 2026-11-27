@@ -14,6 +14,7 @@ require (
 	github.com/mixpanel/mixpanel-go v1.2.1
 	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/neo4j/neo4j-go-driver/v6 v6.0.0
+	github.com/relatedb/relate/clients/go v1.4.0 // Relate client; imported only behind the `relate` build tag (+ CGO_ENABLED=1, native librelate_ffi from the release's relate-ffi-<triple>.tar.gz via CGO_CFLAGS/CGO_LDFLAGS). Keep in step with RELATE_VERSION in scripts/relate-ffi.sh.
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10

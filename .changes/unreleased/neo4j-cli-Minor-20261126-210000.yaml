@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add a repeatable `--relate-opt key=value` flag to `query --relate`, `relate create`, `relate pull` and `relate push` for passing engine open options to the embedded Relate store: `snapshot-format` (parquet, json or markdown, for a new store), `markdown-body-properties`, `checkpoint-interval-secs`, `durability-mode`, `logical-graph-size-limit` and `expression-memory-limit`. An unknown key or invalid value is a usage error that lists the valid keys. `relate list`, `info` and `delete` now also recognise Markdown vault stores'
+time: 2026-11-26T21:00:00+00:00
