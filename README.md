@@ -402,7 +402,7 @@ Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME`
 
 ```bash
 # Create a store, populate and query it via `query --relate` (writes need --rw)
-neo4j-cli relate create movies
+neo4j-cli relate create movies --rw
 neo4j-cli query 'CREATE (:Movie {title: "The Matrix"}) RETURN 1' --relate movies --rw
 
 # List managed stores; inspect one (engine version, counts, labels)
@@ -410,7 +410,7 @@ neo4j-cli relate list
 neo4j-cli relate info movies
 
 # Delete a store (destructive: --yes --force when scripted)
-neo4j-cli relate delete movies --yes --force
+neo4j-cli relate delete movies --rw --yes --force
 ```
 
 `query --relate <name-or-path>` switches the query command to the embedded backend — no Bolt connection is opened (`--uri`/`--username`/`--password`/`--database`/`--credential` are mutually exclusive with it). Everything else works as with a server: parameters, `--atomic`, `--continue-on-error`, `:schema`, output formats, and the `--rw` write guard. `--relate-namespace` selects the session namespace (`neo4j`, `system`, `system_ontologies`).

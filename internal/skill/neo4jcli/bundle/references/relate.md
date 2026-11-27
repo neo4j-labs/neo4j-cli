@@ -19,18 +19,18 @@ Examples:
 
 ```
 # Create a store under the managed directory, then query it
-neo4j-cli relate create movies
+neo4j-cli relate create movies --rw
 neo4j-cli query "CREATE (m:Movie {title: 'The Matrix'}) RETURN m" --relate movies --rw
 
 # Create a store at an explicit path
-neo4j-cli relate create ./mydb
+neo4j-cli relate create ./mydb --rw
 
 # List managed stores; inspect one (engine, counts, labels)
 neo4j-cli relate list
 neo4j-cli relate info movies
 
 # Delete a store (destructive: --yes --force required when scripted)
-neo4j-cli relate delete movies --yes --force
+neo4j-cli relate delete movies --rw --yes --force
 ```
 
 ## neo4j-cli relate create
@@ -52,13 +52,13 @@ Examples:
 
 ```
 # Create a store under the managed directory
-neo4j-cli relate create movies
+neo4j-cli relate create movies --rw
 
 # Create a store at an explicit path
-neo4j-cli relate create ./mydb
+neo4j-cli relate create ./mydb --rw
 
 # Accept an existing store instead of refusing
-neo4j-cli relate create movies --force
+neo4j-cli relate create movies --rw --force
 
 # Create a Markdown vault (one note per node) instead of the default snapshot codec
 neo4j-cli relate create notes --rw --relate-opt snapshot-format=markdown --relate-opt 'markdown-body-properties=Person=bio'
@@ -88,11 +88,11 @@ Examples:
 # Delete a managed store; prompts on a TTY
 neo4j-cli relate delete movies
 
-# Skip the prompt (required for scripts / non-TTY callers)
-neo4j-cli relate delete movies --yes --force
+# Skip the prompt (required for scripts / non-TTY callers, which also need --rw)
+neo4j-cli relate delete movies --rw --yes --force
 
 # Delete a store at an explicit path
-neo4j-cli relate delete ./mydb --yes --force
+neo4j-cli relate delete ./mydb --rw --yes --force
 ```
 
 ## neo4j-cli relate info
@@ -174,7 +174,7 @@ neo4j-cli relate pull recent --rw --uri neo4j://localhost:7687 -u neo4j -p pw \\
 
 Push a local Relate store's subgraph into a remote Neo4j
 
-Push a local embedded Relate store's subgraph into a remote Neo4j database, over Bolt. The remote is selected with the same connection flags as `query`; the first argument is the LOCAL store. Nodes MERGE on their label's identity key: the remote's single-property uniqueness constraint (SHOW CONSTRAINTS) or an explicit `--merge-key Label.property` override (repeatable). A label in scope with no key is refused — create a uniqueness constraint on the remote or pass --merge-key. Relationships MATCH their endpoints by those keys and MERGE on the (start, type, end) pattern — pass `--rel-key property` to key the MERGE on a relationship property instead (for multiple rels of one type between the same pair). Properties are replaced wholesale; the push is additive: nothing is deleted. Scope with --labels and --types (comma-separated; default: the whole store). --batch-size bounds rows per remote statement (default 500). --dry-run prints the plan — labels, keys, counts, batches — without touching the remote. Requires a build with the Relate engine (-tags relate).
+Push a local embedded Relate store's subgraph into a remote Neo4j database, over Bolt. The remote is selected with the same connection flags as `query`; the first argument is the LOCAL store. Nodes MERGE on their label's identity key: the remote's single-property uniqueness constraint (SHOW CONSTRAINTS) or an explicit `--merge-key Label.property` override (repeatable). A label in scope with no key is refused — create a uniqueness constraint on the remote or pass --merge-key. Relationships MATCH their endpoints by those keys and MERGE on the (start, type, end) pattern — pass `--rel-key property` to key the MERGE on a relationship property instead (for multiple rels of one type between the same pair). Properties are replaced wholesale; the push is additive: nothing is deleted. Scope with --labels and --types (comma-separated; default: the whole store). --batch-size bounds rows per remote statement (default 500). --dry-run prints the plan — labels, keys, counts, batches — and writes nothing; the plan is derived from the remote's uniqueness constraints, so a reachable remote (read-only probe) is always required. Requires a build with the Relate engine (-tags relate).
 
 Usage: `neo4j-cli relate push <name-or-path> [flags]`
 
@@ -185,7 +185,7 @@ Flags:
 | `--batch-size` | int | 500 | Rows per remote write statement, 1-10000 |
 | `-c, --credential` | string | - | Credential to use for the remote connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>', or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Remote database name; defaults to the connecting user's home database when unset |
-| `--dry-run` | bool | false | Print the push plan (labels, keys, counts, batches) without touching the remote |
+| `--dry-run` | bool | false | Print the push plan (labels, keys, counts, batches) and write nothing; still reads the remote's constraints |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
 | `--labels` | stringArray | [] | Comma-separated node labels to push (default: every label in the store) |
 | `--merge-key` | stringArray | [] | Identity key override as Label.property (repeatable); default is the remote's uniqueness constraint per label |

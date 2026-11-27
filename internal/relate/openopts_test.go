@@ -40,6 +40,10 @@ func TestApplyOpenOpts_Rejects(t *testing.T) {
 		{"bad enum", []string{"snapshot-format=csv"}, "must be one of parquet, json, markdown"},
 		{"bad int", []string{"checkpoint-interval-secs=-1"}, "non-negative integer"},
 		{"empty value", []string{"markdown-body-properties= "}, "must not be empty"},
+		{"size with decimals", []string{"logical-graph-size-limit=1.5gb"}, "whole number"},
+		{"size with kb", []string{"logical-graph-size-limit=10kb"}, "mb, mib, gb or gib"},
+		{"banana size", []string{"expression-memory-limit=banana"}, "or none"},
+		{"none is only for expression-memory-limit", []string{"logical-graph-size-limit=none"}, "mb, mib, gb or gib"},
 		{"duplicate", []string{"snapshot-format=json", "snapshot-format=markdown"}, "more than once"},
 	}
 	for _, tt := range tests {
@@ -59,4 +63,13 @@ func TestApplyOpenOpts_AllOrNothing(t *testing.T) {
 
 func TestApplyOpenOpts_NoneIsNoop(t *testing.T) {
 	require.NoError(t, ApplyOpenOpts(nil))
+}
+
+func TestApplyOpenOpts_AcceptsEngineMemoryGrammar(t *testing.T) {
+	t.Setenv("RELATE_LOGICAL_GRAPH_SIZE_LIMIT", "")
+	t.Setenv("RELATE_EXPRESSION_MEMORY_LIMIT", "")
+	for _, v := range []string{"512mb", "1GiB", "100", "2 gb", "0"} {
+		require.NoError(t, ApplyOpenOpts([]string{"logical-graph-size-limit=" + v}), v)
+	}
+	require.NoError(t, ApplyOpenOpts([]string{"expression-memory-limit=none"}))
 }

@@ -37,7 +37,8 @@ func newPushCmd(cfg *clicfg.Config) *cobra.Command {
 			"of one type between the same pair). Properties are replaced wholesale; the push is additive: " +
 			"nothing is deleted. Scope with --labels and --types (comma-separated; default: the whole store). " +
 			"--batch-size bounds rows per remote statement (default 500). --dry-run prints the plan — labels, " +
-			"keys, counts, batches — without touching the remote. Requires a build with the Relate engine " +
+			"keys, counts, batches — and writes nothing; the plan is derived from the remote's uniqueness " +
+			"constraints, so a reachable remote (read-only probe) is always required. Requires a build with the Relate engine " +
 			"(-tags relate).",
 		Example: `# Push the whole store into a local Neo4j (nodes MERGE on remote unique constraints)
 neo4j-cli relate push movies --rw --uri neo4j://localhost:7687 -u neo4j -p pw
@@ -75,7 +76,7 @@ neo4j-cli relate push movies --rw --credential local \\
 	cmd.Flags().StringArray("merge-key", nil, "Identity key override as Label.property (repeatable); default is the remote's uniqueness constraint per label")
 	cmd.Flags().String("rel-key", "", "Relationship property to key the remote MERGE on (for multiple rels of one type between the same pair)")
 	cmd.Flags().Int("batch-size", engine.DefaultPullBatchSize, "Rows per remote write statement, 1-10000")
-	cmd.Flags().Bool("dry-run", false, "Print the push plan (labels, keys, counts, batches) without touching the remote")
+	cmd.Flags().Bool("dry-run", false, "Print the push plan (labels, keys, counts, batches) and write nothing; still reads the remote's constraints")
 
 	return cmd
 }
@@ -160,8 +161,8 @@ func runPush(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 	}
 	defer store.Close()
 
-	// Remote connection (driver never opened for --dry-run without keys —
-	// see below; the constraint probe needs it in every other case).
+	// Remote connection. Even --dry-run needs it: the plan is derived from the
+	// remote's uniqueness constraints (a read-only probe), which runs every time.
 	conn, err := dbconn.ResolveConn(cmd, cfg, false)
 	if err != nil {
 		return err

@@ -32,11 +32,11 @@ func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Example: `# Delete a managed store; prompts on a TTY
 neo4j-cli relate delete movies
 
-# Skip the prompt (required for scripts / non-TTY callers)
-neo4j-cli relate delete movies --yes --force
+# Skip the prompt (required for scripts / non-TTY callers, which also need --rw)
+neo4j-cli relate delete movies --rw --yes --force
 
 # Delete a store at an explicit path
-neo4j-cli relate delete ./mydb --yes --force`,
+neo4j-cli relate delete ./mydb --rw --yes --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

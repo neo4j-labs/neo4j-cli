@@ -31,13 +31,13 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"A path that exists but is neither a store nor an empty directory is always refused. " +
 			"Requires a build with the Relate engine (-tags relate).",
 		Example: `# Create a store under the managed directory
-neo4j-cli relate create movies
+neo4j-cli relate create movies --rw
 
 # Create a store at an explicit path
-neo4j-cli relate create ./mydb
+neo4j-cli relate create ./mydb --rw
 
 # Accept an existing store instead of refusing
-neo4j-cli relate create movies --force
+neo4j-cli relate create movies --rw --force
 
 # Create a Markdown vault (one note per node) instead of the default snapshot codec
 neo4j-cli relate create notes --rw --relate-opt snapshot-format=markdown --relate-opt 'markdown-body-properties=Person=bio'

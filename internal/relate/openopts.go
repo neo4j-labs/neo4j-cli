@@ -6,6 +6,7 @@ package relate
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,8 +38,8 @@ var openOpts = map[string]openOpt{
 	"markdown-body-properties": {"RELATE_MARKDOWN_BODY_PROPERTIES", nonEmpty},
 	"checkpoint-interval-secs": {"RELATE_CHECKPOINT_INTERVAL_SECS", nonNegativeInt},
 	"durability-mode":          {"RELATE_DURABILITY_MODE", oneOf("full", "everysecond", "snapshot")},
-	"logical-graph-size-limit": {"RELATE_LOGICAL_GRAPH_SIZE_LIMIT", nonEmpty},
-	"expression-memory-limit":  {"RELATE_EXPRESSION_MEMORY_LIMIT", nonEmpty},
+	"logical-graph-size-limit": {"RELATE_LOGICAL_GRAPH_SIZE_LIMIT", memorySize(false)},
+	"expression-memory-limit":  {"RELATE_EXPRESSION_MEMORY_LIMIT", memorySize(true)},
 }
 
 // OpenOptKeys returns the accepted keys, sorted.
@@ -56,6 +57,28 @@ func nonEmpty(v string) error {
 		return fmt.Errorf("must not be empty")
 	}
 	return nil
+}
+
+// memorySizePattern is the grammar the engine accepts for its memory limits
+// (checked against the standalone CLI): whole bytes, or a whole number with a
+// mb, mib, gb or gib suffix — case-insensitive, no decimals, no kb.
+var memorySizePattern = regexp.MustCompile(`(?i)^\d+\s*(mb|mib|gb|gib)?$`)
+
+func memorySize(allowNone bool) func(string) error {
+	return func(v string) error {
+		v = strings.TrimSpace(v)
+		if allowNone && strings.EqualFold(v, "none") {
+			return nil
+		}
+		if !memorySizePattern.MatchString(v) {
+			want := "bytes or a whole number with an mb, mib, gb or gib suffix (for example 512mb)"
+			if allowNone {
+				want += ", or none"
+			}
+			return fmt.Errorf("must be %s", want)
+		}
+		return nil
+	}
 }
 
 func nonNegativeInt(v string) error {

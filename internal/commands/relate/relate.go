@@ -44,18 +44,18 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"Query a store with `neo4j-cli query \"...\" --relate <name-or-path>` (writes need --rw). " +
 			"`create` and `info` need the engine compiled in (build with -tags relate); `list` and `delete` work in every build.",
 		Example: `# Create a store under the managed directory, then query it
-neo4j-cli relate create movies
+neo4j-cli relate create movies --rw
 neo4j-cli query "CREATE (m:Movie {title: 'The Matrix'}) RETURN m" --relate movies --rw
 
 # Create a store at an explicit path
-neo4j-cli relate create ./mydb
+neo4j-cli relate create ./mydb --rw
 
 # List managed stores; inspect one (engine, counts, labels)
 neo4j-cli relate list
 neo4j-cli relate info movies
 
 # Delete a store (destructive: --yes --force required when scripted)
-neo4j-cli relate delete movies --yes --force`,
+neo4j-cli relate delete movies --rw --yes --force`,
 	}
 
 	cmd.AddCommand(newCreateCmd(cfg))
