@@ -10,6 +10,7 @@ import (
 	engine "github.com/neo4j/cli/internal/k8s"
 
 	k8sflags "github.com/neo4j/cli/internal/commands/k8s/flags"
+	"github.com/neo4j/cli/internal/commands/k8s/instance"
 	"github.com/neo4j/cli/internal/commands/k8s/operator"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -39,6 +40,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd.AddCommand(newDoctorCmd(cfg))
 	cmd.AddCommand(operator.NewCmd(cfg))
+	cmd.AddCommand(instance.NewCmd(cfg))
 
 	return cmd
 }
