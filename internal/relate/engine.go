@@ -78,7 +78,7 @@ func (s *clientStore) Run(statements []string, params map[string]any, atomic boo
 	}
 	results := make([]StatementResult, 0, len(statements))
 	for _, stmt := range statements {
-		res, err := s.conn.QueryParams(stmt, params)
+		res, err := s.conn.QueryParams(stmt, toClientParams(params))
 		if err != nil {
 			if atomic {
 				_ = s.conn.Rollback() //nolint:errcheck // rollback is best-effort; the original error is returned

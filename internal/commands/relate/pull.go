@@ -45,8 +45,8 @@ func newPullCmd(cfg *clicfg.Config) *cobra.Command {
 			"Pulled entities are upserted by source identity: a second pull from the same source updates " +
 			"the entities in place instead of duplicating them (properties are replaced wholesale). " +
 			"Relationships whose endpoints are not part of the pulled result are skipped and reported. " +
-			"--batch-size bounds the rows per write statement (default 500; property values are inlined as " +
-			"literals, so smaller batches mean smaller statements). The store is checkpointed after a " +
+			"--batch-size bounds the rows bound into one write statement (default 5000; values cross as typed " +
+			"parameters, so temporals, points and vectors keep their type). The store is checkpointed after a " +
 			"successful pull. Requires a build with the Relate engine (-tags relate).",
 		Example: `# Pull the Person subgraph from a local Neo4j into a managed store
 neo4j-cli relate pull people --rw --uri neo4j://localhost:7687 -u neo4j -p pw \\
@@ -79,7 +79,7 @@ neo4j-cli relate pull recent --rw --uri neo4j://localhost:7687 -u neo4j -p pw \\
 	cmd.Flags().String("query", "", "Remote Cypher to pull; must return nodes, relationships or paths (not scalars)")
 	cmd.Flags().StringArray(engine.OpenOptFlag, nil, engine.OpenOptFlagUsage)
 	cmd.Flags().StringArray("param", nil, "Remote query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise a string")
-	cmd.Flags().Int("batch-size", engine.DefaultPullBatchSize, "Rows per write statement into the local store, 1-10000 (property values are inlined as literals, so smaller batches mean smaller statements)")
+	cmd.Flags().Int("batch-size", engine.DefaultPullBatchSize, "Rows per write statement into the local store, 1-10000")
 
 	if err := cmd.MarkFlagRequired("query"); err != nil {
 		panic(err) //nolint:errcheck // MarkFlagRequired on a registered flag cannot fail

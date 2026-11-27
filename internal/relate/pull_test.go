@@ -6,7 +6,6 @@ package relate
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,27 +17,38 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 )
 
-// recordingStore records every statement and answers CREATE … RETURN runs
-// with synthetic local element ids, one per row, extracted from the
-// statement's inlined src literals so the identity wiring is exercised.
+// recordingStore records every statement and its parameters, and answers
+// CREATE … RETURN runs with synthetic local element ids, one per bound row,
+// taken from each row's src so the identity wiring is exercised.
 type recordingStore struct {
 	statements []string
+	params     []map[string]any
 	next       int
 }
 
-var srcPattern = regexp.MustCompile(`src: '([^']*)'`)
+// rowsOf returns the bound $rows of the i-th recorded run.
+func (s *recordingStore) rowsOf(i int) []map[string]any {
+	raw, _ := s.params[i]["rows"].([]any)
+	rows := make([]map[string]any, len(raw))
+	for j, r := range raw {
+		rows[j], _ = r.(map[string]any)
+	}
+	return rows
+}
 
 func (s *recordingStore) Run(statements []string, params map[string]any, atomic bool) ([]StatementResult, error) {
 	results := make([]StatementResult, 0, len(statements))
 	for _, stmt := range statements {
 		s.statements = append(s.statements, stmt)
+		s.params = append(s.params, params)
 		res := StatementResult{Rows: [][]any{}}
 		if strings.Contains(stmt, "RETURN elementId") {
-			matches := srcPattern.FindAllStringSubmatch(stmt, -1)
-			for _, m := range matches {
+			rows, _ := params["rows"].([]any)
+			for _, r := range rows {
+				row, _ := r.(map[string]any)
 				s.next++
 				res.Columns = []string{"eid", "src"}
-				res.Rows = append(res.Rows, []any{"local-" + itoa(s.next), m[1]})
+				res.Rows = append(res.Rows, []any{"local-" + itoa(s.next), row["src"]})
 			}
 		}
 		results = append(results, res)
@@ -86,14 +96,22 @@ func TestMaterialize_CreatesAndRecordsIdentity(t *testing.T) {
 	assert.Len(t, ids.Rels, 1)
 	assert.Contains(t, ids.Nodes["4:a:0"], "local-")
 
-	// Node creation statement: backticked labels, literal props (temporals
-	// as constructor literals), identity capture.
+	// Node creation statement: backticked labels, bound rows, identity
+	// capture. Property values cross as typed parameters, not literals.
 	createNode := store.statements[0]
+	assert.Contains(t, createNode, "UNWIND $rows AS row")
 	assert.Contains(t, createNode, "CREATE (n:`Person`)")
 	assert.Contains(t, createNode, "SET n = row.props")
-	assert.Contains(t, createNode, "'name': 'Ada'")
-	assert.Contains(t, createNode, "date('1980-01-01')")
 	assert.Contains(t, createNode, "RETURN elementId(n) AS eid, row.src AS src")
+	assert.NotContains(t, createNode, "Ada", "values are bound, never inlined into the statement")
+	rows := store.rowsOf(0)
+	require.Len(t, rows, 2)
+	byName := map[any]map[string]any{}
+	for _, r := range rows {
+		props, _ := r["props"].(map[string]any)
+		byName[props["name"]] = props
+	}
+	assert.Equal(t, dbtype.Date(time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)), byName["Bob"]["born"], "temporals stay typed")
 
 	// Relationship creation: backticked type, elementId-matched endpoints.
 	relStmt := store.statements[len(store.statements)-1]
@@ -120,9 +138,11 @@ func TestMaterialize_SecondPullReuses(t *testing.T) {
 	assert.Equal(t, 0, stats.NodesCreated+stats.RelsCreated)
 
 	// Updates match by local element id and replace props wholesale.
-	updateStmt := store.statements[len(store.statements)-3]
-	assert.Contains(t, updateStmt, "MATCH (n) WHERE elementId(n) = row.local SET n = row.props")
-	assert.Contains(t, updateStmt, "'age': 40")
+	updateIdx := len(store.statements) - 3
+	assert.Contains(t, store.statements[updateIdx], "MATCH (n) WHERE elementId(n) = row.local SET n = row.props")
+	updated := store.rowsOf(updateIdx)
+	require.Len(t, updated, 1)
+	assert.Equal(t, map[string]any{"name": "Ada", "age": int64(40)}, updated[0]["props"])
 
 	relUpdate := store.statements[len(store.statements)-1]
 	assert.Contains(t, relUpdate, "MATCH ()-[r]->() WHERE elementId(r) = row.local SET r = row.props")
@@ -166,9 +186,9 @@ func TestMaterialize_BatchesByLabelSignatureAndSize(t *testing.T) {
 	}
 	assert.Equal(t, 4, creates)
 
-	// Each statement carries at most batchSize rows.
-	for _, stmt := range store.statements {
-		assert.LessOrEqual(t, len(srcPattern.FindAllString(stmt, -1)), 2)
+	// Each statement binds at most batchSize rows.
+	for i := range store.statements {
+		assert.LessOrEqual(t, len(store.rowsOf(i)), 2)
 	}
 }
 

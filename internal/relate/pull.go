@@ -234,18 +234,14 @@ func Materialize(store Store, g *Subgraph, m *IdentityMap, source string, batchS
 		labels := group[0].Labels
 		for i := 0; i < len(group); i += batchSize {
 			batch := group[i:min(i+batchSize, len(group))]
-			rows := make([]string, len(batch))
+			rows := make([]any, len(batch))
 			for j, n := range batch {
-				props, err := literalProps(n.Props)
-				if err != nil {
-					return nil, fmt.Errorf("node %s: %w", n.ElementID, err)
-				}
-				rows[j] = "{props: " + props + ", src: " + quoteString(n.ElementID) + "}"
+				rows[j] = map[string]any{"props": propsOrEmpty(n.Props), "src": n.ElementID}
 			}
-			stmt := "UNWIND [" + strings.Join(rows, ", ") + "] AS row " +
+			stmt := "UNWIND $rows AS row " +
 				createNodeClause(labels) + " SET n = row.props " +
 				"RETURN elementId(n) AS eid, row.src AS src"
-			res, err := store.Run([]string{stmt}, nil, false)
+			res, err := store.Run([]string{stmt}, map[string]any{"rows": rows}, false)
 			if err != nil {
 				return nil, err
 			}
@@ -287,20 +283,18 @@ func Materialize(store Store, g *Subgraph, m *IdentityMap, source string, batchS
 	for typ, group := range byType {
 		for i := 0; i < len(group); i += batchSize {
 			batch := group[i:min(i+batchSize, len(group))]
-			rows := make([]string, len(batch))
+			rows := make([]any, len(batch))
 			for j, r := range batch {
-				props, err := literalProps(r.Props)
-				if err != nil {
-					return nil, fmt.Errorf("relationship %s: %w", r.ElementID, err)
+				rows[j] = map[string]any{
+					"props": propsOrEmpty(r.Props), "src": r.ElementID,
+					"start": r.localStart, "end": r.localEnd,
 				}
-				rows[j] = "{props: " + props + ", src: " + quoteString(r.ElementID) +
-					", start: " + quoteString(r.localStart) + ", end: " + quoteString(r.localEnd) + "}"
 			}
-			stmt := "UNWIND [" + strings.Join(rows, ", ") + "] AS row " +
+			stmt := "UNWIND $rows AS row " +
 				"MATCH (a), (b) WHERE elementId(a) = row.start AND elementId(b) = row.end " +
 				"CREATE (a)-[r:" + QuoteIdent(typ) + "]->(b) SET r = row.props " +
 				"RETURN elementId(r) AS eid, row.src AS src"
-			res, err := store.Run([]string{stmt}, nil, false)
+			res, err := store.Run([]string{stmt}, map[string]any{"rows": rows}, false)
 			if err != nil {
 				return nil, err
 			}
@@ -316,16 +310,14 @@ func Materialize(store Store, g *Subgraph, m *IdentityMap, source string, batchS
 	return stats, nil
 }
 
-// DefaultPullBatchSize bounds one statement's literal row list. Relate's own
-// default (5000) assumes parameter binding; inlined literal rows grow with
-// property payloads, so the CLI's default stays an order of magnitude lower.
-const DefaultPullBatchSize = 500
+// DefaultPullBatchSize bounds the rows bound into one write statement. It
+// matches Relate's own bulk default.
+const DefaultPullBatchSize = 5000
 
 // MaxPullBatchSize is the largest --batch-size the commands accept. A batch's
-// rows are inlined into ONE statement — on pull as Cypher literals, so the
-// statement string grows linearly with both row count and property payloads —
-// and an unbounded value turns a large pull into a single unbounded statement
-// the engine then has to parse. The bound is a guard, not a tuning target.
+// rows are bound as ONE parameter and written in ONE statement, so an
+// unbounded value turns a large pull into a single unbounded transaction. The
+// bound is a guard, not a tuning target.
 const MaxPullBatchSize = 10000
 
 // batchRows is a single-row update (entities the source already
@@ -339,18 +331,14 @@ type batchRows struct {
 // updateEntity applies an in-place property replacement for one already
 // materialized entity.
 func updateEntity(store Store, r batchRows) error {
-	props, err := literalProps(r.props)
-	if err != nil {
-		return err
-	}
-	row := "{props: " + props + ", local: " + quoteString(r.local) + "}"
-	stmt := "UNWIND [" + row + "] AS row "
+	rows := []any{map[string]any{"props": propsOrEmpty(r.props), "local": r.local}}
+	stmt := "UNWIND $rows AS row "
 	if r.kind == "node-update" {
 		stmt += "MATCH (n) WHERE elementId(n) = row.local SET n = row.props"
 	} else {
 		stmt += "MATCH ()-[r]->() WHERE elementId(r) = row.local SET r = row.props"
 	}
-	_, err = store.Run([]string{stmt}, nil, false)
+	_, err := store.Run([]string{stmt}, map[string]any{"rows": rows}, false)
 	return err
 }
 
@@ -366,13 +354,13 @@ func createNodeClause(labels []string) string {
 	return b.String()
 }
 
-// literalProps renders a property map as a Cypher map literal; nil becomes
-// the empty map so SET n = props never binds null.
-func literalProps(props map[string]any) (string, error) {
+// propsOrEmpty returns the property map, or an empty map for nil so
+// SET n = row.props never binds null.
+func propsOrEmpty(props map[string]any) map[string]any {
 	if props == nil {
-		return "{}", nil
+		return map[string]any{}
 	}
-	return literalMap(props)
+	return props
 }
 
 // sortedKeys returns the map's keys in sorted order.

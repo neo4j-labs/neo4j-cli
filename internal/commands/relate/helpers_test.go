@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -100,7 +99,7 @@ func (f *fakeStore) Run(statements []string, params map[string]any, atomic bool)
 		if f.respond == nil {
 			// Default responder: identity-capturing statements (the pull
 			// materializer's CREATE ... RETURN elementId ...) get synthetic
-			// local ids extracted from the inlined src literals; everything
+			// local ids, one per bound row (taken from $rows); everything
 			// else answers empty.
 			res := relate.StatementResult{Rows: [][]any{}}
 			if strings.Contains(stmt, "RETURN elementId") {
@@ -109,9 +108,11 @@ func (f *fakeStore) Run(statements []string, params map[string]any, atomic bool)
 					return nil, errors.New("engine: simulated failure mid-pull")
 				}
 				res.Columns = []string{"eid", "src"}
-				for _, m := range srcLiteralPattern.FindAllStringSubmatch(stmt, -1) {
+				rows, _ := params["rows"].([]any)
+				for _, r := range rows {
+					row, _ := r.(map[string]any)
 					f.created++
-					res.Rows = append(res.Rows, []any{"local-" + strconv.Itoa(f.created), m[1]})
+					res.Rows = append(res.Rows, []any{"local-" + strconv.Itoa(f.created), row["src"]})
 				}
 			}
 			results = append(results, res)
@@ -125,10 +126,6 @@ func (f *fakeStore) Run(statements []string, params map[string]any, atomic bool)
 	}
 	return results, nil
 }
-
-// srcLiteralPattern extracts the inlined `src: '...'` identities from a
-// materializer statement.
-var srcLiteralPattern = regexp.MustCompile(`src: '([^']*)'`)
 
 func (f *fakeStore) Checkpoint() error {
 	f.checkpoints++
