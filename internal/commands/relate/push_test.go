@@ -217,6 +217,52 @@ func TestRelatePush_Batching(t *testing.T) {
 	assert.Len(t, (*calls)[2].params["rows"].([]any), 1)
 }
 
+// Regression: the unmatched count was computed against the whole group on every
+// batch, so a fully matched group spanning several batches reported bogus skips.
+func TestRelatePush_BatchedRelsReportNoFalseSkips(t *testing.T) {
+	pushStore(t)
+	installFakeRemote(t, [][]any{
+		constraintRow("c1", "UNIQUENESS", "NODE", []any{"Person"}, []any{"email"}),
+	})
+
+	h := newHarness(t, "json")
+	h.seedStoreDir(t, "movies")
+	require.NoError(t, h.execute(t, "push", "movies",
+		"--uri", "neo4j+s://remote:7687", "--username", "neo4j", "--password", "pw",
+		"--batch-size", "1",
+	))
+
+	assert.Contains(t, h.stderr.String(), "Pushed 2 nodes and 2 relationships")
+	assert.Contains(t, h.stderr.String(), "(0 relationships skipped")
+}
+
+// Regression: --rel-key rendered `row.rkey` but no row ever carried it.
+func TestRelatePush_RelKeyBindsRkeyPerRow(t *testing.T) {
+	pushStore(t)
+	calls := installFakeRemote(t, [][]any{
+		constraintRow("c1", "UNIQUENESS", "NODE", []any{"Person"}, []any{"email"}),
+	})
+
+	h := newHarness(t, "json")
+	h.seedStoreDir(t, "movies")
+	require.NoError(t, h.execute(t, "push", "movies",
+		"--uri", "neo4j+s://remote:7687", "--username", "neo4j", "--password", "pw",
+		"--rel-key", "since",
+	))
+
+	var relCall *remoteCall
+	for i := range *calls {
+		if strings.Contains((*calls)[i].query, "MERGE (a)-[r:`KNOWS` {`since`: row.rkey}]->(b)") {
+			relCall = &(*calls)[i]
+		}
+	}
+	require.NotNil(t, relCall, "the keyed relationship statement ran")
+	rows := relCall.params["rows"].([]any)
+	require.Len(t, rows, 2)
+	assert.Equal(t, int64(2020), rows[0].(map[string]any)["rkey"])
+	assert.Equal(t, int64(2021), rows[1].(map[string]any)["rkey"])
+}
+
 func TestRelatePush_MissingStoreIsUsageError(t *testing.T) {
 	// The engine hook must be installed (even a fake) so the command gets
 	// past the not-compiled gate and reaches the missing-store check.

@@ -197,12 +197,43 @@ func TestReadPushRels(t *testing.T) {
 			Rows:    [][]any{{"ada@x", "bob@x", map[string]any{"since": int64(2020)}}},
 		},
 	}}
-	rows, err := ReadPushRels(s, PushRelGroup{Type: "KNOWS", StartLabel: "Person", StartKey: "email", EndLabel: "Person", EndKey: "email"})
+	rows, err := ReadPushRels(s, PushRelGroup{Type: "KNOWS", StartLabel: "Person", StartKey: "email", EndLabel: "Person", EndKey: "email"}, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "ada@x", rows[0]["start"])
 	assert.Equal(t, "bob@x", rows[0]["end"])
 	assert.Equal(t, map[string]any{"since": int64(2020)}, rows[0]["props"])
+}
+
+func TestReadPushRels_RelKeyFillsRkey(t *testing.T) {
+	g := PushRelGroup{Type: "KNOWS", StartLabel: "Person", StartKey: "email", EndLabel: "Person", EndKey: "email"}
+	query := "MATCH (a:`Person`)-[r:`KNOWS`]->(b:`Person`) RETURN a.`email` AS start, b.`email` AS end, properties(r) AS props"
+
+	t.Run("each row carries the key property as rkey", func(t *testing.T) {
+		s := &planStore{responses: map[string]StatementResult{query: {
+			Columns: []string{"start", "end", "props"},
+			Rows: [][]any{
+				{"ada@x", "bob@x", map[string]any{"since": int64(2020)}},
+				{"ada@x", "bob@x", map[string]any{"since": int64(2021)}},
+			},
+		}}}
+		rows, err := ReadPushRels(s, g, "since")
+		require.NoError(t, err)
+		require.Len(t, rows, 2)
+		assert.Equal(t, int64(2020), rows[0]["rkey"])
+		assert.Equal(t, int64(2021), rows[1]["rkey"])
+	})
+
+	t.Run("a relationship without the key property is an error", func(t *testing.T) {
+		s := &planStore{responses: map[string]StatementResult{query: {
+			Columns: []string{"start", "end", "props"},
+			Rows:    [][]any{{"ada@x", "bob@x", map[string]any{"other": int64(1)}}},
+		}}}
+		_, err := ReadPushRels(s, g, "since")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `--rel-key "since"`)
+		assert.Contains(t, err.Error(), "KNOWS")
+	})
 }
 
 // keyedLabel picks the first sorted label with a key.

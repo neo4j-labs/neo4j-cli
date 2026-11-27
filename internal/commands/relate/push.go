@@ -216,20 +216,20 @@ func runPush(cmd *cobra.Command, cfg *clicfg.Config, storeArg string) error {
 		}
 		if err := upsertRemote(ctx, driver, conn.Database,
 			engine.PushNodesStatement(l.Label, l.Key), rows, batchSize,
-			func(matched int) { stats.NodesPushed += int64(matched) }); err != nil {
+			func(_, matched int) { stats.NodesPushed += int64(matched) }); err != nil {
 			return err
 		}
 	}
 	for _, g := range plan.Rels {
-		rows, err := engine.ReadPushRels(store, g)
+		rows, err := engine.ReadPushRels(store, g, relKey)
 		if err != nil {
 			return err
 		}
 		if err := upsertRemote(ctx, driver, conn.Database,
 			engine.PushRelsStatement(g, relKey), rows, batchSize,
-			func(matched int) {
+			func(sent, matched int) {
 				stats.RelsPushed += int64(matched)
-				stats.RelsUnmatched += int64(len(rows) - matched)
+				stats.RelsUnmatched += int64(sent - matched)
 			}); err != nil {
 			return err
 		}
@@ -294,7 +294,7 @@ func resolveRemoteKeys(ctx context.Context, driver neo4j.Driver, database string
 
 // upsertRemote runs one statement over the rows in batches, reporting how
 // many rows the remote actually matched/merged per batch.
-func upsertRemote(ctx context.Context, driver neo4j.Driver, database, stmt string, rows []map[string]any, batchSize int, onMatched func(matched int)) error {
+func upsertRemote(ctx context.Context, driver neo4j.Driver, database, stmt string, rows []map[string]any, batchSize int, onBatch func(sent, matched int)) error {
 	if batchSize <= 0 {
 		batchSize = engine.DefaultPullBatchSize
 	}
@@ -315,7 +315,7 @@ func upsertRemote(ctx context.Context, driver neo4j.Driver, database, stmt strin
 			}
 			return clierr.NewUpstreamError("%w", err)
 		}
-		onMatched(len(resultRows))
+		onBatch(len(batch), len(resultRows))
 	}
 	return nil
 }

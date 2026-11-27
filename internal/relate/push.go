@@ -196,8 +196,11 @@ func ReadPushNodes(store Store, label, key string) ([]map[string]any, error) {
 }
 
 // ReadPushRels reads one group's relationships as parameter rows: the
-// endpoints' key values and the relationship's properties.
-func ReadPushRels(store Store, g PushRelGroup) ([]map[string]any, error) {
+// endpoints' key values and the relationship's properties. With a non-empty
+// relKey each row also carries that property as "rkey", the value
+// PushRelsStatement merges the relationship on; a relationship without it is
+// an error, since merging on a null key would match or create at random.
+func ReadPushRels(store Store, g PushRelGroup, relKey string) ([]map[string]any, error) {
 	res, err := store.Run([]string{
 		"MATCH (a:" + QuoteIdent(g.StartLabel) + ")-[r:" + QuoteIdent(g.Type) + "]->(b:" + QuoteIdent(g.EndLabel) + ") " +
 			"RETURN a." + QuoteIdent(g.StartKey) + " AS start, b." + QuoteIdent(g.EndKey) + " AS end, properties(r) AS props",
@@ -211,7 +214,16 @@ func ReadPushRels(store Store, g PushRelGroup) ([]map[string]any, error) {
 		if props == nil {
 			props = map[string]any{}
 		}
-		rows = append(rows, map[string]any{"start": row[0], "end": row[1], "props": props})
+		out := map[string]any{"start": row[0], "end": row[1], "props": props}
+		if relKey != "" {
+			rkey, ok := props[relKey]
+			if !ok || rkey == nil {
+				return nil, fmt.Errorf("a %s relationship from %s %v to %s %v has no value for --rel-key %q; the remote MERGE would match or create at random — fix the data or choose another key",
+					g.Type, g.StartLabel, row[0], g.EndLabel, row[1], relKey)
+			}
+			out["rkey"] = rkey
+		}
+		rows = append(rows, out)
 	}
 	return rows, nil
 }
