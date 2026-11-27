@@ -67,6 +67,21 @@ func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string
 	return c.onUpdate()
 }
 
+// Update replaces a stored connection without changing its name, default
+// status or embedding link. The normal save path also replaces its password
+// in the keyring when keyring storage is active.
+func (c *DbmsCredentials) Update(name, username, password, databaseName, uri string) error {
+	credential, err := c.Get(name)
+	if err != nil {
+		return err
+	}
+	credential.Username = username
+	credential.Password = password
+	credential.DatabaseName = databaseName
+	credential.URI = uri
+	return c.onUpdate()
+}
+
 func (c *DbmsCredentials) Remove(name string) error {
 	indexToRemove := -1
 

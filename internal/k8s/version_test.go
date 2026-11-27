@@ -67,3 +67,34 @@ func TestMinorSkew(t *testing.T) {
 	_, ok = MinorSkew("v1.36.0", "")
 	assert.False(t, ok, "an unparseable server version cannot be compared")
 }
+
+func TestNormaliseReleaseVersion(t *testing.T) {
+	for in, want := range map[string]string{"1.0.0": "1.0.0", "v1.2.3": "1.2.3", "1.0.0-rc.1": "1.0.0-rc.1"} {
+		got, ok := NormaliseReleaseVersion(in)
+		assert.True(t, ok, in)
+		assert.Equal(t, want, got, in)
+	}
+	for _, in := range []string{"", "latest", "1.0", "vv1.0.0", "1.0.0+build"} {
+		_, ok := NormaliseReleaseVersion(in)
+		assert.False(t, ok, in)
+	}
+}
+
+func TestCompareReleaseVersions(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want int
+		ok   bool
+	}{
+		{a: "1.2.0", b: "1.10.0", want: -1, ok: true},
+		{a: "2.0.0", b: "1.9.9", want: 1, ok: true},
+		{a: "1.0.0", b: "v1.0.0", want: 0, ok: true},
+		{a: "1.0.0-rc.1", b: "1.0.0", want: -1, ok: true},
+		{a: "neo4j-operator-1.0.0", b: "1.0.0", ok: false},
+	}
+	for _, tc := range tests {
+		got, ok := CompareReleaseVersions(tc.a, tc.b)
+		assert.Equal(t, tc.ok, ok, "%s vs %s", tc.a, tc.b)
+		assert.Equal(t, tc.want, got, "%s vs %s", tc.a, tc.b)
+	}
+}

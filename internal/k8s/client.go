@@ -38,15 +38,58 @@ type Settings struct {
 // Methods grow per PR as the operator and instance leaves land.
 type Client interface {
 	// KubectlVersion runs `kubectl version -o json` with a 10s request
-	// timeout and returns the parsed
-	// client and server git versions. When the API server is unreachable the
-	// call returns an error. Any stdout the child still produced is parsed
-	// first, so ClientVersion can carry a value alongside the error.
+	// timeout and returns the parsed client and server git versions. When
+	// the API server is unreachable the call returns an error. Any stdout
+	// the child still produced is parsed first, so ClientVersion can carry
+	// a value alongside the error.
 	KubectlVersion(ctx context.Context) (VersionInfo, error)
 	// HelmVersion runs `helm version --short` and returns the helm version,
 	// for example "v4.1.1+g5caf004". Helm 4 removed the -o json flag, and
 	// --short works on every helm 3 and 4 release.
 	HelmVersion(ctx context.Context) (string, error)
+
+	// ApplyCRDs makes sure that a remote release asset matches its published
+	// digest before applying it. It then server-side applies the manifest at
+	// source, which can also be a local path, with the neo4j-cli field manager.
+	// It returns the CRD names that kubectl reported.
+	ApplyCRDs(ctx context.Context, source string) ([]string, error)
+	// DeleteCRDs deletes the four operator CRDs by name and returns the ones
+	// kubectl reported deleting. Already-absent CRDs are not an error.
+	DeleteCRDs(ctx context.Context) ([]string, error)
+	// HelmUpgrade runs `helm upgrade` for the operator release.
+	HelmUpgrade(ctx context.Context, opts HelmUpgradeOptions) error
+	// HelmUninstall runs `helm uninstall` for the operator release.
+	HelmUninstall(ctx context.Context) error
+	// HelmReleases lists the operator's live Helm release in the client's
+	// namespace, whatever state it is in, but not one already uninstalled.
+	HelmReleases(ctx context.Context) ([]HelmRelease, error)
+	// CurrentContext returns the kube context the client's calls reach: the
+	// --context setting when one is set, otherwise kubeconfig's current one.
+	CurrentContext(ctx context.Context) (string, error)
+	// Deployment returns the status of one Deployment.
+	Deployment(ctx context.Context, name string) (DeploymentStatus, error)
+	// CRD returns one CustomResourceDefinition's versions.
+	CRD(ctx context.Context, name string) (CRDInfo, error)
+	// NamespaceExists reports whether a namespace exists. A missing
+	// namespace is not an error, so a caller can turn it into a clear local
+	// message instead of a raw helm failure.
+	NamespaceExists(ctx context.Context, name string) (bool, error)
+
+	// GetNeo4j returns one Neo4j custom resource in the client's namespace.
+	GetNeo4j(ctx context.Context, name string) (Neo4j, error)
+	// ListNeo4j returns the CLI-managed Neo4j resources in the client's namespace.
+	ListNeo4j(ctx context.Context) ([]Neo4j, error)
+	// CreateNeo4j pipes a manifest to kubectl create and returns the created object.
+	CreateNeo4j(ctx context.Context, manifest []byte) (Neo4j, error)
+	// DeleteNeo4j starts deletion without waiting for finalisers.
+	DeleteNeo4j(ctx context.Context, name string) error
+	// GetSecret returns one Secret's decoded data in the client's namespace.
+	GetSecret(ctx context.Context, name string) (map[string][]byte, error)
+	// ListPods returns pods that match a Kubernetes label selector.
+	ListPods(ctx context.Context, selector string) ([]Pod, error)
+	// PortForward keeps a foreground connection to a pod. Once the OnReady
+	// callback succeeds, it runs until the context ends or kubectl fails.
+	PortForward(ctx context.Context, opts PortForwardOptions) error
 }
 
 // VersionInfo is the parsed output of `kubectl version -o json`. The
@@ -87,11 +130,16 @@ var runFn = realExec
 // It returns the raw result. Callers classify failures through
 // classifyRunError.
 func (c *execClient) exec(ctx context.Context, binary, path string, args []string) runResult {
+	return c.execWithInput(ctx, binary, path, args, nil)
+}
+
+// execWithInput is exec with input piped to the child's stdin.
+func (c *execClient) execWithInput(ctx context.Context, binary, path string, args []string, input []byte) runResult {
 	if c.settings.Debug {
 		debugInvocation(binary, args)
 	}
 	start := time.Now()
-	res := runFn(ctx, path, args)
+	res := runFn(ctx, path, args, input)
 	if c.settings.Debug {
 		debugResult(binary, res, time.Since(start))
 	}
@@ -104,7 +152,7 @@ func (c *execClient) KubectlVersion(ctx context.Context) (VersionInfo, error) {
 	if err != nil {
 		return VersionInfo{}, err
 	}
-	// A black-holed API server would otherwise hold doctor until client-go's
+	// A black-holed API server can otherwise hold doctor until client-go's
 	// own dial timeout, so the probe gets a short, explicit request timeout.
 	args := kubectlArgs(c.settings, "version", "-o", "json", "--request-timeout="+versionProbeTimeout)
 	res := c.exec(ctx, "kubectl", path, args)

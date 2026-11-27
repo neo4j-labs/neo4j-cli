@@ -1305,3 +1305,25 @@ func TestResolveConn_Admin_ConflictPasswordAndCredential(t *testing.T) {
 	assert.Contains(t, err.Error(), "--credential")
 	assert.Contains(t, err.Error(), "--password")
 }
+
+// TestResolveConn_CredentialFlag_KubernetesScopedName pins that a credential
+// stored by `k8s instance credential` resolves through --credential. Its name
+// contains "/" and "@", and an EKS context adds colons and more slashes.
+func TestResolveConn_CredentialFlag_KubernetesScopedName(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, name := range []string{
+		"k8s-default/dev@kind-kind",
+		"k8s-team-a/dev@arn:aws:eks:eu-west-1:123456789012:cluster/dev",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg, _ := newCfgWithCreds(t, `{"dbms":{"credentials":[{"name":"`+name+
+				`","username":"neo4j","password":"secret","database-name":"neo4j","uri":"bolt://127.0.0.1:7687"}]}}`)
+			cmd := newQueryCmd(cfg)
+			require.NoError(t, cmd.ParseFlags([]string{"--credential", name}))
+			conn, err := ResolveConn(cmd, cfg, false)
+			require.NoError(t, err)
+			assert.Equal(t, "bolt://127.0.0.1:7687", conn.URI)
+			assert.Equal(t, "secret", conn.Password)
+		})
+	}
+}

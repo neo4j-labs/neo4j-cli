@@ -45,7 +45,7 @@ func validateBinary(name, path string) error {
 // validation.
 func untrustedBinaryErr(name, path, reason string) error {
 	return clierr.NewUsageError(
-		"refusing to run %s at %s: %s — reinstall %s into a trusted directory such as /usr/local/bin or fix your PATH",
+		"refusing to run %s at %s: %s. Reinstall %s into a trusted directory such as /usr/local/bin, or fix your PATH",
 		name, path, reason, name,
 	)
 }
