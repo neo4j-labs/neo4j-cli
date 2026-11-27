@@ -6,7 +6,6 @@ package instance
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"time"
 
@@ -52,17 +51,12 @@ func instanceSettings(cmd *cobra.Command, cfg *clicfg.Config) (engine.Settings, 
 	return settings, nil
 }
 
-func printTarget(cmd *cobra.Command, settings engine.Settings) error {
-	contextName, err := clientFactory(settings).CurrentContext(cmd.Context())
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(cmd.ErrOrStderr(), "Targeting Kubernetes context %q in namespace %q.\n", contextName, settings.Namespace)
-	return err
-}
-
-func ensureNamespaceWatched(ctx context.Context, client engine.Client, namespace, operatorNamespace string) error {
-	deployment, err := client.OperatorDeployment(ctx, operatorNamespace)
+// ensureNamespaceWatched fails unless the operator is installed, ready and
+// watching the workload namespace. Without the check, nothing reconciles the
+// new resource and --wait only times out. The operator client's namespace is
+// the one that holds the controller.
+func ensureNamespaceWatched(ctx context.Context, operator engine.Client, namespace, operatorNamespace string) error {
+	deployment, err := operator.Deployment(ctx, engine.OperatorDeploymentName)
 	if engine.IsNotFound(err) {
 		return clierr.NewConflictError(
 			"the Neo4j operator is not installed in namespace %q: install it with `neo4j-cli k8s operator install -n %s --watch-namespace %s --rw`",

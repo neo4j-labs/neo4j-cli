@@ -8,7 +8,6 @@ package operator
 
 import (
 	"context"
-	"fmt"
 
 	engine "github.com/neo4j/cli/internal/k8s"
 
@@ -58,16 +57,6 @@ func operatorSettings(cmd *cobra.Command, cfg *clicfg.Config) (engine.Settings, 
 		settings.Namespace = engine.DefaultOperatorNamespace
 	}
 	return settings, nil
-}
-
-// printWriteTarget reports the cluster and namespace before the first write.
-func printWriteTarget(cmd *cobra.Command, client engine.Client, namespace string) error {
-	kubeContext, err := client.CurrentContext(cmd.Context())
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(cmd.ErrOrStderr(), "Targeting Kubernetes context %q in namespace %q.\n", kubeContext, namespace)
-	return err
 }
 
 // crdSource returns the manifest kubectl applies: the --crd-file path when

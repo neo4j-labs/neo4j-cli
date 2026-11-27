@@ -13,33 +13,31 @@ import (
 // fields or the per-method overrides drive the return values.
 type FakeClient struct {
 	// Recorded calls.
-	KubectlVersionCalls     int
-	HelmVersionCalls        int
-	ApplyCRDsCalls          int
-	DeleteCRDsCalls         int
-	HelmUpgradeCalls        int
-	HelmUninstallCalls      int
-	HelmReleasesCalls       int
-	DeploymentCalls         int
-	CRDCalls                int
-	NamespaceCalls          int
-	CurrentContextCalls     int
-	GetNeo4jCalls           int
-	ListNeo4jCalls          int
-	CreateNeo4jCalls        int
-	DeleteNeo4jCalls        int
-	OperatorDeploymentCalls int
+	KubectlVersionCalls int
+	HelmVersionCalls    int
+	ApplyCRDsCalls      int
+	DeleteCRDsCalls     int
+	HelmUpgradeCalls    int
+	HelmUninstallCalls  int
+	HelmReleasesCalls   int
+	DeploymentCalls     int
+	CRDCalls            int
+	NamespaceCalls      int
+	CurrentContextCalls int
+	GetNeo4jCalls       int
+	ListNeo4jCalls      int
+	CreateNeo4jCalls    int
+	DeleteNeo4jCalls    int
 
 	// Recorded arguments.
-	AppliedCRDSources            []string
-	UpgradeOptions               []HelmUpgradeOptions
-	DeploymentNames              []string
-	CRDNames                     []string
-	NamespaceNames               []string
-	GetNeo4jNames                []string
-	DeleteNeo4jNames             []string
-	CreatedManifests             [][]byte
-	OperatorDeploymentNamespaces []string
+	AppliedCRDSources []string
+	UpgradeOptions    []HelmUpgradeOptions
+	DeploymentNames   []string
+	CRDNames          []string
+	NamespaceNames    []string
+	GetNeo4jNames     []string
+	DeleteNeo4jNames  []string
+	CreatedManifests  [][]byte
 
 	// Canned return values.
 	KubectlVersionResult VersionInfo
@@ -62,34 +60,31 @@ type FakeClient struct {
 	MissingNamespaces map[string]bool
 	NamespaceErr      error
 	// CurrentContextResult is the context CurrentContext reports.
-	CurrentContextResult     string
-	CurrentContextErr        error
-	GetNeo4jResult           Neo4j
-	GetNeo4jErr              error
-	ListNeo4jResult          []Neo4j
-	ListNeo4jErr             error
-	CreateNeo4jResult        Neo4j
-	CreateNeo4jErr           error
-	DeleteNeo4jErr           error
-	OperatorDeploymentResult DeploymentStatus
-	OperatorDeploymentErr    error
+	CurrentContextResult string
+	CurrentContextErr    error
+	GetNeo4jResult       Neo4j
+	GetNeo4jErr          error
+	ListNeo4jResult      []Neo4j
+	ListNeo4jErr         error
+	CreateNeo4jResult    Neo4j
+	CreateNeo4jErr       error
+	DeleteNeo4jErr       error
 
 	// Optional behaviour overrides. When set they take precedence over the
 	// canned fields.
-	KubectlVersionFn     func(ctx context.Context) (VersionInfo, error)
-	HelmVersionFn        func(ctx context.Context) (string, error)
-	ApplyCRDsFn          func(ctx context.Context, source string) ([]string, error)
-	DeleteCRDsFn         func(ctx context.Context) ([]string, error)
-	HelmUpgradeFn        func(ctx context.Context, opts HelmUpgradeOptions) error
-	HelmUninstallFn      func(ctx context.Context) error
-	HelmReleasesFn       func(ctx context.Context) ([]HelmRelease, error)
-	DeploymentFn         func(ctx context.Context, name string) (DeploymentStatus, error)
-	CRDFn                func(ctx context.Context, name string) (CRDInfo, error)
-	GetNeo4jFn           func(ctx context.Context, name string) (Neo4j, error)
-	ListNeo4jFn          func(ctx context.Context) ([]Neo4j, error)
-	CreateNeo4jFn        func(ctx context.Context, manifest []byte) (Neo4j, error)
-	DeleteNeo4jFn        func(ctx context.Context, name string) error
-	OperatorDeploymentFn func(ctx context.Context, namespace string) (DeploymentStatus, error)
+	KubectlVersionFn func(ctx context.Context) (VersionInfo, error)
+	HelmVersionFn    func(ctx context.Context) (string, error)
+	ApplyCRDsFn      func(ctx context.Context, source string) ([]string, error)
+	DeleteCRDsFn     func(ctx context.Context) ([]string, error)
+	HelmUpgradeFn    func(ctx context.Context, opts HelmUpgradeOptions) error
+	HelmUninstallFn  func(ctx context.Context) error
+	HelmReleasesFn   func(ctx context.Context) ([]HelmRelease, error)
+	DeploymentFn     func(ctx context.Context, name string) (DeploymentStatus, error)
+	CRDFn            func(ctx context.Context, name string) (CRDInfo, error)
+	GetNeo4jFn       func(ctx context.Context, name string) (Neo4j, error)
+	ListNeo4jFn      func(ctx context.Context) ([]Neo4j, error)
+	CreateNeo4jFn    func(ctx context.Context, manifest []byte) (Neo4j, error)
+	DeleteNeo4jFn    func(ctx context.Context, name string) error
 }
 
 // NewFakeClient returns a FakeClient with a healthy default: a matching
@@ -127,24 +122,19 @@ func NewFakeClient() *FakeClient {
 	}
 }
 
+// defaultFakeNeo4j is a ready standalone server named dev.
 func defaultFakeNeo4j() Neo4j {
-	record := map[string]any{
-		"apiVersion": "neo4j.com/v1",
-		"kind":       "Neo4j",
-		"metadata": map[string]any{
-			"name": "dev", "namespace": "default", "generation": float64(1),
-		},
-		"spec": map[string]any{
-			"edition": "enterprise", "version": DefaultNeo4jVersion,
-			"topology": map[string]any{"mode": "Standalone"},
-		},
-		"status": map[string]any{
-			"phase": "Running", "observedGeneration": float64(1),
-			"serverSummary": map[string]any{"servers": float64(1), "ready": float64(1)},
-			"conditions":    []any{map[string]any{"type": "Ready", "status": "True"}},
-		},
+	instance, err := parseNeo4j([]byte(`{
+	  "apiVersion": "neo4j.com/v1", "kind": "Neo4j",
+	  "metadata": {"name": "dev", "namespace": "default", "generation": 1},
+	  "spec": {"edition": "enterprise", "version": "` + DefaultNeo4jVersion + `", "topology": {"mode": "Standalone"}},
+	  "status": {"phase": "Running", "observedGeneration": 1,
+	    "serverSummary": {"servers": 1, "ready": 1},
+	    "conditions": [{"type": "Ready", "status": "True"}]}
+	}`))
+	if err != nil {
+		panic(err)
 	}
-	instance, _ := neo4jFromRecord(record)
 	return instance
 }
 
@@ -291,18 +281,4 @@ func (f *FakeClient) DeleteNeo4j(ctx context.Context, name string) error {
 		return f.DeleteNeo4jFn(ctx, name)
 	}
 	return f.DeleteNeo4jErr
-}
-
-// OperatorDeployment implements Client. The controller defaults to the same
-// healthy Deployment that operator status uses.
-func (f *FakeClient) OperatorDeployment(ctx context.Context, namespace string) (DeploymentStatus, error) {
-	f.OperatorDeploymentCalls++
-	f.OperatorDeploymentNamespaces = append(f.OperatorDeploymentNamespaces, namespace)
-	if f.OperatorDeploymentFn != nil {
-		return f.OperatorDeploymentFn(ctx, namespace)
-	}
-	if f.OperatorDeploymentErr != nil || f.OperatorDeploymentResult.Name != "" {
-		return f.OperatorDeploymentResult, f.OperatorDeploymentErr
-	}
-	return f.DeploymentResult, nil
 }

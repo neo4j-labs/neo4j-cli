@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/internal/clierr"
+	engine "github.com/neo4j/cli/internal/k8s"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,9 +18,8 @@ func TestCreate_BuildsManifestChecksWatchScopeAndPrintsFullObject(t *testing.T) 
 	stdout, stderr, err := runInstance(t, env,
 		"create dev --accept-license eval --memory 8Gi --cpu 2 --heap 2g --pagecache 1g --config db.transaction.timeout=60s --format json --rw")
 	require.NoError(t, err)
-	assert.Equal(t, "default", env.settings.Namespace)
-	assert.Equal(t, 1, env.fake.OperatorDeploymentCalls)
-	assert.Equal(t, []string{"neo4j-operator-system"}, env.fake.OperatorDeploymentNamespaces)
+	assert.Equal(t, []string{"default", "neo4j-operator-system"}, env.namespaces)
+	assert.Equal(t, []string{engine.OperatorDeploymentName}, env.fake.DeploymentNames)
 	assert.Equal(t, 1, env.fake.CreateNeo4jCalls)
 	assert.Zero(t, env.fake.GetNeo4jCalls, "no readiness poll runs without --wait")
 	assert.Contains(t, stderr, `Targeting Kubernetes context "kind-kind" in namespace "default"`)
@@ -46,7 +46,7 @@ func TestCreate_OperatorNamespaceFlagSelectsController(t *testing.T) {
 	env := newInstanceEnv()
 	_, _, err := runInstance(t, env, "create dev --accept-license eval --operator-namespace operators --format json --rw")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"operators"}, env.fake.OperatorDeploymentNamespaces)
+	assert.Equal(t, []string{"default", "operators"}, env.namespaces)
 }
 
 func TestCreate_FromFilePreservesTLS(t *testing.T) {
@@ -72,7 +72,7 @@ func TestCreate_FailsBeforeCreateWhenNamespaceIsNotWatched(t *testing.T) {
 
 func TestCreate_FailsBeforeCreateWhenOperatorIsMissing(t *testing.T) {
 	env := newInstanceEnv()
-	env.fake.OperatorDeploymentErr = clierr.NewNotFoundError("missing")
+	env.fake.DeploymentErr = clierr.NewNotFoundError("missing")
 	_, _, err := runInstance(t, env, "create dev --accept-license eval --format json --rw")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "operator is not installed")
@@ -96,7 +96,7 @@ func TestCreate_LocalValidationRunsBeforeEngineCalls(t *testing.T) {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantErr)
 			assert.Zero(t, env.fake.CurrentContextCalls)
-			assert.Zero(t, env.fake.OperatorDeploymentCalls)
+			assert.Zero(t, env.fake.DeploymentCalls)
 			assert.Zero(t, env.fake.CreateNeo4jCalls)
 		})
 	}

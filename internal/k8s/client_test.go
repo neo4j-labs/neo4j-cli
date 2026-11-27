@@ -25,7 +25,7 @@ func captureRun(t *testing.T, results []runResult) *[]call {
 	t.Helper()
 	calls := &[]call{}
 	i := 0
-	SetRunFnForTest(t, func(_ context.Context, path string, args []string) runResult {
+	SetRunFnForTest(t, func(_ context.Context, path string, args []string, _ []byte) runResult {
 		*calls = append(*calls, call{path: path, args: args})
 		res := runResult{}
 		if i < len(results) {

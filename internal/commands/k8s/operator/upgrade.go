@@ -7,6 +7,7 @@ import (
 	engine "github.com/neo4j/cli/internal/k8s"
 
 	"github.com/neo4j/cli/internal/clicfg"
+	k8sflags "github.com/neo4j/cli/internal/commands/k8s/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +80,7 @@ neo4j-cli k8s operator upgrade --crd-file ./neo4j-crd-1.0.0.yaml --rw`,
 			if err := requireWatchNamespacesExist(cmd.Context(), client, watchNamespaces); err != nil {
 				return err
 			}
-			if err := printWriteTarget(cmd, client, settings.Namespace); err != nil {
+			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
 			target := upgradeVersion(requested, cmd.Flags().Changed(versionFlag), release)

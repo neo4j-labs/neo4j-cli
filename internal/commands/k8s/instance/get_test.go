@@ -15,7 +15,7 @@ func TestGet_ReturnsFullServerObject(t *testing.T) {
 	env := newInstanceEnv()
 	stdout, _, err := runInstance(t, env, "get dev -n team-a --format json")
 	require.NoError(t, err)
-	assert.Equal(t, "team-a", env.settings.Namespace)
+	assert.Equal(t, []string{"team-a"}, env.namespaces)
 	assert.Equal(t, []string{"dev"}, env.fake.GetNeo4jNames)
 	var record map[string]any
 	require.NoError(t, json.Unmarshal([]byte(stdout), &record))

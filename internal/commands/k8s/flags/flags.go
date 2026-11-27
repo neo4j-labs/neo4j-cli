@@ -2,13 +2,14 @@
 // Neo4j Sweden AB [http://neo4j.com]
 
 // Package flags owns the `k8s` group's persistent flags. It also owns the
-// function that copies them into the engine settings for each leaf. Every
-// kubectl and helm call receives those settings. The separate package lets
-// the group root, `doctor` and `operator` share one definition without
-// importing each other.
+// function that copies them into the engine settings for each leaf, and the
+// line every write prints to name its target. Every kubectl and helm call
+// receives those settings. The separate package lets the group root and its
+// subtrees share one definition without importing each other.
 package flags
 
 import (
+	"fmt"
 	engine "github.com/neo4j/cli/internal/k8s"
 
 	"github.com/neo4j/cli/internal/clicfg"
@@ -52,4 +53,16 @@ func SettingsFrom(cmd *cobra.Command, cfg *clicfg.Config) (engine.Settings, erro
 		Namespace:  namespace,
 		Debug:      debug.Resolve(cmd),
 	}, nil
+}
+
+// PrintWriteTarget names the kube context and namespace on stderr before a
+// write. Kubeconfigs often hold production contexts, so a write against the
+// wrong cluster is then visible at once.
+func PrintWriteTarget(cmd *cobra.Command, client engine.Client, namespace string) error {
+	kubeContext, err := client.CurrentContext(cmd.Context())
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(cmd.ErrOrStderr(), "Targeting Kubernetes context %q in namespace %q.\n", kubeContext, namespace)
+	return err
 }

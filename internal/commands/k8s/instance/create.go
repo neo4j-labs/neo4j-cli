@@ -5,12 +5,12 @@ package instance
 
 import (
 	"fmt"
-	"strings"
 
 	engine "github.com/neo4j/cli/internal/k8s"
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
+	k8sflags "github.com/neo4j/cli/internal/commands/k8s/flags"
 	"github.com/neo4j/cli/internal/flags"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -18,7 +18,7 @@ import (
 
 func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	var opts engine.Neo4jManifestOptions
-	var fromFile string
+	var fromFile, operatorNamespace string
 	var wait bool
 
 	cmd := &cobra.Command{
@@ -78,19 +78,20 @@ neo4j-cli k8s instance create dev-tls --from-file ./neo4j.yaml --wait --rw`,
 			if err != nil {
 				return err
 			}
-			if strings.EqualFold(summary.Mode, "cluster") && summary.Primaries == 1 {
+			if summary.Mode == "Cluster" && summary.Primaries == 1 {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Warning: a cluster created with one primary cannot grow its primary pool later.") //nolint:errcheck // Warning output is best effort.
 			}
-			if strings.EqualFold(summary.Mode, "cluster") && summary.InsecureAdminConnection {
+			if summary.Mode == "Cluster" && summary.InsecureAdminConnection {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Warning: the operator will send its admin password over an unencrypted pod-network connection.") //nolint:errcheck // Warning output is best effort.
 			}
 
 			client := clientFactory(settings)
-			if err := printTarget(cmd, settings); err != nil {
+			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
-			operatorNamespace, _ := cmd.Flags().GetString("operator-namespace")
-			if err := ensureNamespaceWatched(cmd.Context(), client, settings.Namespace, operatorNamespace); err != nil {
+			operatorSettings := settings
+			operatorSettings.Namespace = operatorNamespace
+			if err := ensureNamespaceWatched(cmd.Context(), clientFactory(operatorSettings), settings.Namespace, operatorNamespace); err != nil {
 				return err
 			}
 			instance, err := client.CreateNeo4j(cmd.Context(), manifest)
@@ -108,7 +109,7 @@ neo4j-cli k8s instance create dev-tls --from-file ./neo4j.yaml --wait --rw`,
 		},
 	}
 
-	cmd.Flags().String("operator-namespace", engine.DefaultOperatorNamespace, "Namespace that contains the Neo4j operator")
+	cmd.Flags().StringVar(&operatorNamespace, "operator-namespace", engine.DefaultOperatorNamespace, "Namespace that contains the Neo4j operator")
 	cmd.Flags().StringVar(&opts.Mode, "mode", "standalone", "Topology mode: standalone or cluster")
 	cmd.Flags().IntVar(&opts.Primaries, "primaries", 3, "Number of primary members in cluster mode (odd, 1 to 15)")
 	cmd.Flags().StringVar(&opts.Version, "version", engine.DefaultNeo4jVersion, "Neo4j image version")

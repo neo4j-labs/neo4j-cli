@@ -75,9 +75,14 @@ func resolveHelm() (string, error) {
 // realExec runs one child process and captures its output. It is the
 // production wiring behind the runFn seam. The child inherits the parent
 // environment. Secrets never travel through argv, so none are added here.
-func realExec(ctx context.Context, path string, args []string) runResult {
+// A non-nil input becomes the child's stdin, which is how manifests reach
+// kubectl.
+func realExec(ctx context.Context, path string, args []string, input []byte) runResult {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, path, args...)
+	if input != nil {
+		cmd.Stdin = bytes.NewReader(input)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()

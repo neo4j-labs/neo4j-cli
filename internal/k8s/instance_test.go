@@ -5,6 +5,7 @@ package k8s
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,7 +63,7 @@ func TestCreateNeo4j_PipesManifestOnStdin(t *testing.T) {
 	stubLookPath(t)
 	var gotPath string
 	var gotArgs, gotInput []string
-	SetRunWithInputFnForTest(t, func(_ context.Context, path string, args []string, input []byte) runResult {
+	SetRunFnForTest(t, func(_ context.Context, path string, args []string, input []byte) runResult {
 		gotPath = path
 		gotArgs = args
 		gotInput = []string{string(input)}
@@ -77,30 +78,10 @@ func TestCreateNeo4j_PipesManifestOnStdin(t *testing.T) {
 	assert.Equal(t, []string{"kind: Neo4j\n"}, gotInput)
 }
 
-func TestOperatorDeployment_ReadsOnlyOperatorNamespace(t *testing.T) {
-	stubLookPath(t)
-	deployment := `{
-	  "metadata":{"name":"neo4j-operator-controller-manager","namespace":"operators","generation":1},
-	  "spec":{"replicas":1,"template":{"spec":{"containers":[{"name":"manager","env":[{"name":"WATCH_NAMESPACE","value":"team-a,team-b"}]}]}}},
-	  "status":{"replicas":1,"readyReplicas":1,"observedGeneration":1,"conditions":[{"type":"Available","status":"True"}]}
-	}`
-	calls := captureRun(t, []runResult{{stdout: deployment}})
-	client := NewClient(Settings{Context: "kind-kind", Namespace: "team-a"})
-	status, err := client.OperatorDeployment(context.Background(), "operators")
-	require.NoError(t, err)
-	assert.True(t, status.Available)
-	assert.Equal(t, []string{"team-a", "team-b"}, status.WatchNamespaces)
-	require.Len(t, *calls, 1)
-	assert.Equal(t, []string{
-		"get", "deployment", OperatorDeploymentName, "-o", "json", "--context", "kind-kind", "-n", "operators",
-	}, (*calls)[0].args)
-}
-
 func TestParseNeo4j_StaleGenerationIsNotReady(t *testing.T) {
-	instance, err := parseNeo4j(readyNeo4jJSON)
-	require.NoError(t, err)
-	instance.Record["metadata"].(map[string]any)["generation"] = float64(3)
-	instance, err = neo4jFromRecord(instance.Record)
+	// The spec moved to generation 3, but the operator last reported 2.
+	stale := strings.Replace(readyNeo4jJSON, `"generation":2`, `"generation":3`, 1)
+	instance, err := parseNeo4j([]byte(stale))
 	require.NoError(t, err)
 	assert.False(t, instance.Ready)
 }

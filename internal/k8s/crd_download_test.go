@@ -24,7 +24,7 @@ func TestApplyCRDs_RemoteManifestIsVerifiedBeforeKubectl(t *testing.T) {
 	requests := stubOperatorCRDHTTP(t, manifest, digest)
 	var appliedPath string
 	calls := &[]call{}
-	SetRunFnForTest(t, func(_ context.Context, path string, args []string) runResult {
+	SetRunFnForTest(t, func(_ context.Context, path string, args []string, _ []byte) runResult {
 		*calls = append(*calls, call{path: path, args: args})
 		appliedPath = args[len(args)-1]
 		contents, err := os.ReadFile(appliedPath)

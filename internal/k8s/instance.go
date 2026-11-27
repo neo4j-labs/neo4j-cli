@@ -4,12 +4,9 @@
 package k8s
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
-	"time"
 )
 
 // Neo4j is one Neo4j custom resource. Record is the complete server object
@@ -75,21 +72,15 @@ type neo4jJSON struct {
 	} `json:"status"`
 }
 
-func parseNeo4j(stdout string) (Neo4j, error) {
+// parseNeo4j decodes one Neo4j object twice: into a map for output, and
+// into the typed fields the CLI reads.
+func parseNeo4j(data []byte) (Neo4j, error) {
 	var record map[string]any
-	if err := json.Unmarshal([]byte(stdout), &record); err != nil {
+	if err := json.Unmarshal(data, &record); err != nil {
 		return Neo4j{}, fmt.Errorf("parse Neo4j output: %w", err)
 	}
-	return neo4jFromRecord(record)
-}
-
-func neo4jFromRecord(record map[string]any) (Neo4j, error) {
-	encoded, err := json.Marshal(record)
-	if err != nil {
-		return Neo4j{}, err
-	}
 	var raw neo4jJSON
-	if err := json.Unmarshal(encoded, &raw); err != nil {
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return Neo4j{}, fmt.Errorf("parse Neo4j output: %w", err)
 	}
 	n := Neo4j{
@@ -130,7 +121,7 @@ func (c *execClient) GetNeo4j(ctx context.Context, name string) (Neo4j, error) {
 	if res.err != nil {
 		return Neo4j{}, classifyRunError(ctx, "kubectl", args, res)
 	}
-	return parseNeo4j(res.stdout)
+	return parseNeo4j([]byte(res.stdout))
 }
 
 // ListNeo4j implements Client. It returns only resources carrying the CLI's
@@ -147,14 +138,14 @@ func (c *execClient) ListNeo4j(ctx context.Context) ([]Neo4j, error) {
 		return nil, classifyRunError(ctx, "kubectl", args, res)
 	}
 	var list struct {
-		Items []map[string]any `json:"items"`
+		Items []json.RawMessage `json:"items"`
 	}
 	if err := json.Unmarshal([]byte(res.stdout), &list); err != nil {
 		return nil, fmt.Errorf("parse Neo4j list output: %w", err)
 	}
 	instances := make([]Neo4j, 0, len(list.Items))
 	for _, item := range list.Items {
-		instance, err := neo4jFromRecord(item)
+		instance, err := parseNeo4j(item)
 		if err != nil {
 			return nil, err
 		}
@@ -176,7 +167,7 @@ func (c *execClient) CreateNeo4j(ctx context.Context, manifest []byte) (Neo4j, e
 	if res.err != nil {
 		return Neo4j{}, classifyRunError(ctx, "kubectl", args, res)
 	}
-	return parseNeo4j(res.stdout)
+	return parseNeo4j([]byte(res.stdout))
 }
 
 // DeleteNeo4j implements Client. --wait=false leaves readiness polling to the
@@ -192,41 +183,4 @@ func (c *execClient) DeleteNeo4j(ctx context.Context, name string) error {
 		return classifyRunError(ctx, "kubectl", args, res)
 	}
 	return nil
-}
-
-// OperatorDeployment implements Client. It reads only the operator namespace,
-// so create does not need permission to list Deployments across the cluster.
-func (c *execClient) OperatorDeployment(ctx context.Context, namespace string) (DeploymentStatus, error) {
-	if namespace == "" {
-		namespace = DefaultOperatorNamespace
-	}
-	scoped := *c
-	scoped.settings.Namespace = namespace
-	return scoped.Deployment(ctx, OperatorDeploymentName)
-}
-
-// execWithInput runs one child with a manifest on stdin. It has a separate
-// seam from exec so existing process tests keep their smaller function shape.
-func (c *execClient) execWithInput(ctx context.Context, binary, path string, args []string, input []byte) runResult {
-	if c.settings.Debug {
-		debugInvocation(binary, args)
-	}
-	start := time.Now()
-	res := runWithInputFn(ctx, path, args, input)
-	if c.settings.Debug {
-		debugResult(binary, res, time.Since(start))
-	}
-	return res
-}
-
-var runWithInputFn = realExecWithInput
-
-func realExecWithInput(ctx context.Context, path string, args []string, input []byte) runResult {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Stdin = bytes.NewReader(input)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return runResult{stdout: stdout.String(), stderr: stderr.String(), err: err}
 }

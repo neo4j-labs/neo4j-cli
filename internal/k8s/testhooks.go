@@ -51,17 +51,9 @@ func SetValidateBinaryForTest(t *testing.T, fn func(name, path string) error) {
 // SetRunFnForTest replaces the process-execution seam. Engine tests use it
 // to capture the argv the engine builds and return canned output without
 // spawning a process.
-func SetRunFnForTest(t *testing.T, fn func(ctx context.Context, path string, args []string) runResult) {
+func SetRunFnForTest(t *testing.T, fn func(ctx context.Context, path string, args []string, input []byte) runResult) {
 	t.Helper()
 	prev := runFn
 	runFn = fn
 	t.Cleanup(func() { runFn = prev })
-}
-
-// SetRunWithInputFnForTest replaces the manifest-execution seam.
-func SetRunWithInputFnForTest(t *testing.T, fn func(ctx context.Context, path string, args []string, input []byte) runResult) {
-	t.Helper()
-	prev := runWithInputFn
-	runWithInputFn = fn
-	t.Cleanup(func() { runWithInputFn = prev })
 }

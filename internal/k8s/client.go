@@ -83,8 +83,6 @@ type Client interface {
 	CreateNeo4j(ctx context.Context, manifest []byte) (Neo4j, error)
 	// DeleteNeo4j starts deletion without waiting for finalisers.
 	DeleteNeo4j(ctx context.Context, name string) error
-	// OperatorDeployment finds the controller Deployment in the operator namespace.
-	OperatorDeployment(ctx context.Context, namespace string) (DeploymentStatus, error)
 }
 
 // VersionInfo is the parsed output of `kubectl version -o json`. The
@@ -125,11 +123,16 @@ var runFn = realExec
 // It returns the raw result. Callers classify failures through
 // classifyRunError.
 func (c *execClient) exec(ctx context.Context, binary, path string, args []string) runResult {
+	return c.execWithInput(ctx, binary, path, args, nil)
+}
+
+// execWithInput is exec with input piped to the child's stdin.
+func (c *execClient) execWithInput(ctx context.Context, binary, path string, args []string, input []byte) runResult {
 	if c.settings.Debug {
 		debugInvocation(binary, args)
 	}
 	start := time.Now()
-	res := runFn(ctx, path, args)
+	res := runFn(ctx, path, args, input)
 	if c.settings.Debug {
 		debugResult(binary, res, time.Since(start))
 	}

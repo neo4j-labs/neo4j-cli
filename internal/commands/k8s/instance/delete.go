@@ -9,6 +9,7 @@ import (
 	engine "github.com/neo4j/cli/internal/k8s"
 
 	"github.com/neo4j/cli/internal/clicfg"
+	k8sflags "github.com/neo4j/cli/internal/commands/k8s/flags"
 	"github.com/neo4j/cli/internal/flags"
 	commonoutput "github.com/neo4j/cli/internal/output"
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ neo4j-cli k8s instance delete dev --wait --rw`,
 				return err
 			}
 			client := clientFactory(settings)
-			if err := printTarget(cmd, settings); err != nil {
+			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
 			if err := client.DeleteNeo4j(cmd.Context(), args[0]); err != nil {

@@ -33,8 +33,10 @@ spec:
 `
 
 type instanceEnv struct {
-	fake     *engine.FakeClient
-	settings engine.Settings
+	fake *engine.FakeClient
+	// namespaces records the namespace of each client the leaf builds, in
+	// order. create builds a workload client, then an operator client.
+	namespaces []string
 }
 
 func newInstanceEnv() *instanceEnv {
@@ -51,7 +53,7 @@ func runInstance(t *testing.T, env *instanceEnv, args string) (string, string, e
 
 	original := clientFactory
 	clientFactory = func(settings engine.Settings) engine.Client {
-		env.settings = settings
+		env.namespaces = append(env.namespaces, settings.Namespace)
 		return env.fake
 	}
 	t.Cleanup(func() { clientFactory = original })

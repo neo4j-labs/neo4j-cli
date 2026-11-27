@@ -25,10 +25,9 @@ func (r instanceResult) AsArray() []map[string]any {
 	return []map[string]any{r.instance.TableRow()}
 }
 
+// MarshalJSON emits the full server object, so JSON and TOON output match
+// what Kubernetes returned.
 func (r instanceResult) MarshalJSON() ([]byte, error) {
-	if r.instance.Record == nil {
-		return json.Marshal(r.instance.TableRow())
-	}
 	return json.Marshal(r.instance.Record)
 }
 
@@ -45,10 +44,6 @@ func (r instanceListResult) AsArray() []map[string]any {
 func (r instanceListResult) MarshalJSON() ([]byte, error) {
 	records := make([]map[string]any, 0, len(r))
 	for _, instance := range r {
-		if instance.Record == nil {
-			records = append(records, instance.TableRow())
-			continue
-		}
 		records = append(records, instance.Record)
 	}
 	return json.Marshal(records)

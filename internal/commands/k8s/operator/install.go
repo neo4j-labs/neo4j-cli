@@ -7,6 +7,7 @@ import (
 	engine "github.com/neo4j/cli/internal/k8s"
 
 	"github.com/neo4j/cli/internal/clicfg"
+	k8sflags "github.com/neo4j/cli/internal/commands/k8s/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -68,7 +69,7 @@ neo4j-cli k8s operator install --watch-namespace default --crd-file ./neo4j-crd-
 			if err := requireWatchNamespacesExist(cmd.Context(), client, watchNamespaces); err != nil {
 				return err
 			}
-			if err := printWriteTarget(cmd, client, settings.Namespace); err != nil {
+			if err := k8sflags.PrintWriteTarget(cmd, client, settings.Namespace); err != nil {
 				return err
 			}
 			crds, err := client.ApplyCRDs(cmd.Context(), crdSource(crdFile, version))
