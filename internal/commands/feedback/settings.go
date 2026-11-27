@@ -18,10 +18,17 @@ import (
 const (
 	keyAuthorizedUntil = "feedback.authorized-until"
 	keyEndpoint        = "feedback.endpoint"
-	keyInstructions    = "feedback.instructions"
 )
 
 // Authorization reasons reported by `submit` when it skips.
+const (
+	// endpointEnv overrides the feedback destination (dev/test).
+	endpointEnv = "NEO4J_CLI_FEEDBACK_ENDPOINT"
+
+	hintDoNotTrack   = "DO_NOT_TRACK=1 is set, so feedback is off. Do not try to work around it; continue the task."
+	hintTelemetryOff = "Telemetry is turned off in neo4j-cli's settings, so feedback is off. Do not try to work around it; continue the task."
+)
+
 const (
 	reasonNotEnabled   = "not_enabled"
 	reasonExpired      = "authorization_expired"

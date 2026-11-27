@@ -5,7 +5,6 @@ package feedback
 
 import (
 	"context"
-	"time"
 
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/neo4j/cli/internal/clierr"
@@ -65,15 +64,13 @@ neo4j-cli feedback submit --category unclear_error --expected "The error should 
 
 // runSubmit prints the outcome of submitReport and maps it to an exit code.
 func runSubmit(cmd *cobra.Command, cfg *clicfg.Config, in Input) error {
-	return finish(cmd, submitReport(cmd.Context(), cfg, cmd.Root(), in, nil))
+	return finish(cmd, submitReport(cmd.Context(), cfg, cmd.Root(), in))
 }
 
 // submitReport runs in this order: authorization, endpoint, validation,
 // send, receipt. Nothing touches the network before validation passes. It is
-// shared by `feedback submit` and the `feedback serve` tool. ask is nil on the
-// shell path; the tool passes a consentFunc that asks the person when feedback
-// is not yet authorized.
-func submitReport(ctx context.Context, cfg *clicfg.Config, tree *cobra.Command, in Input, ask consentFunc) outcomeObj {
+// used by `feedback submit`.
+func submitReport(ctx context.Context, cfg *clicfg.Config, tree *cobra.Command, in Input) outcomeObj {
 	fs := cfg.Fs()
 	out := newOutcome()
 
@@ -88,24 +85,11 @@ func submitReport(ctx context.Context, cfg *clicfg.Config, tree *cobra.Command, 
 
 	authReason := authState(cfg, now())
 	if authReason != "" {
-		if ask == nil {
-			out.Outcome, out.Reason = outcomeSkipped, authReason
-			return out
-		}
-		if declinedRecently(cfg, now()) {
-			out.Outcome, out.Reason, out.Hint = outcomeSkipped, reasonUserDeclined, hintDeclined
-			return out
-		}
+		out.Outcome, out.Reason = outcomeSkipped, authReason
+		return out
 	}
 
 	ep := endpoint(cfg)
-	if authReason != "" && ep == "" {
-		ep = fallbackEndpoint()
-	}
-	if authReason != "" && ep == "" {
-		out.Outcome, out.Reason, out.Hint = outcomeSkipped, authReason, hintEnable
-		return out
-	}
 	in.CLIVersion = cfg.Version
 	in.Harness = harnessLabel()
 	in.OS, in.OSArch, in.Invoker = goos, goarch, invokerLabel()
@@ -131,25 +115,6 @@ func submitReport(ctx context.Context, cfg *clicfg.Config, tree *cobra.Command, 
 			Outcome: out.Outcome, Reason: out.Reason, RequestID: out.RequestID, Destination: ep,
 		})
 		return out
-	}
-
-	if authReason != "" {
-		expiry := now().UTC().Add(defaultDays * 24 * time.Hour)
-		c := ask(ctx, payload, ep, expiry)
-		if !c.Granted {
-			if c.Reason == reasonUserDeclined {
-				_ = recordDecline(cfg, now())
-			}
-			out.Outcome, out.Reason, out.Hint = outcomeSkipped, c.Reason, c.Hint
-			out.ReceiptPath = appendReceipt(fs, receiptsPath(), Receipt{
-				Outcome: out.Outcome, Reason: out.Reason, RequestID: out.RequestID, Destination: ep,
-			})
-			return out
-		}
-		if err := authorize(cfg, ep, expiry); err != nil {
-			out.Outcome, out.Reason = outcomeFailed, "authorization_not_stored"
-			return out
-		}
 	}
 
 	res := Send(ctx, ep, payload)

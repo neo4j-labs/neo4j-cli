@@ -4,7 +4,6 @@
 package feedback
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
@@ -103,31 +102,31 @@ func TestFallbackEndpoint_EnvOverrideBeatsTheBuildDefault(t *testing.T) {
 	assert.Equal(t, mixpanelBase, fallbackEndpoint())
 }
 
-// A long-running `feedback serve` must see a revoke, a decline or a new
-// authorization written by another process, not the values it loaded at start.
+// A long-running process must see a revoke or a new authorization written by
+// another process, not the values it loaded at start.
 func TestState_IsReadFromDiskNotFromStartup(t *testing.T) {
 	server := newTestConfig(t)
 	other := clicfg.NewConfig(server.Fs(), "test-version")
 
-	require.NoError(t, authorize(other, loopback, now().Add(time.Hour)))
+	require.NoError(t, setValues(other,
+		[2]string{keyEndpoint, loopback},
+		[2]string{keyAuthorizedUntil, now().Add(time.Hour).Format(time.RFC3339)},
+	))
 	assert.True(t, Authorized(server, now()), "an authorization written elsewhere is seen")
 
 	_, _, err := runCmd(t, newDisableCmd(other))
 	require.NoError(t, err)
-	assert.False(t, Authorized(server, now()), "a revoke written elsewhere stops the running server")
-
-	require.NoError(t, recordDecline(other, now()))
-	assert.True(t, declinedRecently(server, now()), "a decline written elsewhere is seen")
+	assert.False(t, Authorized(server, now()), "a revoke written elsewhere is seen")
 }
 
-// An unwritable config file is an error, never a panic: the hint stays silent
-// and the consent writes report failure instead of crashing `feedback serve`.
+// An unwritable config file is an error, never a panic: the consent writes
+// report failure instead of crashing.
 func TestState_UnwritableConfigFailsCleanly(t *testing.T) {
 	base, err := testfs.GetTestFs("{}", "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(afero.NewReadOnlyFs(base), "test-version")
 	cfg.Flags.SetForTest("flag.feedback-command", true)
-	withSeams(t, true, claudeCodeAgent)
+	withSeams(t, true, "claude-code")
 	prev := lookupEnv
 	t.Cleanup(func() { lookupEnv = prev })
 	lookupEnv = func(k string) string {
@@ -137,13 +136,8 @@ func TestState_UnwritableConfigFailsCleanly(t *testing.T) {
 		return ""
 	}
 
-	assert.Error(t, authorize(cfg, loopback, now().Add(time.Hour)))
-	assert.Error(t, recordDecline(cfg, now()))
+	assert.Error(t, setValues(cfg, [2]string{keyAuthorizedUntil, now().Add(time.Hour).Format(time.RFC3339)}))
 	assert.False(t, Authorized(cfg, now()))
-
-	var w bytes.Buffer
-	assert.NotPanics(t, func() { MaybeRegisterHint(cfg, []string{"query"}, &w) })
-	assert.Empty(t, w.String(), "no hint when the shown-once marker cannot be stored")
 
 	_, _, err = runCmd(t, newDisableCmd(cfg))
 	assert.Error(t, err, "disable says so when it cannot revoke")

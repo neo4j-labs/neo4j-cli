@@ -4,13 +4,11 @@
 package feedback
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 
-	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/neo4j/cli/internal/clicfg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,7 +30,7 @@ func TestDoNotTrack_OnlyOneCountsAsSet(t *testing.T) {
 	for _, v := range []string{"", "0", "true"} {
 		cfg := newTestConfig(t)
 		t.Setenv("DO_NOT_TRACK", v)
-		_, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--endpoint", loopback, "--register=false")
+		_, _, err := runCmd(t, newTestApp(cfg), "feedback", "enable", "--rw", "--accept", "--endpoint", loopback)
 		require.NoError(t, err, "DO_NOT_TRACK=%q", v)
 	}
 }
@@ -52,26 +50,6 @@ func TestDoNotTrack_SubmitSkipsEvenWhenEnabled(t *testing.T) {
 	assert.Equal(t, "skipped", out["outcome"])
 	assert.Equal(t, "do_not_track", out["reason"])
 	assert.Empty(t, out["receipt_path"], "nothing is recorded")
-	assert.EqualValues(t, 0, hits.Load())
-}
-
-func TestDoNotTrack_ToolSkipsWithoutAsking(t *testing.T) {
-	withSeams(t, false, "claude-code")
-	var hits atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits.Add(1) }))
-	t.Cleanup(srv.Close)
-
-	for _, enabled := range []bool{true, false} {
-		cs := connectToolClient(t, srv, enabled) // resets DO_NOT_TRACK, so set it afterwards
-		t.Setenv("DO_NOT_TRACK", "1")
-		res, err := cs.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "feedback_submit",
-			Arguments: map[string]any{"category": "unclear_error", "expected": baseExpected, "observed": baseObserved}})
-		require.NoError(t, err)
-		assert.False(t, res.IsError)
-		out := toolOutcome(t, res)
-		assert.Equal(t, "skipped", out["outcome"], "enabled=%v", enabled)
-		assert.Equal(t, "do_not_track", out["reason"])
-	}
 	assert.EqualValues(t, 0, hits.Load())
 }
 
@@ -131,25 +109,6 @@ func TestTelemetryOff_SubmitSkipsEvenWhenEnabled(t *testing.T) {
 	out := parseJSON(t, stdout)
 	assert.Equal(t, "skipped", out["outcome"])
 	assert.Equal(t, "telemetry_off", out["reason"])
-	assert.EqualValues(t, 0, hits.Load())
-}
-
-func TestTelemetryOff_ToolSkipsWithoutAsking(t *testing.T) {
-	withSeams(t, false, "claude-code")
-	var hits atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits.Add(1) }))
-	t.Cleanup(srv.Close)
-
-	for _, enabled := range []bool{true, false} {
-		cs, cfg := connectToolClientWithConfig(t, srv, enabled)
-		require.NoError(t, cfg.Global.Set("telemetry", "false"))
-		res, err := cs.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "feedback_submit",
-			Arguments: map[string]any{"category": "unclear_error", "expected": baseExpected, "observed": baseObserved}})
-		require.NoError(t, err)
-		out := toolOutcome(t, res)
-		assert.Equal(t, "skipped", out["outcome"], "enabled=%v", enabled)
-		assert.Equal(t, "telemetry_off", out["reason"])
-	}
 	assert.EqualValues(t, 0, hits.Load())
 }
 
