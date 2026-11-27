@@ -57,3 +57,11 @@ func SetRunFnForTest(t *testing.T, fn func(ctx context.Context, path string, arg
 	runFn = fn
 	t.Cleanup(func() { runFn = prev })
 }
+
+// SetRunWithInputFnForTest replaces the manifest-execution seam.
+func SetRunWithInputFnForTest(t *testing.T, fn func(ctx context.Context, path string, args []string, input []byte) runResult) {
+	t.Helper()
+	prev := runWithInputFn
+	runWithInputFn = fn
+	t.Cleanup(func() { runWithInputFn = prev })
+}

@@ -74,6 +74,17 @@ type Client interface {
 	// namespace is not an error, so a caller can turn it into a clear local
 	// message instead of a raw helm failure.
 	NamespaceExists(ctx context.Context, name string) (bool, error)
+
+	// GetNeo4j returns one Neo4j custom resource in the client's namespace.
+	GetNeo4j(ctx context.Context, name string) (Neo4j, error)
+	// ListNeo4j returns the CLI-managed Neo4j resources in the client's namespace.
+	ListNeo4j(ctx context.Context) ([]Neo4j, error)
+	// CreateNeo4j pipes a manifest to kubectl create and returns the created object.
+	CreateNeo4j(ctx context.Context, manifest []byte) (Neo4j, error)
+	// DeleteNeo4j starts deletion without waiting for finalisers.
+	DeleteNeo4j(ctx context.Context, name string) error
+	// OperatorDeployment finds the controller Deployment in the operator namespace.
+	OperatorDeployment(ctx context.Context, namespace string) (DeploymentStatus, error)
 }
 
 // VersionInfo is the parsed output of `kubectl version -o json`. The
@@ -131,7 +142,7 @@ func (c *execClient) KubectlVersion(ctx context.Context) (VersionInfo, error) {
 	if err != nil {
 		return VersionInfo{}, err
 	}
-	// A black-holed API server would otherwise hold doctor until client-go's
+	// A black-holed API server can otherwise hold doctor until client-go's
 	// own dial timeout, so the probe gets a short, explicit request timeout.
 	args := kubectlArgs(c.settings, "version", "-o", "json", "--request-timeout="+versionProbeTimeout)
 	res := c.exec(ctx, "kubectl", path, args)
